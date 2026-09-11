@@ -19,6 +19,12 @@ struct AgaraCloudSettingsView: View {
 
     private var signedIn: Bool { client.isSignedIn }
 
+    /// Client-side gate mirroring the server rules (PocketBase demands ≥ 8 chars) so a bad password
+    /// never leaves the screen.
+    private var emailValid: Bool { email.contains("@") && email.count >= 3 }
+    private var passwordValid: Bool { password.count >= 8 }
+    private var canSubmit: Bool { emailValid && passwordValid }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
@@ -43,11 +49,24 @@ struct AgaraCloudSettingsView: View {
                             .textContentType(.newPassword)
                         HStack {
                             Button("Create account") { run { try await client.register(email: email, password: password) } }
-                                .buttonStyle(.bordered)
+                                .buttonStyle(.borderedProminent)
                             Button("Sign in") { run { try await client.signIn(email: email, password: password) } }
                                 .buttonStyle(.borderedProminent)
                         }
-                        .disabled(working || email.isEmpty || password.count < 6)
+                        .disabled(working || !canSubmit)
+                        if !password.isEmpty && !passwordValid {
+                            Text("Password must be at least 8 characters.")
+                                .font(.caption)
+                                .foregroundStyle(PulseColors.danger)
+                        } else if !email.isEmpty && !emailValid {
+                            Text("Enter a valid email address.")
+                                .font(.caption)
+                                .foregroundStyle(PulseColors.danger)
+                        } else if passwordValid {
+                            Text("Password looks good.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 } else {
                     VStack(spacing: 12) {

@@ -113,7 +113,14 @@ final class AgaraCloudClient {
         guard let http = response as? HTTPURLResponse else { throw CloudError.message("No response from server") }
         let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
         guard (200...299).contains(http.statusCode) else {
-            let message = json["message"] as? String ?? "HTTP \(http.statusCode)"
+            var message = json["message"] as? String ?? "HTTP \(http.statusCode)"
+            // PocketBase puts the per-field reasons under `data` — surface the first one (e.g. the
+            // password-min-length rule) instead of the generic "Failed to create record.".
+            if let dataErrors = json["data"] as? [String: Any],
+               let first = dataErrors.values.compactMap({ ($0 as? [String: Any])?["message"] as? String }).first
+            {
+                message = first
+            }
             throw CloudError.message(message)
         }
         return json
