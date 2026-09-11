@@ -54,7 +54,7 @@ struct AgaraCloudSettingsView: View {
                         Button("Sync now") { run { try await syncNow() } }
                             .buttonStyle(.borderedProminent)
                             .disabled(working)
-                        Button(role: .destructive, "Sign out") { showSignOutDialog = true }
+                        Button("Sign out", role: .destructive) { showSignOutDialog = true }
                             .disabled(working)
                     }
                 }
