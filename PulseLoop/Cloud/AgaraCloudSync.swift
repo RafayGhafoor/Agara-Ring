@@ -72,12 +72,12 @@ final class AgaraCloudSync {
             FetchDescriptor<Measurement>(sortBy: [SortDescriptor(\.timestamp, order: .reverse)])
         ).prefix(maxMeasurements)
         for measurement in measurements {
-            let key = "\(measurement.kind.rawValue)-\(Int(measurement.timestamp.timeIntervalSince1970))-\(measurement.source.rawValue)"
+            let key = "\(measurement.kind.rawValue)-\(Int(measurement.timestamp.timeIntervalSince1970))-\(measurement.sourceRaw)"
             let body: [String: Any] = [
                 "user": userID, "kind": measurement.kind.rawValue,
                 "value": measurement.value, "unit": measurement.unit,
                 "timestamp": Int(measurement.timestamp.timeIntervalSince1970),
-                "source": measurement.source.rawValue, "client_key": key,
+                "source": measurement.sourceRaw, "client_key": key,
             ]
             if let existingID = measurementByKey[key] {
                 try await client.update("measurements", recordID: existingID, body: body)
