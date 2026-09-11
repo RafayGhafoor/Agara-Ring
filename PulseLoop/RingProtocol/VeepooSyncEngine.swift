@@ -44,6 +44,12 @@ final class VeepooSyncEngine: RingSyncEngine {
     /// swallow, with the ~1 Hz FEA1 stream (driver) covering the between-poll movement.
     private var pollTimer: Timer?
     private var pollTick = 0
+    /// Whether the continuous `D0 01` heart-rate test stream is held open (live HR mode). Managed by
+    /// `reconcileLiveStream`, which follows `VeepooLivePrefsStore.liveHeartRateEnabled`.
+    private var liveStreamStarted = false
+    /// The history loop has finished at least once — the SDK docs say measurements should run after
+    /// the daily data was read, so the live stream only starts then (avoids "device busy" refusals).
+    private var historyFinished = false
 
     init(writer: RingCommandWriter?, decoder: VeepooDecoder, historyDays: Int = 7) {
         self.writer = writer
@@ -60,6 +66,8 @@ final class VeepooSyncEngine: RingSyncEngine {
         dailyComplete = false
         sleepFrames.removeAll()
         dailyFrames.removeAll()
+        liveStreamStarted = false
+        historyFinished = false
         stopPolling()
     }
 
@@ -114,6 +122,7 @@ final class VeepooSyncEngine: RingSyncEngine {
                 if self.pollTick.isMultiple(of: 2) {
                     self.writer?.enqueue(VeepooEncoder.battery())
                 }
+                self.reconcileLiveStream()
             }
         }
     }
@@ -122,6 +131,23 @@ final class VeepooSyncEngine: RingSyncEngine {
         pollTimer?.invalidate()
         pollTimer = nil
         pollTick = 0
+    }
+
+    // MARK: Live heart-rate stream
+
+    /// Keep the `D0 01` test stream in step with `VeepooLivePrefsStore.liveHeartRateEnabled`: start
+    /// it once the history pass finished (the ring's own docs warn measurements before the daily read
+    /// are refused as "busy"), stop it when the user disables live mode or the link drops. Re-run on
+    /// every poll tick so a settings change applies within ~30 s.
+    private func reconcileLiveStream() {
+        let wantsLive = VeepooLivePrefsStore.shared.liveHeartRateEnabled
+        if wantsLive, !liveStreamStarted, historyFinished {
+            liveStreamStarted = true
+            writer?.enqueue(VeepooEncoder.heartRateStart())
+        } else if !wantsLive, liveStreamStarted {
+            liveStreamStarted = false
+            writer?.enqueue(VeepooEncoder.heartRateStop())
+        }
     }
 
     // MARK: E0 sleep pages
@@ -187,6 +213,8 @@ final class VeepooSyncEngine: RingSyncEngine {
             writer?.enqueue(VeepooEncoder.sleepHistory(dayOffset: currentDay))
         } else {
             writer?.emit(.historySyncFinished)
+            historyFinished = true
+            reconcileLiveStream()
         }
     }
 

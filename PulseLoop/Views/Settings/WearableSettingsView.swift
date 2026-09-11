@@ -22,6 +22,12 @@ struct WearableSettingsView: View {
             ?? "Connected ring"
     }
 
+    /// Binding into the shared live-streaming preference (default on).
+    private var liveHeartRateBinding: Binding<Bool> {
+        @Bindable var store = VeepooLivePrefsStore.shared
+        return $store.liveHeartRateEnabled
+    }
+
     /// `RelativeDateTimeFormatter` is expensive to allocate; reuse one instance instead of building
     /// a fresh formatter on every access.
     private static let relativeFormatter: RelativeDateTimeFormatter = {
@@ -45,6 +51,16 @@ struct WearableSettingsView: View {
                         FormValueRow(title: "Last synced") { Text(lastSyncedLabel).foregroundStyle(PulseColors.textMuted) }
                     }
                     BatteryHistorySection()
+                    // Veepoo/TK20: continuous HR streaming is optional (battery). Other families have
+                    // no live HR channel, so the toggle only appears for the Agara ring.
+                    if ble.activeDeviceType == .veepoo {
+                        SettingsGroup(
+                            header: "Live data",
+                            footer: "Streams heart rate continuously while connected so the HR card ticks in real time (drains battery). Turn off to revert to periodic updates only."
+                        ) {
+                            FormToggleRow(title: "Live heart rate", isOn: liveHeartRateBinding)
+                        }
+                    }
                     SecondaryButton(title: "Sync now", systemImage: "clock.arrow.circlepath") { coordinator.syncNow() }
                     SecondaryButton(title: "Find ring", systemImage: "bell.fill") { coordinator.findRing() }
                     SecondaryButton(title: "Disconnect", systemImage: "xmark.circle") { ble.disconnect() }

@@ -170,6 +170,8 @@ struct RootAppView: View {
                     AppleHealthSettingsView()
                 case .settingsStrava:
                     StravaSettingsView()
+                case .settingsCloud:
+                    AgaraCloudSettingsView()
                 case .settingsPrivacyData:
                     PrivacyDataSettingsView()
                 case .settingsAbout:

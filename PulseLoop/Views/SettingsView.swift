@@ -152,6 +152,10 @@ struct SettingsView: View {
         rows.append(SettingsRowItem(icon: "figure.run", tint: Color(hex: "#FC4C02"), title: "Strava") {
             path.append(AppRoute.settingsStrava)
         })
+        // Agara cloud account: login + health-data sync to the PocketBase backend.
+        rows.append(SettingsRowItem(icon: "icloud.fill", tint: PulseColors.hrv, title: "Agara Cloud") {
+            path.append(AppRoute.settingsCloud)
+        })
         rows.append(SettingsRowItem(icon: "lock.shield", tint: PulseColors.success, title: "Privacy & Data") {
             path.append(AppRoute.settingsPrivacyData)
         })
