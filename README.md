@@ -162,6 +162,12 @@ declares exactly what it can do and the app shows only those features.
 > that driver is confirmed working on one — but no TK5 has run it, and a few value scales still need a
 > confirmed reading. The app labels it "Limited support" when you pair it. See the
 > [TK5 page](https://saksham2001.github.io/PulseLoopiOS/hardware/tk5/).
+>
+> 🧪 **The TK20 (H Ring / Veepoo) is new.** Its wire protocol is completely separate from every other
+> family — its own GATT, its own A1 session auth, its own DF/E0 history — and this repo's `tools/`
+> harness verified the decodes against the real ring, but no IPhone has connected through the app yet.
+> It labels "Limited support". See the
+> [TK20 page](https://saksham2001.github.io/PulseLoopiOS/hardware/veepoo/).
 
 > 📚 **Full hardware specs, per-model capability matrix, and buying guidance:
 > [Supported hardware docs](https://saksham2001.github.io/PulseLoopiOS/hardware/).**

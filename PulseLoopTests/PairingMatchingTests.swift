@@ -36,6 +36,12 @@ final class PairingMatchingTests: XCTestCase {
         AdvertisementInfo(serviceUUIDs: [], manufacturerData: bytes("10780a01aabbccdd"))
     }
 
+    /// The Veepoo/TK20 capture: `f8f8` company prefix + the MAC byte-reversed. The marker alone never
+    /// claims — only together with a TK name (FEE7 is too common to hang a match on by itself).
+    private var veepooAdv: AdvertisementInfo {
+        AdvertisementInfo(serviceUUIDs: [CBUUID(string: "FEE7")], manufacturerData: bytes("f8f83b00334241"))
+    }
+
     /// A QRing-Colmi: advertises the Nordic-UART-style service, no SmartHealth marker.
     private var qringAdv: AdvertisementInfo {
         AdvertisementInfo(serviceUUIDs: [CBUUID(string: ColmiUUIDs.serviceV1)], manufacturerData: nil)
@@ -144,6 +150,11 @@ final class PairingMatchingTests: XCTestCase {
             ClaimCase(label: "R99 lowercase hex suffix", name: "R99 54dc", advertisement: noAdv, expected: .colmiSmartHealth),
             ClaimCase(label: "TK5", name: "TK5 24AA", advertisement: tk5Adv, expected: .tk5),
             ClaimCase(label: "TK5, name only", name: "TK5 24AA", advertisement: noAdv, expected: .tk5),
+            // Veepoo/TK20: name-only (F008/F002 are not advertised); the `f8f8` marker next to a TK
+            // name backs the claim up, but the name is what decides. "TK20" must NOT fall to the TK5
+            // (`TK5` prefix) coordinator registered ahead of it.
+            ClaimCase(label: "TK20, name only", name: "TK20", advertisement: noAdv, expected: .veepoo),
+            ClaimCase(label: "TK20 with the Veepoo mfg marker", name: "TK20", advertisement: veepooAdv, expected: .veepoo),
             ClaimCase(label: "unknown peripheral", name: "Galaxy Watch", advertisement: noAdv, expected: nil),
         ]
         for ring in cases {
@@ -171,6 +182,20 @@ final class PairingMatchingTests: XCTestCase {
         // fallback below must not steal it from a coordinator that comes after us in the registry.
         XCTAssertFalse(ColmiSmartHealthCoordinator.matches(name: "Unlabeled", advertisement: tk5Adv))
         XCTAssertEqual(RingBLEClient.matchDeviceType(name: "Unlabeled", advertisement: tk5Adv), .tk5)
+    }
+
+    /// TK20 claims by name (the F008/F002 command channel is not advertised, so the name is the only
+    /// pre-connect signal); the `f8f8` mfg marker only ever backs a TK-named claim.
+    func testVeepooCoordinatorMatches() {
+        XCTAssertTrue(VeepooCoordinator.matches(name: "TK20", advertisement: noAdv))
+        XCTAssertTrue(VeepooCoordinator.matches(name: "TK20 3B00", advertisement: noAdv))
+        XCTAssertTrue(VeepooCoordinator.matches(name: "tk20", advertisement: noAdv), "case-insensitive")
+        XCTAssertTrue(VeepooCoordinator.matches(name: "TK20", advertisement: veepooAdv))
+        XCTAssertFalse(VeepooCoordinator.matches(name: nil, advertisement: veepooAdv),
+                       "mfg marker alone must not claim")
+        XCTAssertFalse(VeepooCoordinator.matches(name: "TK5 24AA", advertisement: tk5Adv),
+                       "the TK5 prefix stays TK5, not Veepoo")
+        XCTAssertFalse(VeepooCoordinator.matches(name: "Galaxy Watch", advertisement: noAdv))
     }
 
     /// The marker lives in the manufacturer data's **company-ID slot**, so it is matched as a prefix. An

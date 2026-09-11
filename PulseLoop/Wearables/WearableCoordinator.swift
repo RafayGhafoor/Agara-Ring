@@ -32,6 +32,10 @@ enum RingDeviceType: String, Codable, CaseIterable, Sendable {
     /// its `fdda` service post-connect (issue #29, zaggash's ring). Reached on iOS by picking the
     /// "Colmi R11 (Da Rings app)" card. See `CRPCoordinator`.
     case crp
+    /// Veepoo / TK20 rings — the "H Ring" vendor app (`cn.hring.veepoo`). A completely different wire
+    /// protocol from every other family: F008/F002 GATT, A1 session auth, DF/E0 history. See
+    /// `VeepooCoordinator` and `docs/hardware/veepoo.md`.
+    case veepoo
 
     /// Human-facing default name when no advertised name is available.
     var displayName: String {
@@ -44,6 +48,7 @@ enum RingDeviceType: String, Codable, CaseIterable, Sendable {
         case .ycbt: return "YCBT / SmartHealth ring"
         case .rwfit: return "RWfit ring"
         case .crp: return "Colmi / Moyoung ring (CRP)"
+        case .veepoo: return "Agara Ring"
         }
     }
 }

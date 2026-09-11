@@ -61,6 +61,11 @@ final class RingBLEClient: NSObject {
         // it never auto-claims at scan. It's reached by an explicit "Colmi R11 (Da Rings app)"
         // carousel pick (`preferredFamily = .crp`), iOS having no post-connect re-route like Android's.
         CRPCoordinator.self,
+        // Veepoo/TK20: matches the `TK20` name (plus a `f8f8` mfg marker alongside a TK name) on the
+        // F008/F002 GATT. "TK20" does not hit the TK5 `TK5`-name prefix registered above, so the two
+        // cannot shadow each other; this slot is after them anyway because F008/F002 are not
+        // advertised, making name the only pre-connect signal.
+        VeepooCoordinator.self,
         // Last is RWfit's documented slot, pinned by `testRWfitIsRegisteredLast`: the `A00A` service
         // and company IDs `0x05D6`/`0x06D6`, no name matching at all.
         RWfitCoordinator.self,

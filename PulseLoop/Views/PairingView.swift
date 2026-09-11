@@ -53,7 +53,7 @@ struct PairingView: View {
     @State private var lastAttemptedRingID: UUID?
 
     private static let allBrandsTab = "All"
-    private let allModels = WearableModel.catalog
+    private let allModels = WearableModel.setupCatalog
     /// Prepared when scanning starts so the success haptic fires promptly on connect. `@State` keeps
     /// one instance across re-renders so `prepare()` and the later `notificationOccurred` share it.
     @State private var successHaptic = UINotificationFeedbackGenerator()

@@ -91,6 +91,11 @@ struct PulseLoopApp: App {
 
         let subscriber = EventPersistenceSubscriber(context: container.mainContext)
         self.persistence = subscriber
+        // One-time cloud backfill (pre-app history, exported by tools/cloud_backfill.py on the Mac).
+        // Runs after the persistence subscriber is live so imported events persist like ring traffic.
+        Task { @MainActor in
+            await CloudBackfillService.importIfNeeded(context: container.mainContext)
+        }
         self.summaryCoordinator = CoachSummaryCoordinator(context: container.mainContext)
         self.anomalyMonitor = CoachAnomalyMonitor(context: container.mainContext)
         let diagnostics = DiagnosticsSubscriber(context: container.mainContext)

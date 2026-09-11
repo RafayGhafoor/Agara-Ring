@@ -64,7 +64,7 @@ enum RingAppVariant: String, CaseIterable, Identifiable, Sendable {
         // detects the framing from the GATT, so there is nothing for the user to declare.
         // CRP is the converse: the app *is* the distinction, but it's declared by picking the
         // "Colmi R11 (Da Rings app)" card, so by the time we're here the family is already settled.
-        case .jring, .tk5, .luckRing, .ycbt, .rwfit, .crp: return nil
+        case .jring, .tk5, .luckRing, .ycbt, .rwfit, .crp, .veepoo: return nil
         }
     }
 
@@ -135,6 +135,10 @@ extension RingDeviceType {
         // zaggash's ring (sleep, the all-day vital timelines, a real SpO₂ reading), but the newest
         // opcodes aren't yet — so it keeps the "Limited support" badge until a full validation pass.
         case .crp: return .limited
+        // Verified end-to-end on hardware in this repo's `tools/` harness (auth, battery, steps,
+        // sleep + daily history) — but only ever via the standalone harness, never through the app
+        // itself yet, so it ships with the badge until the first in-app connection is validated.
+        case .veepoo: return .limited
         }
     }
 }
@@ -193,6 +197,18 @@ extension WearableModel {
         id: "tk5", displayName: "TK5", brand: "TK", family: .tk5,
         tint: PulseColors.spo2, blurb: "HR · SpO₂ · HRV · Sleep · Steps",
         advertisedNamePatterns: ["^TK5 ?[0-9A-Fa-f]{0,4}$"], imageName: "tk5"
+    )
+
+    /// TK20 — the Veepoo-family ring sold with the "H Ring" app (`cn.hring.veepoo`), and the unit
+    /// this **Agara**-branded build is aimed at. It advertises as plain `TK20` (the verified unit; the
+    /// pattern also admits a future `Agara`-suffixed name), which is unambiguous (it does not hit the
+    /// `TK5` prefix), so it needs no app-variant picker. No `imageName`: there is no TK20 imageset,
+    /// and a non-nil name that isn't registered renders an empty platter — nil falls back to the
+    /// generic ring art.
+    static let tk20 = WearableModel(
+        id: "tk20", displayName: "Agara Ring", brand: "Agara", family: .veepoo,
+        tint: PulseColors.hrv, blurb: "Steps · Sleep · HR · SpO₂ · HRV · BP · Stress · Glucose",
+        advertisedNamePatterns: ["^TK20 ?[0-9A-Fa-f]{0,4}$", "^AGARA ?[0-9A-Fa-f]{0,4}$"]
     )
 
     /// R10M — sold as the "LittleMeatball" smart ring, and the hardware-validated unit of the generic
@@ -385,6 +401,7 @@ extension WearableModel {
         // R10M is the narrowest of the three.
         r10m,
         tk5,
+        tk20,
         luckRingTK18,
         // Position is irrelevant for matching — neither card has any name patterns to race.
         rwfitRing,
@@ -395,6 +412,11 @@ extension WearableModel {
         guard let id else { return nil }
         return catalog.first { $0.id == id }
     }
+
+    /// The setup/onboarding surface. This is an **Agara**-branded build: pairing shows only the
+    /// Agara ring (the Veepoo/TK20 family). The full `catalog` still drives scan auto-detection and
+    /// resolve, so nothing else is deleted — it just isn't offered for pairing.
+    static let setupCatalog: [WearableModel] = catalog.filter { $0.brand == "Agara" }
 
     static func model(advertisedName: String?) -> WearableModel? {
         guard let advertisedName else { return nil }

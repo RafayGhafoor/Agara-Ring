@@ -248,6 +248,8 @@ struct DeviceHeroCard: View {
         // The connection reveals only the family; both R11 firmwares share the generic Colmi ring line,
         // so the CRP family falls back to the generic ring here (the carousel card carries its own art).
         case .crp: return nil
+        // No TK20 imageset — the generic ring art is the honest choice (nil is the supported fallback).
+        case .veepoo: return nil
         case nil: return nil
         }
     }

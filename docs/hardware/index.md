@@ -66,6 +66,17 @@ section breaks the hardware down by manufacturer.
 
     [:octicons-arrow-right-24: TK5 / SmartHealth](tk5.md)
 
+-   :material-flask-outline: __TK20 / Veepoo (H Ring)__
+
+    ---
+
+    🧪 Limited. The Veepoo-stack ring sold with the **H Ring** app — its own
+    GATT, its own A1 session auth, its own DF/E0 history. Decoded and verified
+    end-to-end against the real ring by this repo's `tools/` harness, but the
+    app driver ships unproven in-app, so it keeps the badge.
+
+    [:octicons-arrow-right-24: TK20 / Veepoo (H Ring)](veepoo.md)
+
 -   :material-flask-outline: __LuckRing / TK18__
 
     ---
