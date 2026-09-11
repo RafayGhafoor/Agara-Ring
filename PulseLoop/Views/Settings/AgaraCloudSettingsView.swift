@@ -41,12 +41,12 @@ struct AgaraCloudSettingsView: View {
                     VStack(spacing: 12) {
                         TextField("Email", text: $email)
                             .textFieldStyle(.roundedBorder)
-                            .textContentType(.emailAddress)
                             .autocapitalization(.none)
-                            .keyboardType(.emailAddress)
+                        // Content-types deliberately dropped: on the Designed-for-iPad Mac build the
+                        // autofill bridge throws a benign ObjC exception that trips Xcode's "All
+                        // Exceptions" breakpoint on every keystroke.
                         SecureField("Password", text: $password)
                             .textFieldStyle(.roundedBorder)
-                            .textContentType(.newPassword)
                         HStack {
                             Button("Create account") { Task { await createAccount() } }
                                 .buttonStyle(.borderedProminent)
