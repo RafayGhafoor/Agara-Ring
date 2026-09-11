@@ -11,7 +11,7 @@ final class AgaraCloudClient {
 
     /// PocketBase instance on the Agara server (hayden). Collections: `health_days` (one row per
     /// user+date) and `measurements` (one row per user+client_key), both owner-scoped by rules.
-    private let baseURL = URL(string: "http://213.136.82.93:8090")!
+    private let baseURL = URL(string: "https://pb.213-136-82-93.sslip.io")!
     private let session = URLSession(configuration: .ephemeral)
     private let defaults = UserDefaults.standard
     private static let log = Logger(subsystem: "com.pulseloop.lab", category: "agara-cloud")
