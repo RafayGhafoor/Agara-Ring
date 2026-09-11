@@ -47,8 +47,8 @@ struct AgaraCloudSettingsView: View {
                             Button("Sign in") { run { try await client.signIn(email: email, password: password) } }
                                 .buttonStyle(.borderedProminent)
                         }
+                        .disabled(working || email.isEmpty || password.count < 6)
                     }
-                    .disabled(working || email.isEmpty || password.count < 6)
                 } else {
                     VStack(spacing: 12) {
                         Button("Sync now") { run { try await syncNow() } }
