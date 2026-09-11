@@ -47,6 +47,7 @@ struct HRLineChart: View {
         .chartYScale(domain: lo...hi)
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)
+        .chartValueMarker(samples, x: \.timestamp, y: \.value, yLabel: { "\(Int($0)) bpm" })
         .frame(height: height)
     }
 }
@@ -138,6 +139,7 @@ struct HRVTrendBandChart: View {
         .chartYScale(domain: lo...hi)
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)
+        .chartValueMarker(samples, x: \.timestamp, y: \.value, yLabel: { "\(Int($0)) ms" })
         .frame(height: height)
     }
 }
@@ -177,6 +179,7 @@ struct TemperatureRangeChart: View {
         .chartYScale(domain: lo...hi)
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)
+        .chartValueMarker(samples, x: \.timestamp, y: \.value, yLabel: { String(format: "%.1f °C", $0) })
         .frame(height: height)
     }
 }
@@ -202,6 +205,7 @@ struct SpO2DotsChart: View {
         .chartYScale(domain: 90...100)
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)
+        .chartValueMarker(samples, x: \.timestamp, y: \.value, yLabel: { "\(Int($0)) %" })
         .frame(height: height)
     }
 }
@@ -238,6 +242,12 @@ struct StepBarsChart: View {
                 AxisValueLabel().foregroundStyle(PulseColors.textMuted)
             }
         }
+        .chartValueMarker(
+            values.enumerated().map {
+                (labels.indices.contains($0.offset) ? labels[$0.offset] : "\($0.offset)", $0.element)
+            },
+            yLabel: { "\(Int($0)) steps" }
+        )
         .frame(height: height)
     }
 }
@@ -261,6 +271,7 @@ struct DistanceLineChart: View {
         .chartYScale(domain: 0...max(hi, 0.5))
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)
+        .chartValueMarker(values, xLabel: { "Day \($0 + 1)" }, yLabel: { String(format: "%.2f km", $0) })
         .frame(height: height)
     }
 }
@@ -292,6 +303,7 @@ struct CaloriesAreaChart: View {
         .chartYScale(domain: 0...max(hi, 50))
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)
+        .chartValueMarker(values, xLabel: { "Day \($0 + 1)" }, yLabel: { "\(Int($0)) kcal" })
         .frame(height: height)
     }
 }
@@ -327,6 +339,7 @@ struct ElevationAreaChart: View {
         .chartYScale(domain: lo...max(hi, lo + 1))
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)
+        .chartValueMarker(altitudes, xLabel: { "Point \($0 + 1)" }, yLabel: { "\(Int($0)) m" })
         .frame(height: height)
     }
 }
