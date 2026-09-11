@@ -48,9 +48,9 @@ struct AgaraCloudSettingsView: View {
                             .textFieldStyle(.roundedBorder)
                             .textContentType(.newPassword)
                         HStack {
-                            Button("Create account") { run { try await client.register(email: email, password: password) } }
+                            Button("Create account") { Task { await createAccount() } }
                                 .buttonStyle(.borderedProminent)
-                            Button("Sign in") { run { try await client.signIn(email: email, password: password) } }
+                            Button("Sign in") { Task { await signIn() } }
                                 .buttonStyle(.borderedProminent)
                         }
                         .disabled(working || !canSubmit)
@@ -70,7 +70,7 @@ struct AgaraCloudSettingsView: View {
                     }
                 } else {
                     VStack(spacing: 12) {
-                        Button("Sync now") { run { try await syncNow() } }
+                        Button("Sync now") { Task { await syncNow() } }
                             .buttonStyle(.borderedProminent)
                             .disabled(working)
                         Button("Sign out", role: .destructive) { showSignOutDialog = true }
@@ -109,27 +109,47 @@ struct AgaraCloudSettingsView: View {
         }
     }
 
-    /// Perform an action, surfacing success/failure as the status line.
-    private func run(_ action: @escaping () async throws -> Void) {
+    // MARK: Actions — plain @MainActor methods, no closure indirection.
+
+    private func createAccount() async {
         working = true
         statusText = nil
-        Task {
-            do {
-                try await action()
-                statusText = signedIn ? "Done." : nil
-            } catch {
-                statusText = error.localizedDescription
-                Self.log.error("cloud action failed: \(error.localizedDescription)")
-            }
-            working = false
+        do {
+            try await client.register(email: email, password: password)
+            statusText = "Done."
+        } catch {
+            statusText = error.localizedDescription
         }
+        working = false
     }
 
-    private func syncNow() async throws {
-        let pushed = try await sync.push(context: modelContext)
-        let pulled = try await sync.pull(context: modelContext)
-        lastSync = Date()
-        UserDefaults.standard.set(lastSync, forKey: "agara.lastSync")
-        statusText = "Pushed \(pushed.days) day(s) / \(pushed.measurements) reading(s), pulled \(pulled) day(s)."
+    private func signIn() async {
+        working = true
+        statusText = nil
+        do {
+            try await client.signIn(email: email, password: password)
+            statusText = "Done."
+        } catch {
+            statusText = error.localizedDescription
+            Self.log.error("sign in failed: \(error.localizedDescription)")
+        }
+        working = false
+    }
+
+    private func syncNow() async {
+        working = true
+        statusText = nil
+        do {
+            let pushed = try await sync.push(context: modelContext)
+            let pulled = try await sync.pull(context: modelContext)
+            lastSync = Date()
+            UserDefaults.standard.set(lastSync, forKey: "agara.lastSync")
+            statusText = "Pushed \(pushed.days) day(s) / \(pushed.measurements) reading(s), pulled \(pulled) day(s)."
+            Self.log.info("sync done: \(statusText ?? "")")
+        } catch {
+            statusText = error.localizedDescription
+            Self.log.error("sync failed: \(error.localizedDescription)")
+        }
+        working = false
     }
 }
