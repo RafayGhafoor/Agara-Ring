@@ -7,8 +7,8 @@ import os
 @MainActor
 struct AgaraCloudSettingsView: View {
     @Environment(\.modelContext) private var modelContext
-    @State private var client = AgaraCloudClient.shared
-    @State private var sync = AgaraCloudSync.shared
+    private let client = AgaraCloudClient.shared
+    private let sync = AgaraCloudSync.shared
     @State private var email = ""
     @State private var password = ""
     @State private var working = false
