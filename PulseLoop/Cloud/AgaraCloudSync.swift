@@ -35,6 +35,11 @@ final class AgaraCloudSync {
         let cutoff = Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? .distantPast
         let activityRows = try context.fetch(FetchDescriptor<ActivityDaily>())
             .filter { $0.date >= cutoff }
+        // Defensive dedupe by day: the app can hold more than one ActivityDaily row per date
+        // (ring sync + live ratchet can each write one), and the server's (user, date) index is
+        // unique — last row wins locally, so last row wins here too.
+        var activityByDay: [String: ActivityDaily] = [:]
+        for row in activityRows { activityByDay[Self.dayString(row.date)] = row }
 
         var pushedMeasurements = 0
         let existingMeasurements = try await client.list("measurements", filter: "user='\(userID)'")
@@ -44,8 +49,7 @@ final class AgaraCloudSync {
             return (key, id)
         })
 
-        for day in activityRows {
-            let dateString = Self.dayString(day.date)
+        for (dateString, day) in activityByDay {
             let sleep = sleepSummary(for: day.date, context: context)
             let body: [String: Any] = [
                 "user": userID, "date": dateString,
@@ -71,8 +75,14 @@ final class AgaraCloudSync {
         let measurements = try context.fetch(
             FetchDescriptor<Measurement>(sortBy: [SortDescriptor(\.timestamp, order: .reverse)])
         ).prefix(maxMeasurements)
+        // Dedupe by client key (kind+epoch+source), newest first — same unique-index protection as
+        // the day dedupe above.
+        var measurementsByKey: [String: Measurement] = [:]
         for measurement in measurements {
             let key = "\(measurement.kind.rawValue)-\(Int(measurement.timestamp.timeIntervalSince1970))-\(measurement.sourceRaw)"
+            if measurementsByKey[key] == nil { measurementsByKey[key] = measurement }
+        }
+        for (key, measurement) in measurementsByKey {
             let body: [String: Any] = [
                 "user": userID, "kind": measurement.kind.rawValue,
                 "value": measurement.value, "unit": measurement.unit,
