@@ -50,6 +50,9 @@ final class VeepooSyncEngine: RingSyncEngine {
     /// The history loop has finished at least once — the SDK docs say measurements should run after
     /// the daily data was read, so the live stream only starts then (avoids "device busy" refusals).
     private var historyFinished = false
+    /// A per-day history pass is in flight (startup or `syncHistory`). While set, the live stream
+    /// must stay off — the ring refuses measurements mid-daily-read; `reconcileLiveStream` gates on it.
+    private var historyInFlight = false
 
     init(writer: RingCommandWriter?, decoder: VeepooDecoder, historyDays: Int = 7) {
         self.writer = writer
@@ -68,6 +71,7 @@ final class VeepooSyncEngine: RingSyncEngine {
         dailyFrames.removeAll()
         liveStreamStarted = false
         historyFinished = false
+        historyInFlight = false
         stopPolling()
     }
 
@@ -104,6 +108,7 @@ final class VeepooSyncEngine: RingSyncEngine {
         writer?.enqueue(VeepooEncoder.battery())
         writer?.enqueue(VeepooEncoder.steps())
         writer?.enqueue(VeepooEncoder.sleepHistory(dayOffset: 0))
+        historyInFlight = true
         startPolling()
     }
 
@@ -140,6 +145,7 @@ final class VeepooSyncEngine: RingSyncEngine {
     /// are refused as "busy"), stop it when the user disables live mode or the link drops. Re-run on
     /// every poll tick so a settings change applies within ~30 s.
     private func reconcileLiveStream() {
+        guard !historyInFlight else { return }
         let wantsLive = VeepooLivePrefsStore.shared.liveHeartRateEnabled
         if wantsLive, !liveStreamStarted, historyFinished {
             liveStreamStarted = true
@@ -214,6 +220,7 @@ final class VeepooSyncEngine: RingSyncEngine {
         } else {
             writer?.emit(.historySyncFinished)
             historyFinished = true
+            historyInFlight = false
             reconcileLiveStream()
         }
     }
@@ -314,6 +321,11 @@ final class VeepooSyncEngine: RingSyncEngine {
     /// Re-run the whole per-day history loop without re-handshaking — the periodic top-up while
     /// connected. Reset the per-day state first so frames from the previous pass cannot pollute this
     /// one (record indexes restart every day, and the ring does not echo the day).
+    ///
+    /// The live HR stream must be **stopped** for the duration: the ring refuses measurements while
+    /// the daily data is being read (the SDK's own "device busy" contract), so a history pass run
+    /// against an open `D0 01` stream comes back empty — which is exactly how "connected but sleep
+    /// never refreshes" happens. `completeDailyTransfer` restarts the stream when the pass ends.
     func syncHistory() {
         guard authenticated else { return }
         currentDay = 0
@@ -321,6 +333,11 @@ final class VeepooSyncEngine: RingSyncEngine {
         dailyComplete = false
         sleepFrames.removeAll()
         dailyFrames.removeAll()
+        if liveStreamStarted {
+            liveStreamStarted = false
+            writer?.enqueue(VeepooEncoder.heartRateStop())
+        }
+        historyInFlight = true
         writer?.enqueue(VeepooEncoder.sleepHistory(dayOffset: 0))
     }
 }
