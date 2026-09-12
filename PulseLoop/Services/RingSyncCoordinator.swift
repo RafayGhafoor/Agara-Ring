@@ -707,6 +707,18 @@ final class RingSyncCoordinator {
 
     // MARK: - Event handling
 
+    /// Throttled stamp of `lastSyncAt` on live/fresh data events (1 Hz HR streams would otherwise
+    /// rewrite the timestamp 60×/min). Keeps the "Synced …" / "Last synced" labels live instead of
+    /// pinned to the last full history pass.
+    private var lastLiveStamp = Date.distantPast
+    private func stampLiveSync() {
+        guard client.activeDeviceType != .rwfit else { return }
+        let now = Date()
+        guard now.timeIntervalSince(lastLiveStamp) >= 10 else { return }
+        lastLiveStamp = now
+        lastSyncAt = now
+    }
+
     private func handle(_ event: PulseEvent) {
         if handleRWfit(event) { return }
         switch event {
@@ -716,10 +728,14 @@ final class RingSyncCoordinator {
             // fires back the instant the command lands, which is what used to end a measurement in ~2s.
             if hrState == .measuring { hrWindow.collect(bpm) }
             resyncHistoryIfStale()
-        case .activityUpdate, .batteryLevel:
+            stampLiveSync()
+        case .activityUpdate, .batteryLevel, .spo2Result, .bloodPressureSample:
             // All-day cadence events (≤5 min apart): each one is a BLE wake — the only execution
             // window a backgrounded app reliably gets — so it doubles as the re-sync heartbeat.
             resyncHistoryIfStale()
+            // Live/fresh data landed: keep the "Synced …" labels honest while streaming (they would
+            // otherwise only advance on full history-sync completion).
+            stampLiveSync()
         case .heartRateComplete:
             // The ring reported a genuine error/no-reading (worn incorrectly). Only fast-fail if this
             // measurement hasn't already produced a real reading.
