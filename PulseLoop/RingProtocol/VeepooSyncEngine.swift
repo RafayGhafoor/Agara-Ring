@@ -172,6 +172,12 @@ final class VeepooSyncEngine: RingSyncEngine {
         } else if !wantsLive, liveStreamStarted {
             liveStreamStarted = false
             writer?.enqueue(VeepooEncoder.heartRateStop())
+        } else if wantsLive, liveStreamStarted {
+            // Re-assert the start every tick: the ring can end the test stream on its side (observed:
+            // ~20 s of 1 Hz rows then silence while the link still stood), and once it has, the only
+            // way back is a fresh start frame — this makes the stream self-healing instead of waiting
+            // for the next reconnect to re-run the whole startup.
+            writer?.enqueue(VeepooEncoder.heartRateStart())
         }
     }
 
