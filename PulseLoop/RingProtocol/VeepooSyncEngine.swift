@@ -59,7 +59,11 @@ final class VeepooSyncEngine: RingSyncEngine {
     /// reconnect) must not wedge the loop and block the live HR start forever.
     private var lastProgressTick = 0
 
-    init(writer: RingCommandWriter?, decoder: VeepooDecoder, historyDays: Int = 7) {
+    /// How many days of history the loop walks. The ring keeps only ~3 days (the verified run had
+    /// data for offsets 0–2 and returned no-data for 3–6). A short pass also matters for **latency**:
+    /// the continuous live-HR stream only starts once the pass finishes, so a 7-day walk (which a
+    /// flaky link may restart from day 0 before ever completing) would keep live HR off indefinitely.
+    init(writer: RingCommandWriter?, decoder: VeepooDecoder, historyDays: Int = 3) {
         self.writer = writer
         self.decoder = decoder
         self.historyDays = historyDays
@@ -133,7 +137,7 @@ final class VeepooSyncEngine: RingSyncEngine {
                 if self.pollTick.isMultiple(of: 2) {
                     self.writer?.enqueue(VeepooEncoder.battery())
                 }
-                if self.historyInFlight, self.pollTick - self.lastProgressTick >= 2 {
+                if self.historyInFlight, self.pollTick - self.lastProgressTick >= 1 {
                     self.watchdogAdvance()
                 }
                 self.reconcileLiveStream()
