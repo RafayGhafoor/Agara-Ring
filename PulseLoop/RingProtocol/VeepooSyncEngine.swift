@@ -53,6 +53,11 @@ final class VeepooSyncEngine: RingSyncEngine {
     /// A per-day history pass is in flight (startup or `syncHistory`). While set, the live stream
     /// must stay off — the ring refuses measurements mid-daily-read; `reconcileLiveStream` gates on it.
     private var historyInFlight = false
+    /// Poll-tick number at which the history pass last made progress. A day that does not advance
+    /// within two ticks (~60 s) is treated as done by `watchdogAdvance` — the ring normally sends an
+    /// explicit completion (or no-data) marker per day, but a dropped one (observed across a BLE
+    /// reconnect) must not wedge the loop and block the live HR start forever.
+    private var lastProgressTick = 0
 
     init(writer: RingCommandWriter?, decoder: VeepooDecoder, historyDays: Int = 7) {
         self.writer = writer
@@ -109,6 +114,7 @@ final class VeepooSyncEngine: RingSyncEngine {
         writer?.enqueue(VeepooEncoder.steps())
         writer?.enqueue(VeepooEncoder.sleepHistory(dayOffset: 0))
         historyInFlight = true
+        lastProgressTick = pollTick
         startPolling()
     }
 
@@ -127,6 +133,9 @@ final class VeepooSyncEngine: RingSyncEngine {
                 if self.pollTick.isMultiple(of: 2) {
                     self.writer?.enqueue(VeepooEncoder.battery())
                 }
+                if self.historyInFlight, self.pollTick - self.lastProgressTick >= 2 {
+                    self.watchdogAdvance()
+                }
                 self.reconcileLiveStream()
             }
         }
@@ -136,6 +145,16 @@ final class VeepooSyncEngine: RingSyncEngine {
         pollTimer?.invalidate()
         pollTimer = nil
         pollTick = 0
+    }
+
+    /// Advance a stalled history day: finish whichever phase is outstanding (sleep, then daily) and
+    /// move on — the loop's own markers are still preferred, this only fires when one is missing.
+    private func watchdogAdvance() {
+        if !sleepComplete {
+            completeSleepTransfer()
+        } else if !dailyComplete {
+            completeDailyTransfer()
+        }
     }
 
     // MARK: Live heart-rate stream
@@ -176,6 +195,7 @@ final class VeepooSyncEngine: RingSyncEngine {
 
     private func completeSleepTransfer() {
         sleepComplete = true
+        lastProgressTick = pollTick
         emitSleepSummary()
         writer?.enqueue(VeepooEncoder.dailyHistory(dayOffset: currentDay))
     }
@@ -213,6 +233,7 @@ final class VeepooSyncEngine: RingSyncEngine {
 
     private func completeDailyTransfer() {
         dailyComplete = true
+        lastProgressTick = pollTick
         emitDailyRecords()
         currentDay += 1
         if currentDay < historyDays {
@@ -338,6 +359,7 @@ final class VeepooSyncEngine: RingSyncEngine {
             writer?.enqueue(VeepooEncoder.heartRateStop())
         }
         historyInFlight = true
+        lastProgressTick = pollTick
         writer?.enqueue(VeepooEncoder.sleepHistory(dayOffset: 0))
     }
 }
