@@ -127,6 +127,14 @@ final class VeepooDriver: WearableDriver {
     }
 
     func makeSyncEngine() -> RingSyncEngine {
-        VeepooSyncEngine(writer: writer, decoder: decoder)
+        VeepooSyncEngine(writer: writer, decoder: decoder, historyDays: Self.configuredHistoryDays)
+    }
+
+    /// How many days the history loop walks. The ring retains ~3 and answers no-data past that, so 7
+    /// costs almost nothing; `-historyDays N` (launch argument) widens it for tooling — e.g. rendering a
+    /// two-month week/month/year view against the ring emulator.
+    static var configuredHistoryDays: Int {
+        let requested = UserDefaults.standard.integer(forKey: "historyDays")
+        return (1...400).contains(requested) ? requested : 7
     }
 }

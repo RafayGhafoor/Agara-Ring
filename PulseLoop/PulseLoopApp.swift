@@ -80,9 +80,24 @@ struct PulseLoopApp: App {
         }
 
         // Don't bring up CoreBluetooth under tests (see `isRunningUnitTests`).
-        let client = RingBLEClient(startManager: !runningTests)
+        #if DEBUG
+        // `-virtualRing <port>` routes the whole pipeline to `ring-emulator` over a socket instead of
+        // BLE. CoreBluetooth is then never started, so a remembered physical ring cannot be dragged
+        // into a virtual session.
+        let useVirtualRing = VirtualRingLink.configuredPort != nil
+        #else
+        let useVirtualRing = false
+        #endif
+        let client = RingBLEClient(startManager: !runningTests && !useVirtualRing)
         let coordinator = RingSyncCoordinator(client: client, context: container.mainContext)
         client.onConnected = { [weak coordinator] in coordinator?.runStartupSequence() }
+        #if DEBUG
+        if useVirtualRing {
+            // The pairing step needs a BLE scan, which the virtual link bypasses — open on the tabs.
+            try? VirtualRingLink.completeOnboardingIfNeeded(context: container.mainContext)
+            VirtualRingLink.shared.attachIfConfigured(client: client)
+        }
+        #endif
         let gps = GpsRouteRecorder()
         _bleClient = State(initialValue: client)
         _coordinator = State(initialValue: coordinator)

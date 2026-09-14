@@ -144,6 +144,11 @@ final class RingBLEClient: NSObject {
     private var activeDriver: WearableDriver?
     private var activeSyncEngine: RingSyncEngine?
     private var activeAdvertisedName: String?
+    #if DEBUG
+    /// Outbound frame sink for the debug virtual transport — see `VirtualRingLink`. When set, frames
+    /// go to the emulator socket instead of CoreBluetooth.
+    private(set) var virtualFrameSink: ((Data) -> Void)?
+    #endif
 
     // MARK: Write serialization
     /// Each queued write carries its already-framed bytes and which characteristic to send it to.
@@ -496,6 +501,9 @@ final class RingBLEClient: NSObject {
     }
 
     private func pumpWrites() {
+        #if DEBUG
+        if virtualFrameSink != nil { pumpVirtualWrites(); return }
+        #endif
         guard !writeInFlight,
               let peripheral,
               let writeChar,
@@ -721,6 +729,84 @@ extension RingBLEClient: RingCommandWriter {
         if case let .supportFunctions(derived) = decoded { applySupportFunctions(derived) }
         activeSyncEngine?.handle(decoded)
     }
+
+    // MARK: - Virtual transport (DEBUG only)
+
+    #if DEBUG
+    /// Debug-only socket transport used by `ring-emulator`, so the whole app pipeline (decode →
+    /// store → UI → cloud) can be exercised on one machine without a ring, a phone or CoreBluetooth.
+    ///
+    /// Nothing about the BLE path changes: the frame still goes through the same driver, the same
+    /// write queue, the same `RingNotificationDelivery` decode and the same event bus.
+    ///
+    /// Bring the client up on the virtual transport, running the same post-connect steps a real GATT
+    /// link runs — the driver's lead handshake (`immediatePostSubscriptionCommands`, i.e. the Veepoo
+    /// A1 open frame) and then `onConnected` (the sync engine's startup sequence).
+    func beginVirtualConnection(
+        coordinator: WearableCoordinator.Type = VeepooCoordinator.self,
+        advertisedName: String = "TK20",
+        wearableModelID: String? = "tk20",
+        sink: @escaping (Data) -> Void
+    ) {
+        installDriver(coordinator)
+        virtualFrameSink = sink
+        activeAdvertisedName = advertisedName
+        activeWearableModelID = wearableModelID
+        subscribedNotifyUUIDs = Set(activeDriver?.notifyUUIDs ?? [])
+        // Start the handshake with a
+        // clean slate, exactly like a fresh GATT link does.
+        activeDriver?.connectionDidStart()
+        activeSyncEngine?.connectionDidStart()
+        state = .connected
+        if let type = activeDeviceType {
+            publish(.deviceIdentified(
+                deviceType: type,
+                wearableModelID: activeWearableModelID,
+                advertisedName: advertisedName,
+                capabilities: activeCapabilities
+            ))
+        }
+        publish(.deviceStateChanged(state: .connected, address: nil))
+        noteActivity()
+        prependWrites(activeDriver?.immediatePostSubscriptionCommands() ?? [])
+        onConnected?()
+        pumpWrites()
+    }
+
+    /// Feed one frame from the virtual transport through the identical path a GATT notification takes.
+    func injectVirtualNotification(_ data: Data, from characteristic: CBUUID) {
+        guard let driver = activeDriver, driver.notifyUUIDs.contains(characteristic) else { return }
+        noteActivity()
+        RingNotificationDelivery.receive(data,
+            decode: { driver.ingest(data, from: characteristic) },
+            publish: { publish($0) }, deliver: { deliverDecoded($0) })
+    }
+
+    func endVirtualConnection() {
+        virtualFrameSink = nil
+        writeQueue.removeAll()
+        activeSyncEngine?.connectionDidEnd()
+        activeDriver?.connectionDidEnd()
+        activeDriver = nil
+        activeCoordinator = nil
+        activeSyncEngine = nil
+        activeDeviceType = nil
+        state = .disconnected
+        publish(.deviceStateChanged(state: .disconnected, address: nil))
+    }
+
+    /// The virtual transport has no ATT round-trip to serialize on, so every queued frame is handed
+    /// to the sink and completed at once — the queue still preserves the order the ring expects.
+    private func pumpVirtualWrites() {
+        guard let sink = virtualFrameSink else { return }
+        while !writeQueue.isEmpty {
+            let item = writeQueue.removeFirst()
+            publishRawPacket(direction: .outgoing, data: item.data)
+            sink(item.data)
+            item.completion?(.success(()))
+        }
+    }
+    #endif
 }
 
 private enum RingWriteError: LocalizedError {

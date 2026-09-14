@@ -59,11 +59,14 @@ final class VeepooSyncEngine: RingSyncEngine {
     /// reconnect) must not wedge the loop and block the live HR start forever.
     private var lastProgressTick = 0
 
-    /// How many days of history the loop walks. The ring keeps only ~3 days (the verified run had
-    /// data for offsets 0–2 and returned no-data for 3–6). A short pass also matters for **latency**:
-    /// the continuous live-HR stream only starts once the pass finishes, so a 7-day walk (which a
-    /// flaky link may restart from day 0 before ever completing) would keep live HR off indefinitely.
-    init(writer: RingCommandWriter?, decoder: VeepooDecoder, historyDays: Int = 3) {
+    /// How many days of history the loop walks.
+    ///
+    /// Seven, because that is what the UI wants to show and what the vendor cloud holds. The ring
+    /// itself only retains ~3 days and answers no-data for the rest — those days complete on their own
+    /// marker immediately, so the extra days cost almost nothing. (An earlier 7-day walk was cut to 3
+    /// because a flaky link restarted the pass from day 0 before it could finish; with the per-day state
+    /// reset in `completeDailyTransfer` each day now ends on its marker instead of the 30 s watchdog.)
+    init(writer: RingCommandWriter?, decoder: VeepooDecoder, historyDays: Int = 7) {
         self.writer = writer
         self.decoder = decoder
         self.historyDays = historyDays
@@ -247,6 +250,15 @@ final class VeepooSyncEngine: RingSyncEngine {
         emitDailyRecords()
         currentDay += 1
         if currentDay < historyDays {
+            // Reset the per-day phases before asking for the next day. Without this, `sleepComplete`
+            // stays true from the previous day, so that day's sleep completion marker (or its no-data
+            // marker) is ignored and the loop only advances via the 30 s stall watchdog — the whole
+            // pass then takes a watchdog tick per day instead of a second. Found by driving this
+            // engine against the ring emulator; on hardware it hid behind the watchdog.
+            sleepComplete = false
+            dailyComplete = false
+            sleepFrames.removeAll()
+            dailyFrames.removeAll()
             writer?.enqueue(VeepooEncoder.sleepHistory(dayOffset: currentDay))
         } else {
             writer?.emit(.historySyncFinished)
