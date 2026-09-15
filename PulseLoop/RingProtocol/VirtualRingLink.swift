@@ -86,6 +86,42 @@ final class VirtualRingLink {
         NSLog("[VirtualRing] onboarding marked complete for the virtual link")
     }
 
+    /// Seed the two things the pairing/onboarding flow would normally create, so the virtual link
+    /// produces a complete picture rather than an empty widget:
+    ///
+    /// * a `UserGoal` row — without one the weekly-goal widget silently falls back to 8 000 steps;
+    /// * one finished workout for today — active minutes are only ever written by a workout session
+    ///   (the TK20 ring reports no active-minutes metric at all), so the weekly-goal ring would
+    ///   otherwise read 0 MIN forever.
+    ///
+    /// Both are skipped when the store already has them, so repeated launches stay idempotent.
+    static func seedToolingDataIfNeeded(context: ModelContext) throws {
+        if try context.fetchCount(FetchDescriptor<UserGoal>()) == 0 {
+            context.insert(UserGoal())
+            try context.save()
+            NSLog("[VirtualRing] seeded a default goal row")
+        }
+        let finishedToday = try context.fetchCount(FetchDescriptor<ActivitySession>(
+            predicate: #Predicate { $0.statusRaw == "finished" }))
+        guard finishedToday == 0 else { return }
+        // Type ids are the design-system keys ("walk", not "walking") — `create` throws otherwise.
+        let end = Date().addingTimeInterval(-3600)
+        do {
+            try ManualActivityService.create(
+                type: "walk",
+                startedAt: end.addingTimeInterval(-45 * 60),
+                durationMinutes: 45,
+                distanceMeters: 4_200,
+                notes: "Emulator session",
+                context: context
+            )
+            NSLog("[VirtualRing] seeded one 45-minute workout for today")
+        } catch {
+            // Logged, never fatal: a failure here only means the active-minutes ring stays empty.
+            NSLog("[VirtualRing] workout seed failed: \(error)")
+        }
+    }
+
     func attach(client: RingBLEClient, port: UInt16, host: String = "127.0.0.1") {
         self.client = client
         self.client = client

@@ -95,6 +95,9 @@ struct PulseLoopApp: App {
         if useVirtualRing {
             // The pairing step needs a BLE scan, which the virtual link bypasses — open on the tabs.
             try? VirtualRingLink.completeOnboardingIfNeeded(context: container.mainContext)
+            // Then seed what that flow would have created (a goal row + one workout), so the
+            // weekly-goal widget and active-minutes ring have something real to show.
+            try? VirtualRingLink.seedToolingDataIfNeeded(context: container.mainContext)
             VirtualRingLink.shared.attachIfConfigured(client: client)
         }
         #endif
