@@ -47,7 +47,11 @@ enum RingEventBridge {
     static let maxDailyDistanceMeters: Double = 120_000   // metres
     static let maxDailyCalories: Double = 10_000          // kcal
 
-    static func events(for decoded: RingDecodedEvent, now: Date = Date()) -> [PulseEvent] {
+    /// - Parameter trustTimestamps: skip the *history-window* guard. Ring-supplied records need it
+    ///   because the ring's clock carries no year (anything outside its retention cannot be trusted);
+    ///   cloud rows carry real epochs from our own server, so re-importing a two-month account must
+    ///   not be silently trimmed to the last 8 days. Value-range gates always apply.
+    static func events(for decoded: RingDecodedEvent, now: Date = Date(), trustTimestamps: Bool = false) -> [PulseEvent] {
         switch decoded {
         case let .activityUpdate(timestamp, steps, distanceMeters, calories):
             // A live cumulative update ratchets the daily row via `max`, so a single misframed packet
@@ -86,7 +90,8 @@ enum RingEventBridge {
             return [.spo2Complete(timestamp: timestamp)]
 
         case let .historyMeasurement(kind, value, timestamp):
-            return historyMeasurementEvents(kind: kind, value: value, timestamp: timestamp, now: now)
+            return historyMeasurementEvents(kind: kind, value: value, timestamp: timestamp, now: now,
+                                            trustTimestamps: trustTimestamps)
 
         case let .stressSample(value, timestamp):
             guard stressRange.contains(value) else { return [] }
@@ -107,7 +112,7 @@ enum RingEventBridge {
             return [.syncProgress(stage: "done")]
 
         case let .sleepTimeline(timestamp, stages):
-            guard isPlausibleSleepStart(timestamp, now: now), !stages.isEmpty else { return [] }
+            guard trustTimestamps || isPlausibleSleepStart(timestamp, now: now), !stages.isEmpty else { return [] }
             return [.sleepTimeline(timestamp: timestamp, stages: stages)]
 
         case let .battery(percent):
@@ -149,10 +154,11 @@ enum RingEventBridge {
         kind: MeasurementKind,
         value: Double,
         timestamp: Date,
-        now: Date
+        now: Date,
+        trustTimestamps: Bool
     ) -> [PulseEvent] {
         guard isPlausible(kind: kind, value: value) else { return [] }
-        guard isWithinHistoryWindow(timestamp, now: now) else { return [] }
+        guard trustTimestamps || isWithinHistoryWindow(timestamp, now: now) else { return [] }
         return [.historyMeasurement(kind: kind, value: value, timestamp: timestamp)]
     }
 
@@ -242,6 +248,6 @@ enum RingEventBridge {
     /// The horizon used by `isWithinHistoryWindow`: 8 days unless `-historyWindowDays N` says otherwise.
     static var historyWindowDays: Double {
         let requested = UserDefaults.standard.integer(forKey: "historyWindowDays")
-        return (1...730).contains(requested) ? Double(requested) : 8
+        return (1...730).contains(requested) ? Double(requested) : Double(AgaraConfig.Ring.historyWindowDays)
     }
 }

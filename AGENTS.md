@@ -14,7 +14,7 @@
 4. **Centralised docs.** Protocol, emulator, cloud, per-app notes and runbooks live in `../docs/`.
    Do not copy them here; link instead.
 5. **Shared brand copy is generated.** `PulseLoop/Generated/AgaraCopy.swift` comes from
-   `../docs/strings/brand.yaml` via `python3 ../tools/gen_strings.py` (verify with `--check`).
+   `../docs/strings/brand.yaml` via `python3 ../tools/gen_shared.py` (verify with `--check`).
    Never hand-edit it. See [`../docs/apps/shared-strings.md`](../docs/apps/shared-strings.md).
 6. **Verify with evidence, then record it** — store rows, a screenshot, a byte-comparison against a
    real capture, or a test that fails when the logic breaks. Update the parity matrix in the same change.

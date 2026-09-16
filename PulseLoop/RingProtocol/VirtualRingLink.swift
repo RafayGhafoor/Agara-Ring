@@ -34,7 +34,7 @@ final class VirtualRingLink {
             return port
         }
         // A bare `-virtualRing` (no value) means "on, default port".
-        if UserDefaults.standard.object(forKey: "virtualRing") != nil { return 9909 }
+        if UserDefaults.standard.object(forKey: "virtualRing") != nil { return UInt16(AgaraConfig.Emulator.defaultPort) }
         return nil
     }
 
@@ -184,7 +184,7 @@ final class VirtualRingLink {
             NSLog("[VirtualRing] reconnecting (\(port))")
             self.connection?.cancel()
             self.connection = nil
-            self.attach(client: client, port: Self.configuredPort ?? 9909)
+            self.attach(client: client, port: Self.configuredPort ?? UInt16(AgaraConfig.Emulator.defaultPort))
         }
     }
 

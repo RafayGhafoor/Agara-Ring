@@ -135,6 +135,6 @@ final class VeepooDriver: WearableDriver {
     /// two-month week/month/year view against the ring emulator.
     static var configuredHistoryDays: Int {
         let requested = UserDefaults.standard.integer(forKey: "historyDays")
-        return (1...400).contains(requested) ? requested : 7
+        return (1...400).contains(requested) ? requested : AgaraConfig.Ring.historyDays
     }
 }

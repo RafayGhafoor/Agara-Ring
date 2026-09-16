@@ -21,16 +21,20 @@ final class AgaraCloudSync {
 
     /// Push the last `days` days of activity/sleep plus up to `maxMeasurements` recent readings.
     /// Returns the counts pushed. Skipped entirely when nobody is signed in.
-    func push(context: ModelContext, days: Int = 90, maxMeasurements: Int = 5000) async throws -> (days: Int, measurements: Int) {
+    func push(context: ModelContext, days: Int = AgaraConfig.Cloud.pushDays, maxMeasurements: Int = AgaraConfig.Cloud.pushMaxMeasurements) async throws -> (days: Int, measurements: Int) {
         guard client.isSignedIn, let userID = client.userID else { return (0, 0) }
 
         var pushedDays = 0
-        let existingDays = try await client.list("health_days", filter: "user='\(userID)'")
+        let existingDays = try await client.list(AgaraConfig.Cloud.healthDaysCollection, filter: "user='\(userID)'")
         let dayDates = existingDays.compactMap { $0["date"] as? String }
-        let dayByDate = Dictionary(uniqueKeysWithValues: existingDays.compactMap { rec -> (String, String)? in
-            guard let date = rec["date"] as? String, let id = rec["id"] as? String else { return nil }
-            return (date, id)
-        })
+        // Fold rather than `Dictionary(uniqueKeysWithValues:)`: that initialiser **traps** on a
+        // duplicate key, so one duplicated row on the server (a race between two devices pushing the
+        // same day) would crash the app instead of being an idempotent upsert.
+        var dayByDate: [String: String] = [:]
+        for record in existingDays {
+            guard let date = record["date"] as? String, let id = record["id"] as? String else { continue }
+            dayByDate[date] = id
+        }
 
         let cutoff = Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? .distantPast
         let activityRows = try context.fetch(FetchDescriptor<ActivityDaily>())
@@ -42,12 +46,13 @@ final class AgaraCloudSync {
         for row in activityRows { activityByDay[Self.dayString(row.date)] = row }
 
         var pushedMeasurements = 0
-        let existingMeasurements = try await client.list("measurements", filter: "user='\(userID)'")
+        let existingMeasurements = try await client.list(AgaraConfig.Cloud.measurementsCollection, filter: "user='\(userID)'")
         let measurementKeys = Set(existingMeasurements.compactMap { $0["client_key"] as? String })
-        let measurementByKey = Dictionary(uniqueKeysWithValues: existingMeasurements.compactMap { rec -> (String, String)? in
-            guard let key = rec["client_key"] as? String, let id = rec["id"] as? String else { return nil }
-            return (key, id)
-        })
+        var measurementByKey: [String: String] = [:]
+        for record in existingMeasurements {
+            guard let key = record["client_key"] as? String, let id = record["id"] as? String else { continue }
+            measurementByKey[key] = id
+        }
 
         for (dateString, day) in activityByDay {
             let sleep = sleepSummary(for: day.date, context: context)
@@ -65,9 +70,9 @@ final class AgaraCloudSync {
                 "quality": sleep?.quality ?? 0,
             ]
             if let existingID = dayByDate[dateString] {
-                try await client.update("health_days", recordID: existingID, body: body)
+                try await client.update(AgaraConfig.Cloud.healthDaysCollection, recordID: existingID, body: body)
             } else if !dayDates.contains(dateString) {
-                try await client.create("health_days", body: body)
+                try await client.create(AgaraConfig.Cloud.healthDaysCollection, body: body)
             }
             pushedDays += 1
         }
@@ -90,9 +95,9 @@ final class AgaraCloudSync {
                 "source": measurement.sourceRaw, "client_key": key,
             ]
             if let existingID = measurementByKey[key] {
-                try await client.update("measurements", recordID: existingID, body: body)
+                try await client.update(AgaraConfig.Cloud.measurementsCollection, recordID: existingID, body: body)
             } else if !measurementKeys.contains(key) {
-                try await client.create("measurements", body: body)
+                try await client.create(AgaraConfig.Cloud.measurementsCollection, body: body)
             }
             pushedMeasurements += 1
         }
@@ -107,8 +112,8 @@ final class AgaraCloudSync {
     @discardableResult
     func pull(context: ModelContext) async throws -> Int {
         guard client.isSignedIn, let userID = client.userID else { return 0 }
-        let days = try await client.list("health_days", filter: "user='\(userID)'")
-        let measurements = try await client.list("measurements", filter: "user='\(userID)'")
+        let days = try await client.list(AgaraConfig.Cloud.healthDaysCollection, filter: "user='\(userID)'")
+        let measurements = try await client.list(AgaraConfig.Cloud.measurementsCollection, filter: "user='\(userID)'")
 
         let calendar = Calendar.current
         var events: [RingDecodedEvent] = []
@@ -150,7 +155,9 @@ final class AgaraCloudSync {
         }
 
         for decoded in events {
-            for pulseEvent in RingEventBridge.events(for: decoded) {
+            // trustTimestamps: cloud rows are our own server's, not the ring's year-less clock, so a
+            // restored two-month account must not be trimmed by the history-window guard.
+            for pulseEvent in RingEventBridge.events(for: decoded, trustTimestamps: true) {
                 await PulseEventBus.shared.publish(pulseEvent)
             }
         }

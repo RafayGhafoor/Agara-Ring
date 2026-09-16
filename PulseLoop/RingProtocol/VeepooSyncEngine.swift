@@ -66,7 +66,7 @@ final class VeepooSyncEngine: RingSyncEngine {
     /// marker immediately, so the extra days cost almost nothing. (An earlier 7-day walk was cut to 3
     /// because a flaky link restarted the pass from day 0 before it could finish; with the per-day state
     /// reset in `completeDailyTransfer` each day now ends on its marker instead of the 30 s watchdog.)
-    init(writer: RingCommandWriter?, decoder: VeepooDecoder, historyDays: Int = 7) {
+    init(writer: RingCommandWriter?, decoder: VeepooDecoder, historyDays: Int = AgaraConfig.Ring.historyDays) {
         self.writer = writer
         self.decoder = decoder
         self.historyDays = historyDays

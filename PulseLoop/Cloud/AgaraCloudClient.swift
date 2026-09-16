@@ -11,7 +11,7 @@ final class AgaraCloudClient {
 
     /// PocketBase instance on the Agara server (hayden). Collections: `health_days` (one row per
     /// user+date) and `measurements` (one row per user+client_key), both owner-scoped by rules.
-    private let baseURL = URL(string: "https://pb.213-136-82-93.sslip.io")!
+    private let baseURL = URL(string: AgaraConfig.Cloud.baseUrl)!
     private let session = URLSession(configuration: .ephemeral)
     private let defaults = UserDefaults.standard
     private static let log = Logger(subsystem: "com.pulseloop.lab", category: "agara-cloud")
@@ -70,11 +70,29 @@ final class AgaraCloudClient {
 
     // MARK: Records
 
+    /// Read a whole collection `filter`ed to one user, **paging through it**.
+    ///
+    /// PocketBase caps `perPage` (500 by default), so a single request silently truncates: with
+    /// ~6 000 readings in a 62-day account a push would see only the first 500 keys, treat the rest
+    /// as new and then fail on the server's unique index, while a pull would restore 500 readings and
+    /// look like it worked. Pagination is part of the contract, not an optimisation.
     func list(_ collection: String, filter: String? = nil, perPage: Int = 500) async throws -> [[String: Any]] {
-        var query: [URLQueryItem] = [.init(name: "perPage", value: String(perPage))]
-        if let filter { query.append(.init(name: "filter", value: filter)) }
-        let json = try await request("api/collections/\(collection)/records", method: "GET", query: query)
-        return (json["items"] as? [[String: Any]]) ?? []
+        var collected: [[String: Any]] = []
+        var page = 1
+        while true {
+            var query: [URLQueryItem] = [
+                .init(name: "perPage", value: String(perPage)),
+                .init(name: "page", value: String(page)),
+            ]
+            if let filter { query.append(.init(name: "filter", value: filter)) }
+            let json = try await request("api/collections/\(collection)/records", method: "GET", query: query)
+            let items = (json["items"] as? [[String: Any]]) ?? []
+            collected.append(contentsOf: items)
+            let totalPages = (json["totalPages"] as? NSNumber)?.intValue ?? 1
+            if page >= totalPages || items.isEmpty { break }
+            page += 1
+        }
+        return collected
     }
 
     @discardableResult
