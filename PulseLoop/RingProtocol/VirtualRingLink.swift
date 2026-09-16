@@ -105,17 +105,25 @@ final class VirtualRingLink {
             predicate: #Predicate { $0.statusRaw == "finished" }))
         guard finishedToday == 0 else { return }
         // Type ids are the design-system keys ("walk", not "walking") — `create` throws otherwise.
-        let end = Date().addingTimeInterval(-3600)
+        //
+        // The session must end in the past **and** stay inside today: a fixed "an hour ago, 45 min
+        // long" crosses midnight when the run happens just after midnight, which credits the minutes
+        // to yesterday and leaves today's goal ring at 0 MIN.
+        let now = Date()
+        let dayStart = Calendar.current.startOfDay(for: now)
+        let elapsedMinutes = Int(now.timeIntervalSince(dayStart) / 60)
+        let durationMinutes = Double(min(45, max(1, elapsedMinutes - 1)))
+        let end = now.addingTimeInterval(-60)
         do {
             try ManualActivityService.create(
                 type: "walk",
-                startedAt: end.addingTimeInterval(-45 * 60),
-                durationMinutes: 45,
-                distanceMeters: 4_200,
+                startedAt: end.addingTimeInterval(-durationMinutes * 60),
+                durationMinutes: durationMinutes,
+                distanceMeters: durationMinutes / 45 * 4_200,
                 notes: "Emulator session",
                 context: context
             )
-            NSLog("[VirtualRing] seeded one 45-minute workout for today")
+            NSLog("[VirtualRing] seeded a \(Int(durationMinutes))-minute workout for today")
         } catch {
             // Logged, never fatal: a failure here only means the active-minutes ring stays empty.
             NSLog("[VirtualRing] workout seed failed: \(error)")
