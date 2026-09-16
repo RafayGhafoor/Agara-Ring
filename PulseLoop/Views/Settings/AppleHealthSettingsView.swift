@@ -85,7 +85,7 @@ struct AppleHealthSettingsView: View {
 
     @ViewBuilder private var accessDeniedHint: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("PulseLoop wasn't granted access. Turn it on for PulseLoop in the Health app.")
+            Text(AgaraCopy.healthPermissionDenied)
                 .font(.caption)
                 .foregroundStyle(PulseColors.danger)
             QuickActionButton(label: "Open Health") { openHealthApp() }

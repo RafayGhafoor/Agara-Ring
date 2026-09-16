@@ -60,7 +60,7 @@ struct StravaSettingsView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("PulseLoop stops uploading and revokes its access to your Strava account. "
+            Text(AgaraCopy.stravaDisconnectCopy + " "
                 + "Workouts already uploaded stay on Strava.")
         }
     }

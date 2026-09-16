@@ -65,7 +65,7 @@ struct AboutSettingsView: View {
                     }
                 }
                 StatusCopy(
-                    title: "PulseLoop",
+                    title: AgaraCopy.aboutProductName,
                     body: """
                     An LLM-native health app that turns a cheap Bluetooth smart ring into a real, \
                     conversational health tracker. It talks to the ring directly over Bluetooth — no \
