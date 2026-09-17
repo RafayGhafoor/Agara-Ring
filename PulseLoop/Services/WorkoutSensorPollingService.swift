@@ -10,7 +10,7 @@ import SwiftData
 /// - HR `.spotPoll` (devices without a realtime stream): the legacy deterministic one-shot reads via
 ///   `RingSyncCoordinator.measureHR()`.
 /// - SpO2 `.spotPoll` (devices with instant SpO2): periodic `measureSpO2()` reads. `.ringLog`/`.off`
-///   never attempt a read — Colmi has no instant SpO2, so polling it only produced failures.
+///   never attempt a read — the ring has no instant SpO2, so polling it only produced failures.
 ///
 /// Every spot attempt / stream stall is recorded as an `ActivitySensorPollEvent` for the
 /// recording-quality report. HR and SpO2 reads never overlap — there is only one ring.

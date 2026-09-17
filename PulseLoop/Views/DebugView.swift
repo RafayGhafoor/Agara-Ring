@@ -43,15 +43,17 @@ struct DebugView: View {
 
             HStack {
                 SecondaryButton(title: "Log mock packet", systemImage: "plus") {
-                    let data = RingEncoder().makeStatusCommand()
-                    let decoded = RingDecoder().decode(data)
+                    // A frame the app really writes: the D8 realtime-readout poll. The old mock built a
+                    // status command with the removed the ring encoder, which logged a packet no driver here
+                    // can produce.
+                    let data = VeepooEncoder.steps()
                     DebugRepository.insertRawPacket(
                         direction: .outgoing,
                         commandId: Int(data.first ?? 0),
                         hexPayload: data.hexString,
-                        decodedKind: decoded.kind,
-                        decodedJSON: decoded.debugJSON,
-                        confidence: decoded.confidence,
+                        decodedKind: "steps_poll",
+                        decodedJSON: nil,
+                        confidence: .known,
                         context: modelContext
                     )
                     try? modelContext.save()

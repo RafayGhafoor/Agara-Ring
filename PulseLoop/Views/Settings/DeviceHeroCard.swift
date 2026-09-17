@@ -16,8 +16,6 @@ struct DeviceHeroStatus: Equatable {
     let batteryText: String?
     let syncText: String?
     let action: Action
-    /// Maturity of the connected/known ring's driver, surfaced as a badge. `.full` renders no badge.
-    var supportLevel: WearableSupportLevel = .full
 
     var actionTitle: String {
         switch action {
@@ -41,8 +39,7 @@ struct DeviceHeroStatus: Equatable {
         knownName: String?,
         batteryPercent: Int?,
         lastSync: Date?,
-        now: Date,
-        supportLevel: WearableSupportLevel = .full
+        now: Date
     ) -> DeviceHeroStatus {
         let title = connectedName ?? knownName ?? "No ring connected"
 
@@ -85,8 +82,7 @@ struct DeviceHeroStatus: Equatable {
 
         return DeviceHeroStatus(
             title: title, statusLine: statusLine, statusTint: statusTint,
-            batteryText: batteryText, syncText: syncText, action: action,
-            supportLevel: supportLevel
+            batteryText: batteryText, syncText: syncText, action: action
         )
     }
 }
@@ -112,8 +108,7 @@ struct DeviceHeroCard: View {
             knownName: wearableModel?.displayName ?? deviceType?.displayName,
             batteryPercent: battery,
             lastSync: coordinator.lastSyncAt,
-            now: Date(),
-            supportLevel: deviceType?.supportLevel ?? .full
+            now: Date()
         )
 
         // The connected card is purely informational and opens Wearable settings, where Disconnect
@@ -124,7 +119,7 @@ struct DeviceHeroCard: View {
                     RingArtView(
                         tint: PulseColors.info,
                         size: 72,
-                        imageName: wearableModel?.imageName ?? ringImageName(for: deviceType)
+                        imageName: wearableModel?.imageName
                     )
                         .accessibilityHidden(true)
 
@@ -139,8 +134,6 @@ struct DeviceHeroCard: View {
                             .font(PulseFont.footnote.weight(.regular))
                             .foregroundStyle(status.statusTint)
                             .lineLimit(1)
-
-                        SupportBadge(level: status.supportLevel) // nothing for fully-supported rings
 
                         if let syncText = status.syncText {
                             Text(syncText)
@@ -212,7 +205,6 @@ struct DeviceHeroCard: View {
         [
             status.title,
             status.statusLine,
-            status.supportLevel.badgeLabel,
             status.batteryText.map { "Battery \($0)" },
             status.syncText,
         ]
@@ -229,29 +221,5 @@ struct DeviceHeroCard: View {
         }
     }
 
-    /// Representative product image for the connected/known ring family (the connection only reveals
-    /// the family, not the exact model); nil falls back to the generic ring in `RingArtView`.
-    private func ringImageName(for type: RingDeviceType?) -> String? {
-        switch type {
-        case .jring: return "jring"
-        // Both Colmi families are the same physical ring line (they differ only in firmware), and the
-        // line has no single representative image — fall back to the generic ring.
-        case .colmiR02, .colmiSmartHealth: return nil
-        case .tk5: return "tk5"
-        case .luckRing: return "luckring-tk18"
-        // R10M is the only catalogued ring in this family and the only one anyone has tested, so its art
-        // is the family's representative — an uncatalogued YCBT ring is far more likely to be one of
-        // these than anything else.
-        case .ycbt: return "r10m"
-        // No RWfit hardware captured yet, so no product art — the generic ring is the honest choice.
-        case .rwfit: return nil
-        // The connection reveals only the family; both R11 firmwares share the generic Colmi ring line,
-        // so the CRP family falls back to the generic ring here (the carousel card carries its own art).
-        case .crp: return nil
-        // No TK20 imageset — the generic ring art is the honest choice (nil is the supported fallback).
-        case .veepoo: return nil
-        case nil: return nil
-        }
-    }
 
 }

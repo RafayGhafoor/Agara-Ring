@@ -5,7 +5,7 @@ import Foundation
 /// DEBUG builds always capture — the packet feed is the daily protocol-debugging tool. Release
 /// builds capture **only while the user has switched it on** in Privacy & Data → Diagnostics. The
 /// release path exists for exactly one workflow: a remote tester on TestFlight pairing a ring
-/// family nobody on the project has in hand (RWfit is the first), where the diagnostics export's
+/// family nobody on the project has in hand (the ring is the first), where the diagnostics export's
 /// hex rows are the only way to see what the ring actually said. Raw packets encode health
 /// readings, so the toggle is off by default, visibly labelled, and the captured rows can be
 /// cleared from the same screen.

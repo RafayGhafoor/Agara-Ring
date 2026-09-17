@@ -106,7 +106,7 @@ final class LiveWorkoutStats {
         }
     }
 
-    /// Seed the SpO₂ tile for ring-log devices (Colmi): the newest all-day log value, which may
+    /// Seed the SpO₂ tile for ring-log devices (the ring): the newest all-day log value, which may
     /// predate the workout — matches the previous `MetricsRepository.latestMeasurement` behaviour
     /// without the per-render fetch.
     func seedSpO2(value: Int, at timestamp: Date) {

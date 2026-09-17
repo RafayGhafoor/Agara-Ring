@@ -7,6 +7,7 @@ import Foundation
 enum AgaraCopy {
     static let appName = "Agara Ring"
     static let appNameDebug = "Agara Ring Debug"
+    static let ringDisplayName = "Agara Ring"
     static let coachTitle = "Agara Coach"
     static let wordmark = "AGARA"
     static let coachGreeting = "Hi! I'm your Agara Coach. I can answer questions about your sleep, heart rate, activity, and recovery. What would you like to know?"

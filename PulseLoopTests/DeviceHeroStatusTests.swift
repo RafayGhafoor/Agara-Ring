@@ -5,9 +5,9 @@ final class DeviceHeroStatusTests: XCTestCase {
     private let now = Date(timeIntervalSince1970: 1_000_000)
 
     func testConnectedWithBatteryShowsChipAndDisconnect() {
-        let s = DeviceHeroStatus.make(state: .connected, connectedName: "Jring 56ff",
-            knownName: "Jring 56ff", batteryPercent: 82, lastSync: nil, now: now)
-        XCTAssertEqual(s.title, "Jring 56ff")
+        let s = DeviceHeroStatus.make(state: .connected, connectedName: "TK20 3B00",
+            knownName: "TK20 3B00", batteryPercent: 82, lastSync: nil, now: now)
+        XCTAssertEqual(s.title, "TK20 3B00")
         XCTAssertEqual(s.statusLine, "Connected")
         XCTAssertEqual(s.batteryText, "82%")
         XCTAssertEqual(s.action, .disconnect)
@@ -22,8 +22,8 @@ final class DeviceHeroStatusTests: XCTestCase {
 
     func testKnownButDisconnectedShowsConnect() {
         let s = DeviceHeroStatus.make(state: .disconnected, connectedName: nil,
-            knownName: "Jring 56ff", batteryPercent: nil, lastSync: nil, now: now)
-        XCTAssertEqual(s.title, "Jring 56ff")
+            knownName: "TK20 3B00", batteryPercent: nil, lastSync: nil, now: now)
+        XCTAssertEqual(s.title, "TK20 3B00")
         XCTAssertEqual(s.statusLine, "Disconnected")
         XCTAssertEqual(s.action, .connect)
     }
@@ -37,29 +37,16 @@ final class DeviceHeroStatusTests: XCTestCase {
     }
 
     func testSyncTextNilWhenNoSamples() {
-        let s = DeviceHeroStatus.make(state: .connected, connectedName: "Jring 56ff",
-            knownName: "Jring 56ff", batteryPercent: 50, lastSync: nil, now: now)
+        let s = DeviceHeroStatus.make(state: .connected, connectedName: "TK20 3B00",
+            knownName: "TK20 3B00", batteryPercent: 50, lastSync: nil, now: now)
         XCTAssertNil(s.syncText)
     }
 
     func testSyncTextPresentWithLastSync() {
-        let s = DeviceHeroStatus.make(state: .connected, connectedName: "Jring 56ff",
-            knownName: "Jring 56ff", batteryPercent: 50,
+        let s = DeviceHeroStatus.make(state: .connected, connectedName: "TK20 3B00",
+            knownName: "TK20 3B00", batteryPercent: 50,
             lastSync: now.addingTimeInterval(-120), now: now)
         XCTAssertEqual(s.syncText?.hasPrefix("Synced") == true, true)
     }
 
-    /// Support level defaults to `.full` (so the badge never shows for a shipped ring) and is carried
-    /// through `make` when the caller knows the family is experimental.
-    func testSupportLevelDefaultsToFullAndPropagates() {
-        let full = DeviceHeroStatus.make(state: .connected, connectedName: "Colmi R11",
-            knownName: "Colmi R11", batteryPercent: 50, lastSync: nil, now: now)
-        XCTAssertEqual(full.supportLevel, .full)
-        XCTAssertNil(full.supportLevel.badgeLabel)
-
-        let limited = DeviceHeroStatus.make(state: .connected, connectedName: "TK5",
-            knownName: "TK5", batteryPercent: 50, lastSync: nil, now: now, supportLevel: .limited)
-        XCTAssertEqual(limited.supportLevel, .limited)
-        XCTAssertEqual(limited.supportLevel.badgeLabel, "Limited support")
-    }
 }

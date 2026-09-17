@@ -317,7 +317,7 @@ To sign the pre-built IPA instead, use Sideloadly / Feather / ESign with your
     A free Apple ID allows only **3** sideloaded apps. Remove another sideloaded
     app or use a different Apple ID.
 
-??? question "`56ff` ring receives no data"
+??? question "Ring receives no data"
     Set the ring up once in the **Jring** app, unpair it there, then connect it
     in PulseLoop. See the [iOS guide](ios.md).
 

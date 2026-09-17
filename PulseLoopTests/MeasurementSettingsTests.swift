@@ -2,32 +2,11 @@ import XCTest
 import SwiftData
 @testable import PulseLoop
 
-/// Pure-logic coverage for the measurement-frequency feature: the Colmi command bytes, the per-device
-/// config ↔ settings mapping, capability gating, vital-visibility, the graph downsampler, and the
-/// user-profile value mapping. None of these need hardware.
+/// Pure-logic coverage for the measurement-frequency feature: the per-device config ↔ settings mapping,
+/// capability gating, vital-visibility, the graph downsampler, and the user-profile value mapping. None
+/// of these need hardware.
 @MainActor
 final class MeasurementSettingsTests: XCTestCase {
-
-    // MARK: - Colmi encoder bytes
-
-    func testAutoHeartRateClampsIntervalToFiveMinuteSteps() {
-        let encoder = ColmiEncoder()
-        // 0x16 = autoHRPref, 0x02 = prefWrite, on flag 0x01, interval 10.
-        XCTAssertEqual(encoder.autoHeartRate(enabled: true, intervalMinutes: 10), [0x16, 0x02, 0x01, 0x0a])
-        // Off uses 0x02 (not 0x00) per the auto-HR shape.
-        XCTAssertEqual(encoder.autoHeartRate(enabled: false, intervalMinutes: 5)[2], 0x02)
-        // Out-of-range / non-multiple values clamp to 5…60 in 5-min steps.
-        XCTAssertEqual(encoder.autoHeartRate(enabled: true, intervalMinutes: 3)[3], 5)
-        XCTAssertEqual(encoder.autoHeartRate(enabled: true, intervalMinutes: 999)[3], 60)
-        XCTAssertEqual(encoder.autoHeartRate(enabled: true, intervalMinutes: 12)[3], 10)
-    }
-
-    func testWriteTempPrefShape() {
-        let encoder = ColmiEncoder()
-        // 0x3a = autoTempPref, 0x03 framing byte, 0x02 = prefWrite, on/off flag.
-        XCTAssertEqual(encoder.writeTempPref(enabled: true), [0x3a, 0x03, 0x02, 0x01])
-        XCTAssertEqual(encoder.writeTempPref(enabled: false), [0x3a, 0x03, 0x02, 0x00])
-    }
 
     // MARK: - Config ↔ settings mapping
 
@@ -56,53 +35,36 @@ final class MeasurementSettingsTests: XCTestCase {
 
     // MARK: - Capability gating
 
-    /// Colmi configures its interval via the 0x16 pref; jring via byte [6] of its 0x19 background
-    /// monitoring command; TK5 via the five YCBT monitor writes (`01 0C/1C/20/26/45 {enable, interval}`,
-    /// interval floored at the firmware's 30-minute minimum).
-    func testMeasurementIntervalCapabilityPerDevice() {
-        XCTAssertTrue(ColmiCoordinator().capabilities.contains(.measurementInterval))
-        XCTAssertTrue(JringCoordinator().capabilities.contains(.measurementInterval))
-        XCTAssertTrue(TK5Coordinator().capabilities.contains(.measurementInterval))
+    /// No measurement-interval knob: this ring's all-day logging is armed by the connect handshake, so it
+    /// does not declare the capability and the Measurement settings screen hides that control.
+    func testTheAgaraRingHasNoMeasurementIntervalKnob() {
+        XCTAssertFalse(VeepooCoordinator().capabilities.contains(.measurementInterval))
     }
 
-    /// A ring can be *asked* for a blood-pressure reading only if its live protocol has a BP mode: the
-    /// jring's `0x23` mode 1, and — as of A4 — the TK5's `03 2f {01,01}`, which is exactly what
-    /// SmartHealth's own BP screen sends (`appStartMeasurement(1, 1)`); the reading streams back on
-    /// `06 03`. The note here used to claim the TK5 had no on-demand BP command. Colmi has no BP sensor
-    /// at all.
-    ///
-    /// The TK5's BP is a *command* the stack has and a *sensor* nobody has confirmed on the ring, so it
-    /// is bitmap-gated (`ISHASBLOOD` / `ISHASTESTBLOOD`) rather than promised: what this asserts is that
-    /// the family can reach it at all, i.e. that a TK5 which claims the bits gets the button.
-    func testManualBloodPressureRequiresALiveBPMode() {
-        XCTAssertTrue(JringCoordinator().capabilities.contains(.manualBloodPressure))
-        let tk5 = TK5Coordinator()
-        XCTAssertTrue(tk5.bitmapGatedCapabilities.contains(.manualBloodPressure))
-        XCTAssertTrue(
-            tk5.refinedCapabilities(bitmapDerived: [.bloodPressure, .manualBloodPressure])
-                .contains(.manualBloodPressure)
-        )
-        XCTAssertFalse(ColmiCoordinator().capabilities.contains(.manualBloodPressure))
-        XCTAssertFalse(ColmiCoordinator().capabilities.contains(.bloodPressure))
+    /// The on-demand BP commands (`90 01 00` / `90 00 00`) are verified against the ring, and DF `B8`
+    /// carries the systolic/diastolic pair in history — so the measure button and the metric card are
+    /// both earned rather than promised.
+    func testManualBloodPressureIsADeclaredCapability() {
+        let coordinator = VeepooCoordinator()
+        XCTAssertTrue(coordinator.capabilities.contains(.manualBloodPressure))
+        XCTAssertTrue(coordinator.capabilities.contains(.bloodPressure))
+        XCTAssertTrue(coordinator.bitmapGatedCapabilities.isEmpty, "nothing here is bitmap-gated")
     }
 
-    /// Only the jring's PPG sweep returns every vital in one packet, so only it collapses the Vitals
-    /// measure row into a single "Measure Vitals" action.
-    func testCombinedVitalsMeasurementIsJringOnly() {
-        XCTAssertTrue(JringCoordinator().capabilities.contains(.combinedVitalsMeasurement))
-        XCTAssertFalse(ColmiCoordinator().capabilities.contains(.combinedVitalsMeasurement))
-        XCTAssertFalse(TK5Coordinator().capabilities.contains(.combinedVitalsMeasurement))
+    /// This ring measures one vital at a time, so the Vitals screen keeps a button per metric instead of
+    /// collapsing them into a single "Measure Vitals" action.
+    func testCombinedVitalsMeasurementIsNotDeclared() {
+        XCTAssertFalse(VeepooCoordinator().capabilities.contains(.combinedVitalsMeasurement))
     }
 
     // MARK: - Vital visibility (capability first, then user opt-out)
 
     func testHiddenVitalIsNotVisibleButUnsupportedStillFalse() throws {
         let context = try TestSupport.makeContext()
-        let colmi = Device(
-            deviceType: .colmiR02,
+        context.insert(Device(
+            deviceType: .veepoo,
             capabilities: [.heartRate, .spo2, .steps, .sleep, .battery, .stress, .hrv, .temperature]
-        )
-        context.insert(colmi)
+        ))
         try context.save()
 
         let store = MetricPrefsStore(defaults: makeEphemeralDefaults())

@@ -2,115 +2,56 @@ import XCTest
 import SwiftData
 @testable import PulseLoop
 
-/// The product UI gates metric cards on the active device's capabilities. A jring hides
-/// HRV/Stress/Temperature; a Colmi R02 shows them. These assertions drive off `Device.capabilities`
-/// via `MetricsService.supports`.
+/// The product UI gates metric cards on the active device's capabilities. For the Agara ring that means
+/// the metrics the Veepoo/TK20 protocol actually delivers, and nothing else: a card for a metric the
+/// ring never records would render permanently empty.
 @MainActor
 final class CapabilityGatingTests: XCTestCase {
 
-    func testJringHidesColmiOnlyMetrics() throws {
+    private var agara: Set<WearableCapability> { VeepooCoordinator().capabilities }
+
+    func testTheAgaraRingSurfacesTheMetricsItRecords() throws {
         let context = try TestSupport.makeContext()
-        let jring = Device(deviceType: .jring, capabilities: [.heartRate, .spo2, .steps, .sleep, .battery])
-        context.insert(jring)
+        context.insert(Device(deviceType: .veepoo, capabilities: agara))
         try context.save()
 
-        XCTAssertTrue(MetricsService.supports(.heartRate, context: context))
-        XCTAssertTrue(MetricsService.supports(.spo2, context: context))
-        XCTAssertFalse(MetricsService.supports(.hrv, context: context))
-        XCTAssertFalse(MetricsService.supports(.stress, context: context))
-        XCTAssertFalse(MetricsService.supports(.temperature, context: context))
-    }
-
-    /// The LuckRing / TK18 baseline surfaces its metric cards — but deliberately not blood sugar, REM
-    /// staging, fatigue, or a combined-vitals sweep (the K6 protocol has no command or record for any
-    /// of them).
-    func testLuckRingSurfacesItsBaselineButNotTheExcludedMetrics() throws {
-        let context = try TestSupport.makeContext()
-        let ring = Device(deviceType: .luckRing, capabilities: LuckRingCoordinator().capabilities)
-        context.insert(ring)
-        try context.save()
-
-        for metric: MetricKey in [.heartRate, .spo2, .hrv, .temperature, .bloodPressureSystolic, .stress] {
+        for metric: MetricKey in [.heartRate, .spo2, .hrv, .stress,
+                                  .bloodPressureSystolic, .bloodPressureDiastolic, .bloodSugar] {
             XCTAssertTrue(MetricsService.supports(metric, context: context), metric.rawValue)
         }
-        // Blood sugar and fatigue are the two vital *metrics* the family deliberately does not claim.
-        for metric: MetricKey in [.bloodSugar, .fatigue] {
+    }
+
+    /// The ring records no temperature, no REM staging and no blood-fatigue score, and it measures vitals
+    /// one at a time (no combined sweep). Those cards stay out of the grid rather than sitting empty.
+    func testTheAgaraRingHidesTheMetricsItDoesNotRecord() throws {
+        let context = try TestSupport.makeContext()
+        context.insert(Device(deviceType: .veepoo, capabilities: agara))
+        try context.save()
+
+        for metric: MetricKey in [.temperature, .fatigue] {
             XCTAssertFalse(MetricsService.supports(metric, context: context), metric.rawValue)
         }
     }
 
-    /// The declared sets, straight from the coordinator: nothing excluded leaks in, and the family gates
-    /// nothing on a bitmap (the K6 FUNCTION_CONTROL bitmap is obfuscated in the decompile).
-    /// `.measurementInterval` *is* declared — the K6 auto-monitoring config (opcode 128) is a real
-    /// interval knob, and the firmware default is off.
-    func testLuckRingCoordinatorDeclaresTheApprovedSet() {
-        let coordinator = LuckRingCoordinator()
+    /// The declared set, straight from the coordinator — the one place a capability can come from. Each
+    /// entry is a verified protocol feature (see `docs/ring/veepoo-protocol.md`).
+    func testTheAgaraCoordinatorDeclaresTheVerifiedSet() {
+        let coordinator = VeepooCoordinator()
+        XCTAssertEqual(coordinator.capabilities, [
+            .steps, .realtimeSteps, .sleep, .battery,
+            .heartRate, .spo2, .spo2History, .hrv, .stress, .bloodSugar, .bloodPressure,
+            .manualHeartRate, .manualSpo2, .manualBloodPressure,
+        ])
+        // No per-unit sensor bitmap on this protocol, so nothing is bitmap-gated.
         XCTAssertTrue(coordinator.bitmapGatedCapabilities.isEmpty)
-        XCTAssertTrue(coordinator.capabilities.contains(.measurementInterval))
-        for cap: WearableCapability in [.bloodSugar, .remSleep, .fatigue, .combinedVitalsMeasurement, .powerOff, .factoryReset] {
-            XCTAssertFalse(coordinator.capabilities.contains(cap), cap.rawValue)
-        }
+        XCTAssertEqual(coordinator.refinedCapabilities(bitmapDerived: [.temperature]), coordinator.capabilities)
     }
 
-    /// The RWfit baseline is deliberately narrow — only what both wire framings serve
-    /// unconditionally — with every per-unit sensor *and* the whole on-demand measurement set
-    /// bitmap-gated: the manual/realtime commands are JieLi-only, so a legacy link must never
-    /// render measure buttons that could only time out.
-    func testRWfitBaselineIsNarrowAndRealtimeIsGated() {
-        let coordinator = RWfitCoordinator()
-        XCTAssertEqual(coordinator.capabilities,
-                       [.battery])
-        for cap: WearableCapability in [.realtimeHeartRate, .manualHeartRate, .manualSpo2,
-                                        .bloodPressure, .temperature, .hrv, .stress, .bloodSugar] {
-            XCTAssertFalse(coordinator.capabilities.contains(cap), cap.rawValue)
-            XCTAssertTrue(coordinator.bitmapGatedCapabilities.contains(cap), cap.rawValue)
-        }
-    }
-
-    /// `refinedCapabilities` folds the JieLi framing grant + the ring's own TLV into the baseline,
-    /// and refuses anything the family didn't pre-approve.
-    func testRWfitRefinementAddsOnlyPreApprovedCapabilities() {
-        let coordinator = RWfitCoordinator()
-        let granted: Set<WearableCapability> = [.heartRate, .realtimeHeartRate, .manualHeartRate,
-                                                   .manualSpo2, .bloodPressure, .findDevice, .powerOff]
-        let refined = coordinator.refinedCapabilities(bitmapDerived: granted)
-        XCTAssertTrue(refined.isSuperset(of: [.heartRate, .realtimeHeartRate, .manualHeartRate,
-                                              .manualSpo2, .bloodPressure]))
-        XCTAssertFalse(refined.contains(.findDevice), "not pre-approved — the bitmap cannot conjure it")
-        XCTAssertFalse(refined.contains(.powerOff))
-    }
-
-    func testColmiShowsRichMetrics() throws {
-        let context = try TestSupport.makeContext()
-        let colmi = Device(
-            deviceType: .colmiR02,
-            capabilities: [.heartRate, .spo2, .steps, .sleep, .battery, .stress, .hrv, .temperature, .remSleep]
-        )
-        context.insert(colmi)
-        try context.save()
-
-        XCTAssertTrue(MetricsService.supports(.heartRate, context: context))
-        XCTAssertTrue(MetricsService.supports(.hrv, context: context))
-        XCTAssertTrue(MetricsService.supports(.stress, context: context))
-        XCTAssertTrue(MetricsService.supports(.temperature, context: context))
-    }
-
-    func testManualSpo2GatingDiffersByDevice() {
-        // jring supports an on-demand SpO2 spot reading; Colmi does not (SpO2 is all-day only).
-        XCTAssertTrue(JringCoordinator().capabilities.contains(.manualSpo2))
-        XCTAssertFalse(ColmiCoordinator().capabilities.contains(.manualSpo2))
-        // Both still expose SpO2 history (the graph) and manual HR.
-        XCTAssertTrue(JringCoordinator().capabilities.contains(.spo2))
-        XCTAssertTrue(ColmiCoordinator().capabilities.contains(.spo2))
-        XCTAssertTrue(ColmiCoordinator().capabilities.contains(.manualHeartRate))
-    }
-
+    /// A device row that predates capability stamping (empty `capabilitiesRaw`) still shows the base
+    /// metrics, so an upgrade doesn't cost anyone their HR/SpO₂ cards.
     func testLegacyDeviceFallsBackToBaseMetrics() throws {
-        // A device row that predates capability stamping (empty capabilitiesRaw) should still show
-        // the base metrics so existing users don't lose HR/SpO₂.
         let context = try TestSupport.makeContext()
-        let legacy = Device(deviceType: .jring, capabilities: [])
-        context.insert(legacy)
+        context.insert(Device(deviceType: .veepoo, capabilities: []))
         try context.save()
 
         XCTAssertTrue(MetricsService.supports(.heartRate, context: context))
@@ -119,8 +60,32 @@ final class CapabilityGatingTests: XCTestCase {
     }
 
     func testCapabilityCSVRoundTrip() {
-        let caps: Set<WearableCapability> = [.heartRate, .hrv, .temperature]
-        let restored = Set<WearableCapability>(csv: caps.csv)
-        XCTAssertEqual(caps, restored)
+        let caps: Set<WearableCapability> = [.heartRate, .hrv, .bloodPressure]
+        XCTAssertEqual(Set<WearableCapability>(csv: caps.csv), caps)
+        // Unknown tokens (an older or newer store) are ignored rather than failing the parse.
+        XCTAssertEqual(Set<WearableCapability>(csv: "heartRate,notACapability"), [.heartRate])
+    }
+
+    /// The bitmap refinement stays additive-only: a device bitmap may grant a capability the coordinator
+    /// pre-approved, and can never conjure one it did not — nor remove part of the baseline.
+    func testRefinementIsAdditiveAndPreApprovedOnly() {
+        let refined = GatedCoordinator().refinedCapabilities(
+            bitmapDerived: [.temperature, .fatigue, .bloodSugar]
+        )
+        XCTAssertTrue(refined.contains(.temperature), "pre-approved, so the bitmap may grant it")
+        XCTAssertFalse(refined.contains(.bloodSugar), "not pre-approved: the bitmap cannot conjure it")
+        XCTAssertTrue(refined.isSuperset(of: GatedCoordinator().capabilities),
+                      "a bitmap can never remove a baseline capability")
+    }
+
+    /// A coordinator that opts into bitmap gating, used only to exercise the mechanism.
+    private struct GatedCoordinator: WearableCoordinator {
+        static let deviceType: RingDeviceType = .veepoo
+        static func matches(name: String?, advertisement: AdvertisementInfo) -> Bool { false }
+        init() {}
+        let capabilities: Set<WearableCapability> = [.heartRate, .spo2, .steps]
+        let bitmapGatedCapabilities: Set<WearableCapability> = [.temperature, .stress]
+        let iconSystemName = "circle"
+        func makeDriver(writer: RingCommandWriter) -> WearableDriver { VeepooDriver(writer: writer) }
     }
 }

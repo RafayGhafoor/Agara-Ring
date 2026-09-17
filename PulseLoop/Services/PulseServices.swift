@@ -159,7 +159,7 @@ enum MetricsService {
         MetricsRepository.activityRows(descending: context)
     }
 
-    /// The current device's capabilities, used to gate metric UI. Falls back to the jring base set
+    /// The current device's capabilities, used to gate metric UI. Falls back to the ring base set
     /// for legacy rows that predate capability stamping (empty `capabilitiesRaw`), so existing users
     /// keep seeing HR / SpO₂ / steps / sleep / battery.
     static func deviceCapabilities(_ context: ModelContext) -> Set<WearableCapability> {
@@ -171,7 +171,7 @@ enum MetricsService {
     }
 
     /// Capabilities of the device the UI should reason about *right now*. Prefers the live connection's
-    /// declared set (so plugging in a 56ff immediately hides Colmi-only controls), and falls back to the
+    /// declared set (so plugging in a 56ff immediately hides the ring-only controls), and falls back to the
     /// last stored device row when nothing is connected.
     static func activeCapabilities(context: ModelContext, ble: RingBLEClient?) -> Set<WearableCapability> {
         if let ble, ble.state == .connected, !ble.activeCapabilities.isEmpty {
@@ -748,7 +748,7 @@ enum ActivityService {
     /// Tag for days whose totals are summed from ring history buckets (vs. live cumulative updates).
     static let ringHistorySource = "ring_history"
 
-    /// Persist one intraday activity **bucket** from ring history (e.g. a Colmi quarter-hour `0x43`
+    /// Persist one intraday activity **bucket** from ring history (e.g. a the ring quarter-hour `0x43`
     /// sample) and recompute its day's total. The bucket is **upserted by its start time** into
     /// `ActivityBucketSample`, so re-syncing the same bucket *replaces* it (never accumulates), and the
     /// day's `ActivityDaily.steps/distance` is recomputed as the **sum of distinct buckets** for that

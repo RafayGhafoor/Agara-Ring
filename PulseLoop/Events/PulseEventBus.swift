@@ -14,11 +14,6 @@ enum PulseEvent: Sendable {
     case deviceForgotten
     case batteryLevel(percent: Int)
     case decodedPacket(RingDecodedEvent)
-    case rwfitSyncOutcome(RWfitSyncOutcome)
-    case rwfitInitialization(RWfitInitializationState)
-    case rwfitDiagnostic(message: String, metadata: [String: String])
-    case rwfitMeasurementOutcome(RWfitMeasurementOutcome)
-    case rwfitMeasurement(type: UInt8, status: UInt8)
     case rawPacket(direction: PacketDirection, data: Data, decoded: RingDecodedEvent)
     case derivedUpdate(kind: String, entityType: String, entityId: String, payloadJSON: String?)
     case activityUpdate(timestamp: Date, steps: Int, distanceMeters: Double, calories: Double)
@@ -37,12 +32,11 @@ enum PulseEvent: Sendable {
     case stressSample(value: Int, timestamp: Date)
     case hrvSample(value: Int, timestamp: Date)
     case temperatureSample(celsius: Double, timestamp: Date)
-    // Extra metrics from the jring/56ff 0x24 combined-sensor packet.
     case bloodPressureSample(systolic: Int, diastolic: Int, timestamp: Date)
     case fatigueSample(value: Int, timestamp: Date)
     case bloodSugarSample(mgdl: Double, timestamp: Date)
     /// Firmware version string parsed from the ring's status/firmware payload; persisted on the Device.
-    /// The ring reported whether it is on the finger (CRP group-3/cmd-7 `onWearStateChange`).
+    /// The ring reported whether it is on the finger.
     /// `RingSyncCoordinator` uses `worn == false` to fast-fail an in-flight spot measure: an optical
     /// sensor with no skin contact cannot read, so idling out the full window only wastes the user's
     /// time. Not persisted — it is a live condition, not data.
@@ -111,7 +105,6 @@ final class EventPersistenceSubscriber {
     /// woke every `@Query` hundreds of times (the re-render storm). Instead we insert/mutate without
     /// saving, then flush (one `save()` + one "data changed" signal) after the stream briefly idles
     /// or a hard cap of pending writes is reached.
-    private var mergingRWfitSleep = false
     private var pendingWrites = 0
     private var flushTask: Task<Void, Never>?
     /// Idle window after the last event before we flush a batch.
@@ -152,10 +145,6 @@ final class EventPersistenceSubscriber {
 
     func start() {
         guard task == nil else { return }
-        RWfitHistoryPersistence.save = { [weak self] events in
-            guard let self else { throw RWfitHistoryPersistence.PersistenceError.unavailable }
-            try self.saveRWfitHistory(events)
-        }
         task = Task {
             let stream = await PulseEventBus.shared.stream()
             for await event in stream {
@@ -167,7 +156,6 @@ final class EventPersistenceSubscriber {
     }
 
     func stop() {
-        RWfitHistoryPersistence.save = nil
         flushTask?.cancel()
         flushNow()
         task?.cancel()
@@ -181,68 +169,6 @@ final class EventPersistenceSubscriber {
         // calorie-estimate recomputes before the save (no-op when nothing is dirty).
         DailyCalorieEstimator.flushDirty(context: context)
         flushNow()
-    }
-
-    /// Destructive history consumption is allowed only after this synchronous durable commit.
-    func saveRWfitHistory(_ events: [RingDecodedEvent], commit: (() throws -> Void)? = nil) throws {
-        let typed = try events.flatMap { decoded -> [PulseEvent] in
-            let mapped = RingEventBridge.events(for: decoded)
-            guard !mapped.isEmpty else { throw RWfitHistoryPersistence.PersistenceError.rejectedRecord }
-            return mapped
-        }
-        // Existing import helpers intentionally tolerate read errors for live data. Preflight those
-        // tables here so the destructive history path fails closed instead of treating a failed fetch
-        // as an empty database.
-        var measurements = try context.fetch(FetchDescriptor<Measurement>())
-        let activity = try RWfitActivityPersistence(context: context)
-        _ = try context.fetch(FetchDescriptor<SleepSession>())
-        _ = try context.fetch(FetchDescriptor<SleepStageBlock>())
-        // Commit unrelated live-event writes first. A failed history transaction can then roll
-        // back safely without discarding another stream's pending measurements.
-        try context.save()
-        pendingWrites = 0
-        flushTask?.cancel()
-        flushTask = nil
-        mergingRWfitSleep = true
-        defer { mergingRWfitSleep = false }
-        do {
-            for event in typed {
-                if activity.apply(event) { continue }
-                if case let .historyMeasurement(kind, value, timestamp) = event {
-                    if let row = measurements.first(where: {
-                        $0.kindRaw == kind.rawValue && $0.timestamp == timestamp && $0.sourceRaw == MeasurementSource.history.rawValue
-                    }) {
-                        row.value = value
-                    } else {
-                        let row = Measurement(kind: kind, value: value, unit: kind.unit, timestamp: timestamp, source: .history)
-                        context.insert(row)
-                        measurements.append(row)
-                        context.insert(DerivedUpdateRow(kind: "history_measurement", entityType: "measurement",
-                                                       entityId: row.id.uuidString))
-                        _ = ActivityRecorderService.linkSample(kind: kind, value: value, timestamp: timestamp,
-                            measurementId: row.id, source: .history, confidence: .known, context: context)
-                    }
-                    continue
-                }
-                if case let .sleepTimeline(timestamp, stages) = event {
-                    // Inject throwing reads so the shared best-effort sleep helper never performs
-                    // a swallowed fetch on the destructive-import path.
-                    let sessions = try context.fetch(FetchDescriptor<SleepSession>())
-                    let blocks = try context.fetch(FetchDescriptor<SleepStageBlock>())
-                    persistSleepTimeline(start: timestamp, stages: stages, sessions: sessions, blocks: blocks)
-                } else {
-                    applyPersist(event)
-                }
-            }
-            if let commit { try commit() } else { try context.save() }
-            for day in activity.touchedDays { DailyCalorieEstimator.markDirty(day) }
-            pendingWrites = 0
-            PulseDataChange.shared.notify()
-        } catch {
-            context.rollback()
-            seenHistoryKeys.removeAll()
-            throw error
-        }
     }
 
     func persist(_ event: PulseEvent) {
@@ -288,7 +214,7 @@ final class EventPersistenceSubscriber {
             device.bleAddressHint = address ?? device.bleAddressHint
             if state == .connected {
                 device.lastConnectedAt = Date()
-                if device.deviceType != .rwfit { device.lastSyncAt = Date() }
+                device.lastSyncAt = Date()
             }
             context.insert(device)
         case let .deviceIdentified(deviceType, wearableModelID, advertisedName, capabilities):
@@ -309,9 +235,9 @@ final class EventPersistenceSubscriber {
             // (`fetchDevices(context).first ?? Device()`), so a name adopted from the ring being
             // forgotten would otherwise outlive it — and, being neither empty nor a placeholder,
             // `adoptDeviceName` would read it as a name the user chose and defend it against the new
-            // ring's own advertisement forever. Forget an R99, pair a TK5, and the coach's `device_name`
-            // and the diagnostics export's `wearableName` would both still say "R99 54DC": worse than the
-            // old placeholder, because it reads as authoritative.
+            // ring's own advertisement forever. Forget one ring, pair the next, and the coach's
+            // `device_name` and the diagnostics export's `wearableName` would both still name the old
+            // one: worse than the old placeholder, because it reads as authoritative.
             device.name = ""
             context.insert(device)
         case let .batteryLevel(percent):
@@ -384,11 +310,11 @@ final class EventPersistenceSubscriber {
         case let .historyMeasurement(kind, value, timestamp):
             persistMeasurement(kind: kind, value: value, timestamp: timestamp, source: .history, kindLabel: "history_measurement")
         case let .stressSample(value, timestamp):
-            persistMeasurement(kind: .stress, value: Double(value), timestamp: timestamp, source: .colmi, kindLabel: "stress_sample")
+            persistMeasurement(kind: .stress, value: Double(value), timestamp: timestamp, source: .ring, kindLabel: "stress_sample")
         case let .hrvSample(value, timestamp):
-            persistMeasurement(kind: .hrv, value: Double(value), timestamp: timestamp, source: .colmi, kindLabel: "hrv_sample")
+            persistMeasurement(kind: .hrv, value: Double(value), timestamp: timestamp, source: .ring, kindLabel: "hrv_sample")
         case let .temperatureSample(celsius, timestamp):
-            persistMeasurement(kind: .temperature, value: celsius, timestamp: timestamp, source: .colmi, kindLabel: "temperature_sample")
+            persistMeasurement(kind: .temperature, value: celsius, timestamp: timestamp, source: .ring, kindLabel: "temperature_sample")
         case let .bloodPressureSample(systolic, diastolic, timestamp):
             // BP is two metrics in one packet — store as two rows so each trends independently.
             persistMeasurement(kind: .bloodPressureSystolic, value: Double(systolic), timestamp: timestamp, source: .live, kindLabel: "bp_systolic_sample")
@@ -426,7 +352,7 @@ final class EventPersistenceSubscriber {
             // Stamp the *completion* of a full history sync so the coach freshness gate can tell a
             // finished sync from a bare CONNECT (`lastSyncAt`, re-stamped every connect).
             if stage == "done" {
-                if let device = DeviceRepository.current(context: context), device.deviceType != .rwfit {
+                if let device = DeviceRepository.current(context: context) {
                     device.lastFullSyncAt = Date()
                 }
                 // The rows are committed by now; the next sync re-checks against the database.
@@ -435,15 +361,7 @@ final class EventPersistenceSubscriber {
                 // batched flush below saves the writes and fires the coalesced change signal.
                 DailyCalorieEstimator.flushDirty(context: context)
             }
-        case let .rwfitSyncOutcome(outcome):
-            if case .success = outcome, let device = DeviceRepository.current(context: context) {
-                let now = Date()
-                device.lastSyncAt = now
-                device.lastFullSyncAt = now
-            }
-            seenHistoryKeys.removeAll(keepingCapacity: true)
-            DailyCalorieEstimator.flushDirty(context: context)
-        case .decodedPacket, .rwfitInitialization, .rwfitDiagnostic, .rwfitMeasurement, .rwfitMeasurementOutcome:
+        case .decodedPacket:
             break
         // `.wearState` is a live condition the measurement flow reacts to, not data — nothing to store.
         case .heartRateComplete, .spo2Progress, .spo2Complete, .workoutStarted, .workoutPaused,
@@ -510,28 +428,28 @@ final class EventPersistenceSubscriber {
         lastBatteryLogAt = now
     }
 
-    /// Names nobody chose: the `Device()` initializer's default (`"SMART_RING"`, which is also the jring's
-    /// display name) and every other family's fallback. A `Device.name` still holding one of these has
-    /// never been told what the ring is actually called.
-    private static let placeholderDeviceNames: Set<String> = Set(RingDeviceType.allCases.map(\.displayName))
+    /// Names nobody chose: `"SMART_RING"` (the default `Device()` used to insert, and still sitting in
+    /// rows written before `Device.name` became empty by default) and the ring's own placeholder name.
+    /// A `Device.name` holding one of these has never been told what the ring is actually called, so it
+    /// is the only kind of name this may overwrite.
+    private static let placeholderDeviceNames: Set<String> =
+        Set(["SMART_RING"] + RingDeviceType.allCases.map(\.displayName))
 
     /// Give the device the best name available for the ring **now on the other end of the link** — its
     /// advertised name, or its family's placeholder when the advertisement carried none — without ever
     /// overwriting a name a human chose.
     ///
     /// `Device.name` is what the human-facing surfaces read (the coach's device context, the diagnostics
-    /// export's `wearableName`), and nothing ever wrote it: a paired Colmi R99 exported as `SMART_RING`,
-    /// the jring's default, which is a misleading thing to hand someone debugging a Colmi. `advertisedName`
-    /// alone was set and nothing read it.
+    /// export's `wearableName`), and nothing ever wrote it: a paired ring exported as `SMART_RING`, which
+    /// is a misleading thing to hand someone debugging. `advertisedName` alone was set and nothing read it.
     ///
     /// The placeholder check is the whole of the "don't clobber" rule. No screen renames a device today,
     /// so in practice this only ever fills a blank — but when one does, the user's name must survive the
     /// next connect, which re-publishes `.deviceIdentified` on every handshake.
     ///
-    /// Falling back to `deviceType.displayName` is what keeps the row's name in the *current* ring's family
-    /// when a connect brings no advertisement to adopt (state restoration, a cached peripheral): the row is
-    /// shared across pairings, so without it a fresh TK5 could keep answering to the name of the Colmi that
-    /// used to be in this slot. `.deviceForgotten` clears the name to `""` precisely so this path can run.
+    /// Falling back to `deviceType.displayName` keeps the row's name in the *current* ring's family when a
+    /// connect brings no advertisement to adopt (state restoration, a cached peripheral). `.deviceForgotten`
+    /// clears the name to `""` precisely so this path can run.
     private func adoptDeviceName(advertised: String?, deviceType: RingDeviceType, on device: Device) {
         let current = device.name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard current.isEmpty || Self.placeholderDeviceNames.contains(current) else { return }
@@ -578,37 +496,6 @@ final class EventPersistenceSubscriber {
         let daySessionIds = Set(sessionsForDay.map { $0.id })
         let existingDayBlocks = (blocks ?? ((try? context.fetch(FetchDescriptor<SleepStageBlock>())) ?? []))
             .filter { daySessionIds.contains($0.sessionId) }
-        if mergingRWfitSleep {
-            // A recovered journal may extend or overlap an already-imported session. Normalize by
-            // minute so a shorter previously saved block cannot suppress the rest of a replay.
-            var minuteStages: [Date: SleepStage] = [:]
-            for block in existingDayBlocks {
-                for minute in 0..<max(0, block.durationMinutes) {
-                    minuteStages[block.startAt.addingTimeInterval(Double(minute) * 60)] = block.stage
-                }
-            }
-            for (minute, stage) in stages.enumerated() {
-                minuteStages[start.addingTimeInterval(Double(minute) * 60)] = stage
-            }
-            for block in existingDayBlocks { context.delete(block) }
-            let dates = minuteStages.keys.sorted()
-            var merged: [SleepStageBlock] = []
-            for date in dates {
-                guard let stage = minuteStages[date] else { continue }
-                if let last = merged.last, last.stage == stage,
-                   last.startAt.addingTimeInterval(Double(last.durationMinutes) * 60) == date {
-                    last.durationMinutes += 1
-                } else {
-                    let block = SleepStageBlock(sessionId: container.id, startAt: date,
-                                                startMinute: 0, durationMinutes: 1, stage: stage)
-                    context.insert(block)
-                    merged.append(block)
-                }
-            }
-            SleepService.reconcileWakingDay(dateKey: dateKey, context: context,
-                                            daySessions: sessionsForDay, dayBlocks: merged)
-            return
-        }
         var existingStarts = Set(existingDayBlocks.map { $0.startAt })
         var newBlocks: [SleepStageBlock] = []
 

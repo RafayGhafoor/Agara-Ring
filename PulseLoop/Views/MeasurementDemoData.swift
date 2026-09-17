@@ -41,7 +41,7 @@ enum MeasurementDemoData {
             return Reading(value: latest(.bloodPressureSystolic), secondary: latest(.bloodPressureDiastolic))
 
         case .vitals:
-            // Mock the metrics the jring's combined packet actually carries.
+            // Mock the metrics the ring's combined packet actually carries.
             for metric in [MeasurementKind.heartRate, .spo2, .bloodPressureSystolic, .bloodPressureDiastolic] {
                 MetricsService.insertMockMeasurement(kind: metric, context: context)
             }

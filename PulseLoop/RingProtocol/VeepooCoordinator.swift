@@ -1,11 +1,11 @@
 import Foundation
 @preconcurrency import CoreBluetooth
 
-/// Coordinator for the Veepoo / TK20 ring (the "H Ring" vendor app, `cn.hring.veepoo`).
+/// Coordinator for the Veepoo / Agara Ring (the "H Ring" vendor app, `cn.hring.veepoo`).
 ///
-/// Recognition is name-first, like the TK5: the ring advertises as `TK20` (the verified unit
+/// Recognition is name-first, like an earlier family: the ring advertises as `TK20` (the verified unit
 /// advertised nothing but the name + `FEE7` service + a `f8f8` manufacturer marker, and `TK20` does
-/// not hit the `TK5` prefix, so the earlier coordinator in the registry cannot shadow it).
+/// not hit the `an earlier family` prefix, so the earlier coordinator in the registry cannot shadow it).
 ///
 /// ## Capability discipline
 ///

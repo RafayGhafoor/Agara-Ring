@@ -7,10 +7,10 @@ import Foundation
 /// The strategy is capability-driven, not device-driven: a ring with a realtime HR stream gets the
 /// stream for the whole workout (dense samples, no 30 s spot warm-ups); one without falls back to
 /// timer-driven spot polls. SpO2 is only spot-polled on devices that can actually take an instant
-/// reading — Colmi can't, so it surfaces the ring's all-day log instead of failing reads.
+/// reading — the ring can't, so it surfaces the ring's all-day log instead of failing reads.
 struct WorkoutVitalsPlan: Equatable, Sendable {
     enum HRMode: Equatable, Sendable {
-        /// Continuous live HR stream for the whole workout (jring 0x14 / Colmi 0x1e).
+        /// Continuous live HR stream for the whole workout (the ring 0x14 / the ring 0x1e).
         case stream
         /// Timer-driven one-shot reads (legacy behaviour; devices without `.realtimeHeartRate`).
         case spotPoll
@@ -18,17 +18,17 @@ struct WorkoutVitalsPlan: Equatable, Sendable {
     }
 
     enum SpO2Mode: Equatable, Sendable {
-        /// Periodic instant readings (`.manualSpo2`, jring 0x23/0x3f).
+        /// Periodic instant readings (`.manualSpo2`, the ring 0x23/0x3f).
         case spotPoll
         /// No instant reading exists; show the latest all-day value and backfill from the ring
-        /// log after the workout (`.spo2History`, Colmi).
+        /// log after the workout (`.spo2History`, the ring).
         case ringLog
         case off
     }
 
     var hrMode: HRMode
     var spo2Mode: SpO2Mode
-    /// Bump the ring's all-day HR log to its densest interval for the workout (Colmi 0x16, 5-min
+    /// Bump the ring's all-day HR log to its densest interval for the workout (the ring 0x16, 5-min
     /// floor) so the on-ring log backfills any stream gaps; the user's configured interval is
     /// restored at finish.
     var bumpRingInterval: Bool

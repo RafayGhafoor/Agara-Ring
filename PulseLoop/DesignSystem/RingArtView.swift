@@ -2,10 +2,10 @@ import SwiftUI
 
 /// Renders a smart ring's product art on a light "platter" for the pairing carousel and the Settings
 /// hero. Each `WearableModel` supplies its own `imageName`; a model (or connected device) without one
-/// falls back to a generic Colmi-style ring — the de-facto look of these inexpensive rings.
+/// falls back to a generic the ring-style ring — the de-facto look of these inexpensive rings.
 struct RingArtView: View {
     /// Generic ring shown when no model-specific image is available.
-    static let fallbackImage = "colmi-r09"
+    static let fallbackImage = "generic-ring"
 
     var tint: Color
     var size: CGFloat = 180

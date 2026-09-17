@@ -226,7 +226,7 @@ final class CoachNotificationService {
         // check-ins fire mid-sync. `lastFullSyncAt` is stamped only on `.syncProgress("done")`.
         if let fullSync = DeviceRepository.current(context: modelContext)?.lastFullSyncAt, fullSync >= cutoff { return true }
         // Fallback: a recent live measurement is fresh data even without a full-sync stamp (covers
-        // jring, which streams samples continuously rather than running a paged history sync).
+        // the ring, which streams samples continuously rather than running a paged history sync).
         if let latest = latestMeasurementTimestamp(), latest >= cutoff { return true }
         return false
     }

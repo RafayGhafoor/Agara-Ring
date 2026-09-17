@@ -19,7 +19,7 @@ enum BatteryAlertKind: Equatable {
 /// Pure transition function: (new sample, state) -> (alert?, new state).
 ///
 /// Level-triggered + latched: fires when a sample is observed below a threshold that hasn't fired yet
-/// — battery samples are sparse (jring reports only on connect), so an edge trigger would miss
+/// — battery samples are sparse (the ring reports only on connect), so an edge trigger would miss
 /// "connected already at 17%".
 enum BatteryAlertEngine {
     static let lowThreshold = 20

@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Results for the combined vitals sweep — the one measurement that returns everything the ring
-/// computes at once (jring's `0x24` packet), rather than a single number.
+/// computes at once (the ring's `0x24` packet), rather than a single number.
 ///
 /// Lives beside `MeasurementSheet` rather than inside it: the sheet's other four kinds all resolve to
 /// one reading in the middle of the ring, and this is the only one that has to lay out a whole grid.

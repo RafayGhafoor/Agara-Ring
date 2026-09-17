@@ -86,7 +86,7 @@ struct VitalsView: View {
     @ViewBuilder
     private func measureRow(_ store: VitalsStore) -> some View {
         // On-demand spot measurements are capability-gated. Rings whose PPG sweep computes every metric
-        // at once (jring: one `0x23` measurement returns HR + BP + SpO₂ + fatigue in a single `0x24`
+        // at once (the ring: one `0x23` measurement returns HR + BP + SpO₂ + fatigue in a single `0x24`
         // packet) get a single "Measure Vitals" action. Everything else measures one metric at a time.
         let caps = store.capabilities
         if caps.contains(.combinedVitalsMeasurement) {

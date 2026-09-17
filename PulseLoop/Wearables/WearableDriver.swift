@@ -29,31 +29,31 @@ extension RingCommandWriter {
 /// decoding (incl. any multi-packet reassembly), and it builds the per-device `RingSyncEngine`.
 ///
 /// `RingBLEClient` stays device-agnostic by reading topology from the active driver and routing every
-/// notify frame through `ingest`. The jring driver is a thin wrapper over the existing
-/// `RingDecoder`/`RingEncoder`; the Colmi driver adds checksum framing + big-data reassembly.
+/// notify frame through `ingest`. The the ring driver is a thin wrapper over the existing
+/// `RingDecoder`/`RingEncoder`; the ring driver adds checksum framing + big-data reassembly.
 @MainActor
 protocol WearableDriver: AnyObject {
     // BLE topology
     var serviceUUIDs: [CBUUID] { get }
     var writeUUID: CBUUID { get }
-    var notifyUUIDs: [CBUUID] { get }          // jring: 1; Colmi: 2 (V1 normal + V2 big-data)
+    var notifyUUIDs: [CBUUID] { get }          // one characteristic on this ring
 
-    /// Optional second write characteristic for out-of-band / big-data requests. Colmi sends `0xbc`
+    /// Optional second write characteristic for out-of-band / big-data requests. the ring sends `0xbc`
     /// big-data requests (SpO2/sleep/temperature) here (`de5bf72a`), with replies on the V2 notify
-    /// char. `nil` ⇒ the device has a single write characteristic (jring).
+    /// char. `nil` ⇒ the device has a single write characteristic (the ring).
     var commandUUID: CBUUID? { get }
 
     /// GATT battery, when the device exposes it. `nil` ⇒ battery arrives in-band as a decoded event
-    /// (Colmi reports battery via command `0x03` / notification, not a GATT characteristic).
+    /// (the ring reports battery via command `0x03` / notification, not a GATT characteristic).
     var batteryServiceUUID: CBUUID? { get }
     var batteryCharUUID: CBUUID? { get }
 
-    /// Apply outbound framing. jring: identity (already 20 bytes). Colmi: pad to 15 content bytes +
+    /// Apply outbound framing. the ring: identity (already 20 bytes). the ring: pad to 15 content bytes +
     /// append the trailing-sum checksum byte (16 total).
     func frame(_ command: Data) -> Data
 
     /// Whether an outbound frame must go to the `commandUUID` characteristic instead of `writeUUID`.
-    /// Colmi: true for `0xbc` big-data requests. Default: false.
+    /// the ring: true for `0xbc` big-data requests. Default: false.
     func usesCommandChannel(for frame: Data) -> Bool
 
     /// Decode one inbound notify frame, tagged with the characteristic it arrived on. Returns 0..n
@@ -64,7 +64,7 @@ protocol WearableDriver: AnyObject {
     /// A GATT link has just come up. Auto-reconnect re-uses the *same* driver instance (only a fresh
     /// pairing rebuilds it), so any partially-reassembled frame or in-flight transfer left over from
     /// the dropped link must be discarded here or it corrupts the first frames of the new one.
-    /// Default: no-op (jring/Colmi carry no cross-connection reassembly state).
+    /// Default: no-op (the ring/the ring carry no cross-connection reassembly state).
     func connectionDidStart()
 
     /// The GATT link has dropped. Clearing on the *next* connect is not enough for a driver whose state
@@ -78,7 +78,7 @@ protocol WearableDriver: AnyObject {
     /// A driver that leaves this empty gets the historical behaviour: `.connected` fires — and with it
     /// the startup handshake — on whichever notify characteristic reports `isNotifying` first. That is
     /// fine for a device whose channels are interchangeable, and wrong for one that splits its protocol
-    /// across them: YCBT puts every command *reply* on `be940001` and the live/history stream on
+    /// across them: an earlier protocol puts every command *reply* on `be940001` and the live/history stream on
     /// `be940003`, so a handshake begun after only one is live loses whichever half was still pending —
     /// silently, because a missing reply is indistinguishable from a slow one.
     ///
@@ -92,18 +92,18 @@ protocol WearableDriver: AnyObject {
     /// Default: none.
     func immediatePostSubscriptionCommands() -> [Data]
 
-    /// The stateful brain: startup sequence + (for Colmi) the response-driven history machine.
+    /// The stateful brain: startup sequence + (for the ring) the response-driven history machine.
     func makeSyncEngine() -> RingSyncEngine
 
     /// Called once per GATT link, immediately after service discovery and before any characteristic
     /// I/O, with every service UUID the peripheral exposes — including ones outside `serviceUUIDs`.
     ///
-    /// Exists for the one family whose *wire framing* cannot be known before connect: RWfit rings all
+    /// Exists for the one family whose *wire framing* cannot be known before connect: rings all
     /// share the `A00A`/`B002`/`B003` GATT but speak two different framings, initially hinted at by
     /// which sibling services (JieLi `AE00`, Telink/PixArt OTA) the firmware exposes. The vendor app
     /// makes the same decision in `onServicesDiscovered`. Runs before notify subscription — and so
     /// before `.connected`, `immediatePostSubscriptionCommands()` and `runStartup()` — which
-    /// provides an initial framing hint; RWfit validates it against received frames. Default: no-op.
+    /// provides an initial framing hint; the ring validates it against received frames. Default: no-op.
     func servicesDiscovered(_ services: [CBUUID])
 }
 
@@ -117,34 +117,28 @@ extension WearableDriver {
     /// starts notifying.
     var requiredSubscriptionsBeforeConnected: [CBUUID] { [] }
     func immediatePostSubscriptionCommands() -> [Data] { [] }
-    /// Only a driver whose framing depends on the discovered GATT (RWfit) cares.
+    /// Only a driver whose framing depends on the discovered GATT (the ring) cares.
     func servicesDiscovered(_ services: [CBUUID]) {}
 }
 
 /// User-chosen all-day measurement configuration, passed as a plain value from the app layer into a
 /// sync engine (the engine never reads SwiftData itself). Devices that support `.measurementInterval`
-/// (Colmi) translate this into the relevant ring commands; others ignore it.
+/// (the ring) translate this into the relevant ring commands; others ignore it.
 struct MeasurementSettings: Sendable, Equatable {
     var hrEnabled: Bool
-    /// All-day HR sampling interval in minutes (Colmi clamps to 5…60 in 5-min steps).
+    /// All-day HR sampling interval in minutes (the ring clamps to 5…60 in 5-min steps).
     var hrIntervalMinutes: Int
     var spo2Enabled: Bool
     var stressEnabled: Bool
     var hrvEnabled: Bool
     var temperatureEnabled: Bool
 
-    /// The current firmware default (matches the previous hard-coded Colmi startup behaviour).
+    /// The current firmware default (matches the previous hard-coded startup behaviour).
     static let allOnDefault = MeasurementSettings(
         hrEnabled: true, hrIntervalMinutes: 5,
         spo2Enabled: true, stressEnabled: true, hrvEnabled: true, temperatureEnabled: true
     )
 
-    /// The jring's own vendor-app default (30-minute cadence). Used until the user's stored settings
-    /// are pushed in, so a freshly paired ring still arms its background logging at a sane rate.
-    static let jringDefault = MeasurementSettings(
-        hrEnabled: true, hrIntervalMinutes: 30,
-        spo2Enabled: true, stressEnabled: true, hrvEnabled: true, temperatureEnabled: true
-    )
 }
 
 /// The user's profile, projected to the byte-ish shape a ring's user-preferences command expects.
@@ -152,7 +146,7 @@ struct MeasurementSettings: Sendable, Equatable {
 /// take a profile ignore it.
 struct UserProfileValues: Sendable, Equatable {
     var metric: Bool
-    /// Ring gender byte: 0x00 female, 0x01 male, 0x02 unspecified/other (Colmi convention).
+    /// Ring gender byte: 0x00 female, 0x01 male, 0x02 unspecified/other (the ring convention).
     var gender: UInt8
     var age: UInt8
     var heightCm: UInt8
@@ -172,8 +166,8 @@ struct UserProfileValues: Sendable, Equatable {
     }
 }
 
-/// Per-device orchestration of command flows. The jring engine is fire-and-forget (`handle` is a
-/// no-op); the Colmi engine advances a 7-stage response-driven history machine inside `handle`.
+/// Per-device orchestration of command flows. The the ring engine is fire-and-forget (`handle` is a
+/// no-op); the ring engine advances a 7-stage response-driven history machine inside `handle`.
 /// Lives behind the driver so `RingBLEClient` / `RingSyncCoordinator` stay clean.
 @MainActor
 protocol RingSyncEngine: AnyObject {
@@ -185,8 +179,8 @@ protocol RingSyncEngine: AnyObject {
     /// so stale work cannot leak across the reconnect gap or report a false successful sync.
     func connectionDidEnd()
 
-    /// Run the connect-time sequence (status/time/locale/etc. for jring; phone-name/time/prefs +
-    /// settings reads for Colmi).
+    /// Run the connect-time sequence (status/time/locale/etc. for the ring; phone-name/time/prefs +
+    /// settings reads for the ring).
     func runStartup()
 
     /// Advance any response-driven state machine. Called synchronously for every decoded event.
@@ -194,16 +188,16 @@ protocol RingSyncEngine: AnyObject {
 
     // App-facing actions (the façade `RingSyncCoordinator` drives these).
 
-    /// Start the *live/workout* HR stream (jring: 0x14; Colmi: realtime 0x1e + keepalive).
+    /// Start the *live/workout* HR stream (the ring: 0x14; the ring: realtime 0x1e + keepalive).
     func startHeartRate()
     func stopHeartRate()
-    /// One-shot *spot* HR measurement (jring: same as start; Colmi: manual 0x69). Defaults to the
+    /// One-shot *spot* HR measurement (the ring: same as start; the ring: manual 0x69). Defaults to the
     /// live start/stop for engines that don't distinguish.
     func measureHeartRateSpot()
     func startSpO2()
     func stopSpO2()
     /// Start/stop an on-demand blood-pressure measurement. Only rings whose live protocol has a BP
-    /// mode (jring: 0x23 mode 1) implement these; the default is a no-op (see the extension below).
+    /// mode (the ring: 0x23 mode 1) implement these; the default is a no-op (see the extension below).
     func startBloodPressure()
     func stopBloodPressure()
 
@@ -212,7 +206,7 @@ protocol RingSyncEngine: AnyObject {
     func startCombinedVitals()
     func stopCombinedVitals()
     /// Start/stop an on-demand HRV stream. Only devices whose live protocol has a dedicated HRV mode
-    /// (YCBT) implement these; the default is a no-op (see the extension below).
+    /// (an earlier protocol) implement these; the default is a no-op (see the extension below).
     func startHRV()
     func stopHRV()
     func findDevice()
@@ -242,28 +236,28 @@ protocol RingSyncEngine: AnyObject {
     /// Push BP calibration *now* (store + send) — the live path when the calibration screen saves.
     func applyBloodPressureCalibration(systolic: Int, diastolic: Int)
 
-    /// Release the ring on Forget: send the unbind command (jring 0x4B UNBOND) so the ring stops
+    /// Release the ring on Forget: send the unbind command (the ring 0x4B UNBOND) so the ring stops
     /// streaming to us and re-advertises for other apps. Devices without a bind protocol ignore it.
     func unbind()
 
     /// Targeted post-workout history pull: re-read the ring's own HR/SpO2 logs so samples recorded
-    /// while the phone was away/suspended land in the just-finished session (Colmi: HR day 0 +
-    /// SpO2 big-data; jring: the 0x16 measurement history stream). Devices without a readable
+    /// while the phone was away/suspended land in the just-finished session (the ring: HR day 0 +
+    /// SpO2 big-data; the ring: the 0x16 measurement history stream). Devices without a readable
     /// vitals log do nothing (default no-op below).
     func syncVitalsHistory()
 
     /// Re-run the ring's history pass **without** re-sending the connect handshake — the periodic
     /// top-up while connected (`RingSyncCoordinator`'s 30-minute timer). Only devices whose history is a
-    /// standalone, re-runnable transfer implement it (YCBT); on the others it is a no-op and the
+    /// standalone, re-runnable transfer implement it (an earlier protocol); on the others it is a no-op and the
     /// timer costs nothing, rather than them re-handshaking on a timer they never asked for.
     func syncHistory()
 
-    /// Re-request the ring's current battery level over its own protocol (Colmi: 0x03). jring reports
+    /// Re-request the ring's current battery level over its own protocol (the ring: 0x03). the ring reports
     /// battery via GATT (read separately by the client), so it has nothing to do here — default no-op.
     func requestBattery()
 
     /// Re-push the device clock after the phone's timezone or wall clock changes. Only rings whose
-    /// firmware keys behaviour off their own RTC need this (jring's sleep detection and day-indexed
+    /// firmware keys behaviour off their own RTC need this (the ring's sleep detection and day-indexed
     /// history do). Default no-op.
     func resyncTime()
 }
@@ -273,14 +267,14 @@ extension RingSyncEngine {
     func connectionDidStart() {}
     func connectionDidEnd() {}
 
-    /// Default: a spot measurement is just the live start (jring has no separate manual command).
+    /// Default: a spot measurement is just the live start (the ring has no separate manual command).
     func measureHeartRateSpot() { startHeartRate() }
 
-    /// Default: devices without a dedicated HRV mode (jring/Colmi) don't stream on-demand HRV.
+    /// Default: devices without a dedicated HRV mode (the ring/the ring) don't stream on-demand HRV.
     func startHRV() {}
     func stopHRV() {}
 
-    /// Default: devices without a blood-pressure sweep (Colmi) have nothing to measure.
+    /// Default: devices without a blood-pressure sweep (the ring) have nothing to measure.
     func startBloodPressure() {}
     func stopBloodPressure() {}
 
@@ -299,11 +293,11 @@ extension RingSyncEngine {
     func setUserProfile(_ profile: UserProfileValues) {}
     func applyUserProfile(_ profile: UserProfileValues) {}
 
-    /// Default: devices without on-device BP calibration (e.g. Colmi) ignore it.
+    /// Default: devices without on-device BP calibration (e.g. the ring) ignore it.
     func setBloodPressureCalibration(systolic: Int, diastolic: Int) {}
     func applyBloodPressureCalibration(systolic: Int, diastolic: Int) {}
 
-    /// Default: devices without a bind protocol (e.g. Colmi) have nothing to release.
+    /// Default: devices without a bind protocol (e.g. the ring) have nothing to release.
     func unbind() {}
 
     /// Default: devices without a readable vitals log have nothing to backfill.
@@ -313,6 +307,6 @@ extension RingSyncEngine {
     /// standalone pass to re-run.
     func syncHistory() {}
 
-    /// Default: devices that report battery over GATT (e.g. jring) have no in-band battery command.
+    /// Default: devices that report battery over GATT (e.g. the ring) have no in-band battery command.
     func requestBattery() {}
 }

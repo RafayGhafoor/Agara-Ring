@@ -9,7 +9,7 @@ struct WearableSettingsView: View {
     @Query private var devices: [Device]
     @Binding var path: NavigationPath
 
-    /// Colmi reports battery in-band (not via a GATT characteristic), so it lands on the persisted
+    /// the ring reports battery in-band (not via a GATT characteristic), so it lands on the persisted
     /// `Device` rather than `ble.batteryPercent`. Mirror the header's fallback so this never shows "--"
     /// when the header shows a value.
     private var batteryPercent: Int? { ble.batteryPercent ?? devices.first?.batteryPercent }

@@ -1,12 +1,6 @@
 import Foundation
 @preconcurrency import CoreBluetooth
 
-enum RingLinkKeepaliveMode: Equatable {
-    case command
-    case gattBatteryRead
-    case none
-}
-
 /// Device-agnostic CoreBluetooth client for any supported wearable.
 ///
 /// The client owns only the CoreBluetooth plumbing — scanning, connecting, discovering
@@ -32,58 +26,27 @@ final class RingBLEClient: NSObject {
     nonisolated deinit {}   // skip the main-actor isolated-deinit hop (crashes on older sim runtimes)
 
     /// Registry of supported wearables. First coordinator whose `matches` claims a peripheral wins.
-    /// **Adding a wearable = append one entry here.**
     ///
-    /// The order is load-bearing at exactly two places:
-    ///   • `ColmiSmartHealthCoordinator` must precede `ColmiCoordinator`. Both recognize the same Colmi
-    ///     local names, and the QRing matcher needs *only* the name — so behind it, no SmartHealth ring
-    ///     would ever be claimed. The SmartHealth matcher is a conjunction a QRing ring cannot satisfy.
-    ///   • `LuckRingCoordinator` must precede `TK5Coordinator`. LuckRing matches strong, family-exclusive
-    ///     signals (the `F618` service, the `0xFF64` company ID) that no other coordinator claims; ordering
-    ///     it ahead of TK5 is defensive, so TK5's weak `TK5`-name prefix could never shadow a hypothetical
-    ///     `TK5x`-named LuckRing sibling. ("TK18" does not hit the `TK5` prefix, so today it is moot.)
+    /// One entry: the Agara Ring. It stays an array — and the match stays a walk — because that is the
+    /// seam a second ring would arrive through, and because `matchDeviceType` is what pairing asks.
     static let coordinators: [WearableCoordinator.Type] = [
-        JringCoordinator.self,
-        // Ahead of both Colmi coordinators: `ColmiSmartHealthCoordinator`'s `<MODEL> <4 hex>` name
-        // convention accepts "R10M FCF4", so an R10M carrying the shared `1078` company ID would
-        // otherwise be claimed as a Colmi and handed the Colmi baseline. This coordinator's own matcher
-        // is narrow enough (see there) that leading the Colmis costs them nothing.
-        YCBTCoordinator.self,
-        ColmiSmartHealthCoordinator.self,
-        ColmiCoordinator.self,
-        LuckRingCoordinator.self,
-        TK5Coordinator.self,
-        // The last two are the zero-risk slots: each matches only family-exclusive signals that no
-        // coordinator above claims, neither matches any name, and their signals are disjoint — so
-        // neither can shadow or be shadowed, and their order relative to each other is free.
-        //
-        // CRP matches the `fdda` service — which the CRP R11 doesn't even advertise pre-connect, so
-        // it never auto-claims at scan. It's reached by an explicit "Colmi R11 (Da Rings app)"
-        // carousel pick (`preferredFamily = .crp`), iOS having no post-connect re-route like Android's.
-        CRPCoordinator.self,
-        // Veepoo/TK20: matches the `TK20` name (plus a `f8f8` mfg marker alongside a TK name) on the
-        // F008/F002 GATT. "TK20" does not hit the TK5 `TK5`-name prefix registered above, so the two
-        // cannot shadow each other; this slot is after them anyway because F008/F002 are not
-        // advertised, making name the only pre-connect signal.
+        // The Veepoo/Agara Ring: matches the `TK20`/`AGARA` name (plus an `f8f8` manufacturer marker
+        // alongside a TK name) on the F008/F002 GATT. Those services are not advertised, so the name is
+        // the only pre-connect signal there is.
         VeepooCoordinator.self,
-        // Last is RWfit's documented slot, pinned by `testRWfitIsRegisteredLast`: the `A00A` service
-        // and company IDs `0x05D6`/`0x06D6`, no name matching at all.
-        RWfitCoordinator.self,
     ]
 
     /// Which coordinator serves a connection. Pure, so the pairing rules are testable without a
     /// `CBCentralManager`.
     ///
-    /// **The user's explicit family outranks the scan's auto-match.** Two Colmi rings that speak
-    /// different protocols can advertise the identical local name, so the advertisement is a hint and
-    /// the pairing screen's app-type pick is the fact. Falls back to jring when neither is known (a
-    /// reconnect to an unrecognized cached peripheral), preserving the original behavior.
+    /// Falls back to the Agara coordinator when no family is known (a reconnect to a peripheral whose
+    /// advertisement carried no name): the only ring this build drives.
     static func coordinatorType(
         preferredFamily: RingDeviceType?,
         autoMatched: RingDeviceType?
     ) -> WearableCoordinator.Type {
         let family = preferredFamily ?? autoMatched
-        return coordinators.first { $0.deviceType == family } ?? JringCoordinator.self
+        return coordinators.first { $0.deviceType == family } ?? VeepooCoordinator.self
     }
 
     /// Walk the registry to claim an advertisement; nil when no coordinator recognizes it.
@@ -130,7 +93,7 @@ final class RingBLEClient: NSObject {
     /// nothing for a device the system has never connected to before.
     private var discoveredPeripherals: [UUID: CBPeripheral] = [:]
     private var writeChar: CBCharacteristic?
-    /// Optional second write characteristic for big-data requests (Colmi `de5bf72a`).
+    /// Optional second write characteristic for big-data requests (the ring `de5bf72a`).
     private var commandChar: CBCharacteristic?
     private var notifyChars: [CBUUID: CBCharacteristic] = [:]
     /// Notify characteristics that have actually reported `isNotifying` on *this* link. Reset per
@@ -168,20 +131,16 @@ final class RingBLEClient: NSObject {
     private var autoReconnect = true
 
     // MARK: Connection reliability (mirrors the Android RingBLEClient hardening)
-    private let encoder = RingEncoder()
     /// Wall-clock of the last proof the link is alive (notification, write ACK, or read). Drives the
     /// watchdog's zombie-link detection.
     private var lastActivityAt: Date?
-    private var keepaliveTask: Task<Void, Never>?
     private var watchdogTask: Task<Void, Never>?
-    /// Keepalive cadence — 15s, comfortably inside the ring's ~20s idle timeout.
-    private let keepaliveInterval: UInt64 = 15_000_000_000
     /// Watchdog tick + the "no activity ⇒ zombie link" threshold. The threshold is loosened from
     /// Android's 50s because iOS hands background apps shorter, less predictable execution windows.
     private let watchdogInterval: UInt64 = 15_000_000_000
     private let linkStaleSeconds: TimeInterval = 60
     /// Watchdog tick counter, used to piggyback a periodic battery re-read on the existing 15s loop
-    /// (no new timer). jring only reports battery on connect, so without this the level goes stale.
+    /// (no new timer). the ring only reports battery on connect, so without this the level goes stale.
     private var watchdogTicks = 0
     /// Write-ACK timeout: if CoreBluetooth never reports the write completing, unblock the queue so a
     /// single dropped ACK can't wedge it.
@@ -190,7 +149,7 @@ final class RingBLEClient: NSObject {
     /// Connect-attempt timeout, armed **only** for a connect the user asked for (see `beginConnect`).
     /// The watchdog above only guards a link that already reached `.connected`; nothing guarded the
     /// connect *phase*, which is where the wrong-driver failure lives: pick the wrong app variant for a
-    /// Colmi and the installed driver hunts for service UUIDs the ring doesn't have — the BLE link
+    /// the ring and the installed driver hunts for service UUIDs the ring doesn't have — the BLE link
     /// opens, GATT discovery turns up nothing, `.connected` never arrives, and the pairing screen spins
     /// forever with no error. 20 s is slack, not a race: a healthy ring completes link + discovery +
     /// notify-enable in a few seconds.
@@ -254,7 +213,7 @@ final class RingBLEClient: NSObject {
     }
 
     /// - Parameter preferredFamily: the family the *user* declared at pairing (the app-type picker on a
-    ///   Colmi card). Non-nil wins over the scan's auto-match — see `coordinatorType(preferredFamily:autoMatched:)`.
+    ///   the ring card). Non-nil wins over the scan's auto-match — see `coordinatorType(preferredFamily:autoMatched:)`.
     func connect(to id: UUID, selectedModelID: String? = nil, preferredFamily: RingDeviceType? = nil) {
         // Prefer the freshly-scanned object; fall back to the system cache (paired/known).
         guard let target = discoveredPeripherals[id] ?? central.retrievePeripherals(withIdentifiers: [id]).first else {
@@ -277,7 +236,7 @@ final class RingBLEClient: NSObject {
     }
 
     /// The carousel selection is an explicit user statement; scan inference is only its fallback.
-    /// This matters for the CRP R11, whose generic `SMART_RING` name is inferred as jring.
+    /// This matters for an earlier ring, whose generic `SMART_RING` name is inferred as the ring.
     static func modelIDForConnect(selectedModelID: String?, scanInferredModelID: String?) -> String? {
         selectedModelID ?? scanInferredModelID
     }
@@ -308,7 +267,7 @@ final class RingBLEClient: NSObject {
         }
     }
 
-    /// Forget the active/last ring: release it (jring sends the 0x4B UNBOND so the ring re-advertises
+    /// Forget the active/last ring: release it (the ring sends the 0x4B UNBOND so the ring re-advertises
     /// for other apps), then disconnect and clear the remembered identifier + device type so the app no
     /// longer auto-reconnects to it. The unbind is best-effort — we give the write a short window to
     /// flush before tearing the link down, but never block Forget on it.
@@ -427,7 +386,7 @@ final class RingBLEClient: NSObject {
         peripheral = target
         target.delegate = self
         // Select the coordinator/driver for this connection: the user's declared family if they made
-        // one, else the auto-match, else jring (an unknown cached peripheral — prior behavior).
+        // one, else the auto-match, else the ring (an unknown cached peripheral — prior behavior).
         let coordinatorType = Self.coordinatorType(preferredFamily: preferredFamily, autoMatched: deviceType)
         activeAdvertisedName = advertisedName
         activeWearableModelID = WearableModel.resolve(
@@ -513,7 +472,7 @@ final class RingBLEClient: NSObject {
         let target = (writeQueue[0].useCommandChannel ? commandChar : writeChar) ?? writeChar
 
         // The write type must come from the characteristic, not a constant. A characteristic that only
-        // supports write-without-response (the TK18's `B002`) silently *discards* a `.withResponse`
+        // supports write-without-response (an earlier family's `B002`) silently *discards* a `.withResponse`
         // write — CoreBluetooth never calls `didWriteValueFor`, so every packet used to sit out the
         // full missed-ACK timeout and the device never received a byte. This mirrors Android's
         // `writeCharacteristic`, which auto-selects the type from the properties.
@@ -570,39 +529,6 @@ final class RingBLEClient: NSObject {
     /// Record that the link just proved itself alive (notification / write ACK / read).
     private func noteActivity() { lastActivityAt = Date() }
 
-    /// The lightweight operation each family can use to prove an otherwise-idle GATT link is alive.
-    /// Kept pure/internal so the reliability policy is regression-testable without CoreBluetooth mocks.
-    static func keepaliveMode(for deviceType: RingDeviceType?) -> RingLinkKeepaliveMode {
-        switch deviceType {
-        case .jring: return .command
-        case .crp: return .gattBatteryRead
-        default: return .none
-        }
-    }
-
-    /// Start the periodic keepalive. jring needs its protocol ping; CRP exposes the standard GATT
-    /// battery characteristic, whose read callback proves the link is alive without competing for
-    /// CRP's scarce command/reply channel. Other families either self-drive or need no client ping.
-    private func startKeepalive() {
-        keepaliveTask?.cancel()
-        let mode = Self.keepaliveMode(for: activeDeviceType)
-        guard mode != .none else { return }
-        keepaliveTask = Task { @MainActor [weak self] in
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: self?.keepaliveInterval ?? 15_000_000_000)
-                guard let self, !Task.isCancelled, self.state == .connected else { return }
-                switch mode {
-                case .command:
-                    self.enqueueWrite(self.encoder.makeKeepaliveCommand())
-                case .gattBatteryRead:
-                    self.readBattery()
-                case .none:
-                    return
-                }
-            }
-        }
-    }
-
     /// Watchdog: CoreBluetooth doesn't always deliver a disconnect when the OS tears the link down in
     /// the background, leaving a "zombie" peripheral that's `.connected` but silent. If we've gone
     /// `linkStaleSeconds` with no inbound activity, force a reconnect. Also catches a hung connect.
@@ -619,14 +545,14 @@ final class RingBLEClient: NSObject {
     }
 
     private func watchdogTick() {
-        // Periodic battery re-read (~every 60 min at the 15s cadence): jring reports battery only on
-        // connect, so refresh it here. Colmi's engine re-requests 0x03; both are harmless no-ops when
+        // Periodic battery re-read (~every 60 min at the 15s cadence): the ring reports battery only on
+        // connect, so refresh it here. the ring's engine re-requests 0x03; both are harmless no-ops when
         // unsupported. Runs before the stale-link check (which may return early).
         watchdogTicks += 1
         if watchdogTicks >= 240, state == .connected {
             watchdogTicks = 0
-            readBattery()                                // jring GATT; no-op when the characteristic is absent
-            activeSyncEngine?.requestBattery()           // Colmi 0x03; protocol default no-op
+            readBattery()                                // standard GATT battery; no-op when absent
+            activeSyncEngine?.requestBattery()           // protocol battery request; default no-op
         }
         guard isBluetoothReady, state == .connected, let last = lastActivityAt else { return }
         if Date().timeIntervalSince(last) > linkStaleSeconds {
@@ -636,7 +562,6 @@ final class RingBLEClient: NSObject {
     }
 
     private func stopReliabilityTimers() {
-        keepaliveTask?.cancel(); keepaliveTask = nil
         watchdogTask?.cancel(); watchdogTask = nil
     }
 
@@ -883,7 +808,7 @@ extension RingBLEClient: CBCentralManagerDelegate {
             guard let displayName = name, !displayName.isEmpty else { return }
             discoveredPeripherals[peripheral.identifier] = peripheral
             // Keep the model tag when the matched family is *any* the card can resolve to, not just its
-            // default — a Colmi claimed as `.colmiSmartHealth` is still a "Colmi R09".
+            // default — a row the scan claimed as another family is still the ring on the other end.
             let modelID: String? = {
                 guard let matchedModel, let matchedType,
                       matchedModel.families.contains(matchedType) else { return nil }
@@ -956,7 +881,7 @@ extension RingBLEClient: CBCentralManagerDelegate {
             batteryCharacteristic = nil
             cancelPendingWrites()
             // Stop the driver's own state machines *now*, not on the next connect: a self-driving one
-            // (the YCBT history transfer's stall watchdog) would otherwise keep stepping through the
+            // (an earlier protocol history transfer's stall watchdog) would otherwise keep stepping through the
             // reconnect gap and refill the queue we just cleared, and those stale queries would be the
             // first thing the new link writes — ahead of its handshake.
             activeDriver?.connectionDidEnd()
@@ -982,7 +907,7 @@ extension RingBLEClient: CBPeripheralDelegate {
     nonisolated func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
         MainActor.assumeIsolated {
             guard let driver = activeDriver else { return }
-            // Full service list first, before any characteristic I/O: the RWfit driver picks its wire
+            // Full service list first, before any characteristic I/O: the ring driver picks its wire
             // framing off which sibling services exist (see `WearableDriver.servicesDiscovered`).
             driver.servicesDiscovered((peripheral.services ?? []).map(\.uuid))
             for service in peripheral.services ?? [] {
@@ -1014,8 +939,8 @@ extension RingBLEClient: CBPeripheralDelegate {
                 let uuid = characteristic.uuid
                 // Write / command / notify are checked independently (not mutually exclusive) because a
                 // device can expose one characteristic that is *both* the write target and a notify
-                // source — the YCBT families' `be940001` receives command replies on the same char it's written
-                // to. jring/Colmi keep these on distinct UUIDs, so their behavior is unchanged.
+                // source — an earlier protocol families' `be940001` receives command replies on the same char it's written
+                // to. the ring/the ring keep these on distinct UUIDs, so their behavior is unchanged.
                 if uuid == driver.writeUUID { writeChar = characteristic }
                 if uuid == driver.commandUUID { commandChar = characteristic }
                 if driver.notifyUUIDs.contains(uuid) {
@@ -1069,7 +994,6 @@ extension RingBLEClient: CBPeripheralDelegate {
             }
             publish(.deviceStateChanged(state: .connected, address: nil))
             noteActivity()
-            startKeepalive()
             startWatchdog()
             readBattery()
             // Order on the wire: the driver's own handshake, then the engine's startup sequence.

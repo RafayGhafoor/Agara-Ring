@@ -91,7 +91,7 @@ final class LiveWorkoutManager {
                 guard timestamp >= stats.startedAt else { return }
                 stats.recordHR(Int(value), at: timestamp, source: .ringLog)
             case .spo2:
-                // Ring-log SpO₂ (Colmi has no instant reading): tile shows the newest all-day value.
+                // Ring-log SpO₂ (the ring has no instant reading): tile shows the newest all-day value.
                 stats.recordSpO2(Int(value), at: timestamp)
             default:
                 break
@@ -127,7 +127,7 @@ final class LiveWorkoutManager {
         stats = fresh
     }
 
-    /// Colmi-style ring-log SpO₂: the tile shows the newest all-day log value, which may predate
+    /// the ring-style ring-log SpO₂: the tile shows the newest all-day log value, which may predate
     /// the workout.
     private func seedRingLogSpO2(into stats: LiveWorkoutStats) {
         guard (activePlan ?? vitalsPlan()).spo2Mode == .ringLog,

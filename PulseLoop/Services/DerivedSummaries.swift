@@ -9,11 +9,11 @@ enum MetricKey: String, CaseIterable {
     case distance
     case activeMinutes = "active_minutes"
     case battery
-    // Colmi R02 metrics (capability-gated in the UI).
+    // an earlier ring metrics (capability-gated in the UI).
     case stress
     case hrv
     case temperature = "temp"
-    // jring/56ff metrics (capability-gated in the UI).
+    // an earlier protocol metrics (capability-gated in the UI).
     case bloodPressureSystolic = "bp_sys"
     case bloodPressureDiastolic = "bp_dia"
     case fatigue

@@ -85,7 +85,7 @@ struct SettingsView: View {
             }
         ]
         // Measurement frequency configures the ring's sampling interval — shown only for rings that
-        // declare `.measurementInterval` (Colmi's 0x16 pref, jring's 0x19 background-monitoring
+        // declare `.measurementInterval` (the ring's 0x16 pref, the ring's 0x19 background-monitoring
         // cadence). Sits under Physiology, above the AI Coach.
         if caps.contains(.measurementInterval) {
             rows.append(SettingsRowItem(icon: "timer", tint: PulseColors.spo2, title: "Measurement Frequency") {
@@ -134,7 +134,7 @@ struct SettingsView: View {
 
     private func resourcesRows(_ caps: Set<WearableCapability>) -> [SettingsRowItem] {
         var rows: [SettingsRowItem] = []
-        // jring-only: only the 56ff jring measures BP / blood sugar, so Calibration hides otherwise.
+        // the ring-only: only the 56ff the ring measures BP / blood sugar, so Calibration hides otherwise.
         if caps.contains(.bloodPressure) || caps.contains(.bloodSugar) {
             rows.append(SettingsRowItem(icon: "slider.horizontal.3", tint: PulseColors.bloodPressure, title: "Calibration") {
                 path.append(AppRoute.settingsCalibration)

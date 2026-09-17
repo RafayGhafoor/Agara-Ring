@@ -15,7 +15,7 @@ final class VitalsStore {
     private(set) var stressSamples: [MetricSample]
     private(set) var hrvSamples: [MetricSample]
     private(set) var tempSamples: [MetricSample]
-    // jring/56ff metrics (calibration offsets already applied by `metricRange`).
+    // an earlier protocol metrics (calibration offsets already applied by `metricRange`).
     private(set) var systolicSamples: [MetricSample]
     private(set) var diastolicSamples: [MetricSample]
     private(set) var bloodSugarSamples: [MetricSample]

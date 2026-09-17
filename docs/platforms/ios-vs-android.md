@@ -70,11 +70,11 @@ text, which Android has no equivalent for.
 
 ## Ring support and protocol
 
-The low-level work has converged. Both ports decode the full jring / 56ff metric
-set (blood pressure, blood sugar, stress, fatigue, HRV), do blood pressure and
-blood sugar calibration, support the Colmi QRing, and share the same connection
-reliability work (write-ACK timeouts, watchdogs, reconnect, proper unbind on
-forget).
+The low-level work has converged, and both ports are **Agara-only**: one ring family (the
+Veepoo/TK20 Agara Ring), one protocol, the same frame handling. Both decode the same metric set (HR,
+SpO₂, HRV, BP, stress, glucose, sleep), do blood pressure calibration, and share the same connection
+work (write-ACK timeouts, watchdogs, reconnect, proper unbind on forget). Protocol behaviour is
+identical by definition; only the transport plumbing differs.
 
 ## Platform-native capabilities
 

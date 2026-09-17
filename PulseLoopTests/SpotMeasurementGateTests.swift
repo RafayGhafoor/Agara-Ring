@@ -23,10 +23,10 @@ final class SpotMeasurementGateTests: XCTestCase {
     /// The R99's case: the ring refuses the measurement we are running, and the poll gives up at once.
     func testARefusalOfTheMeasurementInFlightAbortsIt() {
         var gate = SpotMeasurementGate()
-        let hrv = gate.begin(mode: YCBTMeasurementMode.hrv)
+        let hrv = gate.begin(mode: SpotMode.hrv)
         XCTAssertFalse(gate.isRejected(hrv))
 
-        gate.noteRejected(mode: YCBTMeasurementMode.hrv)
+        gate.noteRejected(mode: SpotMode.hrv)
 
         XCTAssertTrue(gate.isRejected(hrv))
     }
@@ -36,10 +36,10 @@ final class SpotMeasurementGateTests: XCTestCase {
     /// the write queue mid-SpO₂) leaves the running measurement alone.
     func testARefusalOfADifferentModeCannotAbortTheOneInFlight() {
         var gate = SpotMeasurementGate()
-        let spo2 = gate.begin(mode: YCBTMeasurementMode.spo2)
+        let spo2 = gate.begin(mode: SpotMode.spo2)
 
-        gate.noteRejected(mode: YCBTMeasurementMode.hrv)
-        gate.noteRejected(mode: YCBTMeasurementMode.heartRate)
+        gate.noteRejected(mode: SpotMode.hrv)
+        gate.noteRejected(mode: SpotMode.heartRate)
 
         XCTAssertFalse(gate.isRejected(spo2), "only the measurement the ring actually named may be aborted")
     }
@@ -51,7 +51,7 @@ final class SpotMeasurementGateTests: XCTestCase {
         var gate = SpotMeasurementGate()
         XCTAssertTrue(gate.modesInFlight.isEmpty)
 
-        gate.noteRejected(mode: YCBTMeasurementMode.heartRate)
+        gate.noteRejected(mode: SpotMode.heartRate)
 
         XCTAssertTrue(gate.modesInFlight.isEmpty)
     }
@@ -60,15 +60,15 @@ final class SpotMeasurementGateTests: XCTestCase {
     /// retires the token, and a fresh `begin` hands out a new one that nothing has refused.
     func testARefusalCannotLeakIntoTheNextMeasurement() {
         var gate = SpotMeasurementGate()
-        let hrv = gate.begin(mode: YCBTMeasurementMode.hrv)
-        gate.noteRejected(mode: YCBTMeasurementMode.hrv)
+        let hrv = gate.begin(mode: SpotMode.hrv)
+        gate.noteRejected(mode: SpotMode.hrv)
         XCTAssertTrue(gate.isRejected(hrv))
 
         gate.end(hrv)
-        gate.noteRejected(mode: YCBTMeasurementMode.hrv)   // a late duplicate, after we gave up
+        gate.noteRejected(mode: SpotMode.hrv)   // a late duplicate, after we gave up
         XCTAssertFalse(gate.isRejected(hrv), "a retired measurement has no window left to cut short")
 
-        let spo2 = gate.begin(mode: YCBTMeasurementMode.spo2)
+        let spo2 = gate.begin(mode: SpotMode.spo2)
         XCTAssertFalse(gate.isRejected(spo2), "a fresh measurement starts clean")
     }
 
@@ -77,10 +77,10 @@ final class SpotMeasurementGateTests: XCTestCase {
     /// mode we are running cannot abort us unless a refusal is actually reported.
     func testAnAcceptedMeasurementIsNeverAborted() {
         var gate = SpotMeasurementGate()
-        let spo2 = gate.begin(mode: YCBTMeasurementMode.spo2)
+        let spo2 = gate.begin(mode: SpotMode.spo2)
 
         XCTAssertFalse(gate.isRejected(spo2))
-        XCTAssertEqual(gate.modesInFlight, [YCBTMeasurementMode.spo2])
+        XCTAssertEqual(gate.modesInFlight, [SpotMode.spo2])
     }
 
     // MARK: - Concurrent measurements
@@ -91,10 +91,10 @@ final class SpotMeasurementGateTests: XCTestCase {
     /// abort exactly the measurement it names, and nothing else.
     func testARefusalAbortsOnlyTheMeasurementItNamesWhenTwoAreInFlight() {
         var gate = SpotMeasurementGate()
-        let hr = gate.begin(mode: YCBTMeasurementMode.heartRate)          // the workout's timer poll
-        let bp = gate.begin(mode: YCBTMeasurementMode.bloodPressure)      // the user's BP reading
+        let hr = gate.begin(mode: SpotMode.heartRate)          // the workout's timer poll
+        let bp = gate.begin(mode: SpotMode.bloodPressure)      // the user's BP reading
 
-        gate.noteRejected(mode: YCBTMeasurementMode.bloodPressure)
+        gate.noteRejected(mode: SpotMode.bloodPressure)
 
         XCTAssertTrue(gate.isRejected(bp))
         XCTAssertFalse(gate.isRejected(hr), "the ring refused BP — the workout's HR poll was never named")
@@ -105,10 +105,10 @@ final class SpotMeasurementGateTests: XCTestCase {
     /// its entire window — the very failure the fast-fail exists to prevent, reintroduced by an overlap.
     func testASecondMeasurementDoesNotDisplaceTheFirstsClaimOnItsMode() {
         var gate = SpotMeasurementGate()
-        let hr = gate.begin(mode: YCBTMeasurementMode.heartRate)
-        let bp = gate.begin(mode: YCBTMeasurementMode.bloodPressure)
+        let hr = gate.begin(mode: SpotMode.heartRate)
+        let bp = gate.begin(mode: SpotMode.bloodPressure)
 
-        gate.noteRejected(mode: YCBTMeasurementMode.heartRate)
+        gate.noteRejected(mode: SpotMode.heartRate)
 
         XCTAssertTrue(gate.isRejected(hr), "HR is still in flight — its refusal must still reach it")
         XCTAssertFalse(gate.isRejected(bp))
@@ -119,13 +119,13 @@ final class SpotMeasurementGateTests: XCTestCase {
     /// dropped. Retiring a token may only ever retire that token.
     func testEndingOneMeasurementLeavesTheOtherArmed() {
         var gate = SpotMeasurementGate()
-        let hr = gate.begin(mode: YCBTMeasurementMode.heartRate)
-        let bp = gate.begin(mode: YCBTMeasurementMode.bloodPressure)
+        let hr = gate.begin(mode: SpotMode.heartRate)
+        let bp = gate.begin(mode: SpotMode.bloodPressure)
 
         gate.end(bp)   // the BP reading returns first
-        XCTAssertEqual(gate.modesInFlight, [YCBTMeasurementMode.heartRate])
+        XCTAssertEqual(gate.modesInFlight, [SpotMode.heartRate])
 
-        gate.noteRejected(mode: YCBTMeasurementMode.heartRate)
+        gate.noteRejected(mode: SpotMode.heartRate)
         XCTAssertTrue(gate.isRejected(hr), "HR was still mid-poll when the ring refused it")
     }
 }

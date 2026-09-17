@@ -13,7 +13,7 @@ import Foundation
 enum RingEventBridge {
     /// Plausible instantaneous heart rate, in bpm. Drops 0-bpm warm-up frames and noise.
     static let hrRange: ClosedRange<Int> = 30...220
-    /// Plausible stress score (Colmi reports 1–100; 0 = no sample).
+    /// Plausible stress score (the ring reports 1–100; 0 = no sample).
     static let stressRange: ClosedRange<Int> = 1...100
     /// Plausible HRV, in milliseconds.
     static let hrvRange: ClosedRange<Int> = 1...300
@@ -28,7 +28,7 @@ enum RingEventBridge {
     static let bloodSugarRange: ClosedRange<Double> = 40...600
     /// Plausible SpO₂, in percent. The floor is the *display* floor of consumer oximetry hardware, not
     /// the 70 % where its accuracy spec stops: this gate exists to drop the ring's "no sample" fillers
-    /// and misframed bytes, and it must not second-guess a genuinely hypoxemic night. A QRing-Colmi's
+    /// and misframed bytes, and it must not second-guess a genuinely hypoxemic night. A the ring's
     /// all-day SpO₂ log reached persistence ungated before this gate existed, so anything a real sensor
     /// can report has to keep reaching it.
     static let spo2Range: ClosedRange<Int> = 35...100
@@ -68,7 +68,7 @@ enum RingEventBridge {
             // The timestamp needs the same window as every other history path: a bucket the ring logged
             // against an unset RTC decodes to 2000-01-01, and — unlike a live update, which only ratchets
             // today's row — a bucket *creates* an `ActivityDaily` at that date and re-upserts it on every
-            // sync, so it never ages out. (A no-op for Colmi, whose decoder pre-gates the same window.)
+            // sync, so it never ages out. (A no-op for the ring, whose decoder pre-gates the same window.)
             guard (0...maxBucketSteps).contains(steps), (0...maxBucketDistance).contains(distanceMeters),
                   isPlausibleActivityTimestamp(timestamp, now: now) else { return [] }
             return [.activityBucket(timestamp: timestamp, steps: steps, distanceMeters: distanceMeters)]
@@ -121,7 +121,7 @@ enum RingEventBridge {
 
         case let .wearingStatus(worn, _):
             // Fanned out unconditionally; `RingSyncCoordinator` is what gates on family, because only
-            // CRP's polarity is hardware-confirmed (see `RingDecodedEvent.wearingStatus`).
+            // an earlier family's polarity is hardware-confirmed (see `RingDecodedEvent.wearingStatus`).
             return [.wearState(worn: worn)]
 
         case let .status(address):
@@ -131,7 +131,7 @@ enum RingEventBridge {
 
         default:
             // Everything else: events with no typed fan-out here (timeSyncAck/commandAck/unknown, and
-            // bind — advanced by the sync engine's `handle`), plus the jring/56ff 0x24 extras + firmware
+            // bind — advanced by the sync engine's `handle`), plus an earlier protocol 0x24 extras + firmware
             // which are split into `extraMetricEvents` to keep this switch's complexity in check.
             //
             // `.measurementRejected` belongs to that first group on purpose: it is the ring declining a
@@ -141,12 +141,12 @@ enum RingEventBridge {
         }
     }
 
-    /// Fan-out for the jring/56ff 0x24 extra metrics (BP, fatigue, blood sugar) and firmware, with the
+    /// Fan-out for an earlier protocol 0x24 extra metrics (BP, fatigue, blood sugar) and firmware, with the
     /// same plausibility gating as the main vitals. Split from `events` so neither switch grows past
     /// the project's cyclomatic-complexity limit.
     /// Gate a ring-supplied history sample before it reaches persistence.
     ///
-    /// A ring's on-device log can still hold records stamped under a *previous* clock — e.g. a jring
+    /// A ring's on-device log can still hold records stamped under a *previous* clock — e.g. a the ring
     /// that logged against a UTC RTC before the app started setting it to local time. Those decode
     /// hours into the future. Drop anything outside the history horizon rather than persisting a
     /// sample that poisons "today", peak HR and the 24h trends.
@@ -186,10 +186,6 @@ enum RingEventBridge {
 
     private static func extraMetricEvents(for decoded: RingDecodedEvent) -> [PulseEvent] {
         switch decoded {
-        case let .rwfitMeasurementStatus(type, status):
-            return [.rwfitMeasurement(type: type, status: status)]
-
-
         case let .bloodPressureSample(systolic, diastolic, timestamp):
             guard systolicRange.contains(systolic), diastolicRange.contains(diastolic) else { return [] }
             return [.bloodPressureSample(systolic: systolic, diastolic: diastolic, timestamp: timestamp)]
@@ -211,7 +207,7 @@ enum RingEventBridge {
     }
 
     /// A sleep session start is plausible if it falls within roughly the last week and is not in the
-    /// future. The Colmi sleep big-data payload can carry several recent nights (day-indexed), so the
+    /// future. The the ring sleep big-data payload can carry several recent nights (day-indexed), so the
     /// window matches the ~8-day history horizon; a value outside it indicates a misdecoded frame.
     static func isPlausibleSleepStart(_ start: Date, now: Date = Date()) -> Bool {
         isWithinHistoryWindow(start, now: now)

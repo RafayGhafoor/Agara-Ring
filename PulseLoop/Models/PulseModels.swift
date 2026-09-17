@@ -14,16 +14,16 @@ enum RingConnectionState: String, Codable, CaseIterable {
 enum MeasurementKind: String, Codable, CaseIterable {
     case heartRate = "hr"
     case spo2
-    // Colmi R02 metrics jring lacks. Raw values are persisted — append, never rename.
+    // an earlier ring metrics the ring lacks. Raw values are persisted — append, never rename.
     case stress
     case hrv
     case temperature = "temp"
-    // jring/56ff metrics from the 0x24 combined-sensor packet. Append only — raw values persisted.
+    // an earlier protocol metrics from the 0x24 combined-sensor packet. Append only — raw values persisted.
     case bloodPressureSystolic = "bp_sys"
     case bloodPressureDiastolic = "bp_dia"
     case fatigue
     case bloodSugar = "glucose"
-    // YCBT/TK5 history metrics: respiratory rate rides the "All" record (byte 10), VO₂max the
+    // an earlier protocol/an earlier family history metrics: respiratory rate rides the "All" record (byte 10), VO₂max the
     // body-data record (byte 16). Append only — raw values persisted.
     case respiratoryRate = "resp_rate"
     case vo2max
@@ -52,7 +52,10 @@ enum MeasurementSource: String, Codable, CaseIterable {
     case workout
     case manual
     case live
-    case colmi
+    /// **Decode-only.** Rows written by an earlier family carry `"colmi"` as their raw value; the case
+    /// is kept so those rows still read back, and nothing writes it any more. Renaming it would make
+    /// every one of them undecodable (see the append-never-rename rule above).
+    case legacyVendor = "colmi"
 }
 
 enum SleepStage: String, Codable, CaseIterable {
@@ -108,24 +111,24 @@ final class Device {
     /// fields below).
     var lastFullSyncAt: Date?
     var firmwareVersion: String?
-    /// Exact catalog model (for example `colmi-r10`), separate from the protocol/driver family.
+    /// Exact catalog model (for example `the ring-r10`), separate from the protocol/driver family.
     var wearableModelID: String?
-    // Defaulted so SwiftData lightweight migration is additive (existing rows become jring with no
+    // Defaulted so SwiftData lightweight migration is additive (existing rows become the ring with no
     // declared capabilities until the next connect stamps them).
-    var deviceTypeRaw: String = RingDeviceType.jring.rawValue
+    var deviceTypeRaw: String = RingDeviceType.veepoo.rawValue
     var capabilitiesRaw: String = ""   // CSV of WearableCapability raw values
     var createdAt: Date
     var updatedAt: Date
 
     init(
         id: UUID = UUID(),
-        name: String = "SMART_RING",
+        name: String = "",
         advertisedName: String? = nil,
         peripheralIdentifier: String? = nil,
         bleAddressHint: String? = nil,
         batteryPercent: Int? = nil,
         state: RingConnectionState = .idle,
-        deviceType: RingDeviceType = .jring,
+        deviceType: RingDeviceType = .veepoo,
         wearableModelID: String? = nil,
         capabilities: Set<WearableCapability> = []
     ) {
@@ -152,7 +155,10 @@ final class Device {
     }
 
     var deviceType: RingDeviceType {
-        get { RingDeviceType(rawValue: deviceTypeRaw) ?? .jring }
+        // An unrecognized raw value is a device row from a family this build no longer ships. It resolves
+        // to the only family that exists so the app has something consistent to render, and the launch
+        // guard in `PulseServices` drops the row entirely — a ring we can't drive must not look paired.
+        get { RingDeviceType(rawValue: deviceTypeRaw) ?? .veepoo }
         set {
             deviceTypeRaw = newValue.rawValue
             updatedAt = Date()
@@ -529,12 +535,12 @@ final class UserGoal {
 
 /// Per-device all-day measurement configuration: how often the ring measures HR and which background
 /// vitals it records. Keyed by `Device.id` so each paired wearable keeps its own config (future-proof
-/// for multiple devices). Only devices declaring `.measurementInterval` (Colmi) act on this; the
-/// generic jring never surfaces it. All fields are defaulted so this is a safe additive migration.
+/// for multiple devices). Only devices declaring `.measurementInterval` (the ring) act on this; the
+/// generic the ring never surfaces it. All fields are defaulted so this is a safe additive migration.
 @Model
 final class DeviceMeasurementConfig {
     @Attribute(.unique) var deviceId: UUID
-    /// All-day HR sampling interval, minutes. Colmi accepts 5…60 in 5-minute steps.
+    /// All-day HR sampling interval, minutes. the ring accepts 5…60 in 5-minute steps.
     var hrIntervalMinutes: Int = 5
     var hrEnabled: Bool = true
     var spo2Enabled: Bool = true
@@ -668,7 +674,7 @@ final class ActivitySample {
     }
 }
 
-/// One intraday activity bucket from a ring's history sync (e.g. a Colmi quarter-hour `0x43` sample).
+/// One intraday activity bucket from a ring's history sync (e.g. a the ring quarter-hour `0x43` sample).
 /// Keyed by `startEpoch` (the bucket's unix start time) so re-syncing the same bucket **replaces** it
 /// rather than accumulating — the daily total is then the sum of distinct buckets at read time. This
 /// is the GadgetBridge model and the fix for daily totals drifting upward across repeated syncs.

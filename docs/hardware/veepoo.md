@@ -4,7 +4,7 @@
 
 The **TK20** is sold with the *H Ring* app. It speaks the **Veepoo** BLE stack
 (`VeepooBleSDK 2.0.43.15`) — a wire protocol that shares nothing with the other
-families here (not 56ff, YCBT, Colmi, CRP, RWfit or K6): its own GATT topology,
+families this fork used to carry: its own GATT topology,
 its own session handshake, and its own DF/E0 history transfer.
 
 The full byte-level reference lives in

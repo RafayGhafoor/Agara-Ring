@@ -28,8 +28,8 @@ These guide what we build and what we say no to.
 - **Open BLE standards**: heart rate (+ HRV), blood pressure, temperature, weight,
   and glucose. Supporting the standards adds chest straps, BP cuffs, and scales with
   little per-device work.
-- **Reverse-engineered protocols**: more rings (Ultrahuman, RingConn, …) and
-  bands/watches (Amazfit/Zepp, Xiaomi) beyond today's `56ff` and Colmi families.
+- **Reverse-engineered protocols**: more rings (Ultrahuman, RingConn, …) — the registry seam is kept
+  for exactly this, though this fork ships one family (Rule 3).
 - **Device-driver SDK**: let contributors add a wearable without touching the core.
 
 ### Own the hardware
@@ -78,7 +78,7 @@ roadmap is simply bringing the two ports to feature parity. The low-level
 protocol, calibration, and connection reliability are now on both. iOS leads on
 the AI Coach (multiple providers, on-device model, multimodal input), while
 Android still leads on a few vitals detail screens and a couple of
-Colmi-specific decodes.
+ring-specific decodes.
 
 See [iOS vs Android](../platforms/ios-vs-android.md) for the current gap list.
 Much of it is fair game for contributors who want a well-scoped first task.

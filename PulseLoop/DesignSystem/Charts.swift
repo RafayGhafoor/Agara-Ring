@@ -52,7 +52,7 @@ struct HRLineChart: View {
     }
 }
 
-// MARK: - Stress gauge (Vitals, Colmi)
+// MARK: - Stress gauge (Vitals, the ring)
 
 /// Radial gauge showing the latest stress score on a zoned arc:
 /// relaxed (0–29) · normal (30–59) · medium (60–79) · high (80–100).
@@ -98,7 +98,7 @@ struct StressGaugeChart: View {
     }
 }
 
-// MARK: - HRV trend band (Vitals, Colmi)
+// MARK: - HRV trend band (Vitals, the ring)
 
 /// HRV trend line with a shaded baseline band around the mean, so a glance shows whether recent
 /// values sit above or below the user's typical range.
@@ -144,7 +144,7 @@ struct HRVTrendBandChart: View {
     }
 }
 
-// MARK: - Temperature range (Vitals, Colmi)
+// MARK: - Temperature range (Vitals, the ring)
 
 /// Skin-temperature trend as a filled range around the series, emphasizing daily min/max swing.
 struct TemperatureRangeChart: View {

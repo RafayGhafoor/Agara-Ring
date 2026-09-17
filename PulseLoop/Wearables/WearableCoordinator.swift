@@ -2,55 +2,20 @@ import Foundation
 @preconcurrency import CoreBluetooth
 
 /// Stable identifier for a wearable family. Persisted on `Device.deviceTypeRaw`, so **append cases,
-/// never rename/reorder.** Adding a new wearable = add a case here + a `WearableCoordinator`.
+/// never rename/reorder.**
+///
+/// There is exactly one family: the Veepoo/TK20 **Agara Ring**. The other families this app once
+/// supported are gone — case, coordinator and driver. An old install can still be holding a raw value
+/// for one of them in `deviceTypeRaw`; such a device row is dropped at launch rather than reinterpreted,
+/// because this build cannot drive that ring (`Agara` in `PulseServices` does the dropping).
 enum RingDeviceType: String, Codable, CaseIterable, Sendable {
-    case jring
-    case colmiR02
-    case tk5
-    /// Colmi rings that ship with the **SmartHealth** app instead of QRing. Same hardware line as
-    /// `.colmiR02`, entirely different firmware: they speak YCBT (the TK5's protocol), so they share
-    /// that driver, not `ColmiDriver`. Which of the two a given ring is cannot be read off its
-    /// advertisement — the user declares it at pairing (see `RingAppVariant`).
-    case colmiSmartHealth
-    /// LuckRing / TK18 family (the "K6" vendor SDK, company ID `0xFF64`). Sold under simsonlab and other
-    /// brands; TK18 is the hardware-tested unit. See `LuckRingCoordinator`.
-    case luckRing
-    /// Generic YCBT / SmartHealth rings that are **not** part of the Colmi line and carry no TK5
-    /// identity — the LittleMeatball R10M is the hardware-validated unit. Same wire protocol as `.tk5`
-    /// and `.colmiSmartHealth` (so it shares the whole `YCBT*` stack), kept a separate family because its
-    /// capability set, product art and firmware quirks are its own. See `YCBTCoordinator`.
-    case ycbt
-    /// RWfit rings (the `com.rw.revivalfit` vendor app; often rebranded — the known unit was sold as
-    /// a "Colmi" but shares nothing with the Colmi protocol). One family covers both of the vendor's
-    /// wire framings — legacy `0x7E` and JieLi `0xAB` — because they share the `A00A` GATT and the
-    /// advertisement cannot tell them apart; the driver picks the framing after service discovery.
-    /// See `RWfitCoordinator`.
-    case rwfit
-    /// CRP ("crrepa"/CRPsmart) family — the proprietary `fdda`-profile rings whose official app is
-    /// Moyoung "Da Rings" (`com.moyoung.ring`). Notably the CRP-firmware Colmi R11: it advertises the
-    /// generic "SMART_RING" name with no service UUID, so it's classified jring at scan and only reveals
-    /// its `fdda` service post-connect (issue #29, zaggash's ring). Reached on iOS by picking the
-    /// "Colmi R11 (Da Rings app)" card. See `CRPCoordinator`.
-    case crp
-    /// Veepoo / TK20 rings — the "H Ring" vendor app (`cn.hring.veepoo`). A completely different wire
-    /// protocol from every other family: F008/F002 GATT, A1 session auth, DF/E0 history. See
-    /// `VeepooCoordinator` and `docs/hardware/veepoo.md`.
+    /// Veepoo / Agara Rings — the "H Ring" vendor app (`cn.hring.veepoo`), sold here as the Agara Ring.
+    /// F008/F002 GATT, A1 session auth, DF/E0 history. See `VeepooCoordinator` and
+    /// `docs/ring/veepoo-protocol.md`.
     case veepoo
 
     /// Human-facing default name when no advertised name is available.
-    var displayName: String {
-        switch self {
-        case .jring: return "SMART_RING"
-        case .colmiR02: return "Colmi / Yawell ring"
-        case .tk5: return "TK5 ring"
-        case .colmiSmartHealth: return "Colmi ring (SmartHealth)"
-        case .luckRing: return "LuckRing"
-        case .ycbt: return "YCBT / SmartHealth ring"
-        case .rwfit: return "RWfit ring"
-        case .crp: return "Colmi / Moyoung ring (CRP)"
-        case .veepoo: return "Agara Ring"
-        }
-    }
+    var displayName: String { AgaraCopy.ringDisplayName }
 }
 
 /// The advertisement facts a coordinator needs to claim a discovered peripheral, wrapped so
@@ -79,9 +44,10 @@ protocol WearableCoordinator {
     var capabilities: Set<WearableCapability> { get }
 
     /// Capabilities this family will accept **only if the connected unit's own capability bitmap claims
-    /// them** (YCBT's `02 01` reply; see `YCBTSupportFunction`). Empty by default.
+    /// them** (a per-SKU sensor bitmap some firmwares report; the Agara ring has none). Empty by
+    /// default.
     ///
-    /// Exists because a *family* is not a *SKU*: two Colmi rings that speak the identical protocol can
+    /// Exists because a *family* is not a *SKU*: two rings that speak the identical protocol can
     /// differ on whether they have a temperature or blood-pressure sensor at all. A static set is then
     /// wrong in one of two ways — it hides a metric the ring really has, or it promises one it doesn't
     /// and the card renders permanently empty. Listing a capability here says "this family *may* have
@@ -103,8 +69,8 @@ protocol WearableCoordinator {
 extension WearableCoordinator {
     var displayName: String { Self.deviceType.displayName }
 
-    /// Nothing is bitmap-gated unless a family opts in, so jring / QRing-Colmi — neither of which speaks
-    /// YCBT, and so has no bitmap to consult — keep their static sets. Both YCBT families opt in.
+    /// Nothing is bitmap-gated unless a family opts in, so the Agara ring — which reports no such bitmap —
+    /// keeps its static set.
     var bitmapGatedCapabilities: Set<WearableCapability> { [] }
 
     /// Fold a device-reported capability bitmap into this family's capability set.

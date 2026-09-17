@@ -1,7 +1,7 @@
 import SwiftUI
 import SwiftData
 
-/// Calibration detail screen (56ff/jring only). Two independent calibrations, both mirrored from the
+/// Calibration detail screen (56ff/the ring only). Two independent calibrations, both mirrored from the
 /// Android port:
 /// - **Blood pressure** — enter a reference cuff reading. It's pushed to the ring (`0x33`) so the ring
 ///   applies an on-device offset, and an app-side display offset is derived against a ring reading.
@@ -10,8 +10,8 @@ import SwiftData
 /// - **Blood sugar** — the ring estimates glucose from your profile (no real sensor), so the only
 ///   calibration is an app-side offset: `offset = labReading − latestRaw`.
 ///
-/// Capability-gated: only rings that declare `.bloodPressure` / `.bloodSugar` (the jring) reach here;
-/// a defensive empty-state covers arriving without those capabilities (e.g. a Colmi).
+/// Capability-gated: only rings that declare `.bloodPressure` / `.bloodSugar` (the ring) reach here;
+/// a defensive empty-state covers arriving without those capabilities (e.g. a the ring).
 struct CalibrationSettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(RingBLEClient.self) private var ble

@@ -20,7 +20,7 @@ import UIKit
 /// Reduce Motion (a TimelineView tick is not accessibility "motion"). Reduce Motion gates only the
 /// decorative heartbeat and beat-rings; it never freezes a value the user is waiting on.
 struct MeasurementSheet: View {
-    /// `.vitals` is one sweep that returns every metric the ring computes (jring's `0x24` packet);
+    /// `.vitals` is one sweep that returns every metric the ring computes (the ring's `0x24` packet);
     /// the rest are single-metric spot readings on devices that measure one thing at a time.
     enum Kind: Hashable { case hr, spo2, hrv, bloodPressure, vitals }
 
@@ -84,9 +84,7 @@ struct MeasurementSheet: View {
     /// Sourced from the coordinator: copying the literal is how the ring and the measurement desync.
     /// Nil in demo mode too — no 30s window is running there, so a countdown would be pure theatre.
     private var countdownWindow: Double? {
-        // RwFit first waits for a history page boundary and command acceptance, so total
-        // wall-clock duration is variable even though the sampling window remains fixed.
-        guard kind == .hr, ble.state == .connected, ble.activeDeviceType != .rwfit else { return nil }
+        guard kind == .hr, ble.state == .connected else { return nil }
         return Double(coordinator.hrMeasureSeconds)
     }
 

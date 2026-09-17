@@ -198,7 +198,7 @@ struct OnboardingWelcomeView: View {
 
                 Spacer().frame(height: (14 * s).rounded())
 
-                FittedOnboardingHeader(title: "Set up PulseLoop", subtitle: headerSubtitle, s: s)
+                FittedOnboardingHeader(title: AgaraCopy.onboardingSetupTitle, subtitle: headerSubtitle, s: s)
 
                 Spacer().frame(height: (16 * s).rounded())
 
@@ -216,7 +216,7 @@ struct OnboardingWelcomeView: View {
         ScrollView {
             VStack(spacing: 18) {
                 logo(size: 92)
-                CompactOnboardingHeader(title: "Set up PulseLoop", subtitle: headerSubtitle)
+                CompactOnboardingHeader(title: AgaraCopy.onboardingSetupTitle, subtitle: headerSubtitle)
                 LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(features) { feature in
                         VStack(spacing: 8) {

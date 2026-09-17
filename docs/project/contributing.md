@@ -86,8 +86,7 @@ features. To add a ring:
 1. **Identify it** — advertised BLE name, primary service UUID, and the
    write/notify characteristic UUIDs (use a scanner like LightBlue or nRF Connect).
 2. **Decode the protocol** — capture the 20-byte command/notification packets from
-   the vendor app and map them to metrics. Existing decoders (`RingDecoderTests`,
-   `ColmiDecoderTests`) are good references and good places to add coverage.
+   the vendor app and map them to metrics. Existing decoders (`VeepooDecoderTests`) are good references and good places to add coverage.
 3. **Declare capabilities** — give the driver the right capability set so the app
    gates features correctly.
 4. **Add tests** — decoder round-trips and capability gating, following the

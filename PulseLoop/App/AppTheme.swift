@@ -80,7 +80,7 @@ enum PulseColors {
     static let distance = Color(hex: "#4DA3FF")
     static let readiness = Color(hex: "#D6FF65")
     static let battery = Color(hex: "#A7F3D0")
-    // Colmi R02 metrics
+    // an earlier ring metrics
     static let stress = Color(hex: "#FF8A4C")
     static let hrv = Color(hex: "#9D7CFF")
     static let temperature = Color(hex: "#2DD4D8")
@@ -89,7 +89,7 @@ enum PulseColors {
     static let macroProtein = Color(hex: "#4DA3FF")   // blue
     static let macroCarbs = Color(hex: "#35E0A1")     // mint
     static let macroFat = Color(hex: "#FFD166")       // gold
-    // jring/56ff metrics
+    // an earlier protocol metrics
     static let bloodPressure = Color(hex: "#FF6B9D")
     static let bloodSugar = Color(hex: "#FFB84D")
     static let fatigue = Color(hex: "#C77DFF")
