@@ -20,5 +20,6 @@ enum AgaraCopy {
     static let notificationsDisabled = "Notifications are off for Agara Ring. Turn them on in the Settings app to get check-ins."
     static let healthPermissionDenied = "Agara Ring wasn't granted access. Turn it on for Agara Ring in the Health app."
     static let stravaDisconnectCopy = "Agara Ring stops uploading and revokes its access to your Strava account."
+    static let projectUrl = "https://github.com/RafayGhafoor/Agara-Ring"
     static let shareCardBrand = "Agara Ring"
 }

@@ -59,7 +59,7 @@ final class OpenFoodFactsClientTests: XCTestCase {
         let request = try XCTUnwrap(captured)
         let userAgent = try XCTUnwrap(request.value(forHTTPHeaderField: "User-Agent"))
         XCTAssertTrue(userAgent.hasPrefix("\(AgaraCopy.appName)/"), "OFF requires app identification")
-        XCTAssertTrue(userAgent.contains("@"), "OFF asks for a contact in the UA")
+        XCTAssertTrue(userAgent.contains(AgaraCopy.projectUrl), "OFF asks for a contact in the UA")
         let url = try XCTUnwrap(request.url?.absoluteString)
         XCTAssertTrue(url.contains("world.openfoodfacts.org/api/v2/product/123"))
         XCTAssertTrue(url.contains("fields="), "always trim payloads")
