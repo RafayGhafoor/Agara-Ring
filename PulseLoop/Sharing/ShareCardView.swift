@@ -292,7 +292,7 @@ struct ShareCardView: View {
 
     private var footer: some View {
         HStack(spacing: 8) {
-            Image("pulseloop-logo")
+            Image("agara-wordmark")
                 .resizable()
                 .frame(width: 22, height: 22)
                 .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))

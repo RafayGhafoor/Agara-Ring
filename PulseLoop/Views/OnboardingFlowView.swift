@@ -247,7 +247,7 @@ struct OnboardingWelcomeView: View {
     }
 
     private func logo(size: CGFloat) -> some View {
-        Image("pulseloop-logo")
+        Image("agara-wordmark")
             .resizable()
             .scaledToFit()
             .frame(width: size, height: size)

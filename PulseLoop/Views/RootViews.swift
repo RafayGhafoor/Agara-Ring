@@ -428,6 +428,14 @@ struct AppHeader: View {
         let greeting = self.greeting
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 1) {
+                // The brand lockup above the greeting — the same one the launcher and the share cards
+                // carry, transparent so it sits on the ground rather than in a white box.
+                Image("agara-wordmark")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 11)
+                    .padding(.bottom, 3)
+                    .accessibilityHidden(true)
                 if let firstName {
                     // Two lines: greeting on top, name below — avoids truncating a long name.
                     Text("\(greeting.lead),")
