@@ -772,7 +772,7 @@
 				DEVELOPMENT_TEAM = CQUQ9RZMDK;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PulseLoopWidgets/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = PulseLoop;
+				INFOPLIST_KEY_CFBundleDisplayName = "Agara Ring";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -802,7 +802,7 @@
 				DEVELOPMENT_TEAM = CQUQ9RZMDK;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PulseLoopWidgets/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = PulseLoop;
+				INFOPLIST_KEY_CFBundleDisplayName = "Agara Ring";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
