@@ -5,27 +5,80 @@ import os
 ///
 /// Dev base URL is plain HTTP — the lab build carries an ATS exception (see Info.plist). A
 /// production build must point `baseURL` at a TLS endpoint and drop the exception.
+/// The signed-in session, as the client sees it. A protocol so tests can drive the client with an
+/// in-memory store instead of the real `UserDefaults` (mirrors Android's `AgaraCloudSession`).
 @MainActor
-final class AgaraCloudClient {
-    static let shared = AgaraCloudClient()
+protocol AgaraCloudSession {
+    var token: String? { get }
+    var userID: String? { get }
+    var email: String? { get }
+    var isSignedIn: Bool { get }
+    func saveSession(token: String, userID: String, email: String)
+    func rememberIdentity(userID: String, email: String)
+    func clear()
+}
 
-    /// PocketBase instance on the Agara server (hayden). Collections: `health_days` (one row per
-    /// user+date) and `measurements` (one row per user+client_key), both owner-scoped by rules.
-    private let baseURL = URL(string: AgaraConfig.Cloud.baseUrl)!
-    private let session = URLSession(configuration: .ephemeral)
-    private let defaults = UserDefaults.standard
-    private static let log = Logger(subsystem: "com.pulseloop.lab", category: "agara-cloud")
-
+/// `UserDefaults`-backed session (iOS keeps the token in the app's defaults; Android encrypts it).
+@MainActor
+final class AgaraUserDefaultsSession: AgaraCloudSession {
+    private let defaults: UserDefaults
     private enum Key {
         static let token = "agara.authToken"
         static let userID = "agara.userID"
         static let email = "agara.email"
     }
 
-    var authToken: String? { defaults.string(forKey: Key.token) }
+    init(defaults: UserDefaults = .standard) { self.defaults = defaults }
+
+    var token: String? { defaults.string(forKey: Key.token) }
     var userID: String? { defaults.string(forKey: Key.userID) }
     var email: String? { defaults.string(forKey: Key.email) }
-    var isSignedIn: Bool { authToken != nil }
+    var isSignedIn: Bool { token != nil }
+
+    func saveSession(token: String, userID: String, email: String) {
+        defaults.set(token, forKey: Key.token)
+        defaults.set(userID, forKey: Key.userID)
+        defaults.set(email, forKey: Key.email)
+    }
+
+    func rememberIdentity(userID: String, email: String) {
+        defaults.set(userID, forKey: Key.userID)
+        defaults.set(email, forKey: Key.email)
+    }
+
+    func clear() {
+        for key in [Key.token, Key.userID, Key.email] { defaults.removeObject(forKey: key) }
+    }
+}
+
+@MainActor
+final class AgaraCloudClient {
+    static let shared = AgaraCloudClient()
+
+    /// PocketBase instance on the Agara server (hayden). Collections: `health_days` (one row per
+    /// user+date) and `measurements` (one row per user+client_key), both owner-scoped by rules.
+    /// The endpoint actually in use: the catalog default, unless `-cloudBaseUrl <url>` points this
+    /// build at another PocketBase (the local test instance in the runbook) — the iOS twin of
+    /// Android's `--es cloudBaseUrl`.
+    let baseURL: URL
+    private let session: URLSession
+    private let store: AgaraCloudSession
+    private static let log = Logger(subsystem: "com.pulseloop.lab", category: "agara-cloud")
+
+    init(
+        store: AgaraCloudSession? = nil,
+        baseURL: URL? = nil,
+        session: URLSession = URLSession(configuration: .ephemeral)
+    ) {
+        self.store = store ?? AgaraUserDefaultsSession()
+        let override = UserDefaults.standard.string(forKey: "cloudBaseUrl").flatMap(URL.init(string:))
+        self.baseURL = baseURL ?? override ?? URL(string: AgaraConfig.Cloud.baseUrl)!
+        self.session = session
+    }
+
+    var userID: String? { store.userID }
+    var email: String? { store.email }
+    var isSignedIn: Bool { store.isSignedIn }
 
     enum CloudError: LocalizedError {
         case message(String)
@@ -48,8 +101,7 @@ final class AgaraCloudClient {
             body: ["email": email, "password": password, "passwordConfirm": password]
         )
         guard let id = json["id"] as? String else { throw CloudError.message("Sign-up did not return a record") }
-        defaults.set(id, forKey: Key.userID)
-        defaults.set(email, forKey: Key.email)
+        store.rememberIdentity(userID: id, email: email)
         try await signIn(email: email, password: password)   // get a session token
     }
 
@@ -59,13 +111,11 @@ final class AgaraCloudClient {
               let record = json["record"] as? [String: Any],
               let id = record["id"] as? String
         else { throw CloudError.message("Login succeeded but the session was malformed") }
-        defaults.set(token, forKey: Key.token)
-        defaults.set(id, forKey: Key.userID)
-        defaults.set(email, forKey: Key.email)
+        store.saveSession(token: token, userID: id, email: email)
     }
 
     func signOut() {
-        for key in [Key.token, Key.userID, Key.email] { defaults.removeObject(forKey: key) }
+        store.clear()
     }
 
     // MARK: Records
@@ -119,7 +169,7 @@ final class AgaraCloudClient {
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.timeoutInterval = 20
-        if authed, let token = authToken {
+        if authed, let token = store.token {
             request.setValue(token, forHTTPHeaderField: "Authorization")
         }
         if let body {

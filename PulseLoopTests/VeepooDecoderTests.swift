@@ -91,7 +91,7 @@ final class VeepooDecoderTests: XCTestCase {
     /// 283 total, deep 60, light 160, other 63 → awake 0; start `09 0B 00 29` (Sep 11 00:41),
     /// end `09 0B 05 18` (05:24).
     func testSleepSummaryDecodesA3Durations() {
-        var summaryBytes: [UInt8] = [0] * 29
+        var summaryBytes = [UInt8](repeating: 0, count: 29)
         summaryBytes[0...3] = [0x09, 0x0B, 0x00, 0x29]    // start 09-11 00:41
         summaryBytes[4...7] = [0x09, 0x0B, 0x05, 0x18]    // end   09-11 05:24
         summaryBytes[11] = 90                            // efficiency score

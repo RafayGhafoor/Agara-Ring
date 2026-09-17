@@ -135,10 +135,12 @@ extension RingDeviceType {
         // zaggash's ring (sleep, the all-day vital timelines, a real SpO₂ reading), but the newest
         // opcodes aren't yet — so it keeps the "Limited support" badge until a full validation pass.
         case .crp: return .limited
-        // Verified end-to-end on hardware in this repo's `tools/` harness (auth, battery, steps,
-        // sleep + daily history) — but only ever via the standalone harness, never through the app
-        // itself yet, so it ships with the badge until the first in-app connection is validated.
-        case .veepoo: return .limited
+        // Verified end-to-end through the app itself now, not just the standalone harness: auth,
+        // sleep + daily history, HR/SpO₂/BP measurements, the live-HR stream and battery, against the
+        // physical ring and against the ring emulator (see docs/apps/parity-matrix.md). The badge's
+        // original condition — "until the first in-app connection is validated" — has been met, and
+        // this is the only family the app ships, so it must not carry a "Limited support" badge.
+        case .veepoo: return .full
         }
     }
 }

@@ -43,7 +43,7 @@ final class AgaraCloudSync {
         // (ring sync + live ratchet can each write one), and the server's (user, date) index is
         // unique — last row wins locally, so last row wins here too.
         var activityByDay: [String: ActivityDaily] = [:]
-        for row in activityRows { activityByDay[Self.dayString(row.date)] = row }
+        for row in activityRows { activityByDay[mapping.dayString(row.date)] = row }
 
         var pushedMeasurements = 0
         let existingMeasurements = try await client.list(AgaraConfig.Cloud.measurementsCollection, filter: "user='\(userID)'")
@@ -84,7 +84,7 @@ final class AgaraCloudSync {
         // the day dedupe above.
         var measurementsByKey: [String: Measurement] = [:]
         for measurement in measurements {
-            let key = "\(measurement.kind.rawValue)-\(Int(measurement.timestamp.timeIntervalSince1970))-\(measurement.sourceRaw)"
+            let key = mapping.clientKey(kind: measurement.kind.rawValue, timestamp: measurement.timestamp, source: measurement.sourceRaw)
             if measurementsByKey[key] == nil { measurementsByKey[key] = measurement }
         }
         for (key, measurement) in measurementsByKey {
@@ -115,44 +115,7 @@ final class AgaraCloudSync {
         let days = try await client.list(AgaraConfig.Cloud.healthDaysCollection, filter: "user='\(userID)'")
         let measurements = try await client.list(AgaraConfig.Cloud.measurementsCollection, filter: "user='\(userID)'")
 
-        let calendar = Calendar.current
-        var events: [RingDecodedEvent] = []
-        for day in days {
-            guard let dateString = day["date"] as? String else { continue }
-            guard let date = Self.date(from: dateString, calendar: calendar) else { continue }
-            let steps = (day["steps"] as? NSNumber)?.intValue ?? 0
-            let distanceKm = (day["distance_km"] as? NSNumber)?.doubleValue ?? 0
-            let calories = (day["calories"] as? NSNumber)?.doubleValue ?? 0
-            events.append(.activityUpdate(
-                timestamp: date, steps: steps,
-                distanceMeters: distanceKm * 1000, calories: calories
-            ))
-            let start = (day["sleep_start"] as? NSNumber)?.intValue ?? 0
-            let end = (day["sleep_end"] as? NSNumber)?.intValue ?? 0
-            if start > 0, end > start {
-                let deep = (day["deep"] as? NSNumber)?.intValue ?? 0
-                let light = (day["light"] as? NSNumber)?.intValue ?? 0
-                let awake = (day["awake"] as? NSNumber)?.intValue ?? 0
-                let other = (day["other"] as? NSNumber)?.intValue ?? 0
-                let stages = [SleepStage](repeating: .deep, count: deep)
-                    + [SleepStage](repeating: .light, count: light)
-                    + [SleepStage](repeating: .awake, count: awake)
-                    + [SleepStage](repeating: .unknown, count: other)
-                events.append(.sleepTimeline(
-                    timestamp: Date(timeIntervalSince1970: TimeInterval(start)), stages: stages
-                ))
-            }
-        }
-        for measurement in measurements {
-            guard let kindRaw = measurement["kind"] as? String,
-                  let kind = MeasurementKind(rawValue: kindRaw),
-                  let value = (measurement["value"] as? NSNumber)?.doubleValue,
-                  let epoch = (measurement["timestamp"] as? NSNumber)?.intValue
-            else { continue }
-            events.append(.historyMeasurement(
-                kind: kind, value: value, timestamp: Date(timeIntervalSince1970: TimeInterval(epoch))
-            ))
-        }
+        let events = Self.mapping.events(days: days, measurements: measurements)
 
         for decoded in events {
             // trustTimestamps: cloud rows are our own server's, not the ring's year-less clock, so a
@@ -166,6 +129,74 @@ final class AgaraCloudSync {
     }
 
     // MARK: Helpers
+
+    /// Row → ring-event mapping, split out so the pull's semantics are testable without a server or
+    /// a SwiftData store (Android asserts the same shapes in `AgaraCloudSyncTest`).
+    enum mapping {
+        /// `"<kind>-<epoch seconds>-<source>"` — the server's unique key for a reading.
+        static func clientKey(kind: String, timestamp: Date, source: String) -> String {
+            "\(kind)-\(Int(timestamp.timeIntervalSince1970))-\(source)"
+        }
+
+        /// `yyyy-MM-dd` in the given calendar — the server's `date` field.
+        static func dayString(_ date: Date, calendar: Calendar = .current) -> String {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.timeZone = calendar.timeZone
+            return formatter.string(from: date)
+        }
+
+        /// Cloud rows → the events the bridge understands. An unparseable date, a night with no
+        /// usable bounds and an unknown metric kind are skipped rather than guessed.
+        static func events(days: [[String: Any]], measurements: [[String: Any]]) -> [RingDecodedEvent] {
+            var events: [RingDecodedEvent] = []
+            for day in days {
+                guard let dateString = day["date"] as? String,
+                      let date = date(from: dateString) else { continue }
+                events.append(.activityUpdate(
+                    timestamp: date,
+                    steps: (day["steps"] as? NSNumber)?.intValue ?? 0,
+                    distanceMeters: ((day["distance_km"] as? NSNumber)?.doubleValue ?? 0) * 1000,
+                    calories: (day["calories"] as? NSNumber)?.doubleValue ?? 0
+                ))
+                let start = (day["sleep_start"] as? NSNumber)?.intValue ?? 0
+                let end = (day["sleep_end"] as? NSNumber)?.intValue ?? 0
+                if start > 0, end > start {
+                    let deep = (day["deep"] as? NSNumber)?.intValue ?? 0
+                    let light = (day["light"] as? NSNumber)?.intValue ?? 0
+                    let awake = (day["awake"] as? NSNumber)?.intValue ?? 0
+                    let other = (day["other"] as? NSNumber)?.intValue ?? 0
+                    let stages = [SleepStage](repeating: .deep, count: deep)
+                        + [SleepStage](repeating: .light, count: light)
+                        + [SleepStage](repeating: .awake, count: awake)
+                        + [SleepStage](repeating: .unknown, count: other)
+                    events.append(.sleepTimeline(
+                        timestamp: Date(timeIntervalSince1970: TimeInterval(start)), stages: stages
+                    ))
+                }
+            }
+            for measurement in measurements {
+                guard let kindRaw = measurement["kind"] as? String,
+                      let kind = MeasurementKind(rawValue: kindRaw),
+                      let value = (measurement["value"] as? NSNumber)?.doubleValue,
+                      let epoch = (measurement["timestamp"] as? NSNumber)?.intValue
+                else { continue }
+                events.append(.historyMeasurement(
+                    kind: kind, value: value,
+                    timestamp: Date(timeIntervalSince1970: TimeInterval(epoch))
+                ))
+            }
+            return events
+        }
+
+        /// `yyyy-MM-dd` → start of that day, or nil when the string is not a date.
+        static func date(from string: String) -> Date? {
+            let parts = string.split(separator: "-").compactMap { Int($0) }
+            guard parts.count == 3 else { return nil }
+            return Calendar.current.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2]))
+        }
+    }
 
     /// Aggregate the sleeping-day's stage blocks into the durations the cloud record carries.
     private func sleepSummary(for day: Date, context: ModelContext) -> (startAt: Date, endAt: Date, deep: Int, light: Int, awake: Int, other: Int, quality: Int)? {

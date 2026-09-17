@@ -11,6 +11,9 @@ final class YCBTEncoderTests: XCTestCase {
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.timeZone = TimeZone(identifier: "UTC")
+        // Without a fixed locale a `dateFormat` is interpreted against the device's locale/calendar,
+        // so `date(from:)` returns nil and the force-unwrap crashes the whole test run (it did).
+        formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
         return formatter.date(from: iso)!
     }
