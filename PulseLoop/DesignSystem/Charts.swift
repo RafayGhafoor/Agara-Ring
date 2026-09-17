@@ -31,8 +31,12 @@ struct HRLineChart: View {
 
     var body: some View {
         let values = samples.map(\.value)
-        let lo = (values.min() ?? 0) - 5
-        let hi = (values.max() ?? 100) + 5
+        // Scale to a physiological band, not to the series: filling the height with the data's own
+        // extent puts the *lowest* reading on the floor, so an overnight 68 drew along the bottom and
+        // read as flat/dead. Clamped, so a reading outside the band is still plotted.
+        let band = 45.0...115.0
+        let lo = min(band.lowerBound, values.min() ?? band.lowerBound) - 2
+        let hi = max(band.upperBound, values.max() ?? band.upperBound) + 2
         Chart {
             ForEach(samples) { sample in
                 LineMark(
@@ -109,8 +113,11 @@ struct HRVTrendBandChart: View {
     var body: some View {
         let values = samples.map(\.value)
         let mean = values.isEmpty ? 0 : values.reduce(0, +) / Double(values.count)
-        let lo = (values.min() ?? 0) - 8
-        let hi = (values.max() ?? 100) + 8
+        // Same reasoning as the HR chart: a resting HRV sits low, and a series-scaled axis pinned it
+        // to the floor. 15–80 ms is the band the metric actually occupies.
+        let band = 15.0...80.0
+        let lo = min(band.lowerBound, values.min() ?? band.lowerBound) - 2
+        let hi = max(band.upperBound, values.max() ?? band.upperBound) + 2
         let bandHalf = max(6, mean * 0.12)   // ±12% baseline band
 
         Chart {
