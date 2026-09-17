@@ -163,7 +163,7 @@ struct OnboardingWelcomeView: View {
 
     private let features = [
         OnboardingItem(icon: "dollarsign.circle.fill", title: "No subscription", detail: "Own your ring data", tint: PulseColors.success),
-        OnboardingItem(icon: "lock.shield.fill", title: "Privacy first", detail: "Stays on your device", tint: PulseColors.info),
+        OnboardingItem(icon: "lock.shield.fill", title: "Privacy first", detail: "Stays local unless you sync", tint: PulseColors.info),
         OnboardingItem(icon: "sparkles", title: "AI coach", detail: "Learns your baseline", tint: PulseColors.accent),
         OnboardingItem(icon: "waveform.path.ecg", title: "Your vitals", detail: "HR, SpO₂, HRV, stress", tint: PulseColors.heartRate),
         OnboardingItem(icon: "moon.stars.fill", title: "Sleep tracking", detail: "Stages & trends", tint: PulseColors.sleep),
