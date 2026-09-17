@@ -353,12 +353,18 @@ struct SleepBar: Identifiable {
     let durationMin: Int?
     let score: Int?
     let present: Bool
+    /// The night (or month, in the year view) this bar stands for. The axis is built one bar per day
+    /// including placeholders, so position alone would have worked — but a date makes the mapping
+    /// explicit and survives any later change to the axis.
+    var date: Date? = nil
 }
 
 struct SleepDurationHistogramChart: View {
     let bars: [SleepBar]
     var goalMin: Int?
     var slim: Bool = false
+    /// Called with the tapped bar's index when the caller wants the chart to be interactive.
+    var onSelect: ((Int) -> Void)? = nil
     var barWidth: CGFloat? = nil
     var weekBars: Bool = false
     var height: CGFloat = 210

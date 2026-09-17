@@ -438,7 +438,30 @@ struct SleepView: View {
             noData: !enough
         )
         VisualizationCard(eyebrow: "Duration", title: vizTitle, legend: false) {
-            SleepDurationHistogramChart(bars: bars, goalMin: goalMin, slim: range == .month, barWidth: range == .week ? 30 : nil, weekBars: range == .week)
+            SleepDurationHistogramChart(
+                bars: bars, goalMin: goalMin, slim: range == .month,
+                onSelect: { index in
+                    guard bars.indices.contains(index), let date = bars[index].date else { return }
+                    let calendar = Calendar.current
+                    switch range {
+                    case .year:
+                        // A year bar is a month, so its natural destination is the month view.
+                        range = .month
+                    case .week, .month:
+                        // A bar is a night: anchor the day view on it.
+                        let days = calendar.dateComponents(
+                            [.day],
+                            from: calendar.startOfDay(for: date),
+                            to: calendar.startOfDay(for: Date())
+                        ).day ?? 0
+                        dayOffset = max(0, days)
+                        range = .day
+                    case .day:
+                        break
+                    }
+                },
+                barWidth: range == .week ? 30 : nil, weekBars: range == .week
+            )
         }
         SleepStageSummaryCardsView(
             prefix: "Avg ",

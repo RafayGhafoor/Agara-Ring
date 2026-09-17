@@ -398,7 +398,8 @@ extension SleepInsights {
                 label: label,
                 durationMin: present ? session?.session.totalMinutes : nil,
                 score: present ? session.map { SleepScore.calculate($0).score } : nil,
-                present: present
+                present: present,
+                date: cursor
             ))
             cursor = calendar.date(byAdding: .day, value: 1, to: cursor) ?? last.addingTimeInterval(86_400)
         }
@@ -430,7 +431,8 @@ extension SleepInsights {
                 label: monthAbbrev.string(from: monthDate),
                 durationMin: avg,
                 score: averageScore(monthSessions),
-                present: !monthSessions.isEmpty
+                present: !monthSessions.isEmpty,
+                date: monthDate
             ))
         }
         return bars
