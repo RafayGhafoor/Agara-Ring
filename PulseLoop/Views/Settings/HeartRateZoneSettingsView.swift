@@ -81,7 +81,7 @@ struct HeartRateZoneSettingsView: View {
 
                 Text("Medical guidelines describe 60–100 bpm as a typical adult resting range, but "
                      + "large studies of healthy adults find most rest between 50 and 90 bpm. "
-                     + "PulseLoop's standard zones use 50–90. These ranges are informational, not a diagnosis.")
+                     + "\(AgaraCopy.appName)'s standard zones use 50–90. These ranges are informational, not a diagnosis.")
                     .font(PulseFont.caption.weight(.regular))
                     .foregroundStyle(PulseColors.textMuted)
                     .padding(.horizontal, 16)

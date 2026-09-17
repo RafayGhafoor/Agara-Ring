@@ -12,9 +12,9 @@ nonisolated enum DataArchiveError: LocalizedError, Sendable {
     var errorDescription: String? {
         switch self {
         case let .unsupportedVersion(found, supported):
-            return "This file was exported by a newer version of PulseLoop (format \(found); this app reads up to \(supported)). Update the app and try again."
+            return "This file was exported by a newer app version (format \(found); this app reads up to \(supported)). Update the app and try again."
         case .invalidFile:
-            return "This file isn't a PulseLoop export, or it's damaged."
+            return "This file isn't an export from this app, or it's damaged."
         case let .duplicateKeys(entity):
             return "This file contains duplicate \(entity) entries and can't be imported."
         case .operationInProgress:

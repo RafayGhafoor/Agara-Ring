@@ -133,7 +133,7 @@ struct CoachSettingsSection: View {
         }
 
         if checkInPermissionDenied {
-            Text("Notifications are off for PulseLoop. Turn them on in iOS Settings to get check-ins.")
+            Text(AgaraCopy.notificationsDisabled)
                 .font(.caption)
                 .foregroundStyle(PulseColors.danger)
                 .frame(maxWidth: .infinity, alignment: .leading)

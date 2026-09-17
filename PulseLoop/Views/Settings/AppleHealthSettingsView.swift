@@ -57,13 +57,13 @@ struct AppleHealthSettingsView: View {
         } message: {
             Text("Choose how much of your ring history to copy into Apple Health.")
         }
-        .alert("Remove PulseLoop data from Apple Health?", isPresented: $showRemoveAlert) {
+        .alert("Remove \(AgaraCopy.appName) data from Apple Health?", isPresented: $showRemoveAlert) {
             Button("Remove", role: .destructive) {
                 Task { await service.removeAllExportedData(context: modelContext) }
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This deletes only the samples PulseLoop wrote. Data from other apps is untouched.")
+            Text("This deletes only the samples \(AgaraCopy.appName) wrote. Data from other apps is untouched.")
         }
     }
 
@@ -71,7 +71,7 @@ struct AppleHealthSettingsView: View {
 
     @ViewBuilder private var masterGroup: some View {
         SettingsGroup(
-            footer: "When on, PulseLoop mirrors your ring's data into Apple Health. "
+            footer: "When on, \(AgaraCopy.appName) mirrors your ring's data into Apple Health. "
                 + "Turning it off stops writing — data already in Health stays."
         ) {
             FormToggleRow(title: "Sync to Apple Health", isOn: Binding(
@@ -132,12 +132,12 @@ struct AppleHealthSettingsView: View {
     }
 
     @ViewBuilder private var dangerGroup: some View {
-        SettingsGroup(footer: "Deletes only the samples PulseLoop wrote to Apple Health.") {
+        SettingsGroup(footer: "Deletes only the samples \(AgaraCopy.appName) wrote to Apple Health.") {
             Button {
                 showRemoveAlert = true
             } label: {
                 HStack {
-                    Text("Remove PulseLoop data from Apple Health")
+                    Text("Remove \(AgaraCopy.appName) data from Apple Health")
                         .font(PulseFont.body)
                         .foregroundStyle(PulseColors.danger)
                     Spacer()
@@ -163,9 +163,9 @@ struct AppleHealthSettingsView: View {
             if let last = store.syncState.lastSyncAt {
                 return ("Connected", "Last synced \(Self.relative(last)).")
             }
-            return ("Connected", "PulseLoop is mirroring your ring data to Apple Health.")
+            return ("Connected", "\(AgaraCopy.appName) is mirroring your ring data to Apple Health.")
         case .denied:
-            return ("Access is off", "PulseLoop's access to Apple Health is turned off. Turn it back on in the Health app.")
+            return ("Access is off", "\(AgaraCopy.appName)'s access to Apple Health is turned off. Turn it back on in the Health app.")
         default:
             return ("Not connected", "Turn on Apple Health to mirror your ring's vitals, sleep, and activity.")
         }

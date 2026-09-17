@@ -91,7 +91,7 @@ struct NotificationsSettingsView: View {
             }
         }
         if notifPermissionDenied {
-            Text("Notifications are disabled for PulseLoop in iOS Settings.")
+            Text(AgaraCopy.notificationsDisabled)
                 .font(.caption).foregroundStyle(PulseColors.danger)
                 .padding(.horizontal, 4)
         }

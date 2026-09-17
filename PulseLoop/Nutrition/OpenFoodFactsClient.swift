@@ -35,7 +35,7 @@ struct OpenFoodFactsClient: FoodDatabaseClient {
     /// OFF-required app identification: AppName/Version (contact).
     nonisolated static var userAgent: String {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
-        return "PulseLoop/\(version) (sakshambhutani2001@gmail.com)"
+        return "\(AgaraCopy.appName)/\(version) (sakshambhutani2001@gmail.com)"
     }
 
     private static let productFields = [

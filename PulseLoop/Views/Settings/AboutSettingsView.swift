@@ -67,29 +67,8 @@ struct AboutSettingsView: View {
                 StatusCopy(
                     title: AgaraCopy.aboutProductName,
                     body: """
-                    An LLM-native health app that turns a cheap Bluetooth smart ring into a real, \
-                    conversational health tracker. It talks to the ring directly over Bluetooth — no \
-                    vendor cloud, no account — and layers an AI coach on top of your own data.
-                    """
-                )
+                    \(AgaraCopy.aboutDescription)
 
-                SettingsGroup(header: "Project") {
-                    linkCard(
-                        icon: "chevron.left.forwardslash.chevron.right",
-                        title: "Source on GitHub",
-                        subtitle: "github.com/saksham2001/PulseLoopiOS",
-                        url: repoURL
-                    )
-                    linkCard(
-                        icon: "bubble.left.and.bubble.right.fill",
-                        title: "Join the Discord",
-                        subtitle: "discord.gg/t9y85ebaKD",
-                        url: discordURL
-                    )
-                }
-                StatusCopy(
-                    title: "License",
-                    body: """
                     Creative Commons Attribution 4.0 International (CC BY 4.0). Free to share and \
                     adapt, including commercially, with appropriate credit: PulseLoop by Saksham Bhutani.
                     """
@@ -151,20 +130,16 @@ struct AboutSettingsView: View {
     private func linkCard(icon: String, title: String, subtitle: String, url: URL) -> some View {
         Link(destination: url) {
             FormField {
-                HStack(spacing: 14) {
-                    Image(systemName: icon)
-                        .font(PulseFont.callout.weight(.semibold))
-                        .foregroundStyle(PulseColors.accent)
-                        .frame(width: 36, height: 36)
-                        .background(PulseColors.accent.opacity(0.14), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(title).font(PulseFont.callout.weight(.semibold)).foregroundStyle(PulseColors.textPrimary)
-                        Text(subtitle).font(PulseFont.caption.weight(.regular)).foregroundStyle(PulseColors.textSecondary)
-                    }
-                    Spacer(minLength: 8)
+                HStack(spacing: 8) {
+                    // Deliberately understated: this row credits the upstream project and offers a
+                    // community link. It is attribution, not a feature, so it reads as a footnote —
+                    // no icon tile, smaller type, muted tint.
                     Image(systemName: "arrow.up.right")
-                        .font(PulseFont.caption.weight(.semibold))
+                        .font(PulseFont.caption2.weight(.semibold))
                         .foregroundStyle(PulseColors.textMuted)
+                    Text(title).font(PulseFont.footnote.weight(.regular)).foregroundStyle(PulseColors.textSecondary)
+                    Spacer(minLength: 8)
+                    Text(subtitle).font(PulseFont.caption2.weight(.regular)).foregroundStyle(PulseColors.textMuted)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }

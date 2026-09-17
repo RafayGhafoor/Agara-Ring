@@ -175,7 +175,7 @@ struct OnboardingWelcomeView: View {
         GridItem(.flexible(), spacing: 10),
     ]
 
-    private let headerSubtitle = "Your health, on your terms — no subscription, no cloud."
+    private let headerSubtitle = AgaraCopy.onboardingSubtitle
 
     var body: some View {
         Group {
@@ -441,7 +441,7 @@ struct OnboardingBaselineView: View {
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             OnboardingActionFooter {
-                PrimaryButton(title: "Start using PulseLoop", systemImage: "arrow.right", action: finish)
+                PrimaryButton(title: "Start using \(AgaraCopy.appName)", systemImage: "arrow.right", action: finish)
             }
         }
         .onAppear {

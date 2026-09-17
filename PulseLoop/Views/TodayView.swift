@@ -370,7 +370,7 @@ enum TodayInsights {
         if today.calibration.isCalibrating {
             return Hero(
                 title: "Learning your baseline",
-                summary: "Your ring is paired. Wear it through the day and sync once before bed so PulseLoop can start building your activity and recovery baseline.",
+                summary: "Your ring is paired. Wear it through the day and sync once before bed so the app can start building your activity and recovery baseline.",
                 chips: [
                     ToneChip(label: "Day \(today.calibration.day) of \(today.calibration.totalDays)", tone: .warn),
                     ToneChip(label: today.latestHeartRate == nil ? "HR pending" : "HR collected", tone: today.latestHeartRate == nil ? .warn : .neutral),

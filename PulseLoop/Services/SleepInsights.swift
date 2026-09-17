@@ -358,7 +358,7 @@ enum SleepInsights {
     static func noDataState(_ range: SleepRangeKey) -> SleepNoDataState {
         switch range {
         case .day:
-            return SleepNoDataState(label: "Last Sleep", value: "No sleep captured last night", support: "Wear your ring overnight so PulseLoop can track your next night.")
+            return SleepNoDataState(label: "Last Sleep", value: "No sleep captured last night", support: "Wear your ring overnight so the app can track your next night.")
         case .week:
             return SleepNoDataState(label: "Weekly Sleep", value: "Not enough weekly data", support: "Wear your ring overnight for a few nights to build a weekly view.")
         case .month:

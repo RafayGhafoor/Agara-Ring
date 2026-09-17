@@ -51,7 +51,7 @@ final class WorkoutLiveActivityService: ObservableObject {
     func start(sessionID: String, activityName: String, activityType: String,
                startDate: Date, displayOptions: WorkoutLiveActivityDisplayOptions) -> String? {
         guard ActivityAuthorizationInfo().areActivitiesEnabled else {
-            liveActivityLog.error("Live Activities not enabled (toggle off in Settings → PulseLoop → Live Activities, or unsupported). Skipping start.")
+            liveActivityLog.error("Live Activities not enabled (toggle off in Settings → \(AgaraCopy.appName) → Live Activities, or unsupported). Skipping start.")
             return nil
         }
 

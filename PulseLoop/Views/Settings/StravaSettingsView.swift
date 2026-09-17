@@ -69,7 +69,7 @@ struct StravaSettingsView: View {
 
     @ViewBuilder private var masterGroup: some View {
         SettingsGroup(
-            footer: "When on, PulseLoop can push finished workouts to your Strava account. "
+            footer: "When on, \(AgaraCopy.appName) can push finished workouts to your Strava account. "
                 + "Turning it off stops uploads — your Strava connection is kept."
         ) {
             FormToggleRow(title: "Upload to Strava", isOn: Binding(
@@ -123,7 +123,7 @@ struct StravaSettingsView: View {
             return ("Not configured", "Strava isn't configured in this build. Add StravaSecrets.plist "
                 + "with your API application's client ID and secret.")
         case .disconnected:
-            return ("Not connected", "Connect your Strava account to push workouts from PulseLoop.")
+            return ("Not connected", "Connect your Strava account to push workouts from \(AgaraCopy.appName).")
         case .connecting:
             return ("Connecting…", "Finish signing in to Strava to link your account.")
         case let .connected(athleteName):
