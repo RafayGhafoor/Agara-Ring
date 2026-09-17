@@ -7,6 +7,8 @@
 		<string>com.pulseloop.coach.refresh</string>
 		<string>com.pulseloop.coach.process</string>
 	</array>
+	<key>CFBundleDisplayName</key>
+	<string>Agara Ring</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSAppTransportSecurity</key>
