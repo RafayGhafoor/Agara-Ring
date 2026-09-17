@@ -54,26 +54,26 @@ enum AgaraFont {
 /// The brand palette as hex, so `PulseColors` keeps owning the `Color` construction.
 /// Regenerate with `python3 tools/gen_shared.py` (add `--check` in CI).
 enum AgaraPalette {
-    /// Warm cream ground — the pouch's paper, brightened from the shadowed photo sample.
-    static let background = "#F6F2EA"
-    /// Behind the ground: sheet/scrim backdrop.
-    static let secondaryBackground = "#EFEAE0"
-    /// Card surface on the cream ground.
-    static let card = "#FFFFFF"
+    /// Warm near-black ground — warm so the orange does not sit on blue. Not the old blue-black #080A0F, which made the brand orange look muddy.
+    static let background = "#12100E"
+    /// Darker than the ground: scrims, sheet backdrops.
+    static let secondaryBackground = "#0C0B0A"
+    /// Card surface on the warm ground.
+    static let card = "#1B1815"
     /// Softer card / inset rows.
-    static let cardSoft = "#FBF8F3"
+    static let cardSoft = "#221E1A"
     /// Raised surface (sheets, popovers).
-    static let elevated = "#FFFFFF"
-    /// Warm near-black, like the wordmark's type on the pouch.
-    static let textPrimary = "#16130F"
-    /// Secondary copy on the cream ground.
-    static let textSecondary = "#5C554B"
+    static let elevated = "#272220"
+    /// Warm white, like the wordmark's type.
+    static let textPrimary = "#F7F4F0"
+    /// Secondary copy on the warm ground.
+    static let textSecondary = "#BDB4A9"
     /// Hints, axis ticks, trailing values.
-    static let textMuted = "#8A8175"
-    /// The brand orange, sampled from the logo's triangular A. Reserved for interactive elements and the brand — never for a metric series.
+    static let textMuted = "#8E867C"
+    /// The brand orange, sampled from the logo's triangular A. Reserved for interactive elements and the brand — never for a metric series. ~4.6:1 on the ground: fine for UI and large text, not for small body copy.
     static let accent = "#E85D27"
     /// Re-hued from #FF8A4C: stress was brand-orange-adjacent, and the accent is orange now. Indigo is unused elsewhere.
     static let stress = "#6C5CE7"
-    /// Re-hued from #FFB84D: same collision, and amber sat next to the flame gradient. Deep sea green is distinct from steps and temperature.
+    /// Re-hued from #FFB84D: same collision. Deep sea green is distinct from steps and temperature.
     static let bloodSugar = "#2E7D6B"
 }

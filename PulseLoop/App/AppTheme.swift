@@ -64,16 +64,16 @@ enum MainTab: String, CaseIterable, Identifiable {
 /// `Color(hex: AgaraPalette.…)` again. Until then the Android side reads the catalog and iOS does not,
 /// which is a drift risk recorded in the parity matrix.
 enum PulseColors {
-    static let background = Color(hex: "#F6F2EA")
-    static let secondaryBackground = Color(hex: "#EFEAE0")
-    static let card = Color(hex: "#FFFFFF")
-    static let cardSoft = Color(hex: "#FBF8F3")
-    static let elevated = Color(hex: "#FFFFFF")
-    static let textPrimary = Color(hex: "#16130F")
-    static let textSecondary = Color(hex: "#5C554B")
-    static let textMuted = Color(hex: "#8A8175")
+    static let background = Color(hex: "#12100E")
+    static let secondaryBackground = Color(hex: "#0C0B0A")
+    static let card = Color(hex: "#1B1815")
+    static let cardSoft = Color(hex: "#221E1A")
+    static let elevated = Color(hex: "#272220")
+    static let textPrimary = Color(hex: "#F7F4F0")
+    static let textSecondary = Color(hex: "#BDB4A9")
+    static let textMuted = Color(hex: "#8E867C")
     static let accent = Color(hex: "#E85D27")
-    static let accentSoft = Color(hex: "#E85D27").opacity(0.18)
+    static let accentSoft = Color(hex: "#E85D27").opacity(0.20)
     static let success = Color(hex: "#35E0A1")
     static let warning = Color(hex: "#FFB86B")
     static let danger = Color(hex: "#FF4D6D")
@@ -110,7 +110,7 @@ enum PulseColors {
     static let zoneRed = Color(hex: "#FF4D6D")      // high / critical
     static let zoneCritical = Color(hex: "#FF1744") // no longer used by HR (too close to the HR accent); kept for snapshot decode compat
     static let zoneDeepRed = Color(hex: "#B3261E")  // HR high — dark red, CVD-safe separation from the pink-red HR accent
-    static let borderSubtle = Color.black.opacity(0.08)   // light ground: hairlines are dark now
+    static let borderSubtle = Color.white.opacity(0.10)   // dark ground: hairlines are light again
     static let borderStrong = Color.white.opacity(0.16)
 }
 
