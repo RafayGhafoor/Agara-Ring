@@ -57,23 +57,20 @@ enum MainTab: String, CaseIterable, Identifiable {
     }
 }
 
-/// NOTE: these values mirror `docs/config/palette.yaml` by hand for now. The generated file
-/// (`Generated/AgaraFont.swift`, which carries `AgaraPalette`) is not a member of the
-/// `PulseLoopWidgetsExtension` target, and this file is compiled into both — so referencing it here
-/// breaks the extension. Add the generated file to that target in Xcode and these can become
-/// `Color(hex: AgaraPalette.…)` again. Until then the Android side reads the catalog and iOS does not,
-/// which is a drift risk recorded in the parity matrix.
+/// Values come from the shared palette catalog (`docs/config/palette.yaml` → `AgaraPalette`), the
+/// same source Android reads — this file is compiled into the app *and* the widgets extension, and the
+/// generated token file is a member of both targets, so neither has a hand-mirrored copy any more.
 enum PulseColors {
-    static let background = Color(hex: "#12100E")
-    static let secondaryBackground = Color(hex: "#0C0B0A")
-    static let card = Color(hex: "#1B1815")
-    static let cardSoft = Color(hex: "#221E1A")
-    static let elevated = Color(hex: "#272220")
-    static let textPrimary = Color(hex: "#F7F4F0")
-    static let textSecondary = Color(hex: "#BDB4A9")
-    static let textMuted = Color(hex: "#8E867C")
-    static let accent = Color(hex: "#E85D27")
-    static let accentSoft = Color(hex: "#E85D27").opacity(0.20)
+    static let background = Color(hex: AgaraPalette.background)
+    static let secondaryBackground = Color(hex: AgaraPalette.secondaryBackground)
+    static let card = Color(hex: AgaraPalette.card)
+    static let cardSoft = Color(hex: AgaraPalette.cardSoft)
+    static let elevated = Color(hex: AgaraPalette.elevated)
+    static let textPrimary = Color(hex: AgaraPalette.textPrimary)
+    static let textSecondary = Color(hex: AgaraPalette.textSecondary)
+    static let textMuted = Color(hex: AgaraPalette.textMuted)
+    static let accent = Color(hex: AgaraPalette.accent)
+    static let accentSoft = Color(hex: AgaraPalette.accent).opacity(0.20)
     static let success = Color(hex: "#35E0A1")
     static let warning = Color(hex: "#FFB86B")
     static let danger = Color(hex: "#FF4D6D")
@@ -87,7 +84,7 @@ enum PulseColors {
     static let readiness = Color(hex: "#D6FF65")
     static let battery = Color(hex: "#A7F3D0")
     // an earlier ring metrics
-    static let stress = Color(hex: "#6C5CE7")
+    static let stress = Color(hex: AgaraPalette.stress)
     static let hrv = Color(hex: "#9D7CFF")
     static let temperature = Color(hex: "#2DD4D8")
     // Nutrition macros (intake energy reuses `calories`). Hues picked to be CVD-separable from
@@ -97,7 +94,7 @@ enum PulseColors {
     static let macroFat = Color(hex: "#FFD166")       // gold
     // an earlier protocol metrics
     static let bloodPressure = Color(hex: "#FF6B9D")
-    static let bloodSugar = Color(hex: "#2E7D6B")
+    static let bloodSugar = Color(hex: AgaraPalette.bloodSugar)
     static let fatigue = Color(hex: "#C77DFF")
     // Vitals reference-zone palette. These are the ONLY colors a zone may use, so the chart line,
     // reference band, gauge arc, stat dot, and status label are always identical for the same zone.

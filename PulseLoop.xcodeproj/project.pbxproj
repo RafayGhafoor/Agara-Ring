@@ -98,6 +98,7 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				App/AppTheme.swift,
+				Generated/AgaraFont.swift,
 				DesignSystem/ActivityRings.swift,
 				DesignSystem/GlassCompat.swift,
 				DesignSystem/PulseFont.swift,
