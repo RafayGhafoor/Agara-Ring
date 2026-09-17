@@ -41,7 +41,10 @@ extension WearableModel {
         id: "tk20", displayName: AgaraCopy.ringDisplayName, brand: AgaraCopy.ringDisplayName,
         family: .veepoo,
         tint: PulseColors.hrv, blurb: "Steps · Sleep · HR · SpO₂ · HRV · BP · Stress · Glucose",
-        advertisedNamePatterns: ["^TK20 ?[0-9A-Fa-f]{0,4}$", "^AGARA ?[0-9A-Fa-f]{0,4}$"]
+        advertisedNamePatterns: ["^TK20 ?[0-9A-Fa-f]{0,4}$", "^AGARA ?[0-9A-Fa-f]{0,4}$"],
+        // No photograph of the ring exists, so the card carries the brand mark — the orange A,
+        // transparent — rather than a generic silhouette.
+        imageName: "agara-logo"
     )
 
     /// Every driver family this card can resolve to. The pairing screen filters discovered rows on this.

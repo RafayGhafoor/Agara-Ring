@@ -28,8 +28,10 @@ final class AgaraPairingTests: XCTestCase {
         XCTAssertEqual(ring?.family, .veepoo)
         XCTAssertEqual(ring?.displayName, AgaraCopy.ringDisplayName)
         XCTAssertEqual(ring?.brand, AgaraCopy.ringDisplayName)
-        // No product art is registered for the Agara ring: nil is the supported path to the generic one.
-        XCTAssertNil(ring?.imageName)
+        // Art is the brand mark until there is a product photograph — and it must resolve, or the
+        // device card renders an empty platter rather than falling back.
+        XCTAssertEqual(ring?.imageName, "agara-logo")
+        XCTAssertNotNil(UIImage(named: "agara-logo"), "the model's art must exist in the catalog")
     }
 
     /// The name shown for a ring that never advertised one comes from the shared copy catalog, so the
