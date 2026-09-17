@@ -457,10 +457,9 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = PulseLoopLiveActivityExtension.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 545A455972;
+				DEVELOPMENT_TEAM = CQUQ9RZMDK;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PulseLoopLiveActivity/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = PulseLoopLiveActivity;
@@ -472,9 +471,8 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 2.6.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.agara.ring.LiveActivity;
+				PRODUCT_BUNDLE_IDENTIFIER = xyz.sakshambhutani.pulseloop2.PulseLoopLiveActivity;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE_SPECIFIER = "";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -493,7 +491,7 @@
 				CODE_SIGN_ENTITLEMENTS = PulseLoopLiveActivityExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 545A455972;
+				DEVELOPMENT_TEAM = CQUQ9RZMDK;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PulseLoopLiveActivity/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = PulseLoopLiveActivity;
@@ -505,7 +503,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 2.6.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.agara.ring.LiveActivity;
+				PRODUCT_BUNDLE_IDENTIFIER = xyz.sakshambhutani.pulseloop2.PulseLoopLiveActivity;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -552,7 +550,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = 545A455972;
+				DEVELOPMENT_TEAM = CQUQ9RZMDK;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -616,7 +614,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = 545A455972;
+				DEVELOPMENT_TEAM = CQUQ9RZMDK;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -646,18 +644,15 @@
 				CODE_SIGN_ENTITLEMENTS = PulseLoop/PulseLoop.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 545A455972;
+				DEVELOPMENT_TEAM = CQUQ9RZMDK;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PulseLoop/Info.plist;
-				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
-				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "PulseLoop connects to your smart ring over Bluetooth to sync steps, sleep and vitals.";
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "PulseLoop connects to your SMART_RING to sync activity, heart rate, SpO2, and sleep.";
 				INFOPLIST_KEY_NSBluetoothPeripheralUsageDescription = "PulseLoop connects to your SMART_RING to sync activity, heart rate, SpO2, and sleep.";
-				INFOPLIST_KEY_NSCameraUsageDescription = "Attach a photo to ask the AI Coach about it.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "PulseLoop reads your Health profile (age, sex, height, weight) to personalize calorie and vitals insights.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "PulseLoop writes your ring's heart rate, blood oxygen, HRV, temperature, sleep, activity, and workouts to Apple Health — only for the data types you enable.";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "PulseLoop connects to the AI model server you run on your own network, so coaching can happen without sending your health data to a cloud provider.";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "PulseLoop keeps recording your workout route in the background while a workout is active.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "PulseLoop records your route during outdoor workouts, and — when enabled — uses your approximate location for weather-aware coaching.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
@@ -671,7 +666,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 2.6.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.agara.ring;
+				PRODUCT_BUNDLE_IDENTIFIER = xyz.sakshambhutani.pulseloop2;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -689,21 +684,17 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = PulseLoop/PulseLoop.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 545A455972;
+				DEVELOPMENT_TEAM = CQUQ9RZMDK;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PulseLoop/Info.plist;
-				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
-				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "PulseLoop connects to your smart ring over Bluetooth to sync steps, sleep and vitals.";
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "PulseLoop connects to your SMART_RING to sync activity, heart rate, SpO2, and sleep.";
 				INFOPLIST_KEY_NSBluetoothPeripheralUsageDescription = "PulseLoop connects to your SMART_RING to sync activity, heart rate, SpO2, and sleep.";
-				INFOPLIST_KEY_NSCameraUsageDescription = "Attach a photo to ask the AI Coach about it.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "PulseLoop reads your Health profile (age, sex, height, weight) to personalize calorie and vitals insights.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "PulseLoop writes your ring's heart rate, blood oxygen, HRV, temperature, sleep, activity, and workouts to Apple Health — only for the data types you enable.";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "PulseLoop connects to the AI model server you run on your own network, so coaching can happen without sending your health data to a cloud provider.";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "PulseLoop keeps recording your workout route in the background while a workout is active.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "PulseLoop records your route during outdoor workouts, and — when enabled — uses your approximate location for weather-aware coaching.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
@@ -717,9 +708,8 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 2.6.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.agara.ring;
+				PRODUCT_BUNDLE_IDENTIFIER = xyz.sakshambhutani.pulseloop2;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE_SPECIFIER = "";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -736,12 +726,12 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 545A455972;
+				DEVELOPMENT_TEAM = CQUQ9RZMDK;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MARKETING_VERSION = 2.6.0;
 				OTHER_SWIFT_FLAGS = "$(inherited) -Xfrontend -solver-expression-time-threshold=60";
-				PRODUCT_BUNDLE_IDENTIFIER = com.agara.ringTests;
+				PRODUCT_BUNDLE_IDENTIFIER = xyz.sakshambhutani.pulseloop2Tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -758,11 +748,11 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 545A455972;
+				DEVELOPMENT_TEAM = CQUQ9RZMDK;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MARKETING_VERSION = 2.6.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.agara.ringTests;
+				PRODUCT_BUNDLE_IDENTIFIER = xyz.sakshambhutani.pulseloop2Tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -779,7 +769,7 @@
 				CODE_SIGN_ENTITLEMENTS = PulseLoopWidgetsExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 545A455972;
+				DEVELOPMENT_TEAM = CQUQ9RZMDK;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PulseLoopWidgets/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = PulseLoop;
@@ -791,7 +781,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 2.6.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.agara.ring.Widgets;
+				PRODUCT_BUNDLE_IDENTIFIER = xyz.sakshambhutani.pulseloop2.PulseLoopWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -809,7 +799,7 @@
 				CODE_SIGN_ENTITLEMENTS = PulseLoopWidgetsExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 545A455972;
+				DEVELOPMENT_TEAM = CQUQ9RZMDK;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PulseLoopWidgets/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = PulseLoop;
@@ -821,7 +811,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 2.6.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.agara.ring.Widgets;
+				PRODUCT_BUNDLE_IDENTIFIER = xyz.sakshambhutani.pulseloop2.PulseLoopWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
