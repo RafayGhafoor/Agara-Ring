@@ -7,11 +7,19 @@
 		<string>com.pulseloop.coach.refresh</string>
 		<string>com.pulseloop.coach.process</string>
 	</array>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>PulseLoop connects to your smart ring over Bluetooth to sync steps, sleep and vitals.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Attach a photo to ask the AI Coach about it.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>PulseLoop connects to the AI model server you run on your own network, so coaching can happen without sending your health data to a cloud provider.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>
