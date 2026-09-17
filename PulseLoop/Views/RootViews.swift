@@ -192,7 +192,7 @@ struct RootAppView: View {
             }
         }
         .tint(PulseColors.accent)
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(.light)   // Agara brand is light-first (cream ground, black type, orange accent)
     }
 
     /// Navigate to a workout requested by a Live Activity tap / Lock Screen control.

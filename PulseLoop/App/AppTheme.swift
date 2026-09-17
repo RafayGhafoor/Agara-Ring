@@ -57,17 +57,23 @@ enum MainTab: String, CaseIterable, Identifiable {
     }
 }
 
+/// NOTE: these values mirror `docs/config/palette.yaml` by hand for now. The generated file
+/// (`Generated/AgaraFont.swift`, which carries `AgaraPalette`) is not a member of the
+/// `PulseLoopWidgetsExtension` target, and this file is compiled into both — so referencing it here
+/// breaks the extension. Add the generated file to that target in Xcode and these can become
+/// `Color(hex: AgaraPalette.…)` again. Until then the Android side reads the catalog and iOS does not,
+/// which is a drift risk recorded in the parity matrix.
 enum PulseColors {
-    static let background = Color(hex: "#080A0F")
-    static let secondaryBackground = Color(hex: "#0E1118")
-    static let card = Color(hex: "#151A23")
-    static let cardSoft = Color(hex: "#1B2230")
-    static let elevated = Color(hex: "#202838")
-    static let textPrimary = Color(hex: "#F5F7FA")
-    static let textSecondary = Color(hex: "#AAB3C2")
-    static let textMuted = Color(hex: "#6F7A8C")
-    static let accent = Color(hex: "#7C5CFF")
-    static let accentSoft = Color(hex: "#7C5CFF").opacity(0.18)
+    static let background = Color(hex: "#F6F2EA")
+    static let secondaryBackground = Color(hex: "#EFEAE0")
+    static let card = Color(hex: "#FFFFFF")
+    static let cardSoft = Color(hex: "#FBF8F3")
+    static let elevated = Color(hex: "#FFFFFF")
+    static let textPrimary = Color(hex: "#16130F")
+    static let textSecondary = Color(hex: "#5C554B")
+    static let textMuted = Color(hex: "#8A8175")
+    static let accent = Color(hex: "#E85D27")
+    static let accentSoft = Color(hex: "#E85D27").opacity(0.18)
     static let success = Color(hex: "#35E0A1")
     static let warning = Color(hex: "#FFB86B")
     static let danger = Color(hex: "#FF4D6D")
@@ -81,7 +87,7 @@ enum PulseColors {
     static let readiness = Color(hex: "#D6FF65")
     static let battery = Color(hex: "#A7F3D0")
     // an earlier ring metrics
-    static let stress = Color(hex: "#FF8A4C")
+    static let stress = Color(hex: "#6C5CE7")
     static let hrv = Color(hex: "#9D7CFF")
     static let temperature = Color(hex: "#2DD4D8")
     // Nutrition macros (intake energy reuses `calories`). Hues picked to be CVD-separable from
@@ -91,7 +97,7 @@ enum PulseColors {
     static let macroFat = Color(hex: "#FFD166")       // gold
     // an earlier protocol metrics
     static let bloodPressure = Color(hex: "#FF6B9D")
-    static let bloodSugar = Color(hex: "#FFB84D")
+    static let bloodSugar = Color(hex: "#2E7D6B")
     static let fatigue = Color(hex: "#C77DFF")
     // Vitals reference-zone palette. These are the ONLY colors a zone may use, so the chart line,
     // reference band, gauge arc, stat dot, and status label are always identical for the same zone.
@@ -104,7 +110,7 @@ enum PulseColors {
     static let zoneRed = Color(hex: "#FF4D6D")      // high / critical
     static let zoneCritical = Color(hex: "#FF1744") // no longer used by HR (too close to the HR accent); kept for snapshot decode compat
     static let zoneDeepRed = Color(hex: "#B3261E")  // HR high — dark red, CVD-safe separation from the pink-red HR accent
-    static let borderSubtle = Color.white.opacity(0.08)
+    static let borderSubtle = Color.black.opacity(0.08)   // light ground: hairlines are dark now
     static let borderStrong = Color.white.opacity(0.16)
 }
 

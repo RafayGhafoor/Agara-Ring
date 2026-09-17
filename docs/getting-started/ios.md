@@ -24,8 +24,8 @@ to request an invite, or ask on the [Discord](https://discord.gg/t9y85ebaKD).
     Every release ships a pre-built IPA you can sign with your own Apple ID.
     See **[Sideloading the IPA](sideloading.md)**.
 
-!!! note "`56ff` ring not receiving any data?"
-    Some users have reported receiving no data when setting the `56ff` ring up
+!!! note "Ring not receiving any data?"
+    Some users have reported receiving no data when setting the ring up
     directly with PulseLoop. If this happens, set the ring up once using the
     **Jring** app first, then unpair it from Jring and use it with PulseLoop.
 
@@ -36,8 +36,9 @@ to request an invite, or ask on the [Discord](https://discord.gg/t9y85ebaKD).
 - **Xcode 16+** on macOS.
 - An **iOS 18+ physical device** — Bluetooth and Live Activities need real
   hardware, so the simulator can't reach the ring.
-- A compatible `56ff` or Colmi/Yawell BLE ring (see
-  [supported rings](../hardware/index.md)).
+- An **Agara Ring** (a Veepoo/TK20 ring). It is the only family this build supports
+  ([supported rings](../hardware/index.md)) — or the socket transport in
+  [`ring-emulator`](../../../ring-emulator/README.md) to run without hardware.
 - An AI provider for the optional Coach. Apple's on-device model and a
   [local / self-hosted server](../local-llm-coach.md) need no cloud API key;
   hosted providers use the key from that provider.
@@ -54,14 +55,15 @@ to request an invite, or ask on the [Discord](https://discord.gg/t9y85ebaKD).
         give it your team and a unique bundle ID as well, or the build will fail
         to sign.
 
-    !!! note "WeatherKit capability (optional weather-aware coaching)"
+    !!! note "WeatherKit and Personal Team signing"
         The Coach can share your **city name and current weather** with the AI
         provider (opt-in under **Settings → Coach → "Use location & weather"**).
-        This uses **WeatherKit**, which needs the *WeatherKit* capability enabled
-        on your App ID in the Apple Developer portal — the `PulseLoop.entitlements`
-        already declares `com.apple.developer.weatherkit`. If you skip this step
-        the coach still works; the weather block is simply omitted. Only the
-        reverse-geocoded city is ever shared — never your precise location.
+        Free Personal Teams cannot provision the WeatherKit capability, so the
+        repository does not request its entitlement by default. The coach still
+        works and omits weather when the service is unavailable. Paid teams can
+        enable WeatherKit on their App ID and add the capability in Xcode. See
+        [Fixing Xcode Personal Team Signing](personal-team-signing.md) for the
+        complete setup and troubleshooting guide.
 
 4. Build & run (`⌘R`).
 5. On first launch, complete onboarding, then keep the ring nearby — the app
