@@ -426,16 +426,17 @@ struct AppHeader: View {
 
     var body: some View {
         let greeting = self.greeting
+        // The brand lockup sits centred above the row, so it reads as the app's masthead and the
+        // greeting/status below stay aligned with the rest of the screen's leading edge.
+        VStack(spacing: 6) {
+            Image("agara-wordmark")
+                .resizable()
+                .scaledToFit()
+                .frame(height: 11)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .accessibilityHidden(true)
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 1) {
-                // The brand lockup above the greeting — the same one the launcher and the share cards
-                // carry, transparent so it sits on the ground rather than in a white box.
-                Image("agara-wordmark")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(height: 11)
-                    .padding(.bottom, 3)
-                    .accessibilityHidden(true)
                 if let firstName {
                     // Two lines: greeting on top, name below — avoids truncating a long name.
                     Text("\(greeting.lead),")
@@ -465,6 +466,7 @@ struct AppHeader: View {
         .padding(.top, 8)
         .padding(.bottom, 10)
         .background(PulseColors.background)
+        }
     }
 
     /// Prefer live BLE state; otherwise fall back to the stored device so demo

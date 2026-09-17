@@ -76,7 +76,7 @@ struct SettingsRow: View {
             HStack(spacing: 14) {
                 Image(systemName: item.icon)
                     .font(PulseFont.callout.weight(.semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(PulseColors.textPrimary)
                     .frame(width: 34, height: 34)
                     // Neutral "white glass" tile (iOS Settings look): a light translucent
                     // fill with a top sheen — not glassEffect, which can't nest inside the

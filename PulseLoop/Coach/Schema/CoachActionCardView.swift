@@ -46,7 +46,7 @@ struct CoachActionCardView: View {
                     Text(action.confirmLabel)
                         .font(PulseFont.footnote.weight(.semibold))
                         .frame(maxWidth: .infinity).padding(.vertical, 9)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(PulseColors.textPrimary)
                         // Solid accent/danger fill (not tinted glass): keeps the destructive
                         // affordance visible while avoiding glass-inside-glass flattening.
                         .background(isDestructive ? PulseColors.danger : PulseColors.accent, in: Capsule())

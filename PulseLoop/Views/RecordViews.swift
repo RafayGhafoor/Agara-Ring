@@ -353,7 +353,7 @@ private struct EditWorkoutSheet: View {
                     .font(PulseFont.bodyEmphasis)
                     .frame(maxWidth: .infinity)
                     .frame(height: 56)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(PulseColors.textPrimary)
                     .background(validationMessage == nil ? PulseColors.accent : PulseColors.accent.opacity(0.4))
                     .clipShape(Capsule())
             }
@@ -965,7 +965,7 @@ private struct WorkoutEndSheet: View {
                     .font(PulseFont.bodyEmphasis)
                     .frame(maxWidth: .infinity)
                     .frame(height: 56)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(PulseColors.textPrimary)
                     .pulseGlass(Capsule(), interactive: true, tint: destructive ? PulseColors.danger : PulseColors.accent)
             }
 

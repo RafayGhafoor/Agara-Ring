@@ -264,7 +264,7 @@ struct PrimaryButton: View {
             // Primary action = translucent Liquid Glass with an accent tint (real
             // lensing, not a flat fill). Glass provides the surface; no manual fill.
             Button(action: action) {
-                label.foregroundStyle(.white)
+                label.foregroundStyle(PulseColors.textPrimary)
             }
             .buttonStyle(.glass)
             .tint(PulseColors.accent)
@@ -272,7 +272,7 @@ struct PrimaryButton: View {
         } else {
             Button(action: action) {
                 label
-                    .foregroundStyle(.white)
+                    .foregroundStyle(PulseColors.textPrimary)
                     .background(PulseColors.accent)
                     .clipShape(Capsule())
             }

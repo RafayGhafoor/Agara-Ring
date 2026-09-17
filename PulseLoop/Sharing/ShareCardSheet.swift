@@ -145,7 +145,7 @@ struct ShareCardSheet: View {
                     image: shareImage.previewImage
                 )
             ) {
-                shareLabel.foregroundStyle(.white)
+                shareLabel.foregroundStyle(PulseColors.textPrimary)
             }
             if #available(iOS 26, *), !reduceTransparency {
                 link
