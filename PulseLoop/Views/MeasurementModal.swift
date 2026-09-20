@@ -2,6 +2,7 @@ import SwiftUI
 import Combine
 #if canImport(UIKit)
 import UIKit
+import SwiftData
 #endif
 
 /// Live measurement sheet ported from `frontend/src/components/measurement/MeasurementModal.tsx`.

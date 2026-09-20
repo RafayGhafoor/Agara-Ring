@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 /// Pure, view-agnostic description of the ring's state for the Settings hero card.
 /// All branching lives here so `DeviceHeroCard` stays declarative and this stays unit-testable.
