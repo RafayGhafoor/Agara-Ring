@@ -229,6 +229,14 @@ final class RingBLEClient: NSObject {
     // MARK: - Public API
 
     func startScanning() {
+        #if DEBUG
+        // E2E: a deferred virtual ring (`-virtualRingOnPair YES`) "is found" by the scan and connects.
+        if VirtualRingLink.shared.attachDeferredIfNeeded() {
+            lastError = nil
+            state = .scanning
+            return
+        }
+        #endif
         guard isBluetoothReady else {
             lastError = "Bluetooth is not powered on."
             return
@@ -240,11 +248,11 @@ final class RingBLEClient: NSObject {
         state = .scanning
         // Scan with no service filter so we also catch firmwares that don't advertise their service
         // UUID; matching is done in didDiscover via the coordinator registry.
-        central.scanForPeripherals(withServices: nil, options: [CBCentralManagerScanOptionAllowDuplicatesKey: false])
+        central?.scanForPeripherals(withServices: nil, options: [CBCentralManagerScanOptionAllowDuplicatesKey: false])
     }
 
     func stopScanning() {
-        central.stopScan()
+        central?.stopScan()
         if state == .scanning { state = .idle }
     }
 
@@ -252,7 +260,7 @@ final class RingBLEClient: NSObject {
     ///   the ring card). Non-nil wins over the scan's auto-match — see `coordinatorType(preferredFamily:autoMatched:)`.
     func connect(to id: UUID, selectedModelID: String? = nil, preferredFamily: RingDeviceType? = nil) {
         // Prefer the freshly-scanned object; fall back to the system cache (paired/known).
-        guard let target = discoveredPeripherals[id] ?? central.retrievePeripherals(withIdentifiers: [id]).first else {
+        guard let target = discoveredPeripherals[id] ?? central?.retrievePeripherals(withIdentifiers: [id]).first else {
             lastError = "Ring no longer available; scan again."
             return
         }
@@ -279,8 +287,11 @@ final class RingBLEClient: NSObject {
 
     /// Silently reconnect to the last paired ring (used on launch). Falls back to scanning.
     func connectLastKnown() {
+        #if DEBUG
+        if VirtualRingLink.shared.hasDeferredRing, VirtualRingLink.shared.attachDeferredIfNeeded() { return }
+        #endif
         guard isBluetoothReady, let id = lastKnownIdentifier else { return }
-        if let known = central.retrievePeripherals(withIdentifiers: [id]).first {
+        if let known = central?.retrievePeripherals(withIdentifiers: [id]).first {
             beginConnect(
                 to: known,
                 deviceType: lastKnownDeviceType,
@@ -294,10 +305,13 @@ final class RingBLEClient: NSObject {
 
     func disconnect() {
         autoReconnect = false
+        #if DEBUG
+        if VirtualRingLink.shared.userDisconnect() { return }
+        #endif
         cancelConnectTimeout()   // an explicit disconnect is not a failed connect attempt
-        central.stopScan()
+        central?.stopScan()
         if let peripheral {
-            central.cancelPeripheralConnection(peripheral)
+            central?.cancelPeripheralConnection(peripheral)
         } else {
             state = .idle
         }
@@ -386,7 +400,12 @@ final class RingBLEClient: NSObject {
         Set(csv: UserDefaults.standard.string(forKey: Self.lastCapabilitiesKey) ?? "")
     }
 
-    var hasLastKnownRing: Bool { lastKnownIdentifier != nil }
+    var hasLastKnownRing: Bool {
+        #if DEBUG
+        if VirtualRingLink.shared.hasDeferredRing { return true }
+        #endif
+        return lastKnownIdentifier != nil
+    }
 
     /// The active sync engine, exposed so the `RingSyncCoordinator` façade can drive command flows.
     var syncEngine: RingSyncEngine? { activeSyncEngine }
@@ -406,7 +425,7 @@ final class RingBLEClient: NSObject {
         preferredFamily: RingDeviceType? = nil,
         userInitiated: Bool = false
     ) {
-        central.stopScan()
+        central?.stopScan()
         autoReconnect = true
         // Force-close any stale connection (incl. a different peripheral) before opening a new one, so
         // a reconnect after an idle drop can't collide with an orphaned handle. iOS analogue of
@@ -414,7 +433,7 @@ final class RingBLEClient: NSObject {
         stopReliabilityTimers()
         cancelConnectTimeout()
         if let old = peripheral, old.identifier != target.identifier || old.state != .disconnected {
-            central.cancelPeripheralConnection(old)
+            central?.cancelPeripheralConnection(old)
         }
         writeChar = nil; commandChar = nil; notifyChars = [:]; batteryCharacteristic = nil
         subscribedNotifyUUIDs = []
@@ -434,7 +453,7 @@ final class RingBLEClient: NSObject {
         installDriver(coordinatorType)
         state = .connecting
         if userInitiated { startConnectTimeout() }
-        central.connect(target, options: nil)
+        central?.connect(target, options: nil)
     }
 
     /// Instantiate the coordinator's driver + sync engine for the upcoming connection. A fresh driver
@@ -549,7 +568,7 @@ final class RingBLEClient: NSObject {
                 // ATT callbacks have no request identifier. Retire the link so a late ACK cannot
                 // accidentally complete the next write after this deadline.
                 cancelPendingWrites(error: RingWriteError.timedOut)
-                central.cancelPeripheralConnection(peripheral)
+                central?.cancelPeripheralConnection(peripheral)
             }
         }
     }
@@ -598,7 +617,7 @@ final class RingBLEClient: NSObject {
         guard isBluetoothReady, state == .connected, let last = lastActivityAt else { return }
         if Date().timeIntervalSince(last) > linkStaleSeconds {
             // Zombie link: drop it and let the disconnect handler's auto-reconnect re-link.
-            if let peripheral { central.cancelPeripheralConnection(peripheral) }
+            if let peripheral { central?.cancelPeripheralConnection(peripheral) }
         }
     }
 
@@ -632,7 +651,7 @@ final class RingBLEClient: NSObject {
         // Order matters: `didDisconnectPeripheral` re-dials whenever `autoReconnect` is set, so clearing
         // it *before* the cancel is what stops the failure from instantly reconnecting itself.
         autoReconnect = false
-        if let peripheral { central.cancelPeripheralConnection(peripheral) }
+        if let peripheral { central?.cancelPeripheralConnection(peripheral) }
         stopReliabilityTimers()
         // Names the app variant we tried and the one to try instead — the whole point of failing loudly
         // here is that the wrong-app pick is recoverable in one tap (`PairingView`).
@@ -687,7 +706,7 @@ extension RingBLEClient: RingCommandWriter {
         let tracked = RingTrackedWrite(timeoutError: RingWriteError.timedOut, onTimeout: { [weak self] in
             guard let self else { return }
             self.cancelPendingWrites(error: RingWriteError.timedOut)
-            if let peripheral = self.peripheral { self.central.cancelPeripheralConnection(peripheral) }
+            if let peripheral = self.peripheral { self.central?.cancelPeripheralConnection(peripheral) }
         }, completion: completion)
         enqueueWrite(command, completion: { tracked.finish($0) })
     }
@@ -859,7 +878,7 @@ extension RingBLEClient {
             autoReconnect = true
             if peripheral.state == .disconnected {
                 state = .reconnecting
-                central.connect(peripheral, options: nil)
+                central?.connect(peripheral, options: nil)
             }
         } else {
             connectLastKnown()

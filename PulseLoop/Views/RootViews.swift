@@ -404,6 +404,9 @@ struct MainTabView: View {
                 onOpenMeal: { requestCoachRoute(.mealDetail($0)) }
             )
                 .presentationDragIndicator(.visible) // grabber ("pull tab") at the top of the sheet
+                // CoachView reads the coordinator; pass it explicitly (see the note on VitalsView's sheet —
+                // a sheet presented on the iPad/Mac idiom can lose the WindowGroup's environment objects).
+                .environment(coordinator)
         }
         .background(PulseColors.background.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
@@ -584,6 +587,7 @@ struct RingStatusChip: View {
         ))
         .accessibilityHint(AgaraHelp.ringChip)
         .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier("ringChip")
         .help(AgaraHelp.ringChip)
         .onAppear { startPulse(status == .connecting) }
         // The chip stays mounted across state changes, so `onAppear` alone would miss a later

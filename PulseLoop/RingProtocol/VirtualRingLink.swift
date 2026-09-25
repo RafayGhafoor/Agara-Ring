@@ -21,6 +21,25 @@ import SwiftData
 /// Enable with either the scheme argument `-virtualRing 9909` (or any port) or the environment
 /// variable `PULSELOOP_VIRTUAL_RING=9909`. When it is configured, CoreBluetooth is not started at all
 /// (see `PulseLoopApp`), so a remembered physical ring can never be dragged into the session.
+/// E2E tooling: plain-text trace lines appended to `Documents/e2e.log` and stderr. The unified log redacts
+/// `NSLog` interpolations as `<private>`, and a Mac "Designed for iPad" run has no UI-test runner to read the
+/// screen, so this file is how a scripted run proves what happened (`tools/e2e_ios.sh --mac`).
+enum E2ETrace {
+    nonisolated static func log(_ message: String) {
+        let line = "\(ISO8601DateFormatter().string(from: Date())) \(message)\n"
+        FileHandle.standardError.write(Data(line.utf8))
+        guard let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
+        let url = docs.appendingPathComponent("e2e.log")
+        if let handle = try? FileHandle(forWritingTo: url) {
+            handle.seekToEndOfFile()
+            handle.write(Data(line.utf8))
+            try? handle.close()
+        } else {
+            try? Data(line.utf8).write(to: url)
+        }
+    }
+}
+
 @MainActor
 final class VirtualRingLink {
     static let shared = VirtualRingLink()
@@ -52,6 +71,46 @@ final class VirtualRingLink {
     private let writeUUID = CBUUID(string: VeepooUUIDs.commandWrite)
 
     private init() {}
+
+    /// `-virtualRingOnPair YES`: don't connect at launch; wait for the pairing screen's scan.
+    static let onPairKey = "virtualRingOnPair"
+    private weak var deferredClient: RingBLEClient?
+
+    func deferAttach(client: RingBLEClient) {
+        deferredClient = client
+        E2ETrace.log("virtualRing deferred until the pairing scan")
+    }
+
+    /// Settings › Wearable › Disconnect on the virtual ring: drop the socket like a real link going down and
+    /// keep the client, so "Reconnect last ring" (→ `attachDeferredIfNeeded`) can bring it back. True if the
+    /// virtual link handled it.
+    func userDisconnect() -> Bool {
+        guard isAttached || isConnecting, let client else { return false }
+        generation += 1   // late callbacks from the dropped connection are ignored
+        connection?.cancel()
+        connection = nil
+        isAttached = false
+        isConnecting = false
+        client.endVirtualConnection()
+        deferredClient = client
+        deferredByUser = true
+        E2ETrace.log("virtualRing disconnected by the user")
+        return true
+    }
+
+    /// A virtual ring is waiting to be (re)connected — the virtual stand-in for a remembered peripheral.
+    /// (Not for `-virtualRingOnPair`: that one must wait for the pairing scan, not the foreground reconnect.)
+    var hasDeferredRing: Bool { deferredClient != nil && deferredByUser }
+    private var deferredByUser = false
+
+    /// Called by `RingBLEClient.startScanning()`: connect the deferred link (once). True if it did.
+    func attachDeferredIfNeeded() -> Bool {
+        guard let client = deferredClient, let port = Self.configuredPort else { return false }
+        deferredClient = nil
+        deferredByUser = false
+        attach(client: client, port: port)
+        return true
+    }
 
     /// Start the virtual link if the launch arguments ask for it. Safe to call unconditionally.
     @discardableResult
@@ -152,6 +211,7 @@ final class VirtualRingLink {
         }
         connection.start(queue: .global(qos: .userInitiated))
         NSLog("[VirtualRing] connecting to ring-emulator at \(host):\(port)")
+        E2ETrace.log("virtualRing connecting to \(host):\(port)")
     }
 
     /// Connect again with the last arguments — used by the firmware installer after the emulator drops the
@@ -190,6 +250,7 @@ final class VirtualRingLink {
         switch state {
         case .ready:
             NSLog("[VirtualRing] connected — starting the virtual link")
+            E2ETrace.log("virtualRing connected")
             isAttached = true
             isConnecting = false
             // Called on the main actor already: send in order, without a Task hop per frame (a firmware
@@ -200,6 +261,7 @@ final class VirtualRingLink {
             receive()
         case let .failed(error):
             NSLog("[VirtualRing] failed: \(error) — retrying in 2 s")
+            E2ETrace.log("virtualRing failed: \(error)")
             let wasAttached = isAttached
             isAttached = false
             isConnecting = false
@@ -209,6 +271,7 @@ final class VirtualRingLink {
             // Nobody listening (the emulator isn't up yet / restarting): NWConnection would wait for a
             // network change that never comes. Treat it as a failure and retry on the usual 2 s cadence.
             NSLog("[VirtualRing] waiting: \(error) — retrying in 2 s")
+            E2ETrace.log("virtualRing waiting: \(error)")
             isConnecting = false
             if isAttached {
                 isAttached = false

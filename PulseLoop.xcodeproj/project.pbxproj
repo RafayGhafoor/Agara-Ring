@@ -37,6 +37,13 @@
 			remoteGlobalIDString = AB000000000000000000000C;
 			remoteInfo = PulseLoopWidgetsExtension;
 		};
+		AC0000000000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4147614E2FCC0F81009EB0EF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 414761552FCC0F81009EB0EF;
+			remoteInfo = PulseLoop;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -63,6 +70,7 @@
 		AA0000000000000000000002 /* PulseLoopTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PulseLoopTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AB0000000000000000000004 /* PulseLoopWidgetsExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PulseLoopWidgetsExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		AB0000000000000000000005 /* PulseLoopWidgetsExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PulseLoopWidgetsExtension.entitlements; sourceTree = "<group>"; };
+		AC0000000000000000000003 /* AgaraRingUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AgaraRingUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -146,6 +154,11 @@
 			path = PulseLoopWidgets;
 			sourceTree = "<group>";
 		};
+		AC0000000000000000000004 /* AgaraRingUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = AgaraRingUITests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -181,6 +194,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AC0000000000000000000006 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -201,6 +221,7 @@
 				414761582FCC0F81009EB0EF /* PulseLoop */,
 				41298AC22FCE7CD300778428 /* PulseLoopLiveActivity */,
 				AB000000000000000000000A /* PulseLoopWidgets */,
+				AC0000000000000000000004 /* AgaraRingUITests */,
 				41298ABD2FCE7CD300778428 /* Frameworks */,
 				414761572FCC0F81009EB0EF /* Products */,
 				414763642FCCCC58009EB0EF /* Recovered References */,
@@ -214,6 +235,7 @@
 				AA0000000000000000000002 /* PulseLoopTests.xctest */,
 				41298ABC2FCE7CD300778428 /* PulseLoopLiveActivityExtension.appex */,
 				AB0000000000000000000004 /* PulseLoopWidgetsExtension.appex */,
+				AC0000000000000000000003 /* AgaraRingUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -321,6 +343,29 @@
 			productReference = AB0000000000000000000004 /* PulseLoopWidgetsExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		AC0000000000000000000008 /* AgaraRingUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AC000000000000000000000B /* Build configuration list for PBXNativeTarget "AgaraRingUITests" */;
+			buildPhases = (
+				AC0000000000000000000005 /* Sources */,
+				AC0000000000000000000006 /* Frameworks */,
+				AC0000000000000000000007 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				AC0000000000000000000002 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				AC0000000000000000000004 /* AgaraRingUITests */,
+			);
+			name = AgaraRingUITests;
+			packageProductDependencies = (
+			);
+			productName = AgaraRingUITests;
+			productReference = AC0000000000000000000003 /* AgaraRingUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -343,6 +388,10 @@
 					};
 					AB000000000000000000000C = {
 						CreatedOnToolsVersion = 26.5;
+					};
+					AC0000000000000000000008 = {
+						CreatedOnToolsVersion = 26.5;
+						TestTargetID = 414761552FCC0F81009EB0EF;
 					};
 				};
 			};
@@ -367,6 +416,7 @@
 				AA0000000000000000000001 /* PulseLoopTests */,
 				41298ABB2FCE7CD300778428 /* PulseLoopLiveActivityExtension */,
 				AB000000000000000000000C /* PulseLoopWidgetsExtension */,
+				AC0000000000000000000008 /* AgaraRingUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -394,6 +444,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		AB000000000000000000000F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AC0000000000000000000007 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -431,6 +488,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AC0000000000000000000005 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -448,6 +512,11 @@
 			isa = PBXTargetDependency;
 			target = AB000000000000000000000C /* PulseLoopWidgetsExtension */;
 			targetProxy = AB0000000000000000000006 /* PBXContainerItemProxy */;
+		};
+		AC0000000000000000000002 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 414761552FCC0F81009EB0EF /* PulseLoop */;
+			targetProxy = AC0000000000000000000001 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -653,14 +722,14 @@
 				INFOPLIST_FILE = PulseLoop/Info.plist;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
-				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "PulseLoop connects to your smart ring over Bluetooth to sync steps, sleep and vitals.";
-				INFOPLIST_KEY_NSBluetoothPeripheralUsageDescription = "PulseLoop connects to your SMART_RING to sync activity, heart rate, SpO2, and sleep.";
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Agara Ring connects to your ring over Bluetooth to sync steps, sleep and vitals.";
+				INFOPLIST_KEY_NSBluetoothPeripheralUsageDescription = "Agara Ring connects to your ring to sync activity, heart rate, SpO2 and sleep.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Attach a photo to ask the AI Coach about it.";
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "PulseLoop reads your Health profile (age, sex, height, weight) to personalize calorie and vitals insights.";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "PulseLoop writes your ring's heart rate, blood oxygen, HRV, temperature, sleep, activity, and workouts to Apple Health — only for the data types you enable.";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "PulseLoop connects to the AI model server you run on your own network, so coaching can happen without sending your health data to a cloud provider.";
-				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "PulseLoop keeps recording your workout route in the background while a workout is active.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "PulseLoop records your route during outdoor workouts, and — when enabled — uses your approximate location for weather-aware coaching.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Agara Ring reads your Health profile (age, sex, height, weight) to personalize calorie and vitals insights.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Agara Ring writes your ring's heart rate, blood oxygen, HRV, temperature, sleep, activity, and workouts to Apple Health — only for the data types you enable.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Agara Ring connects to the AI model server you run on your own network, so coaching can happen without sending your health data to a cloud provider.";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Agara Ring keeps recording your workout route in the background while a workout is active.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Agara Ring records your route during outdoor workouts, and — when enabled — uses your approximate location for weather-aware coaching.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -699,14 +768,14 @@
 				INFOPLIST_FILE = PulseLoop/Info.plist;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
-				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "PulseLoop connects to your smart ring over Bluetooth to sync steps, sleep and vitals.";
-				INFOPLIST_KEY_NSBluetoothPeripheralUsageDescription = "PulseLoop connects to your SMART_RING to sync activity, heart rate, SpO2, and sleep.";
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Agara Ring connects to your ring over Bluetooth to sync steps, sleep and vitals.";
+				INFOPLIST_KEY_NSBluetoothPeripheralUsageDescription = "Agara Ring connects to your ring to sync activity, heart rate, SpO2 and sleep.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Attach a photo to ask the AI Coach about it.";
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "PulseLoop reads your Health profile (age, sex, height, weight) to personalize calorie and vitals insights.";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "PulseLoop writes your ring's heart rate, blood oxygen, HRV, temperature, sleep, activity, and workouts to Apple Health — only for the data types you enable.";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "PulseLoop connects to the AI model server you run on your own network, so coaching can happen without sending your health data to a cloud provider.";
-				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "PulseLoop keeps recording your workout route in the background while a workout is active.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "PulseLoop records your route during outdoor workouts, and — when enabled — uses your approximate location for weather-aware coaching.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Agara Ring reads your Health profile (age, sex, height, weight) to personalize calorie and vitals insights.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Agara Ring writes your ring's heart rate, blood oxygen, HRV, temperature, sleep, activity, and workouts to Apple Health — only for the data types you enable.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Agara Ring connects to the AI model server you run on your own network, so coaching can happen without sending your health data to a cloud provider.";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Agara Ring keeps recording your workout route in the background while a workout is active.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Agara Ring records your route during outdoor workouts, and — when enabled — uses your approximate location for weather-aware coaching.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -834,6 +903,42 @@
 			};
 			name = Release;
 		};
+		AC0000000000000000000009 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 545A455972;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MARKETING_VERSION = 2.6.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.agara.ring.UITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = PulseLoop;
+			};
+			name = Debug;
+		};
+		AC000000000000000000000A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 545A455972;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MARKETING_VERSION = 2.6.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.agara.ring.UITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = PulseLoop;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -878,6 +983,15 @@
 			buildConfigurations = (
 				AB0000000000000000000010 /* Debug */,
 				AB0000000000000000000011 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AC000000000000000000000B /* Build configuration list for PBXNativeTarget "AgaraRingUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AC0000000000000000000009 /* Debug */,
+				AC000000000000000000000A /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

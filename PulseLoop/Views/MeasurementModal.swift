@@ -114,6 +114,11 @@ struct MeasurementSheet: View {
     /// combined sweep, which has several numbers to read.
     private var needsExplicitDone: Bool {
         if kind == .vitals || kind == .bloodComponents { return true }
+        #if DEBUG
+        // `-measureHoldResult YES` (E2E tooling): keep the result on screen until Done, so a UI test can
+        // read it instead of racing the 1.3 s auto-dismiss.
+        if UserDefaults.standard.bool(forKey: "measureHoldResult") { return true }
+        #endif
         #if canImport(UIKit)
         return UIAccessibility.isVoiceOverRunning || UIAccessibility.isSwitchControlRunning
         #else
@@ -360,6 +365,7 @@ struct MeasurementSheet: View {
             .accessibilityElement()
             .accessibilityLabel("\(name) measurement")
             .accessibilityValue(statusValue)
+            .accessibilityIdentifier("measurement.status")
             .accessibilityAddTraits(isBusy ? .updatesFrequently : [])
     }
 
@@ -417,6 +423,7 @@ struct MeasurementSheet: View {
             withAnimation(.spring(response: 0.35, dampingFraction: 0.6).delay(0.18)) { resultBounce = 1.0 }
         }
         announce(statusValue)
+        logOutcome()
     }
 
     private func enterError() {
@@ -425,6 +432,7 @@ struct MeasurementSheet: View {
         notify.notificationOccurred(.error)
         #endif
         announce(errorMessage)
+        logOutcome()
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(0.4))
             errorFocus = true
@@ -438,6 +446,14 @@ struct MeasurementSheet: View {
             announcedStillWorking = true
             announce("Still working, keep still")
         }
+    }
+
+    /// E2E tooling: one line per terminal stage, so a run the UI test runner can't drive (the Mac build)
+    /// still leaves evidence of how the measurement ended.
+    private func logOutcome() {
+        #if DEBUG
+        E2ETrace.log("measurement \(name): \(statusValue)")
+        #endif
     }
 
     private func announce(_ message: String) {

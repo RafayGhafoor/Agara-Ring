@@ -150,6 +150,11 @@ private struct HRSampleWindow {
         return now.timeIntervalSince(lastSampleAt) > contactGap
     }
 
+    #if DEBUG
+    /// E2E trace: how many samples, and their range.
+    var sampleSummary: String { "\(samples.count) [\(samples.min() ?? 0)–\(samples.max() ?? 0)]" }
+    #endif
+
     /// The settled reading: the median of the samples that agree with each other — or nil if they
     /// never did.
     var stableValue: Int? {
@@ -668,6 +673,11 @@ final class RingSyncCoordinator {
         restartWorkoutHeartRateIfActive()
 
         let result = aborted ? nil : hrWindow.stableValue
+        #if DEBUG
+        E2ETrace.log("measureHR: aborted=\(aborted) contactLost=\(hrWindow.contactLost()) " +
+                     "noReading=\(hrNoReadingReported) rejected=\(spot.isRejected(token)) " +
+                     "connected=\(client.state == .connected) samples=\(hrWindow.sampleSummary) result=\(result.map(String.init) ?? "nil")")
+        #endif
         hrState = result.map { .done($0) } ?? .failed
         return result
     }
@@ -836,6 +846,10 @@ final class RingSyncCoordinator {
             // Live/fresh data landed: keep the "Synced …" labels honest while streaming (they would
             // otherwise only advance on full history-sync completion).
             stampLiveSync()
+            // SpO₂ and BP are also spot-measurement results: mirror them, or `measureSpO2()` /
+            // `measureBloodPressure()` poll a value that never lands and every test times out (the
+            // regression from abfcf50, which moved these two cases here; found by the E2E suite).
+            mirrorLiveValue(event)
         case .heartRateComplete:
             // The ring reported a genuine error/no-reading (worn incorrectly). Only fast-fail if this
             // measurement hasn't already produced a real reading.

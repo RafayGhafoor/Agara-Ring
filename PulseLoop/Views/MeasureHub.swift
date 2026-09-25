@@ -84,6 +84,7 @@ struct MeasureHubSheet: View {
 
             if isCharging {
                 ChargingBanner()
+                    .accessibilityIdentifier("measure.chargingBanner")
             }
 
             LazyVGrid(columns: columns, spacing: 12) {
@@ -154,5 +155,6 @@ private struct MeasureTile: View {
         .opacity(enabled ? 1 : 0.45)
         .accessibilityLabel("\(kind.title), about \(kind.seconds) seconds")
         .accessibilityHint(enabled ? "Starts the measurement." : MeasurementRefusal.chargingMessage)
+        .accessibilityIdentifier("measure.tile.\(kind.id)")
     }
 }

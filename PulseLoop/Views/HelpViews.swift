@@ -69,6 +69,12 @@ final class CoachMarkStore {
 
     init(defaults: UserDefaults = .standard, suppressed: Bool? = nil) {
         self.defaults = defaults
+        #if DEBUG
+        // `-resetCoachMarks YES` (E2E): show every hint again, as on a fresh install.
+        if suppressed == nil, UserDefaults.standard.bool(forKey: "resetCoachMarks") {
+            for id in Self.order { defaults.removeObject(forKey: Self.key(id)) }
+        }
+        #endif
         seen = Set(Self.order.filter { defaults.bool(forKey: Self.key($0)) })
         self.suppressed = suppressed
             ?? (NSClassFromString("XCTestCase") != nil || UserDefaults.standard.bool(forKey: "noCoachMarks"))
@@ -113,6 +119,7 @@ struct CoachMark: ViewModifier {
                     .onTapGesture { shown = false }
                     .accessibilityAddTraits(.isButton)
                     .accessibilityHint("Double-tap to dismiss")
+                    .accessibilityIdentifier("coachMark.\(id)")
                     .presentationCompactAdaptation(.popover)
             }
             .onChange(of: shown) { _, now in

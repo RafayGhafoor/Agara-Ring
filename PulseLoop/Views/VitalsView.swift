@@ -80,18 +80,31 @@ struct VitalsView: View {
             persistOrder()
         }
         .task { ensureStore(); if isActive { store?.updateProfile(profile) } }
+        #if DEBUG
+        .task { await autoMeasureIfRequested() }
+        #endif
         .onChange(of: dataChange.token) { _, _ in if isActive { store?.refreshIfNeeded() } }
         .onChange(of: isActive) { _, active in if active { store?.updateProfile(profile) } }
         .onChange(of: profile?.updatedAt) { _, _ in store?.updateProfile(profile) }
         .sheet(item: $sheet) { sheet in
-            switch sheet {
-            case .hub:
-                MeasureHubSheet(kinds: measureKinds(activeStore), isCharging: ringCharging) { kind in
-                    self.sheet = .measure(kind.sheetKind)
+            Group {
+                switch sheet {
+                case .hub:
+                    MeasureHubSheet(kinds: measureKinds(activeStore), isCharging: ringCharging) { kind in
+                        self.sheet = .measure(kind.sheetKind)
+                    }
+                case let .measure(kind):
+                    MeasurementSheet(kind: kind)
                 }
-            case let .measure(kind):
-                MeasurementSheet(kind: kind)
             }
+            // Hand the ring objects to the sheet explicitly. Picking a tile swaps the hub for the
+            // measurement in the same sheet slot; on the iPad idiom (and so the Mac "Designed for iPad"
+            // build) SwiftUI presents the queued sheet from the hub's `viewDidDisappear`, with an
+            // environment that no longer carries the `.environment(_:)` objects set on the WindowGroup —
+            // `MeasurementSheet`'s `@Environment(RingBLEClient.self)` then traps ("No Observable object of
+            // type RingBLEClient found"). That was the Mac "Measure → Heart rate" crash (2026-09-25).
+            .environment(ble)
+            .environment(coordinator)
         })
     }
 
@@ -124,6 +137,7 @@ struct VitalsView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityHint("Choose a measurement to take with your ring.")
+                .accessibilityIdentifier("vitals.measure")
                 .help("Take a measurement now")
                 .coachMark(CoachMarkStore.measure, text: AgaraHelp.hintMeasure)
             }
@@ -319,6 +333,34 @@ struct VitalsView: View {
     private func open(_ metric: MetricKind) {
         path.append(AppRoute.metricDetail(metric))
     }
+
+    // MARK: - E2E tooling
+
+    #if DEBUG
+    /// Once per process: `-autoMeasure <id>` (a `MeasureKind` id, e.g. `heartRate`) opens the hub, then picks
+    /// that tile the way a tap does — for destinations XCUITest can't drive (the Mac "Designed for iPad"
+    /// build). Pair with `-startTab vitals`. It waits for the ring to connect (up to 60 s), then goes
+    /// ahead regardless, so the no-ring / Bluetooth-off path is exercised too.
+    private static var didAutoMeasure = false
+
+    private func autoMeasureIfRequested() async {
+        guard !Self.didAutoMeasure, isActive,
+              let id = UserDefaults.standard.string(forKey: "autoMeasure") else { return }
+        Self.didAutoMeasure = true
+        for _ in 0..<120 where ble.state != .connected {
+            try? await Task.sleep(for: .milliseconds(500))
+        }
+        E2ETrace.log("autoMeasure \(id): ring state \(ble.state)")
+        sheet = .hub
+        try? await Task.sleep(for: .seconds(1.5))
+        guard let kind = MeasureKind.all.first(where: { $0.id == id }) else {
+            E2ETrace.log("autoMeasure \(id): unknown id")
+            return
+        }
+        E2ETrace.log("autoMeasure \(id): opening the measurement")
+        sheet = .measure(kind.sheetKind)
+    }
+    #endif
 
     // MARK: - Store lifecycle
 

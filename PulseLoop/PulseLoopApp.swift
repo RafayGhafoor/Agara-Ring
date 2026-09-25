@@ -120,7 +120,11 @@ struct PulseLoopApp: App {
         // Ring firmware install (stage 4, debug + `firmwareInstall`): gates read the live client + coordinator.
         FirmwareInstallController.shared.attach(client: client, coordinator: coordinator)
         #if DEBUG
-        if useVirtualRing {
+        if useVirtualRing, UserDefaults.standard.bool(forKey: VirtualRingLink.onPairKey) {
+            // `-virtualRingOnPair YES` (E2E): leave onboarding alone and connect only when the pairing
+            // screen's "Connect my ring" starts a scan, so the real pairing → "Name your ring" path runs.
+            VirtualRingLink.shared.deferAttach(client: client)
+        } else if useVirtualRing {
             // The pairing step needs a BLE scan, which the virtual link bypasses — open on the tabs.
             try? VirtualRingLink.completeOnboardingIfNeeded(context: container.mainContext)
             // Then seed what that flow would have created (a goal row + one workout), so the

@@ -324,6 +324,9 @@ final class FirmwareUpdateChecker {
             deleteStaleFiles(keeping: name)
             status = .ready(release)
         } catch {
+            #if DEBUG
+            E2ETrace.log("firmware download failed: \(error)")
+            #endif
             status = .error("Download failed — try again")
         }
     }

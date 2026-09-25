@@ -1,0 +1,173 @@
+import XCTest
+
+/// Base class for the end-to-end suite. Every test drives the real app against the ring emulator over the
+/// debug socket transport (`-virtualRing <port>`), so the whole pipeline — frames, decode, store, UI — runs.
+///
+/// The runner (`tools/e2e_ios.sh`) starts the emulator(s) and hands the ports in through the test-runner
+/// environment (`TEST_RUNNER_E2E_*` → `E2E_*` here):
+///
+/// | variable          | emulator                                                       |
+/// |-------------------|----------------------------------------------------------------|
+/// | `E2E_PORT`        | main ring, `--seed 7 --now … --days 8 --sleep-nights 8`         |
+/// | `E2E_OTA_PORT`    | ring on firmware 00.12.07 that is offered 00.12.09             |
+/// | `E2E_OTA_HTTP`    | that emulator's fake vendor version server                     |
+/// | `E2E_CHG_PORT`    | ring sitting on its charger (`--charging`)                     |
+///
+/// A variable that isn't set skips the tests that need that emulator, rather than failing them.
+class AgaraUITestCase: XCTestCase {
+    /// Every feature flag the release ships or can switch on, so every tile and screen is reachable.
+    static let allFeatures = [
+        "capability_probe", "measure_stress", "charging_state", "find_ring", "vitals_respiration",
+        "vitals_met", "vitals_cardiac_load", "blood_components", "measure_lipids", "measure_glucose",
+        "auto_measure_settings", "profile_sync", "firmware_check", "firmware_download", "firmware_install",
+    ].map { "\($0)=on" }.joined(separator: ",")
+
+    var app: XCUIApplication!
+
+    override func setUp() {
+        super.setUp()
+        continueAfterFailure = false
+        app = XCUIApplication()
+    }
+
+    override func tearDown() {
+        // A screenshot on every failure, attached to the .xcresult (kept on success too for the report).
+        if let app, (testRun?.totalFailureCount ?? 0) > 0 {
+            let shot = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "failure-\(name)"
+            shot.lifetime = .keepAlways
+            add(shot)
+        }
+        app?.terminate()
+        super.tearDown()
+    }
+
+    // MARK: - Environment
+
+    func port(_ key: String) throws -> String {
+        guard let value = ProcessInfo.processInfo.environment[key], !value.isEmpty else {
+            throw XCTSkip("\(key) not set — run through tools/e2e_ios.sh (TEST_RUNNER_\(key)=<port>)")
+        }
+        return value
+    }
+
+    // MARK: - Launch
+
+    /// Launch against the ring emulator on `portKey`, with every feature flag on and coach marks off.
+    @discardableResult
+    func launch(portKey: String = "E2E_PORT",
+                extra: [String] = [],
+                coachMarks: Bool = false,
+                features: String = AgaraUITestCase.allFeatures) throws -> XCUIApplication {
+        let ringPort = try port(portKey)
+        app.launchArguments = [
+            "-virtualRing", ringPort,
+            "-features", features,
+            "-historyDays", "8",
+            "-historyWindowDays", "90",
+            "-noCoachMarks", coachMarks ? "NO" : "YES",
+            // Keep every run on the same, shipped look regardless of what an earlier test chose.
+            "-AppleLanguages", "(en)",
+        ] + extra
+        app.launch()
+        return app
+    }
+
+    /// Launch with no ring transport at all (CoreBluetooth path — unauthorized/unsupported in the sim).
+    func launchWithoutRing(extra: [String] = []) {
+        app.launchArguments = ["-noCoachMarks", "YES", "-features", Self.allFeatures] + extra
+        app.launch()
+    }
+
+    // MARK: - Waiting
+
+    @discardableResult
+    func waitFor(_ element: XCUIElement, timeout: TimeInterval = 20,
+                 _ message: String? = nil, file: StaticString = #filePath, line: UInt = #line) -> XCUIElement {
+        if !element.waitForExistence(timeout: timeout) {
+            attachScreenshot("waiting-for-\(element.description.prefix(40))")
+            XCTFail(message ?? "Timed out waiting for \(element)", file: file, line: line)
+        }
+        return element
+    }
+
+    /// Poll until `predicate` is true (or fail). XCUI's `waitForExistence` only covers existence.
+    func eventually(timeout: TimeInterval = 20, _ message: String,
+                    file: StaticString = #filePath, line: UInt = #line, _ predicate: () -> Bool) {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if predicate() { return }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+        }
+        attachScreenshot("eventually-\(message.prefix(40))")
+        XCTFail(message, file: file, line: line)
+    }
+
+    func attachScreenshot(_ name: String) {
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = name
+        shot.lifetime = .keepAlways
+        add(shot)
+    }
+
+    /// Any element carrying `identifier`, whatever its type.
+    func element(_ identifier: String) -> XCUIElement {
+        app.descendants(matching: .any).matching(identifier: identifier).firstMatch
+    }
+
+    /// Any static text containing `text`.
+    func text(containing text: String) -> XCUIElement {
+        app.staticTexts.containing(NSPredicate(format: "label CONTAINS[c] %@", text)).firstMatch
+    }
+
+    func anyElement(labelContains text: String) -> XCUIElement {
+        app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS[c] %@", text)).firstMatch
+    }
+
+    // MARK: - Navigation
+
+    func openTab(_ name: String, file: StaticString = #filePath, line: UInt = #line) {
+        let tab = app.tabBars.buttons[name]
+        if tab.waitForExistence(timeout: 20) {
+            tab.tap()
+            return
+        }
+        // iOS 18–25 fallback bar / Designed-for-iPad sidebar: any button with the tab's label.
+        let button = app.buttons.matching(NSPredicate(format: "label == %@", name)).firstMatch
+        waitFor(button, "tab \(name) not found", file: file, line: line).tap()
+    }
+
+    /// Scroll the frontmost scroll view until `element` is hittable (bounded).
+    func scrollTo(_ element: XCUIElement, maxSwipes: Int = 12, up: Bool = false) {
+        var n = 0
+        while !(element.exists && element.isHittable) && n < maxSwipes {
+            if up { app.swipeDown() } else { app.swipeUp() }
+            n += 1
+        }
+    }
+
+    /// Wait until the post-connect history sync has finished (the header's "Syncing" bar gone for 3 s).
+    /// Measuring while that sync floods the main thread delays HR samples past the 3 s contact-gap rule and
+    /// the reading is (wrongly) abandoned — see the report; tests measure the way a user does, after sync.
+    func waitForSyncIdle(timeout: TimeInterval = 120) {
+        let bar = app.descendants(matching: .any).matching(NSPredicate(format: "label == 'Syncing'")).firstMatch
+        let deadline = Date().addingTimeInterval(timeout)
+        var quietSince: Date?
+        while Date() < deadline {
+            if bar.exists { quietSince = nil } else if quietSince == nil { quietSince = Date() }
+            if let quietSince, Date().timeIntervalSince(quietSince) >= 3 { return }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+        }
+        attachScreenshot("sync-never-idle")
+    }
+
+    /// Wait until the virtual ring's post-auth handshake has completed (the header reads connected).
+    func waitForConnected(timeout: TimeInterval = 40, file: StaticString = #filePath, line: UInt = #line) {
+        let chip = app.buttons["ringChip"]
+        waitFor(chip, timeout: timeout, "ring chip missing", file: file, line: line)
+        eventually(timeout: timeout, "ring never connected (chip: \(chip.label))", file: file, line: line) {
+            let label = chip.label.lowercased()
+            return label.contains(" connected") || label.contains(" charging")
+        }
+    }
+}
