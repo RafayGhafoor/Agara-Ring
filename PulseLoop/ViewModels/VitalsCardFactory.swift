@@ -16,6 +16,11 @@ enum VitalsCardFactory {
         var systolic: [MetricSample] = []
         var diastolic: [MetricSample] = []
         var glucose: [MetricSample] = []
+        var respiration: [MetricSample] = []
+        var met: [MetricSample] = []
+        var cardiacLoad: [MetricSample] = []
+        /// The five blood-component series, canonical units (mmol/L, µmol/L).
+        var components: [MetricKind: [MetricSample]] = [:]
         var summary: TodaySummary?
         var range: MetricRange = .twentyFourHours
         var now: Date = Date()
@@ -35,7 +40,70 @@ enum VitalsCardFactory {
         case .temperature: return temperature(inputs, profile, calibration)
         case .bloodPressure: return bloodPressure(inputs, profile, calibration)
         case .glucose: return glucose(inputs, profile, calibration)
+        case .respiration:
+            return seriesCard(.respiration, samples: inputs.respiration, inputs: inputs, profile: profile,
+                              calibration: calibration, subtitle: "Breaths per minute, from the ring's 5-minute log")
+        case .met:
+            return seriesCard(.met, samples: inputs.met, inputs: inputs, profile: profile,
+                              calibration: calibration, subtitle: "Activity intensity · 1 = resting", decimals: 1)
+        case .cardiacLoad:
+            return seriesCard(.cardiacLoad, samples: inputs.cardiacLoad, inputs: inputs, profile: profile,
+                              calibration: calibration, subtitle: "Relative score from the ring")
+        case .totalCholesterol, .triglycerides, .hdl, .ldl, .uricAcid:
+            return componentCard(metric, inputs: inputs, profile: profile, calibration: calibration)
         }
+    }
+
+    // MARK: - Ring history series (respiration / MET / cardiac load)
+
+    /// A plain line card for a ring-logged series: latest value, zone label, half-hourly chart.
+    private static func seriesCard(_ metric: MetricKind, samples: [MetricSample], inputs: Inputs,
+                                   profile: UserPhysiologyProfile, calibration cal: Calibration,
+                                   subtitle: String, decimals: Int = 0) -> VitalCardViewModel {
+        let latest = samples.last?.value
+        let quality = SourceQualityResolver.quality(for: metric, latest: samples.last?.timestamp, now: inputs.now, calibration: cal)
+        let interp = latest.map { VitalsThresholdEngine.interpret(value: $0, metric: metric, profile: profile) }
+        let chart = ChartSampleBuilder.from(samples, quality: quality)
+        let values = samples.map(\.value).filter { $0 > 0 }
+        let domain = ChartAxes.fixedAxis(metric, data: values)?.domain ?? ChartAxes.niceAxis(values).domain
+        let valueText = latest.map { decimals > 0 ? String(format: "%.\(decimals)f", $0) : "\(Int($0.rounded()))" } ?? "--"
+        return VitalCardViewModel(
+            metric: metric, title: metric.title,
+            valueText: valueText, unitText: latest != nil && !metric.unit.isEmpty ? metric.unit : nil,
+            statusText: interp?.displayLabel ?? "No data", statusColor: interp?.statusColor ?? PulseColors.textMuted,
+            subtitleText: subtitle,
+            samples: halfHourly(samples, quality: quality), zones: VitalsThresholdEngine.zones(for: metric, profile: profile),
+            yDomain: domain, referenceBands: [], dashedRules: [],
+            trend: TrendSummary.compute(samples: chart, metric: metric, unitLabel: metric.unit),
+            sourceQuality: quality, isEstimated: false, confidenceLabel: nil,
+            lastUpdatedText: lastUpdated(samples.last?.timestamp, now: inputs.now),
+            isEmpty: samples.count < 2
+        )
+    }
+
+    /// One blood component (lipid or uric acid), in the user's display unit. Always an estimate.
+    private static func componentCard(_ metric: MetricKind, inputs: Inputs, profile: UserPhysiologyProfile,
+                                      calibration cal: Calibration) -> VitalCardViewModel {
+        let samples = inputs.components[metric] ?? []
+        let unit = profile.preferredGlucoseUnit
+        let latest = samples.last?.value
+        let quality = SourceQualityResolver.quality(for: metric, latest: samples.last?.timestamp, now: inputs.now, calibration: cal)
+        let interp = latest.map { VitalsThresholdEngine.interpret(value: $0, metric: metric, profile: profile) }
+        let disp = samples.map { MetricSample(timestamp: $0.timestamp, value: BloodComponents.displayValue($0.value, metric: metric, unit: unit)) }
+        let chart = ChartSampleBuilder.from(disp, quality: quality)
+        let domain = ChartAxes.niceAxis(disp.map(\.value).filter { $0 > 0 }).domain
+        return VitalCardViewModel(
+            metric: metric, title: metric.title,
+            valueText: latest.map { BloodComponents.format($0, metric: metric, unit: unit) } ?? "--",
+            unitText: latest != nil ? BloodComponents.displayUnit(metric: metric, unit: unit) : nil,
+            statusText: interp?.displayLabel ?? "No estimate", statusColor: interp?.statusColor ?? PulseColors.textMuted,
+            subtitleText: AgaraCopy.estimateDisclaimer,
+            samples: chart, zones: [], yDomain: domain, referenceBands: [], dashedRules: [],
+            trend: TrendSummary.compute(samples: chart, metric: metric),
+            sourceQuality: quality, isEstimated: true, confidenceLabel: "Estimated",
+            lastUpdatedText: lastUpdated(samples.last?.timestamp, now: inputs.now),
+            isEmpty: samples.isEmpty
+        )
     }
 
     // MARK: - Heart rate
@@ -50,13 +118,14 @@ enum VitalsCardFactory {
         let resting = inputs.summary?.restingHeartRateEstimate.map { "Resting \(Int($0))" } ?? "Resting calibrating"
         let peak = inputs.summary?.peakHeartRateToday.map { "Peak \(Int($0))" } ?? "Peak —"
         let chart = ChartSampleBuilder.from(samples, quality: quality)
-        let domain = clampedDomain(samples, fallback: 40...140, pad: 8, hardLower: 40, hardUpper: 220)
+        // The same fixed axis as the detail chart, so a card and its detail share a baseline (ChartAxes).
+        let domain = ChartAxes.fixedAxis(.heartRate, data: samples.map(\.value).filter { $0 > 0 })!.domain
         return VitalCardViewModel(
             metric: .heartRate, title: MetricKind.heartRate.title,
             valueText: valueText, unitText: latest != nil ? "bpm range" : nil,
             statusText: interp?.displayLabel ?? "No reading", statusColor: interp?.statusColor ?? PulseColors.textMuted,
             subtitleText: "\(resting) · \(peak)",
-            samples: chart, zones: VitalsThresholdEngine.zones(for: .heartRate, profile: profile),
+            samples: halfHourly(samples, quality: quality), zones: VitalsThresholdEngine.zones(for: .heartRate, profile: profile),
             yDomain: domain, referenceBands: bands(for: .heartRate, profile: profile, domain: domain),
             dashedRules: [],
             trend: TrendSummary.compute(samples: chart, metric: .heartRate, unitLabel: "bpm"),
@@ -81,8 +150,11 @@ enum VitalsCardFactory {
             valueText: TodayInsights.averageLabel(samples, latest), unitText: latest != nil ? "% avg" : nil,
             statusText: interp?.displayLabel ?? "No reading", statusColor: interp?.statusColor ?? PulseColors.textMuted,
             subtitleText: subtitle,
-            samples: chart, zones: VitalsThresholdEngine.zones(for: .spo2, profile: profile),
-            yDomain: 88...100,
+            // Spot readings stay individual; logged all day (5-min history) they average per half hour.
+            samples: chart.count > ChartAxes.denseDayReadings ? halfHourly(samples, quality: quality) : chart,
+            zones: VitalsThresholdEngine.zones(for: .spo2, profile: profile),
+            // 80–100 rather than 88–100: a 97 → 99 wobble drew as a cliff on the tighter band.
+            yDomain: 80...100,
             referenceBands: [ReferenceBand(lower: 95, upper: 100, colorToken: .cyan)],
             dashedRules: [92],
             trend: TrendSummary.compute(samples: chart, metric: .spo2, unitLabel: "%"),
@@ -101,7 +173,7 @@ enum VitalsCardFactory {
         let quality = SourceQualityResolver.quality(for: .hrv, latest: samples.last?.timestamp, now: inputs.now, calibration: cal)
         let interp = latest.map { VitalsThresholdEngine.interpret(value: $0, metric: .hrv, profile: profile, baseline: baseline) }
         let chart = ChartSampleBuilder.from(samples, quality: quality)
-        let domain = clampedDomain(samples, fallback: 0...120, pad: 10, hardLower: 0, hardUpper: 250)
+        let domain = ChartAxes.fixedAxis(.hrv, data: samples.map(\.value).filter { $0 > 0 })!.domain
         var bands: [ReferenceBand] = []
         if let baseline, baseline.isEstablished {
             let half = max(6, baseline.mean * 0.12)
@@ -119,7 +191,7 @@ enum VitalsCardFactory {
             valueText: latest.map { "\(Int($0))" } ?? "--", unitText: latest != nil ? "ms" : nil,
             statusText: interp?.displayLabel ?? "Building baseline", statusColor: interp?.statusColor ?? PulseColors.textMuted,
             subtitleText: subtitle,
-            samples: chart, zones: VitalsThresholdEngine.zones(for: .hrv, profile: profile, baseline: baseline),
+            samples: halfHourly(samples, quality: quality), zones: VitalsThresholdEngine.zones(for: .hrv, profile: profile, baseline: baseline),
             yDomain: domain, referenceBands: bands, dashedRules: baseline.map { [$0.mean] } ?? [],
             trend: TrendSummary.compute(samples: chart, metric: .hrv, baseline: baseline, unitLabel: "ms"),
             sourceQuality: quality, isEstimated: false, confidenceLabel: interp?.confidenceLabel,
@@ -269,6 +341,12 @@ enum VitalsCardFactory {
     // MARK: - Helpers
 
     /// A y-domain padded around the data and clamped to sane hard limits, falling back when empty.
+    /// The card chart's series for a continuous signal: 30-minute averages. The raw mix of 1 Hz live HR
+    /// and 5-minute history drew as a jagged wall; the value text and trend still read every raw sample.
+    private static func halfHourly(_ samples: [MetricSample], quality: SourceQuality) -> [ChartSample] {
+        ChartSampleBuilder.from(ChartAxes.bucketAverage(samples, bucket: ChartAxes.halfHour), quality: quality)
+    }
+
     private static func clampedDomain(_ samples: [MetricSample], fallback: ClosedRange<Double>,
                                       pad: Double, hardLower: Double, hardUpper: Double) -> ClosedRange<Double> {
         let values = samples.map(\.value).filter { $0 > 0 }

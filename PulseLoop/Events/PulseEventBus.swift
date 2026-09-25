@@ -9,7 +9,11 @@ enum PulseEvent: Sendable {
         deviceType: RingDeviceType,
         wearableModelID: String?,
         advertisedName: String?,
-        capabilities: Set<WearableCapability>
+        capabilities: Set<WearableCapability>,
+        /// The connected ring's CoreBluetooth peripheral UUID — the stable per-ring identity on iOS (the
+        /// MAC is hidden). Keys the per-ring nickname memory (`RingNicknameMemory`). Nil when there is no
+        /// peripheral (the emulator's virtual transport); the row's identity is then left alone.
+        peripheralIdentifier: String? = nil
     )
     case deviceForgotten
     case batteryLevel(percent: Int)
@@ -27,7 +31,8 @@ enum PulseEvent: Sendable {
     case spo2Progress(percent: Int?, timestamp: Date)
     case spo2Result(value: Int, timestamp: Date)
     case spo2Complete(timestamp: Date)
-    case sleepTimeline(timestamp: Date, stages: [SleepStage])
+    /// One sleep record and the source that delivered it (see `RingDecodedEvent.sleepTimeline`).
+    case sleepTimeline(timestamp: Date, stages: [SleepStage], source: String? = nil)
     case historyMeasurement(kind: MeasurementKind, value: Double, timestamp: Date)
     case stressSample(value: Int, timestamp: Date)
     case hrvSample(value: Int, timestamp: Date)
@@ -42,6 +47,17 @@ enum PulseEvent: Sendable {
     /// time. Not persisted — it is a live condition, not data.
     case wearState(worn: Bool)
     case firmwareVersion(String)
+    /// The ring's device number and test version from the `a1` reply — the firmware-update lookup key
+    /// (`FirmwareUpdateChecker`). Persisted on the Device row next to `firmwareVersion`.
+    case firmwareIdentity(deviceNumber: Int, version: String, testVersion: String)
+    /// The ring is (not) on its charger. A live condition — not persisted (`RingBLEClient.isCharging`).
+    case chargingState(Bool)
+    /// The ring's decoded capability packets; persisted on the Device row.
+    case ringCapabilities(RingCapabilities)
+    /// The ring's automatic-measurement schedule; persisted on the Device row.
+    case autoMeasureSchedule([AutoMeasureEntry])
+    /// A finished on-demand blood-components test: five spot readings.
+    case bloodComponentsSample(BloodComponentsReading, timestamp: Date)
     /// Friendly history-sync progress for the product UI (e.g. "Syncing sleep…"). Never protocol terms.
     case syncProgress(stage: String)
     case workoutStarted(UUID)
@@ -217,7 +233,7 @@ final class EventPersistenceSubscriber {
                 device.lastSyncAt = Date()
             }
             context.insert(device)
-        case let .deviceIdentified(deviceType, wearableModelID, advertisedName, capabilities):
+        case let .deviceIdentified(deviceType, wearableModelID, advertisedName, capabilities, peripheralIdentifier):
             let device = MetricsService.fetchDevices(context).first ?? Device()
             device.deviceType = deviceType
             device.wearableModelID = wearableModelID
@@ -225,6 +241,11 @@ final class EventPersistenceSubscriber {
                 device.advertisedName = advertisedName
             }
             device.capabilities = capabilities
+            // The single row is reused by whichever ring connects, so its nickname follows the ring's
+            // identity: ring B connecting after ring A shows B's own name (or none), not A's.
+            if let peripheralIdentifier {
+                RingNicknameMemory().adopt(identifier: peripheralIdentifier, on: device)
+            }
             adoptDeviceName(advertised: advertisedName, deviceType: deviceType, on: device)
             context.insert(device)
         case .deviceForgotten:
@@ -239,6 +260,13 @@ final class EventPersistenceSubscriber {
             // `device_name` and the diagnostics export's `wearableName` would both still name the old
             // one: worse than the old placeholder, because it reads as authoritative.
             device.name = ""
+            // The user's name for the ring goes with it too: the next ring paired starts as "Agara Ring",
+            // and this ring's entry leaves the per-ring memory so re-pairing it later starts unnamed.
+            device.nickname = nil
+            if let identifier = device.peripheralIdentifier {
+                RingNicknameMemory().remove(identifier: identifier)
+            }
+            device.peripheralIdentifier = nil
             context.insert(device)
         case let .batteryLevel(percent):
             let device = MetricsService.fetchDevices(context).first ?? Device()
@@ -310,7 +338,8 @@ final class EventPersistenceSubscriber {
         case let .historyMeasurement(kind, value, timestamp):
             persistMeasurement(kind: kind, value: value, timestamp: timestamp, source: .history, kindLabel: "history_measurement")
         case let .stressSample(value, timestamp):
-            persistMeasurement(kind: .stress, value: Double(value), timestamp: timestamp, source: .ring, kindLabel: "stress_sample")
+            // The on-demand stress test (`89 06`) is a spot reading, stored like the other spot legs.
+            persistMeasurement(kind: .stress, value: Double(value), timestamp: timestamp, source: .live, kindLabel: "stress_sample")
         case let .hrvSample(value, timestamp):
             persistMeasurement(kind: .hrv, value: Double(value), timestamp: timestamp, source: .ring, kindLabel: "hrv_sample")
         case let .temperatureSample(celsius, timestamp):
@@ -325,8 +354,26 @@ final class EventPersistenceSubscriber {
             persistMeasurement(kind: .bloodSugar, value: mgdl, timestamp: timestamp, source: .live, kindLabel: "blood_sugar_sample")
         case let .firmwareVersion(version):
             persistFirmwareVersion(version)
-        case let .sleepTimeline(timestamp, stages):
-            persistSleepTimeline(start: timestamp, stages: stages)
+        case let .firmwareIdentity(deviceNumber, _, testVersion):
+            if let device = DeviceRepository.current(context: context) {
+                if device.deviceNumber != deviceNumber { device.deviceNumber = deviceNumber }
+                if device.firmwareTestVersion != testVersion { device.firmwareTestVersion = testVersion }
+            }
+        case let .ringCapabilities(capabilities):
+            if let device = DeviceRepository.current(context: context), device.ringCapabilitiesJSON != capabilities.json {
+                device.ringCapabilitiesJSON = capabilities.json
+            }
+        case let .autoMeasureSchedule(entries):
+            let json = AutoMeasureEntry.encodeList(entries)
+            if let device = DeviceRepository.current(context: context), device.autoMeasureJSON != json {
+                device.autoMeasureJSON = json
+            }
+        case let .bloodComponentsSample(reading, timestamp):
+            for (kind, value) in reading.measurements {
+                persistMeasurement(kind: kind, value: value, timestamp: timestamp, source: .live, kindLabel: "blood_components_sample")
+            }
+        case let .sleepTimeline(timestamp, stages, source):
+            SleepService.applySleepRecord(start: timestamp, stages: stages, source: source, context: context)
         case let .gpsPoint(sessionId, latitude, longitude, altitude, horizontalAccuracy, speed, course, accepted, rejectionReason, timestamp):
             context.insert(ActivityGpsPoint(
                 sessionId: sessionId,
@@ -365,7 +412,7 @@ final class EventPersistenceSubscriber {
             break
         // `.wearState` is a live condition the measurement flow reacts to, not data — nothing to store.
         case .heartRateComplete, .spo2Progress, .spo2Complete, .workoutStarted, .workoutPaused,
-             .workoutResumed, .workoutFinished, .coachTrace, .wearState:
+             .workoutResumed, .workoutFinished, .coachTrace, .wearState, .chargingState:
             break
         }
         // NB: no per-event save here — `scheduleFlush()` (called by `persist`) batches the save.
@@ -462,64 +509,5 @@ final class EventPersistenceSubscriber {
     private func persistFirmwareVersion(_ version: String) {
         guard let device = DeviceRepository.current(context: context), device.firmwareVersion != version else { return }
         device.firmwareVersion = version
-    }
-
-    /// Upsert a sleep session by night, appending this packet's per-minute stage blocks and
-    /// recomputing session bounds. The ring streams ~20 timeline packets (15 samples each) per
-    /// night, so blocks must accumulate into one session rather than spawning a session per
-    /// packet. Mirrors `persistence._on_sleep_timeline`.
-    private func persistSleepTimeline(start: Date, stages: [SleepStage],
-                                      sessions: [SleepSession]? = nil, blocks: [SleepStageBlock]? = nil) {
-        let calendar = Calendar.current
-
-        // Group packets by the waking-day boundary (sleep from 7 PM rolls to the next morning) so a
-        // night that starts before midnight lands under the morning of waking. See
-        // `Calendar.wakingDay(forSleepStart:)`.
-        let dateKey = calendar.wakingDay(forSleepStart: start)
-
-        // Attach this packet's per-minute blocks to the day's container session (create one if the
-        // day is empty), deduping by block start across every session on the day. Then hand off to
-        // `SleepService.reconcileWakingDay`, which re-splits the day's blocks into distinct sessions
-        // (main night vs. naps separated by a >= 60 min gap) and recomputes each session's bounds.
-        let allSessions = sessions ?? ((try? context.fetch(FetchDescriptor<SleepSession>())) ?? [])
-        let daySessions = allSessions.filter { calendar.isDate($0.date, inSameDayAs: dateKey) }
-        let container = daySessions.min { $0.startAt < $1.startAt }
-            ?? {
-                let new = SleepSession(date: dateKey, startAt: start, endAt: start, totalMinutes: 0, syncedAt: Date())
-                context.insert(new)
-                return new
-            }()
-
-        // Rows to hand `reconcileWakingDay` (a just-created container isn't in `daySessions` yet).
-        let sessionsForDay = daySessions.contains(where: { $0.id == container.id }) ? daySessions : daySessions + [container]
-
-        let daySessionIds = Set(sessionsForDay.map { $0.id })
-        let existingDayBlocks = (blocks ?? ((try? context.fetch(FetchDescriptor<SleepStageBlock>())) ?? []))
-            .filter { daySessionIds.contains($0.sessionId) }
-        var existingStarts = Set(existingDayBlocks.map { $0.startAt })
-        var newBlocks: [SleepStageBlock] = []
-
-        var offset = 0
-        while offset < stages.count {
-            let stage = stages[offset]
-            var duration = 1
-            while offset + duration < stages.count, stages[offset + duration] == stage {
-                duration += 1
-            }
-            let blockStart = calendar.date(byAdding: .minute, value: offset, to: start) ?? start
-            if !existingStarts.contains(blockStart) {
-                let block = SleepStageBlock(sessionId: container.id, startAt: blockStart, startMinute: 0, durationMinutes: duration, stage: stage)
-                context.insert(block)
-                newBlocks.append(block)
-                existingStarts.insert(blockStart)
-            }
-            offset += duration
-        }
-
-        // Hand the in-memory rows + blocks (incl. the ones just inserted, unsaved under the
-        // coalesced flush) straight to reconcile so it needn't re-scan the whole store.
-        SleepService.reconcileWakingDay(dateKey: dateKey, context: context,
-                                        daySessions: sessionsForDay,
-                                        dayBlocks: existingDayBlocks + newBlocks)
     }
 }

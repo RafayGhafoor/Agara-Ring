@@ -182,12 +182,12 @@ private struct DecimalValueSheet: View {
                 .accessibilityLabel("Weight in \(unit)")
 
                 Text("You can use either a comma or a period as the decimal separator.")
-                    .font(.caption)
+                    .font(PulseFont.caption)
                     .foregroundStyle(PulseColors.textMuted)
 
                 if !text.isEmpty && parsedValue == nil {
                     Text("Enter a weight between \(Int(validRange.lowerBound)) and \(Int(validRange.upperBound)) \(unit).")
-                        .font(.caption)
+                        .font(PulseFont.caption)
                         .foregroundStyle(PulseColors.danger)
                 }
 

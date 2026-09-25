@@ -36,6 +36,17 @@ enum RingEventBridge {
     static let respiratoryRateRange: ClosedRange<Int> = 4...60
     /// Plausible VO₂max, in mL/kg/min (sedentary floor to elite-athlete ceiling).
     static let vo2maxRange: ClosedRange<Int> = 10...90
+    /// MET (resting 1.0 to a hard sprint); the ring reports tenths.
+    static let metRange: ClosedRange<Double> = 0.5...25
+    /// Cardiac load, the ring's unitless per-minute score (25–38 seen on our ring).
+    static let cardiacLoadRange: ClosedRange<Double> = 1...254
+    /// Blood-component estimates, canonical units: lipids mmol/L, uric acid µmol/L. Wide physiological
+    /// brackets — the gate drops misframed bytes, the reference ranges judge the values.
+    static let totalCholesterolRange: ClosedRange<Double> = 0.5...20
+    static let triglyceridesRange: ClosedRange<Double> = 0.05...20
+    static let hdlRange: ClosedRange<Double> = 0.05...10
+    static let ldlRange: ClosedRange<Double> = 0.05...15
+    static let uricAcidRange: ClosedRange<Double> = 30...1500
     /// Sanity ceilings for one intraday activity bucket (~15 min): well above any human cadence so
     /// only clearly-misframed packets are rejected.
     static let maxBucketSteps = 5000
@@ -111,9 +122,9 @@ enum RingEventBridge {
         case .historySyncFinished:
             return [.syncProgress(stage: "done")]
 
-        case let .sleepTimeline(timestamp, stages):
+        case let .sleepTimeline(timestamp, stages, source):
             guard trustTimestamps || isPlausibleSleepStart(timestamp, now: now), !stages.isEmpty else { return [] }
-            return [.sleepTimeline(timestamp: timestamp, stages: stages)]
+            return [.sleepTimeline(timestamp: timestamp, stages: stages, source: source)]
 
         case let .battery(percent):
             guard (0...100).contains(percent) else { return [] }
@@ -181,6 +192,13 @@ enum RingEventBridge {
         case .bloodSugar: return bloodSugarRange.contains(value)
         case .respiratoryRate: return respiratoryRateRange.contains(Int(value))
         case .vo2max: return vo2maxRange.contains(Int(value))
+        case .met: return metRange.contains(value)
+        case .cardiacLoad: return cardiacLoadRange.contains(value)
+        case .totalCholesterol: return totalCholesterolRange.contains(value)
+        case .triglycerides: return triglyceridesRange.contains(value)
+        case .hdl: return hdlRange.contains(value)
+        case .ldl: return ldlRange.contains(value)
+        case .uricAcid: return uricAcidRange.contains(value)
         }
     }
 
@@ -198,8 +216,23 @@ enum RingEventBridge {
             guard bloodSugarRange.contains(mgdl) else { return [] }
             return [.bloodSugarSample(mgdl: mgdl, timestamp: timestamp)]
 
-        case let .firmware(version):
-            return [.firmwareVersion(version)]
+        case let .firmware(version, deviceNumber, testVersion):
+            guard let deviceNumber, let testVersion else { return [.firmwareVersion(version)] }
+            return [.firmwareVersion(version),
+                    .firmwareIdentity(deviceNumber: deviceNumber, version: version, testVersion: testVersion)]
+
+        case let .chargingState(isCharging):
+            return [.chargingState(isCharging)]
+
+        case let .ringCapabilities(capabilities):
+            return [.ringCapabilities(capabilities)]
+
+        case let .autoMeasureSchedule(entries):
+            return [.autoMeasureSchedule(entries)]
+
+        case let .bloodComponentsSample(reading, timestamp):
+            let plausible = reading.measurements.allSatisfy { isPlausible(kind: $0.0, value: $0.1) }
+            return plausible ? [.bloodComponentsSample(reading, timestamp: timestamp)] : []
 
         default:
             return []

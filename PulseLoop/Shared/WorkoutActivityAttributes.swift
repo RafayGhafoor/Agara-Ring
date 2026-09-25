@@ -146,18 +146,14 @@ struct FinishWorkoutIntent: LiveActivityIntent {
 // MARK: - Shared palette + helpers for the widget
 
 enum WorkoutLAColors {
-    // #7C5CFF
-    static let accent = Color(.sRGB, red: 0.486, green: 0.361, blue: 1.0, opacity: 1)
-    // #FF4D6D
-    static let heartRate = Color(.sRGB, red: 1.0, green: 0.302, blue: 0.427, opacity: 1)
-    // #4DDCFF
-    static let spo2 = Color(.sRGB, red: 0.302, green: 0.863, blue: 1.0, opacity: 1)
-    // #4DA3FF
-    static let distance = Color(.sRGB, red: 0.302, green: 0.639, blue: 1.0, opacity: 1)
-    // #6F7A8C
-    static let textMuted = Color(.sRGB, red: 0.435, green: 0.478, blue: 0.549, opacity: 1)
-    // #080A0F
-    static let background = Color(.sRGB, red: 0.031, green: 0.039, blue: 0.059, opacity: 1)
+    // From the palette catalog's default theme (Generated/AgaraFont.swift is a member of this extension).
+    // This used to be a hand copy of the pre-rebrand purple / blue-black palette.
+    static let accent = AgaraTheme.dark.accent
+    static let heartRate = AgaraTheme.dark.heartRate
+    static let spo2 = AgaraTheme.dark.spo2
+    static let distance = AgaraTheme.dark.distance
+    static let textMuted = AgaraTheme.dark.textMuted
+    static let background = AgaraTheme.dark.background
 
     static func icon(for activityType: String) -> String {
         switch activityType.lowercased() {

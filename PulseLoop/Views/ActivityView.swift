@@ -85,6 +85,9 @@ struct ActivityView: View {
                             .pulseGlass(Circle(), interactive: true)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Workout history")
+                    .accessibilityHint("Opens your past workouts by date.")
+                    .help("Workout history")
                 }
                 // Record pill + calendar circle share one container so their glass renders/blends together.
                 .pulseGlassContainer(spacing: 12)
@@ -159,6 +162,8 @@ struct ActivityView: View {
                     .pulseGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
                 }
                 .buttonStyle(.plain)
+
+                StepsByHourCard(units: units, reloadToken: dataChange.token)
                 }   // if let summary
             }
             .padding(.horizontal, 16)
@@ -397,7 +402,7 @@ struct WorkoutHistorySheet: View {
                     } else {
                         ForEach(Array(groups.enumerated()), id: \.element.day) { index, group in
                             Text(header(for: group.day))
-                                .font(.system(size: 11, weight: .medium)).tracking(1.4)
+                                .font(AgaraFont.face(11, .medium)).tracking(1.4)
                                 .foregroundStyle(PulseColors.textMuted)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.top, index == 0 ? 0 : 8)
@@ -415,5 +420,107 @@ struct WorkoutHistorySheet: View {
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } } }
         }
         .presentationDetents([.large])
+    }
+}
+
+// MARK: - Steps by hour
+
+/// Today's ring step buckets grouped by hour, only the hours with steps. The ring reports every 5-minute
+/// slot walking or not (~190 a day, a handful with steps), so a raw list was nearly all zeros. Collapsed by
+/// default; Android's version also deletes an hour (issue #70), which iOS has no data path for yet.
+struct StepsByHourCard: View {
+    let units: UnitsPreference
+    let reloadToken: Int
+    @Environment(\.modelContext) private var modelContext
+    @State private var expanded = false
+    @State private var hours: [HourRecord]?
+
+    struct HourRecord: Identifiable, Equatable {
+        let start: Date
+        let steps: Int
+        let distanceMeters: Double
+        var id: Date { start }
+
+        static func group(_ buckets: [(timestamp: Date, steps: Int, distanceMeters: Double)], calendar: Calendar = .current) -> [HourRecord] {
+            var byHour: [Date: (Int, Double)] = [:]
+            for b in buckets where b.steps > 0 {
+                let hour = calendar.dateInterval(of: .hour, for: b.timestamp)?.start ?? b.timestamp
+                let cur = byHour[hour] ?? (0, 0)
+                byHour[hour] = (cur.0 + b.steps, cur.1 + b.distanceMeters)
+            }
+            return byHour.map { HourRecord(start: $0.key, steps: $0.value.0, distanceMeters: $0.value.1) }
+                .sorted { $0.start > $1.start }
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button { expanded.toggle() } label: {
+                HStack {
+                    Text("STEPS BY HOUR").font(PulseFont.caption2).tracking(1.4).foregroundStyle(PulseColors.textMuted)
+                    Spacer()
+                    if let hours {
+                        Text(hours.count == 1 ? "1 active hour" : "\(hours.count) active hours")
+                            .font(PulseFont.caption.weight(.regular)).foregroundStyle(PulseColors.textMuted)
+                    }
+                    Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                        .font(PulseFont.footnote.weight(.semibold)).foregroundStyle(PulseColors.textMuted)
+                }
+                .padding(16)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if expanded, let hours {
+                if hours.isEmpty {
+                    Text("No steps recorded today yet.")
+                        .font(PulseFont.footnote.weight(.regular)).foregroundStyle(PulseColors.textMuted)
+                        .padding([.horizontal, .bottom], 16)
+                } else {
+                    let peak = max(hours.map(\.steps).max() ?? 1, 1)
+                    VStack(spacing: 10) {
+                        ForEach(hours) { hour in
+                            VStack(spacing: 4) {
+                                HStack {
+                                    Text(Self.hourLabel(hour.start)).font(PulseFont.footnote.weight(.regular)).foregroundStyle(PulseColors.textSecondary)
+                                    Spacer()
+                                    Text("\(hour.steps.formatted()) steps").font(PulseFont.footnote.weight(.semibold)).foregroundStyle(PulseColors.textPrimary)
+                                    if hour.distanceMeters > 0 {
+                                        let d = UnitsFormatter.distance(meters: hour.distanceMeters, units: units)
+                                        Text("· \(d.value) \(d.unit)").font(PulseFont.caption2).foregroundStyle(PulseColors.textMuted)
+                                    }
+                                }
+                                // A bar relative to the day's busiest hour, so the list reads at a glance.
+                                GeometryReader { geo in
+                                    ZStack(alignment: .leading) {
+                                        Capsule().fill(PulseColors.cardSoft)
+                                        Capsule().fill(PulseColors.steps).frame(width: geo.size.width * CGFloat(hour.steps) / CGFloat(peak))
+                                    }
+                                }
+                                .frame(height: 4)
+                            }
+                        }
+                    }
+                    .padding([.horizontal, .bottom], 16)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .pulseGlass(RoundedRectangle(cornerRadius: PulseRadius.card, style: .continuous))
+        .task(id: reloadToken) { reload() }
+    }
+
+    private func reload() {
+        let today = Calendar.current.startOfDay(for: Date())
+        let rows = (try? modelContext.fetch(FetchDescriptor<ActivityBucketSample>(
+            predicate: #Predicate { $0.date == today }
+        ))) ?? []
+        hours = HourRecord.group(rows.map { ($0.timestamp, $0.steps, $0.distanceMeters) })
+    }
+
+    private static func hourLabel(_ start: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "h a"
+        return f.string(from: start) + " – " + f.string(from: start.addingTimeInterval(3600))
     }
 }

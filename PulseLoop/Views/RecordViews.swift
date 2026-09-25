@@ -85,18 +85,18 @@ struct StaleSessionRecoveryCard: View {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(PulseColors.warning)
                     Text("Unfinished workout")
-                        .font(.headline)
+                        .font(PulseFont.headline)
                 }
                 Text("A workout was left running from an earlier session. Finish it to keep its time and distance, or discard it.")
-                    .font(.caption)
+                    .font(PulseFont.caption)
                     .foregroundStyle(PulseColors.textMuted)
                 ForEach(sessions) { session in
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(ActivityMeta.label(session.type))
-                                .font(.subheadline.weight(.medium))
+                                .font(PulseFont.subheadline.weight(.medium))
                             Text(session.startedAt, style: .relative)
-                                .font(.caption2)
+                                .font(PulseFont.caption2)
                                 .foregroundStyle(PulseColors.textMuted)
                         }
                         Spacer()
@@ -105,12 +105,12 @@ struct StaleSessionRecoveryCard: View {
                         Button("Finish") {
                             liveWorkout.finish(session)
                         }
-                        .font(.caption.weight(.semibold))
+                        .font(PulseFont.caption.weight(.semibold))
                         .foregroundStyle(PulseColors.success)
                         Button("Discard") {
                             liveWorkout.cancel(session)
                         }
-                        .font(.caption.weight(.semibold))
+                        .font(PulseFont.caption.weight(.semibold))
                         .foregroundStyle(PulseColors.danger)
                     }
                     .padding(.vertical, 4)
@@ -129,24 +129,24 @@ struct WorkoutRow: View {
         PulseCard {
             HStack {
                 Image(systemName: ActivityMeta.icon(session.type))
-                    .font(.title2)
+                    .font(PulseFont.title2)
                     .foregroundStyle(PulseColors.steps)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(ActivityMeta.label(session.type))
-                        .font(.headline)
+                        .font(PulseFont.headline)
                     Text(session.startedAt, style: .date)
-                        .font(.caption)
+                        .font(PulseFont.caption)
                         .foregroundStyle(PulseColors.textMuted)
                 }
                 Spacer()
                 VStack(alignment: .trailing) {
                     Text(session.status.rawValue.capitalized)
-                        .font(.caption)
+                        .font(PulseFont.caption)
                         .foregroundStyle(PulseColors.textSecondary)
                     if let distance = session.distanceMeters {
                         let d = UnitsFormatter.distance(meters: distance, units: units)
                         Text("\(d.value) \(d.unit)")
-                            .font(.caption.monospacedDigit())
+                            .font(PulseFont.caption.monospacedDigit())
                             .foregroundStyle(PulseColors.textMuted)
                     }
                 }
@@ -423,15 +423,15 @@ struct RecordSelectView: View {
                             VStack(alignment: .leading, spacing: 6) {
                                 Image(systemName: kind.symbol)
                                     .font(PulseFont.title2.weight(.regular))
-                                    .foregroundStyle(isSelected ? .white : PulseColors.textSecondary)
+                                    .foregroundStyle(isSelected ? PulseColors.onAccent : PulseColors.textSecondary)
                                     .frame(width: 46, height: 46)
-                                    .background(isSelected ? Color.white.opacity(0.22) : PulseColors.cardSoft, in: Circle())
+                                    .background(isSelected ? PulseColors.onAccent.opacity(0.22) : PulseColors.cardSoft, in: Circle())
                                 Text(kind.label)
                                     .font(PulseFont.bodyEmphasis)
-                                    .foregroundStyle(isSelected ? .white : PulseColors.textPrimary)
+                                    .foregroundStyle(isSelected ? PulseColors.onAccent : PulseColors.textPrimary)
                                 Text(kind.helper)
                                     .font(PulseFont.caption.weight(.regular))
-                                    .foregroundStyle(isSelected ? Color.white.opacity(0.85) : PulseColors.textMuted)
+                                    .foregroundStyle(isSelected ? PulseColors.onAccent.opacity(0.85) : PulseColors.textMuted)
                                     .lineLimit(2)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
@@ -606,14 +606,27 @@ struct RecordLiveView: View {
                 }
             }
             .sheet(isPresented: $confirmFinish) {
-                WorkoutEndSheet(
-                    title: "Finish workout?",
-                    message: "Your workout will be saved with its time, route, and ring measurements.",
-                    stats: endSheetStats(session: session),
-                    confirmTitle: "Finish workout",
-                    confirmIcon: "flag.checkered",
-                    destructive: false
-                ) { finish(session) }
+                // Under a minute is a mis-tap, not a workout: offer to discard it rather than save a
+                // "0m" entry into today's list (Android matches, `WorkoutEndRules.minimumSeconds`).
+                if elapsed(session: session, now: Date()) < 60 {
+                    WorkoutEndSheet(
+                        title: "Discard this workout?",
+                        message: "It's under a minute — too short to count. Keep recording, or discard it.",
+                        stats: endSheetStats(session: session),
+                        confirmTitle: "Discard workout",
+                        confirmIcon: "trash",
+                        destructive: true
+                    ) { discard(session) }
+                } else {
+                    WorkoutEndSheet(
+                        title: "Finish workout?",
+                        message: "Your workout will be saved with its time, route, and ring measurements.",
+                        stats: endSheetStats(session: session),
+                        confirmTitle: "Finish workout",
+                        confirmIcon: "flag.checkered",
+                        destructive: false
+                    ) { finish(session) }
+                }
             }
             .sheet(isPresented: $confirmDiscard) {
                 WorkoutEndSheet(
@@ -885,10 +898,10 @@ private struct LiveRouteMapSection: View {
 
             if permissionDenied {
                 Text("Location access is denied — enable it in Settings to record your route.")
-                    .font(.caption).foregroundStyle(PulseColors.warning).multilineTextAlignment(.center)
+                    .font(PulseFont.caption).foregroundStyle(PulseColors.warning).multilineTextAlignment(.center)
             } else if !hasAlwaysAuthorization {
                 Text("Route will pause when the screen locks — allow “Always” location in Settings for full background tracking.")
-                    .font(.caption).foregroundStyle(PulseColors.warning).multilineTextAlignment(.center)
+                    .font(PulseFont.caption).foregroundStyle(PulseColors.warning).multilineTextAlignment(.center)
             }
         }
     }

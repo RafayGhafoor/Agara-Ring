@@ -133,6 +133,8 @@ nonisolated struct ArchiveDevice: Codable, Sendable {
     var lastFullSyncAt: Date?
     var firmwareVersion: String?
     var wearableModelID: String?
+    /// Optional so archives written before ring naming still decode.
+    var nickname: String?
     var deviceTypeRaw: String
     var capabilitiesRaw: String
     var createdAt: Date
@@ -152,6 +154,7 @@ nonisolated struct ArchiveDevice: Codable, Sendable {
         lastFullSyncAt = m.lastFullSyncAt
         firmwareVersion = m.firmwareVersion
         wearableModelID = m.wearableModelID
+        nickname = m.nickname
         deviceTypeRaw = m.deviceTypeRaw
         capabilitiesRaw = m.capabilitiesRaw
         createdAt = m.createdAt
@@ -173,6 +176,7 @@ nonisolated struct ArchiveDevice: Codable, Sendable {
         m.lastFullSyncAt = lastFullSyncAt
         m.firmwareVersion = firmwareVersion
         m.wearableModelID = wearableModelID
+        m.nickname = nickname
         m.deviceTypeRaw = deviceTypeRaw
         m.capabilitiesRaw = capabilitiesRaw
         m.createdAt = createdAt
@@ -291,6 +295,8 @@ nonisolated struct ArchiveSleepSession: Codable, Sendable {
     var syncedAt: Date?
     var createdAt: Date
     var updatedAt: Date
+    /// Optional, so archives written before sleep was source-stamped still decode (as unsourced).
+    var sourceAddress: String?
 
     @MainActor init(_ m: SleepSession) {
         id = m.id
@@ -302,10 +308,12 @@ nonisolated struct ArchiveSleepSession: Codable, Sendable {
         syncedAt = m.syncedAt
         createdAt = m.createdAt
         updatedAt = m.updatedAt
+        sourceAddress = m.sourceAddress
     }
 
     @MainActor func insert(into context: ModelContext) {
-        let m = SleepSession(date: date, startAt: startAt, endAt: endAt, totalMinutes: totalMinutes, score: score, syncedAt: syncedAt)
+        let m = SleepSession(date: date, startAt: startAt, endAt: endAt, totalMinutes: totalMinutes, score: score,
+                             syncedAt: syncedAt, sourceAddress: sourceAddress)
         m.id = id
         m.date = date   // init re-derives startOfDay in the local timezone; restore the exact value
         m.createdAt = createdAt
@@ -321,6 +329,9 @@ nonisolated struct ArchiveSleepStageBlock: Codable, Sendable {
     var startMinute: Int
     var durationMinutes: Int
     var stageRaw: String
+    /// Optional, so archives written before sleep was source-stamped still decode (as unsourced).
+    var recordStartAt: Date?
+    var sourceAddress: String?
 
     @MainActor init(_ m: SleepStageBlock) {
         id = m.id
@@ -329,10 +340,13 @@ nonisolated struct ArchiveSleepStageBlock: Codable, Sendable {
         startMinute = m.startMinute
         durationMinutes = m.durationMinutes
         stageRaw = m.stageRaw
+        recordStartAt = m.recordStartAt
+        sourceAddress = m.sourceAddress
     }
 
     @MainActor func insert(into context: ModelContext) {
-        let m = SleepStageBlock(sessionId: sessionId, startAt: startAt, startMinute: startMinute, durationMinutes: durationMinutes, stage: .unknown)
+        let m = SleepStageBlock(sessionId: sessionId, startAt: startAt, startMinute: startMinute, durationMinutes: durationMinutes,
+                                stage: .unknown, recordStartAt: recordStartAt, sourceAddress: sourceAddress)
         m.id = id
         m.stageRaw = stageRaw
         context.insert(m)

@@ -30,6 +30,14 @@ final class VeepooDriver: WearableDriver {
     /// True between a measurement start frame and its stop frame; the ring only streams D0/0x80/0x90
     /// measurement frames while measuring, and the latch keeps ambient frames from decoding as ones.
     private var measuring = false
+    /// The same latch for the tests on shared opcodes (0x89 stress/glucose, 0x8A blood components):
+    /// the opcode + sub-op of the running test, nil when none. The ring also answers 0x89/0x8A with
+    /// calibration reads (`89 03`, `8a 02`) that must never read as a result.
+    private var spotTest: (opcode: UInt8, sub: UInt8)?
+    /// `a7` capability packets seen on this link, by package number (byte 19).
+    private var capabilityPackets: [Int: [UInt8]] = [:]
+    /// `b3` auto-measure read-reply frames on this link, by sequence number (byte 3).
+    private var autoMeasureFrames: [Int: [UInt8]] = [:]
 
     init(writer: RingCommandWriter) {
         self.writer = writer
@@ -59,12 +67,21 @@ final class VeepooDriver: WearableDriver {
         if let opcode = command.first, [0xD0, 0x80, 0x90].contains(opcode), command.count >= 2 {
             measuring = command[1] == 0x01
         }
+        // Stress / glucose / blood components: `89|8a <sub> 01|02 …` — byte 2 is start (01) / stop (02).
+        if let opcode = command.first, [0x89, 0x8A].contains(opcode), command.count >= 3,
+           [0x01, 0x06].contains(command[command.startIndex + 1]) {
+            spotTest = command[command.startIndex + 2] == 0x01 ? (opcode, command[command.startIndex + 1]) : nil
+        }
         return command   // already 20 bytes, no checksum
     }
 
     func connectionDidStart() {
         sentAuthentication = false
         lastLiveMinute = nil
+        measuring = false
+        spotTest = nil
+        capabilityPackets.removeAll()
+        autoMeasureFrames.removeAll()
     }
 
     /// The ring answers exactly one thing before auth: the A1 open frame. It must be the first write
@@ -94,11 +111,18 @@ final class VeepooDriver: WearableDriver {
 
         switch data[0] {
         case VeepooOpcode.open.rawValue:
-            // The auth ack — the engine's gate for the whole post-auth sequence.
-            return [.commandAck(commandId: data[0])]
+            // The auth ack — the engine's gate for the whole post-auth sequence — plus the firmware it
+            // carries (bytes 6–8).
+            var events: [RingDecodedEvent] = [.commandAck(commandId: data[0])]
+            if let info = decoder.firmware(frame: data) {
+                events.append(.firmware(version: info.version, deviceNumber: info.deviceNumber, testVersion: info.testVersion))
+            }
+            return events
         case VeepooOpcode.deviceInfo.rawValue:
             guard let percent = decoder.battery(frame: data) else { return [] }
-            return [.battery(percent: percent)]
+            var events: [RingDecodedEvent] = [.battery(percent: percent)]
+            if let charging = decoder.charging(frame: data) { events.append(.chargingState(isCharging: charging)) }
+            return events
         case VeepooOpcode.realtime.rawValue:
             guard let activity = decoder.activity(frame: data) else { return [] }
             return [.activityUpdate(
@@ -111,19 +135,102 @@ final class VeepooDriver: WearableDriver {
             // Reassembled by the engine, which owns the per-day history state machine.
             return [.unknown(commandId: data[0], raw: data)]
         case 0xD0 where measuring:
-            // One-shot heart-rate stream: D0 <bpm>, 1 Hz, 0 while warming up.
-            return decoder.heartRate(frame: data).map { [.heartRateSample(bpm: $0, timestamp: Date())] } ?? []
+            return heartRateEvents(data)
         case 0x80 where measuring:
-            // One-shot oxygen stream: 80 01 00 00 <spo2> 00 … (byte-map partial, see decoder).
+            // One-shot oxygen stream: 80 01 <status> <spo2> 00 64 … (value at byte 3, status at byte 2).
+            if let refusal = decoder.oxygenRefusal(frame: data) {
+                return [.measurementRejected(mode: SpotMode.spo2, reason: refusal)]
+            }
             return decoder.oxygen(frame: data).map { [.spo2Result(value: $0, timestamp: Date())] } ?? []
         case 0x90 where measuring:
             // One-shot BP stream: progress %, then the final 90 <sys> <dia> 64 00 01 …
+            if let refusal = decoder.bloodPressureRefusal(frame: data) {
+                return [.measurementRejected(mode: SpotMode.bloodPressure, reason: refusal)]
+            }
             return decoder.bloodPressure(frame: data).map {
                 [.bloodPressureSample(systolic: $0.systolic, diastolic: $0.diastolic, timestamp: Date())]
             } ?? []
+        case 0x89 where spotTest?.opcode == 0x89:
+            return spotTestEvents(data)
+        case 0x8A where spotTest?.opcode == 0x8A:
+            return bloodComponentsEvents(data)
+        case 0xA7:
+            return capabilityEvents(data)
+        case 0xB3:
+            return autoMeasureEvents(data)
+        case 0xA3:
+            guard let ok = decoder.profileAck(frame: data) else { return [.unknown(commandId: data[0], raw: data)] }
+            return [.settingAck(commandId: 0xA3, ok: ok)]
         default:
             return [.unknown(commandId: data[0], raw: data)]
         }
+    }
+
+    /// D0 frames: a bpm, or a verdict. The busy reply (`d0 01 00 00 00 0a`, the answer to a re-asserted
+    /// start) is dropped; a plain `d0 01`/`d0 02` means no finger.
+    private func heartRateEvents(_ data: Data) -> [RingDecodedEvent] {
+        switch decoder.heartRateReply(frame: data) {
+        case let .bpm(value)?: return [.heartRateSample(bpm: value, timestamp: Date())]
+        case .notWorn?: return [.measurementRejected(mode: SpotMode.heartRate, reason: .notWorn)]
+        case .busy?, .warmingUp?, nil: return []
+        }
+    }
+
+    /// 0x89 replies while a stress (sub 06) or glucose (sub 01) test runs.
+    private func spotTestEvents(_ data: Data) -> [RingDecodedEvent] {
+        guard data.count >= 2 else { return [] }
+        let sub = data[data.startIndex + 1]
+        guard sub == spotTest?.sub else { return [.unknown(commandId: data[0], raw: data)] }
+        if sub == 0x06 {
+            switch decoder.stressReply(frame: data) {
+            case let .result(value)?: return [.stressSample(value: Int(value), timestamp: Date())]
+            case let .refused(reason)?: return [.measurementRejected(mode: SpotMode.stress, reason: reason)]
+            default: return []
+            }
+        }
+        switch decoder.glucoseReply(frame: data) {
+        case let .result(mmol)?:
+            // The app stores glucose in mg/dL (the DF path converts the same way).
+            return [.bloodSugarSample(mgdl: mmol * 18.016, timestamp: Date())]
+        case let .refused(reason)?: return [.measurementRejected(mode: SpotMode.glucose, reason: reason)]
+        default: return []
+        }
+    }
+
+    private func bloodComponentsEvents(_ data: Data) -> [RingDecodedEvent] {
+        switch decoder.bloodComponentsReply(frame: data) {
+        case let .result(reading)?: return [.bloodComponentsSample(reading, timestamp: Date())]
+        case let .refused(reason)?: return [.measurementRejected(mode: SpotMode.bloodComponents, reason: reason)]
+        case .progress?, .stopped?: return []
+        case nil: return [.unknown(commandId: data[0], raw: data)]
+        }
+    }
+
+    /// `a7` capability packets (package number at byte 19). Emits the decoded capabilities once packages
+    /// 1–4 (all our ring sends) have arrived, and again on any later package (persistence is idempotent).
+    private func capabilityEvents(_ data: Data) -> [RingDecodedEvent] {
+        let bytes = [UInt8](data)
+        guard bytes.count >= 20, (1...5).contains(bytes[19]) else { return [.unknown(commandId: data[0], raw: data)] }
+        let package = Int(bytes[19])
+        capabilityPackets[package] = bytes
+        guard (1...4).allSatisfy({ capabilityPackets[$0] != nil }) else { return [] }
+        return [.ringCapabilities(RingCapabilities.decode(packages: capabilityPackets))]
+    }
+
+    /// `b3 02 01 <seq>` read-reply frames; the header TLV in frame 1 says how many to expect.
+    private func autoMeasureEvents(_ data: Data) -> [RingDecodedEvent] {
+        let bytes = [UInt8](data)
+        guard bytes.count >= 5, bytes[1] == 0x02, bytes[2] == 0x01 else { return [.unknown(commandId: data[0], raw: data)] }
+        let seq = Int(bytes[3])
+        if seq == 1 { autoMeasureFrames.removeAll() }
+        autoMeasureFrames[seq] = Array(bytes.dropFirst(4))
+        guard let first = autoMeasureFrames[1], first.count >= 3, first[0] == 0xA0 else { return [] }
+        let expected = Int(first[2])
+        guard expected > 0, (1...expected).allSatisfy({ autoMeasureFrames[$0] != nil }) else { return [] }
+        let body = (1...expected).flatMap { autoMeasureFrames[$0] ?? [] }
+        autoMeasureFrames.removeAll()
+        let entries = VeepooDecoder.autoMeasureSchedule(body: body)
+        return entries.isEmpty ? [] : [.autoMeasureSchedule(entries)]
     }
 
     func makeSyncEngine() -> RingSyncEngine {

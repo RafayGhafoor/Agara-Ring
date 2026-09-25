@@ -56,15 +56,15 @@ struct AgaraCloudSettingsView: View {
                         .disabled(working || !canSubmit)
                         if !password.isEmpty && !passwordValid {
                             Text("Password must be at least 8 characters.")
-                                .font(.caption)
+                                .font(PulseFont.caption)
                                 .foregroundStyle(PulseColors.danger)
                         } else if !email.isEmpty && !emailValid {
                             Text("Enter a valid email address.")
-                                .font(.caption)
+                                .font(PulseFont.caption)
                                 .foregroundStyle(PulseColors.danger)
                         } else if passwordValid {
                             Text("Password looks good.")
-                                .font(.caption)
+                                .font(PulseFont.caption)
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -80,12 +80,12 @@ struct AgaraCloudSettingsView: View {
 
                 if let lastSync {
                     Text("Last sync: \(lastSync.formatted(date: .abbreviated, time: .shortened))")
-                        .font(.footnote)
+                        .font(PulseFont.footnote)
                         .foregroundStyle(.secondary)
                 }
                 if let statusText {
                     Text(statusText)
-                        .font(.footnote)
+                        .font(PulseFont.footnote)
                         .foregroundStyle(.secondary)
                 }
             }

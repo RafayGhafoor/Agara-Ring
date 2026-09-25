@@ -27,6 +27,16 @@ enum MeasurementKind: String, Codable, CaseIterable {
     // body-data record (byte 16). Append only — raw values persisted.
     case respiratoryRate = "resp_rate"
     case vo2max
+    // Agara ring DF history (measure-hub spec §5): MET (BF ÷ 10), cardiac load (B9 bytes 20–24) and the
+    // blood-component estimates (C2 / the `8a 01` test). Canonical units: lipids mmol/L, uric acid µmol/L.
+    // Append only — raw values persisted and synced (same keys as Android).
+    case met
+    case cardiacLoad = "cardiac_load"
+    case totalCholesterol = "total_cholesterol"
+    case triglycerides
+    case hdl
+    case ldl
+    case uricAcid = "uric_acid"
 
     /// Display unit for a measurement of this kind.
     var unit: String {
@@ -41,6 +51,10 @@ enum MeasurementKind: String, Codable, CaseIterable {
         case .bloodSugar: return "mg/dL"
         case .respiratoryRate: return "brpm"    // breaths per minute
         case .vo2max: return "mL/kg/min"
+        case .met: return "MET"
+        case .cardiacLoad: return ""
+        case .totalCholesterol, .triglycerides, .hdl, .ldl: return "mmol/L"
+        case .uricAcid: return "µmol/L"
         }
     }
 }
@@ -111,8 +125,22 @@ final class Device {
     /// fields below).
     var lastFullSyncAt: Date?
     var firmwareVersion: String?
+    /// The ring's device number from the `a1` reply (2526 for the Agara ring) — the firmware-update lookup
+    /// key. Optional + defaulted, so the SwiftData migration stays additive.
+    var deviceNumber: Int? = nil
+    /// The firmware's test version from the `a1` reply ("00.12.09.00") — sent with the update lookup.
+    var firmwareTestVersion: String? = nil
+    /// The ring's own capability packets, decoded (`RingCapabilities`, JSON). Nil until a connect has
+    /// seen them. Optional + defaulted, so the SwiftData migration stays additive.
+    var ringCapabilitiesJSON: String? = nil
+    /// The ring's automatic-measurement schedule (`[AutoMeasureEntry]`, JSON), as last read from it.
+    var autoMeasureJSON: String? = nil
     /// Exact catalog model (for example `the ring-r10`), separate from the protocol/driver family.
     var wearableModelID: String?
+    /// The name the user gave this ring ("Left hand", "Sleep ring"; 1–24 chars, trimmed). Nil means
+    /// "show the model name" — see `RingNickname`. Optional + defaulted, so the SwiftData migration stays
+    /// additive. Forgetting the ring clears it with the rest of the row's identity.
+    var nickname: String? = nil
     // Defaulted so SwiftData lightweight migration is additive (existing rows become the ring with no
     // declared capabilities until the next connect stamps them).
     var deviceTypeRaw: String = RingDeviceType.veepoo.rawValue
@@ -153,6 +181,12 @@ final class Device {
             updatedAt = Date()
         }
     }
+
+    /// What this ring claimed in its capability packets; nil before the first probe.
+    var ringCapabilities: RingCapabilities? { RingCapabilities(json: ringCapabilitiesJSON) }
+
+    /// The ring's automatic-measurement schedule as last read; empty before the first read.
+    var autoMeasureSchedule: [AutoMeasureEntry] { AutoMeasureEntry.decodeList(autoMeasureJSON) }
 
     var deviceType: RingDeviceType {
         // An unrecognized raw value is a device row from a family this build no longer ships. It resolves
@@ -282,11 +316,17 @@ final class SleepSession {
     var startAt: Date
     var endAt: Date
     var totalMinutes: Int
+    /// The score the Sleep tab shows (`SleepScore.calculate`), written by `reconcileWakingDay` so the
+    /// cloud upload, insights and the coach read the same number (decision D1).
     var score: Int?
     var syncedAt: Date?
     var createdAt: Date
     var updatedAt: Date
-    
+    /// The source whose blocks this row holds (`SleepStageBlock.sourceAddress`); nil for rows written
+    /// before sleep was source-stamped. A row never mixes sources. Optional, so the store migrates
+    /// lightweight and existing rows are kept.
+    var sourceAddress: String?
+
     init(
         id: UUID = UUID(),
         date: Date,
@@ -294,7 +334,8 @@ final class SleepSession {
         endAt: Date,
         totalMinutes: Int,
         score: Int? = nil,
-        syncedAt: Date? = nil
+        syncedAt: Date? = nil,
+        sourceAddress: String? = nil
     ) {
         self.id = id
         self.date = Calendar.current.startOfDay(for: date)
@@ -305,6 +346,7 @@ final class SleepSession {
         self.syncedAt = syncedAt
         self.createdAt = Date()
         self.updatedAt = Date()
+        self.sourceAddress = sourceAddress
     }
 }
 
@@ -316,14 +358,22 @@ final class SleepStageBlock {
     var startMinute: Int
     var durationMinutes: Int
     var stageRaw: String
-    
+    /// Start of the sleep record (E0 `A1` block) this run came from. Nil for blocks stored before it was kept.
+    var recordStartAt: Date?
+    /// Identity of the link that delivered the record (see `SleepSource`). A record replaces only blocks
+    /// with the **same** source that overlap it; nil = written before sleep was source-stamped, which no
+    /// sourced record ever deletes.
+    var sourceAddress: String?
+
     init(
         id: UUID = UUID(),
         sessionId: UUID,
         startAt: Date,
         startMinute: Int,
         durationMinutes: Int,
-        stage: SleepStage
+        stage: SleepStage,
+        recordStartAt: Date? = nil,
+        sourceAddress: String? = nil
     ) {
         self.id = id
         self.sessionId = sessionId
@@ -331,6 +381,8 @@ final class SleepStageBlock {
         self.startMinute = startMinute
         self.durationMinutes = durationMinutes
         self.stageRaw = stage.rawValue
+        self.recordStartAt = recordStartAt
+        self.sourceAddress = sourceAddress
     }
     
     var stage: SleepStage { SleepStage(rawValue: stageRaw) ?? .unknown }

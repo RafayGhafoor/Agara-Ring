@@ -72,7 +72,7 @@ struct NotificationsSettingsView: View {
         if store.settings.notificationsEnabled {
             QuickActionButton(label: "Send a test check-in now") { sendTestCheckin() }
             if let testStatus {
-                Text(testStatus).font(.caption).foregroundStyle(PulseColors.textMuted)
+                Text(testStatus).font(PulseFont.caption).foregroundStyle(PulseColors.textMuted)
                     .padding(.horizontal, 4)
             }
 
@@ -92,7 +92,7 @@ struct NotificationsSettingsView: View {
         }
         if notifPermissionDenied {
             Text(AgaraCopy.notificationsDisabled)
-                .font(.caption).foregroundStyle(PulseColors.danger)
+                .font(PulseFont.caption).foregroundStyle(PulseColors.danger)
                 .padding(.horizontal, 4)
         }
     }

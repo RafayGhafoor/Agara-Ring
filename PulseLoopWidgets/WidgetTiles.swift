@@ -22,14 +22,14 @@ struct WidgetTileHeader: View {
             Circle().fill(color).frame(width: 8, height: 8)
                 .shadow(color: color.opacity(0.7), radius: 5)
             Text(label.uppercased())
-                .font(.system(size: 11, weight: .medium))
+                .font(AgaraFont.face(11, .medium))
                 .tracking(0.6)
                 .foregroundStyle(PulseColors.textMuted)
                 .lineLimit(1)
             if let asOf {
                 Spacer(minLength: 4)
                 Text(asOf, style: .time)
-                    .font(.system(size: 9, weight: .medium))
+                    .font(AgaraFont.face(9, .medium))
                     .foregroundStyle(PulseColors.textMuted.opacity(0.8))
             }
         }
@@ -55,7 +55,7 @@ struct WidgetEmptyMessage: View {
             Image(systemName: systemImage)
                 .font(.system(size: 24)).foregroundStyle(color.opacity(0.7))
             Text(message)
-                .font(.system(size: 13, weight: .medium))
+                .font(AgaraFont.face(13, .medium))
                 .foregroundStyle(PulseColors.textPrimary)
                 .multilineTextAlignment(.center)
         }
@@ -101,7 +101,7 @@ struct WidgetActivityContent: View {
                     ForEach(Array(values.enumerated()), id: \.offset) { _, value in
                         VStack(alignment: .leading, spacing: 0) {
                             Text(value.label)
-                                .font(.system(size: 10, weight: .semibold))
+                                .font(AgaraFont.face(10, .semibold))
                                 .tracking(0.8)
                                 .foregroundStyle(value.color)
                             Text(value.text)
@@ -136,14 +136,14 @@ struct WidgetNutritionContent: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .firstTextBaseline, spacing: 5) {
                     Text(payload.centerText)
-                        .font(.system(size: 30, weight: .semibold))
+                        .font(AgaraFont.face(30, .semibold))
                         .monospacedDigit()
                         .foregroundStyle(payload.kcalGoal > 0 && payload.kcal > payload.kcalGoal
                                          ? Color(hex: payload.ringColorHex) : PulseColors.textPrimary)
                         .minimumScaleFactor(0.7)
                         .lineLimit(1)
                     Text(payload.centerLabel)
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(AgaraFont.face(10, .semibold))
                         .tracking(1.0)
                         .foregroundStyle(PulseColors.textMuted)
                 }
@@ -157,20 +157,20 @@ struct WidgetNutritionContent: View {
                 // Single compact stat line, matching the in-app tile (no wrap at small size).
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text("\(Int(payload.kcal.rounded()).formatted())")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(AgaraFont.face(13, .semibold))
                         .monospacedDigit()
                         .foregroundStyle(PulseColors.textPrimary)
                     Text("EATEN")
-                        .font(.system(size: 9, weight: .semibold)).tracking(0.8)
+                        .font(AgaraFont.face(9, .semibold)).tracking(0.8)
                         .foregroundStyle(PulseColors.calories)
                     if payload.kcalGoal > 0 {
                         Spacer(minLength: 4)
                         Text("\(Int(payload.kcalGoal.rounded()).formatted())")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(AgaraFont.face(13, .semibold))
                             .monospacedDigit()
                             .foregroundStyle(PulseColors.textSecondary)
                         Text("GOAL")
-                            .font(.system(size: 9, weight: .semibold)).tracking(0.8)
+                            .font(AgaraFont.face(9, .semibold)).tracking(0.8)
                             .foregroundStyle(PulseColors.textMuted)
                     }
                 }
@@ -226,7 +226,7 @@ struct WidgetActivityFullContent: View {
     private func metric(label: String, value: String, unit: String?, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(label.uppercased())
-                .font(.system(size: 15, weight: .bold)).tracking(0.6)
+                .font(AgaraFont.face(15, .bold)).tracking(0.6)
                 .foregroundStyle(color)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
@@ -234,7 +234,7 @@ struct WidgetActivityFullContent: View {
                 Text(value)
                     .activityValueStyle(size: 32)
                 if let unit {
-                    Text(unit).font(.system(size: 14, weight: .medium)).foregroundStyle(PulseColors.textMuted)
+                    Text(unit).font(AgaraFont.face(14, .medium)).foregroundStyle(PulseColors.textMuted)
                 }
             }
         }
@@ -252,7 +252,7 @@ struct WidgetSleepContent: View {
         if let payload, !rolledOver {
             VStack(alignment: .leading, spacing: 10) {
                 Text(payload.durationText)
-                    .font(.system(size: 30, weight: .semibold))
+                    .font(AgaraFont.face(30, .semibold))
                     .monospacedDigit()
                     .foregroundStyle(PulseColors.textPrimary)
                     .minimumScaleFactor(0.7)
@@ -263,11 +263,11 @@ struct WidgetSleepContent: View {
                 .frame(height: 24)
                 HStack(alignment: .firstTextBaseline, spacing: 5) {
                     Text("\(payload.score)")
-                        .font(.system(size: 32, weight: .semibold))
+                        .font(AgaraFont.face(32, .semibold))
                         .monospacedDigit()
                         .foregroundStyle(PulseColors.textPrimary)
                     Text("SCORE")
-                        .font(.system(size: 10, weight: .semibold)).tracking(1.0)
+                        .font(AgaraFont.face(10, .semibold)).tracking(1.0)
                         .foregroundStyle(PulseColors.textMuted)
                 }
             }
@@ -290,18 +290,18 @@ struct WidgetChartContent: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(payload.valueText)
-                    .font(.system(size: 26, weight: .semibold)).monospacedDigit()
+                    .font(AgaraFont.face(26, .semibold)).monospacedDigit()
                     .foregroundStyle(PulseColors.textPrimary)
                     .minimumScaleFactor(0.7).lineLimit(1)
                 if let unit = payload.unitText {
-                    Text(unit).font(.system(size: 11, weight: .medium)).foregroundStyle(PulseColors.textMuted)
+                    Text(unit).font(AgaraFont.face(11, .medium)).foregroundStyle(PulseColors.textMuted)
                         .lineLimit(1)
                 }
             }
             Spacer(minLength: 0)
             if payload.isEmpty {
                 Text(payload.statusText)
-                    .font(.system(size: 12)).foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.face(12)).foregroundStyle(PulseColors.textMuted)
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 ZoneLineChart(
@@ -388,7 +388,7 @@ struct WidgetBloodPressureContent: View {
                 lineWidth: 7
             )
             Text(title)
-                .font(.system(size: 10, weight: .semibold)).tracking(0.8)
+                .font(AgaraFont.face(10, .semibold)).tracking(0.8)
                 .foregroundStyle(PulseColors.textMuted)
         }
         .frame(maxWidth: .infinity)

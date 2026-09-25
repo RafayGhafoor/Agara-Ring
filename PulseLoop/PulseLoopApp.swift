@@ -47,7 +47,19 @@ struct PulseLoopApp: App {
     }
 
     init() {
+        // Manrope ships as data assets; register it before the first view resolves a `Font.custom`.
+        AgaraFontRegistry.registerBundledFonts()
+        AgaraUIKitFonts.apply()
         let runningTests = Self.isRunningUnitTests
+        #if DEBUG
+        // `-theme <name>` pins a catalog theme (docs/config/palette.yaml) over the Appearance choice —
+        // for screenshots. Applied before any view is built.
+        AppearanceStore.shared.debugThemeOverride = UserDefaults.standard.string(forKey: "theme")
+        ThemeStore.select(UserDefaults.standard.string(forKey: "theme"))
+        // `-features "a=on,b=off"` overrides feature flags (docs/config/features.yaml); persisted like the
+        // Settings › Developer › Feature flags toggles.
+        AgaraFeatureStore.shared.applyLaunchOverrides(UserDefaults.standard.string(forKey: AgaraFeatureStore.launchArgumentKey))
+        #endif
 
         let container: ModelContainer
         do {
@@ -58,6 +70,16 @@ struct PulseLoopApp: App {
             fatalError("Failed to create SwiftData container: \(error)")
         }
         self.container = container
+
+        // First frame in the right theme: the persisted Appearance choice (or the profile-sex default) and
+        // the current OS light/dark setting. `RootAppView` keeps it in step from here on.
+        // (Not under tests: they expect the shipped `.dark` unless they select a theme themselves.)
+        if !runningTests {
+            let profileSex = (try? container.mainContext.fetch(FetchDescriptor<UserProfile>()))?.first?.sex
+            ThemeStore.current = AppearanceStore.shared.resolvedTheme(
+                systemIsDark: UITraitCollection.current.userInterfaceStyle != .light, sex: profileSex
+            )
+        }
 
         // One-time cleanup of activity totals inflated by the old accumulator bug.
         ActivityService.migrateInflatedActivityIfNeeded(context: container.mainContext)
@@ -72,6 +94,10 @@ struct PulseLoopApp: App {
         // One-time re-split of days whose nap merged into that morning's night (issue #59): re-derive
         // each waking day into distinct sessions so the carousel can page through them.
         SleepService.migrateSleepSessionSegmentsIfNeeded(context: container.mainContext)
+
+        // One-time repair of nights stacked by the old add-only sleep rule (from the raw trace, when it
+        // holds the transfers) and a stored score for every night (sleep-session-merge.md, D1/D4).
+        SleepService.migrateSleepSourcesIfNeeded(context: container.mainContext)
 
         // A persisted "connected" state can't survive a restart — the live link is gone. Reset it so
         // the UI never shows a false "Connected" until a real connection re-confirms.
@@ -91,6 +117,8 @@ struct PulseLoopApp: App {
         let client = RingBLEClient(startManager: !runningTests && !useVirtualRing)
         let coordinator = RingSyncCoordinator(client: client, context: container.mainContext)
         client.onConnected = { [weak coordinator] in coordinator?.runStartupSequence() }
+        // Ring firmware install (stage 4, debug + `firmwareInstall`): gates read the live client + coordinator.
+        FirmwareInstallController.shared.attach(client: client, coordinator: coordinator)
         #if DEBUG
         if useVirtualRing {
             // The pairing step needs a BLE scan, which the virtual link bypasses — open on the tabs.
@@ -148,6 +176,10 @@ struct PulseLoopApp: App {
         healthSyncPublisher.start()
         stravaSyncPublisher.start()
         notificationDataTrigger.start()
+        // Ring firmware check (flag `firmwareCheck`): at most once a day, when the ring's `a1` identity arrives.
+        FirmwareUpdateChecker.shared.start()
+        // `-firmwareAutoInstall YES` (debug): download + install once the gates pass (headless verification).
+        FirmwareInstallController.shared.startAutoInstallIfRequested()
 
         // Daily check-in notifications: route taps + register the background wake.
         UNUserNotificationCenter.current().delegate = notificationDelegate
@@ -160,6 +192,8 @@ struct PulseLoopApp: App {
     var body: some Scene {
         WindowGroup {
             RootAppView()
+                // The default for every Text without its own font — Manrope, never SF Pro.
+                .font(PulseFont.body)
                 .environment(bleClient)
                 .environment(coordinator)
                 .environment(gpsRecorder)

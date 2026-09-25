@@ -252,7 +252,7 @@ struct CoachView: View {
                 Button { send(draft) } label: {
                     Image(systemName: "arrow.up")
                         .font(PulseFont.bodyEmphasis)
-                        .foregroundStyle(canSend ? .white : PulseColors.textMuted)
+                        .foregroundStyle(canSend ? PulseColors.onAccent : PulseColors.textMuted)
                         .frame(width: 36, height: 36)
                         .pulseGlass(Circle(), interactive: true, tint: canSend ? PulseColors.accent : nil)
                 }
@@ -549,7 +549,7 @@ struct CoachBubble: View {
         } else {
             (message.role == "user" ? Text(message.body) : Text(coachMarkdown: message.body))
                 .font(PulseFont.subheadline.weight(.regular))
-                .foregroundStyle(message.role == "user" ? .white : PulseColors.textPrimary)
+                .foregroundStyle(message.role == "user" ? PulseColors.onAccent : PulseColors.textPrimary)
                 .padding(14)
                 .modifier(CoachBubbleSurface(isUser: message.role == "user"))
         }
@@ -590,7 +590,7 @@ struct CoachErrorBubble: View {
                     .font(PulseFont.footnote.weight(.semibold))
                 Text("·").foregroundStyle(PulseColors.textMuted)
                 Text(error.code)
-                    .font(PulseFont.caption.weight(.semibold).monospaced())
+                    .font(AgaraFont.face(12, .semibold).monospacedDigit())
             }
             .foregroundStyle(PulseColors.danger)
 

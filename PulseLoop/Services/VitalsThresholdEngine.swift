@@ -35,6 +35,11 @@ enum VitalsThresholdEngine {
         case .bloodPressure: return systolicZones()   // legend uses systolic; card shows both
         case .glucose: return glucoseZones(context: context.measurement)
         case .temperature: return temperatureZones()
+        case .respiration: return respirationZones()
+        case .met: return metZones()
+        case .cardiacLoad: return cardiacLoadZones()
+        case .totalCholesterol, .triglycerides, .hdl, .ldl, .uricAcid:
+            return BloodComponents.zones(for: metric, sex: profile.sex)
         }
     }
 
@@ -288,6 +293,41 @@ enum VitalsThresholdEngine {
 
     // MARK: - Stress / Fatigue (device 0–100 scores)
 
+    /// Resting adult respiration: 12–20 breaths/min is the textbook range.
+    private static func respirationZones() -> [MetricZone] {
+        [
+            MetricZone(id: "resp.low", label: "Low", lower: nil, upper: 12,
+                       severity: .watch, colorToken: .blue, explanation: "Slower than the typical resting range."),
+            MetricZone(id: "resp.typical", label: "Typical", lower: 12, upper: 21,
+                       severity: .normal, colorToken: .mint, explanation: "A typical resting breathing rate."),
+            MetricZone(id: "resp.elevated", label: "Elevated", lower: 21, upper: nil,
+                       severity: .watch, colorToken: .amber, explanation: "Faster than the typical resting range — activity raises it."),
+        ]
+    }
+
+    /// MET intensity bands (1 = resting).
+    private static func metZones() -> [MetricZone] {
+        [
+            MetricZone(id: "met.rest", label: "Resting", lower: nil, upper: 1.5,
+                       severity: .normal, colorToken: .cyan, explanation: "At rest or sitting."),
+            MetricZone(id: "met.light", label: "Light", lower: 1.5, upper: 3,
+                       severity: .optimal, colorToken: .mint, explanation: "Light activity, such as easy walking."),
+            MetricZone(id: "met.moderate", label: "Moderate", lower: 3, upper: 6,
+                       severity: .watch, colorToken: .amber, explanation: "Moderate activity, such as brisk walking."),
+            MetricZone(id: "met.vigorous", label: "Vigorous", lower: 6, upper: nil,
+                       severity: .high, colorToken: .orange, explanation: "Vigorous activity."),
+        ]
+    }
+
+    /// Cardiac load is the ring's own unitless score; there is no published reference range.
+    private static func cardiacLoadZones() -> [MetricZone] {
+        [
+            MetricZone(id: "cardiac.estimate", label: "Ring estimate", lower: nil, upper: nil,
+                       severity: .normal, colorToken: .metricAccent(.cardiacLoad),
+                       explanation: "A relative score from the ring; compare it with your own trend."),
+        ]
+    }
+
     private static func stressZones() -> [MetricZone] {
         [
             MetricZone(id: "stress.calm", label: "Calm", lower: nil, upper: 26,
@@ -333,7 +373,7 @@ enum VitalsThresholdEngine {
             MetricZone(id: "bp.sys.stage2", label: "Stage 2", lower: 140, upper: 180,
                        severity: .high, colorToken: .red, explanation: "Stage 2 hypertension range (systolic ≥140)."),
             MetricZone(id: "bp.sys.crisis", label: "Severe", lower: 180, upper: nil,
-                       severity: .critical, colorToken: .red, explanation: "Severe range (systolic >180). Seek care if confirmed."),
+                       severity: .critical, colorToken: .deepRed, explanation: "Severe range (systolic >180). Seek care if confirmed."),
         ]
     }
 
@@ -349,7 +389,7 @@ enum VitalsThresholdEngine {
             MetricZone(id: "bp.dia.stage2", label: "Stage 2", lower: 90, upper: 120,
                        severity: .high, colorToken: .red, explanation: "Stage 2 hypertension range (diastolic ≥90)."),
             MetricZone(id: "bp.dia.crisis", label: "Severe", lower: 120, upper: nil,
-                       severity: .critical, colorToken: .red, explanation: "Severe range (diastolic >120). Seek care if confirmed."),
+                       severity: .critical, colorToken: .deepRed, explanation: "Severe range (diastolic >120). Seek care if confirmed."),
         ]
     }
 

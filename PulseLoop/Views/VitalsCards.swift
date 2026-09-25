@@ -26,7 +26,9 @@ struct VitalChartCard: View {
                     yDomain: model.yDomain,
                     referenceBands: model.referenceBands,
                     range: .twentyFourHours,
-                    showPoints: showPoints,
+                    // A dot per reading reads as a band of noise once the ring has logged SpO₂ all day
+                    // (every 5 min): dots only for sparse spot readings, the line alone otherwise.
+                    showPoints: showPoints && model.samples.count <= ChartAxes.denseDayReadings,
                     showAxes: true,
                     dashedRules: model.dashedRules,
                     thresholds: VitalsThresholdEngine.zoneThresholds(
@@ -187,7 +189,7 @@ struct VitalEmptyState: View {
                 .font(.system(size: compact ? 20 : 26))
                 .foregroundStyle(metric.accentColor.opacity(0.7))
             Text(title)
-                .font(.system(size: compact ? 12 : 14, weight: .medium))
+                .font(AgaraFont.face(compact ? 12 : 14, .medium))
                 .foregroundStyle(PulseColors.textPrimary)
                 .multilineTextAlignment(.center)
             if !compact {
@@ -210,6 +212,10 @@ struct VitalEmptyState: View {
         case .fatigue: return "bed.double"
         case .glucose: return "drop"
         case .temperature: return "thermometer.medium"
+        case .respiration: return "wind"
+        case .met: return "flame"
+        case .cardiacLoad: return "heart.circle"
+        case .totalCholesterol, .triglycerides, .hdl, .ldl, .uricAcid: return "drop.triangle"
         }
     }
 
@@ -223,6 +229,10 @@ struct VitalEmptyState: View {
         case .fatigue: return "No fatigue score yet"
         case .glucose: return "No glucose estimate yet"
         case .temperature: return "No temperature yet"
+        case .respiration: return "No respiration data yet"
+        case .met: return "No MET data yet"
+        case .cardiacLoad: return "No cardiac load yet"
+        case .totalCholesterol, .triglycerides, .hdl, .ldl, .uricAcid: return "No estimate yet"
         }
     }
 
@@ -236,6 +246,9 @@ struct VitalEmptyState: View {
         case .fatigue: return "Sync your ring to see today's score."
         case .glucose: return "Estimated from your profile — set it in Settings → Profile."
         case .temperature: return "Trends appear after overnight wear."
+        case .respiration, .met, .cardiacLoad: return "Wear the ring and sync — it logs this every 5 minutes."
+        case .totalCholesterol, .triglycerides, .hdl, .ldl, .uricAcid:
+            return "The ring estimates these every 30 minutes — sync to see them."
         }
     }
 }

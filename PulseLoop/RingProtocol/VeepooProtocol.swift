@@ -42,17 +42,28 @@ enum VeepooOpcode: UInt8 {
 /// open frame, which the harness that cracked the channel sent **unpadded** (15 bytes) and which the
 /// ring answered; keep it that way.
 enum VeepooEncoder {
-    static func authentication(now: Date = Date(), calendar: Calendar = .current) -> Data {
+    /// Bytes 12–13 carry the phone's timezone the way the vendor SDK builds them: `01`, then the UTC
+    /// offset in 15-minute steps as a signed byte (+05:00 → `01 14`, −10:00 → `01 d8`). The frame used to
+    /// send a constant `00 d8` there (UTC−10) whatever the phone's zone was.
+    static func authentication(now: Date = Date(), calendar: Calendar = .current,
+                               timeZone: TimeZone? = nil) -> Data {
         let components = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: now)
         let year = UInt16(components.year ?? 0)
+        let zone = timeZone ?? calendar.timeZone
         return Data([
             0xA1, 0x00, 0x00, 0x00,
             UInt8((year >> 8) & 0xFF), UInt8(year & 0xFF),
             UInt8(components.month ?? 0), UInt8(components.day ?? 0),
             UInt8(components.hour ?? 0), UInt8(components.minute ?? 0),
             UInt8(components.second ?? 0),
-            0x01, 0x00, 0xD8, 0x00,
+            0x01, 0x01, utcOffsetQuarterHours(zone, at: now), 0x00,
         ])
+    }
+
+    /// The zone's UTC offset at `date` in 15-minute steps, as a two's-complement byte.
+    static func utcOffsetQuarterHours(_ zone: TimeZone, at date: Date = Date()) -> UInt8 {
+        let steps = zone.secondsFromGMT(for: date) / 900
+        return UInt8(bitPattern: Int8(clamping: steps))
     }
 
     static func session() -> Data { padded([0xF4, 0x02, 0x02, 0x00, 0x01]) }
@@ -71,6 +82,33 @@ enum VeepooEncoder {
     static func oxygenStop() -> Data { padded([0x80, 0x02, 0x02]) }
     static func bloodPressureStart() -> Data { padded([0x90, 0x01, 0x00]) }
     static func bloodPressureStop() -> Data { padded([0x90, 0x00, 0x00]) }
+
+    // Tests that share opcodes with others route on byte 1 (0x89: 01 glucose, 06 stress; 0x8A: 01 blood
+    // components); byte 2 is start (01) / stop (02). Standard (uncalibrated) mode throughout.
+    static func stressStart() -> Data { padded([0x89, 0x06, 0x01]) }
+    static func stressStop() -> Data { padded([0x89, 0x06, 0x02]) }
+    static func glucoseStart() -> Data { padded([0x89, 0x01, 0x01, 0x00]) }
+    static func glucoseStop() -> Data { padded([0x89, 0x01, 0x02, 0x00]) }
+    static func bloodComponentsStart() -> Data { padded([0x8A, 0x01, 0x01, 0x00]) }
+    static func bloodComponentsStop() -> Data { padded([0x8A, 0x01, 0x02, 0x00]) }
+
+    /// Read the automatic-measurement schedule (`b3 02`); the ring answers with multi-frame `b3 02 01 <seq>`.
+    static func autoMeasureRead() -> Data { padded([0xB3, 0x02]) }
+
+    /// Find ring: the ring vibrates until `findDeviceStop` (or its own timeout).
+    static func findDeviceStart() -> Data { padded([0xB5, 0x0A]) }
+    static func findDeviceStop() -> Data { padded([0xB5, 0x0B]) }
+
+    /// Profile + goals (`a3`): height cm, weight kg, age, sex (1 male / 0 female), step goal BE16, sleep
+    /// goal in minutes BE16. The ring answers `a3 01` (ok) / `a3 00`.
+    static func profile(_ values: UserProfileValues) -> Data {
+        let steps = UInt16(clamping: max(0, values.stepGoal))
+        let sleep = UInt16(clamping: max(0, values.sleepGoalMinutes))
+        return padded([
+            0xA3, values.heightCm, values.weightKg, values.age, values.gender == 0x00 ? 0x00 : 0x01,
+            UInt8(steps >> 8), UInt8(steps & 0xFF), UInt8(sleep >> 8), UInt8(sleep & 0xFF),
+        ])
+    }
 
     private static func padded(_ bytes: [UInt8]) -> Data {
         var frame = bytes
@@ -102,4 +140,17 @@ func veepooUInt16LE(_ bytes: [UInt8], _ offset: Int) -> Int {
 func veepooUInt16BE(_ bytes: [UInt8], _ offset: Int) -> Int {
     guard bytes.count >= offset + 2 else { return 0 }
     return (Int(bytes[offset]) << 8) | Int(bytes[offset + 1])
+}
+
+/// CRC-16/MODBUS (poly 0xA001 reflected, init 0xFFFF) — the checksum in a DF record's part-00 header
+/// (bytes 11–12, LE) over the reassembled payload's first `valid` bytes (byte 10).
+func veepooCRC16Modbus(_ bytes: [UInt8]) -> UInt16 {
+    var crc: UInt16 = 0xFFFF
+    for byte in bytes {
+        crc ^= UInt16(byte)
+        for _ in 0..<8 {
+            crc = (crc & 1) != 0 ? (crc >> 1) ^ 0xA001 : crc >> 1
+        }
+    }
+    return crc
 }

@@ -83,14 +83,14 @@ struct SettingsRow: View {
                     // glass section card. White glyph, no colour tint.
                     .background(
                         LinearGradient(
-                            colors: [Color.white.opacity(0.16), Color.white.opacity(0.07)],
+                            colors: [PulseColors.textPrimary.opacity(0.16), PulseColors.textPrimary.opacity(0.07)],
                             startPoint: .top, endPoint: .bottom
                         ),
                         in: RoundedRectangle(cornerRadius: 12, style: .continuous)
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .strokeBorder(.white.opacity(0.18), lineWidth: 0.5)
+                            .strokeBorder(PulseColors.textPrimary.opacity(0.18), lineWidth: 0.5)
                     )
 
                 Text(item.title)
@@ -132,7 +132,7 @@ struct SettingsRowButtonStyle: ButtonStyle {
             // section's outer corners on the first/last row, square in between —
             // glassEffect doesn't clip the row content, so we shape the fill itself.
             .background(
-                (configuration.isPressed ? Color.white.opacity(0.08) : Color.clear)
+                (configuration.isPressed ? PulseColors.textPrimary.opacity(0.08) : Color.clear)
                     .clipShape(highlightShape)
             )
             .animation(.easeOut(duration: 0.15), value: configuration.isPressed)

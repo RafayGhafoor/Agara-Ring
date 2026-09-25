@@ -71,8 +71,43 @@ final class RingBLEClient: NSObject {
     private(set) var state: RingConnectionState = .idle
     private(set) var discovered: [DiscoveredRing] = []
     private(set) var batteryPercent: Int?
+    /// The ring is on its charger (battery frame byte 1). A live condition: reset whenever the link drops.
+    private(set) var isCharging = false { didSet { if !isCharging { chargeSeries.reset() } } }
+    /// Battery readings of the current charge (live frames only) — the input to `chargeEstimate`.
+    private(set) var chargeSeries = ChargeEstimator.Series()
+    /// "Full in ~N min" etc. while on the charger; nil otherwise.
+    var chargeEstimate: ChargeEstimator.Estimate? { isCharging ? chargeSeries.estimate : nil }
+    /// The last battery frame's level and time. The ring sends level and charging flag in one frame, level
+    /// first, so the charging event picks this up for the first reading of a charge.
+    @ObservationIgnored private var lastBatteryReading: ChargeEstimator.Reading?
     private(set) var isBluetoothReady = false
     private(set) var lastError: String?
+
+    /// The level from the ring's own battery frame (`a0`, in-band) on this connection; nil until one arrived.
+    /// `batteryPercent` is the GATT battery characteristic, which the Agara ring doesn't have.
+    private(set) var ringBatteryPercent: Int?
+    /// What this ring's `a7` capability packets said on this connection (nil until all four arrived).
+    private(set) var ringCapabilities: RingCapabilities?
+    /// The firmware the ring's `a1` reply reported on the *current* link; cleared whenever the link drops,
+    /// so a firmware install can tell the restarted ring's answer from the old one.
+    private(set) var firmwareSinceConnect: String?
+
+    // MARK: Firmware update channel (AB-OTA on F003; plan firmware-update stage 4)
+    /// `F003` with its `F031` notify and `F032` write characteristics was found on this link (always true on
+    /// the emulator's socket, which routes `F032` writes / `F031` notifications — emulator `ota.py`).
+    private(set) var otaServiceAvailable = false
+    @ObservationIgnored private var otaNotifyChar: CBCharacteristic?
+    @ObservationIgnored private var otaWriteChar: CBCharacteristic?
+    @ObservationIgnored private var otaNotifyEnabled = false
+    /// Frames for `F032`, written without response as fast as the peripheral's buffer allows.
+    @ObservationIgnored private var otaWriteQueue: [Data] = []
+    /// The running install's listener: every `F031` notification, and the link going down.
+    @ObservationIgnored private var otaListener: ((OtaLinkEvent) -> Void)?
+    private let otaServiceCBUUID = CBUUID(string: AbOta.serviceUUID)
+    private let otaNotifyCBUUID = CBUUID(string: AbOta.notifyUUID)
+    private let otaWriteCBUUID = CBUUID(string: AbOta.writeUUID)
+    /// The emulator link carries a whole frame per line; this mirrors Android's virtual MTU (515 − 3).
+    static let virtualOtaFrameLimit = 512
 
     /// The wearable family of the active connection (nil until a driver is selected).
     private(set) var activeDeviceType: RingDeviceType?
@@ -109,8 +144,9 @@ final class RingBLEClient: NSObject {
     private var activeAdvertisedName: String?
     #if DEBUG
     /// Outbound frame sink for the debug virtual transport — see `VirtualRingLink`. When set, frames
-    /// go to the emulator socket instead of CoreBluetooth.
-    private(set) var virtualFrameSink: ((Data) -> Void)?
+    /// go to the emulator socket instead of CoreBluetooth. The first argument is the characteristic the
+    /// write targets (nil = the ring's command channel; `F032` for a firmware update).
+    private(set) var virtualFrameSink: ((String?, Data) -> Void)?
     #endif
 
     // MARK: Write serialization
@@ -383,6 +419,7 @@ final class RingBLEClient: NSObject {
         writeChar = nil; commandChar = nil; notifyChars = [:]; batteryCharacteristic = nil
         subscribedNotifyUUIDs = []
         cancelPendingWrites()
+        clearOtaChannel()
         peripheral = target
         target.delegate = self
         // Select the coordinator/driver for this connection: the user's declared family if they made
@@ -416,6 +453,9 @@ final class RingBLEClient: NSObject {
         activeSyncEngine = driver.makeSyncEngine()
         activeDeviceType = coordinatorType.deviceType
         activeCapabilities = coordinator.refinedCapabilities(bitmapDerived: lastKnownCapabilities)
+        isCharging = false
+        ringBatteryPercent = nil
+        ringCapabilities = nil
     }
 
     /// Re-adopt the remembered ring's identity: its family **and** the exact catalog model.
@@ -455,7 +495,8 @@ final class RingBLEClient: NSObject {
             deviceType: type,
             wearableModelID: activeWearableModelID,
             advertisedName: activeAdvertisedName,
-            capabilities: refined
+            capabilities: refined,
+            peripheralIdentifier: deviceIdentifier
         ))
     }
 
@@ -626,6 +667,12 @@ final class RingBLEClient: NSObject {
 
 extension RingBLEClient: RingCommandWriter {
     var deviceIdentifier: String? { peripheral?.identifier.uuidString }
+    var connectionSource: String? {
+        #if DEBUG
+        if virtualFrameSink != nil { return SleepSource.virtualTransport }
+        #endif
+        return deviceIdentifier
+    }
     /// Drivers / sync engines enqueue logical commands through this seam; framing is applied in
     /// `enqueueWrite`.
     func enqueue(_ command: Data) {
@@ -652,6 +699,20 @@ extension RingBLEClient: RingCommandWriter {
     private func deliverDecoded(_ decoded: RingDecodedEvent) {
         for event in RingNotificationDelivery.events(for: decoded) { publish(event) }
         if case let .supportFunctions(derived) = decoded { applySupportFunctions(derived) }
+        if case let .firmware(version, _, _) = decoded, !version.isEmpty { firmwareSinceConnect = version }
+        if case let .ringCapabilities(capabilities) = decoded { ringCapabilities = capabilities }
+        if case let .battery(percent) = decoded {
+            ringBatteryPercent = percent
+            let reading = ChargeEstimator.Reading(date: Date(), percent: percent)
+            lastBatteryReading = reading
+            if isCharging { chargeSeries.add(percent: reading.percent, at: reading.date) }
+        }
+        if case let .chargingState(charging) = decoded {
+            if charging != isCharging { isCharging = charging }
+            if charging, let reading = lastBatteryReading {
+                chargeSeries.add(percent: reading.percent, at: reading.date)   // same frame → deduplicated
+            }
+        }
         activeSyncEngine?.handle(decoded)
     }
 
@@ -671,10 +732,12 @@ extension RingBLEClient: RingCommandWriter {
         coordinator: WearableCoordinator.Type = VeepooCoordinator.self,
         advertisedName: String = "TK20",
         wearableModelID: String? = "tk20",
-        sink: @escaping (Data) -> Void
+        sink: @escaping (String?, Data) -> Void
     ) {
         installDriver(coordinator)
         virtualFrameSink = sink
+        clearOtaChannel()
+        otaServiceAvailable = true
         activeAdvertisedName = advertisedName
         activeWearableModelID = wearableModelID
         subscribedNotifyUUIDs = Set(activeDriver?.notifyUUIDs ?? [])
@@ -700,6 +763,10 @@ extension RingBLEClient: RingCommandWriter {
 
     /// Feed one frame from the virtual transport through the identical path a GATT notification takes.
     func injectVirtualNotification(_ data: Data, from characteristic: CBUUID) {
+        if characteristic == otaNotifyCBUUID {
+            handleOtaNotify(data)
+            return
+        }
         guard let driver = activeDriver, driver.notifyUUIDs.contains(characteristic) else { return }
         noteActivity()
         RingNotificationDelivery.receive(data,
@@ -710,12 +777,15 @@ extension RingBLEClient: RingCommandWriter {
     func endVirtualConnection() {
         virtualFrameSink = nil
         writeQueue.removeAll()
+        clearOtaChannel()
+        otaListener?(.dropped)
         activeSyncEngine?.connectionDidEnd()
         activeDriver?.connectionDidEnd()
         activeDriver = nil
         activeCoordinator = nil
         activeSyncEngine = nil
         activeDeviceType = nil
+        isCharging = false
         state = .disconnected
         publish(.deviceStateChanged(state: .disconnected, address: nil))
     }
@@ -727,11 +797,117 @@ extension RingBLEClient: RingCommandWriter {
         while !writeQueue.isEmpty {
             let item = writeQueue.removeFirst()
             publishRawPacket(direction: .outgoing, data: item.data)
-            sink(item.data)
+            sink(nil, item.data)
             item.completion?(.success(()))
         }
     }
     #endif
+}
+
+// MARK: - Firmware update channel (AB-OTA on F003; plan firmware-update stage 4)
+
+extension RingBLEClient {
+    /// Receive every `F031` notification and link drop while an install runs; nil detaches.
+    func setOtaListener(_ listener: ((OtaLinkEvent) -> Void)?) { otaListener = listener }
+
+    /// Prepare `F003` on the current connection: enable `F031` notifications (never done until an install
+    /// asks). Returns the largest frame the link carries write-without-response (CoreBluetooth negotiates the
+    /// MTU itself), or nil when the ring has no update service or the notification can't be enabled.
+    func openOtaChannel(timeout: TimeInterval = 5) async -> Int? {
+        guard otaServiceAvailable else { return nil }
+        #if DEBUG
+        if virtualFrameSink != nil { return Self.virtualOtaFrameLimit }
+        #endif
+        guard let peripheral, let notify = otaNotifyChar, otaWriteChar != nil else { return nil }
+        if !otaNotifyEnabled {
+            peripheral.setNotifyValue(true, for: notify)
+            let deadline = Date().addingTimeInterval(timeout)
+            while !otaNotifyEnabled, Date() < deadline {
+                try? await Task.sleep(nanoseconds: 20_000_000)
+            }
+            guard otaNotifyEnabled else { return nil }
+        }
+        let limit = peripheral.maximumWriteValueLength(for: .withoutResponse)
+        NSLog("[OTA] channel ready, write limit \(limit) B")
+        return limit
+    }
+
+    /// One firmware-update frame to `F032` (write-without-response, in order). Logged header-only.
+    func writeOta(_ frame: Data) {
+        publishOtaPacket(frame, outgoing: true)
+        #if DEBUG
+        if let sink = virtualFrameSink {
+            sink(AbOta.writeUUID, frame)
+            return
+        }
+        #endif
+        otaWriteQueue.append(frame)
+        pumpOtaWrites()
+    }
+
+    /// Bring the ring back after a drop during an update, or after it restarts with new firmware: the socket
+    /// link re-attaches to the emulator; Bluetooth re-dials the known peripheral.
+    func reconnectForFirmwareUpdate() {
+        #if DEBUG
+        if VirtualRingLink.configuredPort != nil {
+            VirtualRingLink.shared.reattach()
+            return
+        }
+        #endif
+        guard state != .connected else { return }
+        if let peripheral {
+            autoReconnect = true
+            if peripheral.state == .disconnected {
+                state = .reconnecting
+                central.connect(peripheral, options: nil)
+            }
+        } else {
+            connectLastKnown()
+        }
+    }
+
+    /// Drain the `F032` queue while the peripheral's without-response buffer has room;
+    /// `peripheralIsReady(toSendWriteWithoutResponse:)` resumes it.
+    fileprivate func pumpOtaWrites() {
+        guard let peripheral, let target = otaWriteChar else { return }
+        while !otaWriteQueue.isEmpty, peripheral.canSendWriteWithoutResponse {
+            peripheral.writeValue(otaWriteQueue.removeFirst(), for: target, type: .withoutResponse)
+        }
+    }
+
+    fileprivate func handleOtaNotify(_ data: Data) {
+        noteActivity()
+        publishOtaPacket(data, outgoing: false)
+        otaListener?(.notify(data))
+    }
+
+    /// The raw-packet capture keeps each OTA frame's header/offset/status (never block payloads).
+    private func publishOtaPacket(_ frame: Data, outgoing: Bool) {
+        let event = PulseEvent.rawPacket(
+            direction: outgoing ? .outgoing : .incoming,
+            data: AbOta.logBytes(frame, outgoing: outgoing),
+            decoded: .otaFrame(commandId: frame.first ?? 0, summary: AbOta.summary(frame, outgoing: outgoing))
+        )
+        Task { await PulseEventBus.shared.publish(event) }
+    }
+
+    /// Find `F031` / `F032` in the `F003` service (never subscribed until an install asks).
+    fileprivate func bindOtaService(_ service: CBService) {
+        otaNotifyChar = service.characteristics?.first { $0.uuid == otaNotifyCBUUID }
+        otaWriteChar = service.characteristics?.first { $0.uuid == otaWriteCBUUID }
+        otaNotifyEnabled = false
+        otaServiceAvailable = otaNotifyChar != nil && otaWriteChar != nil
+        NSLog("[OTA] update service \(otaServiceAvailable ? "present" : "absent")")
+    }
+
+    fileprivate func clearOtaChannel() {
+        otaNotifyChar = nil
+        otaWriteChar = nil
+        otaNotifyEnabled = false
+        otaWriteQueue.removeAll()
+        otaServiceAvailable = false
+        firmwareSinceConnect = nil
+    }
 }
 
 private enum RingWriteError: LocalizedError {
@@ -783,6 +959,8 @@ extension RingBLEClient: CBCentralManagerDelegate {
                 }
             case .poweredOff, .unauthorized, .unsupported:
                 cancelPendingWrites()
+                clearOtaChannel()
+                otaListener?(.dropped)
                 activeDriver?.connectionDidEnd()
                 activeSyncEngine?.connectionDidEnd()
                 state = .idle
@@ -838,6 +1016,7 @@ extension RingBLEClient: CBCentralManagerDelegate {
             // when the old link dropped (a partial frame, an in-flight history transfer) must go.
             activeDriver?.connectionDidStart()
             activeSyncEngine?.connectionDidStart()
+            firmwareSinceConnect = nil
             // Discover ALL services so we also find a Device Information Service the ring exposes
             // without advertising it (firmware revision lives there). Characteristic discovery below
             // filters to the driver's chars + battery + firmware.
@@ -880,12 +1059,15 @@ extension RingBLEClient: CBCentralManagerDelegate {
             subscribedNotifyUUIDs = []
             batteryCharacteristic = nil
             cancelPendingWrites()
+            clearOtaChannel()
+            otaListener?(.dropped)
             // Stop the driver's own state machines *now*, not on the next connect: a self-driving one
             // (an earlier protocol history transfer's stall watchdog) would otherwise keep stepping through the
             // reconnect gap and refill the queue we just cleared, and those stale queries would be the
             // first thing the new link writes — ahead of its handshake.
             activeDriver?.connectionDidEnd()
             activeSyncEngine?.connectionDidEnd()
+            isCharging = false
             publish(.deviceStateChanged(state: .disconnected, address: nil))
             if autoReconnect {
                 state = .reconnecting
@@ -923,6 +1105,9 @@ extension RingBLEClient: CBPeripheralDelegate {
                 } else if service.uuid == disServiceCBUUID {
                     // Standard Device Information Service — read firmware/software revision.
                     peripheral.discoverCharacteristics(Array(firmwareCharUUIDs), for: service)
+                } else if service.uuid == otaServiceCBUUID {
+                    // Firmware update (AB-OTA): bound now, subscribed only when an install asks.
+                    peripheral.discoverCharacteristics([otaNotifyCBUUID, otaWriteCBUUID], for: service)
                 }
             }
         }
@@ -934,6 +1119,10 @@ extension RingBLEClient: CBPeripheralDelegate {
         error: Error?
     ) {
         MainActor.assumeIsolated {
+            if service.uuid == otaServiceCBUUID {
+                bindOtaService(service)
+                return
+            }
             guard let driver = activeDriver else { return }
             for characteristic in service.characteristics ?? [] {
                 let uuid = characteristic.uuid
@@ -963,6 +1152,10 @@ extension RingBLEClient: CBPeripheralDelegate {
         error: Error?
     ) {
         MainActor.assumeIsolated {
+            if characteristic.uuid == otaNotifyCBUUID {
+                otaNotifyEnabled = error == nil && characteristic.isNotifying
+                return
+            }
             guard let driver = activeDriver,
                   driver.notifyUUIDs.contains(characteristic.uuid),
                   characteristic.isNotifying else { return }
@@ -989,7 +1182,8 @@ extension RingBLEClient: CBPeripheralDelegate {
                     deviceType: type,
                     wearableModelID: activeWearableModelID,
                     advertisedName: activeAdvertisedName,
-                    capabilities: activeCapabilities
+                    capabilities: activeCapabilities,
+                    peripheralIdentifier: peripheral.identifier.uuidString
                 ))
             }
             publish(.deviceStateChanged(state: .connected, address: nil))
@@ -1013,6 +1207,10 @@ extension RingBLEClient: CBPeripheralDelegate {
         MainActor.assumeIsolated {
             guard let value = characteristic.value else { return }
             noteActivity()
+            if characteristic.uuid == otaNotifyCBUUID {
+                handleOtaNotify(value)
+                return
+            }
             if characteristic.uuid == activeDriver?.batteryCharUUID {
                 if let first = value.first {
                     batteryPercent = Int(first)
@@ -1057,6 +1255,7 @@ extension RingBLEClient: CBPeripheralDelegate {
     /// `canSendWriteWithoutResponse` park here when the peripheral's buffer is full.)
     nonisolated func peripheralIsReady(toSendWriteWithoutResponse peripheral: CBPeripheral) {
         MainActor.assumeIsolated {
+            pumpOtaWrites()
             pumpWrites()
         }
     }

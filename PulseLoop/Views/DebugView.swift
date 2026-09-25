@@ -5,10 +5,19 @@ struct DebugView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var filter = "all"
     @State private var refreshToken = UUID()
+    @State private var showsFeatureFlags = false
+    @State private var tipsReset = false
 
     var body: some View {
         let packets = DebugRepository.queryPackets(filter: packetFilter, context: modelContext)
         VStack(spacing: 12) {
+            #if DEBUG
+            SecondaryButton(title: "Feature flags", systemImage: "flag") { showsFeatureFlags = true }
+                .padding(.horizontal)
+                .sheet(isPresented: $showsFeatureFlags) { FeatureFlagsView() }
+            #endif
+            tipsRow
+                .padding(.horizontal)
             Picker("Filter", selection: $filter) {
                 Text("All").tag("all")
                 Text("In").tag(PacketDirection.incoming.rawValue)
@@ -28,13 +37,13 @@ struct DebugView: View {
                         Text(packet.confidence.debugLabel)
                             .foregroundStyle(packet.confidence == .unknown ? PulseColors.warning : PulseColors.success)
                     }
-                    .font(.caption.monospaced())
+                    .font(PulseFont.caption.monospacedDigit())
                     Text(packet.hexPayload)
-                        .font(.caption2.monospaced())
+                        .font(PulseFont.caption2.monospacedDigit())
                         .foregroundStyle(PulseColors.textMuted)
                         .lineLimit(2)
                     Text(packet.decodedKind ?? "unknown")
-                        .font(.caption)
+                        .font(PulseFont.caption)
                         .foregroundStyle(PulseColors.textSecondary)
                 }
                 .listRowBackground(PulseColors.card)
@@ -65,6 +74,37 @@ struct DebugView: View {
         .id(refreshToken)
         .background(PulseColors.background)
         .pageChrome("Debug")
+    }
+
+    /// Settings › Developer › Tips: "Show tips again" clears the seen one-time hints
+    /// (`CoachMarkStore.resetAll`), so the Measure and ring-chip coach marks appear again, in
+    /// `CoachMarkStore.order`. Same row as Android's `TipsCard`.
+    private var tipsRow: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Show tips again")
+                    .font(PulseFont.body)
+                    .foregroundStyle(PulseColors.textPrimary)
+                Text(tipsReset
+                     ? "Tips will show again."
+                     : "The one-time hints (Measure, then the ring chip) appear again the next time their screen is shown.")
+                    .font(PulseFont.caption)
+                    .foregroundStyle(PulseColors.textMuted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 8)
+            Button("Reset") {
+                CoachMarkStore.shared.resetAll()
+                tipsReset = true
+            }
+            .font(PulseFont.body.weight(.semibold))
+            .foregroundStyle(PulseColors.accent)
+            .buttonStyle(.plain)
+            .frame(minHeight: 44)
+            .accessibilityLabel("Show tips again")
+        }
+        .padding(12)
+        .background(PulseColors.card, in: RoundedRectangle(cornerRadius: 12))
     }
 
     private var packetFilter: DebugPacketFilter {

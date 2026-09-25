@@ -14,7 +14,10 @@ enum RingDecodedEvent: Sendable {
     case spo2Progress(percent: Int?, timestamp: Date)
     case spo2Result(value: Int, timestamp: Date)
     case spo2Complete(timestamp: Date)
-    case sleepTimeline(timestamp: Date, stages: [SleepStage])
+    /// One sleep record (an E0 `A1` block). `source` is the identity of the link that delivered it —
+    /// the CoreBluetooth peripheral UUID, `SleepSource.virtualTransport` for the emulator socket, or
+    /// `SleepSource.cloud` for a cloud restore. A record replaces only its own source's overlapping blocks.
+    case sleepTimeline(timestamp: Date, stages: [SleepStage], source: String? = nil)
     case historyMeasurement(kind: MeasurementKind, value: Double, timestamp: Date)
     case stressSample(value: Int, timestamp: Date)
     case hrvSample(value: Int, timestamp: Date)            // milliseconds
@@ -27,8 +30,9 @@ enum RingDecodedEvent: Sendable {
     case historySyncFinished
     case battery(percent: Int)
     case status(address: String?)
-    /// Firmware version string parsed from the 0x0c status / 0xf6 firmware payload.
-    case firmware(version: String)
+    /// Firmware version string parsed from the ring's `a1` reply. `deviceNumber` and `testVersion` (the
+    /// firmware-update lookup key, e.g. 2526 / "00.12.09.00") ride along when the frame carries them.
+    case firmware(version: String, deviceNumber: Int? = nil, testVersion: String? = nil)
     /// Ring bind/unbind handshake frame (0x4B): `action`/`state` per the protocol state machine.
     case bind(action: UInt8, state: UInt8)
     /// The device's own capability bitmap, already mapped onto `WearableCapability` (the protocol's `02 01`; see
@@ -53,7 +57,7 @@ enum RingDecodedEvent: Sendable {
     /// off the raw-packet feed and aborts the matching in-flight measurement, which is the whole point —
     /// the owner's an earlier ring refuses HRV (mode `0x0a` → status `0x01`), and without this the app polls a ring
     /// that already said no for the full 45-second window before reporting a generic failure.
-    case measurementRejected(mode: UInt8)
+    case measurementRejected(mode: UInt8, reason: MeasurementRefusal = .refused)
     case measurementStatus(type: UInt8, status: UInt8)
     /// One frame of a an earlier family all-day "timing" vital timeline just landed. The ring returns a day in
     /// fixed-size frames and only sends the next one when asked, so the sync engine's `handle` uses this
@@ -66,6 +70,19 @@ enum RingDecodedEvent: Sendable {
     case timingHistoryFrame(cmd: Int, day: Int, frameIndex: Int)
     case timeSyncAck(timestamp: Date)
     case commandAck(commandId: UInt8)
+    /// Battery frame byte 1 — the ring is on its charger. Emitted alongside `.battery`.
+    case chargingState(isCharging: Bool)
+    /// The ring's own capability packets (`a7` ×4), decoded. Persisted on the device row.
+    case ringCapabilities(RingCapabilities)
+    /// The ring's automatic-measurement schedule (`b3` read reply), one entry per metric type.
+    case autoMeasureSchedule([AutoMeasureEntry])
+    /// A finished on-demand blood-components test (`8a 01`): five values, stored as spot readings.
+    case bloodComponentsSample(BloodComponentsReading, timestamp: Date)
+    /// A settings write the ring acknowledged (`ok`) or refused — e.g. the `a3` profile frame.
+    case settingAck(commandId: UInt8, ok: Bool)
+    /// A firmware-update frame on `F031`/`F032` (AB-OTA), for the raw-packet log only: `summary` is
+    /// `AbOta.summary` ("a0 #3 start=4096 len=4096 (+230 B)", "90 #20 status=ff done").
+    case otaFrame(commandId: UInt8, summary: String)
     case unknown(commandId: UInt8, raw: Data)
 
     var kind: String {
@@ -99,6 +116,12 @@ enum RingDecodedEvent: Sendable {
         case .timingHistoryFrame: return "timing_history_frame"
         case .timeSyncAck: return "time_sync_ack"
         case .commandAck: return "command_ack"
+        case .chargingState: return "charging_state"
+        case .ringCapabilities: return "ring_capabilities"
+        case .autoMeasureSchedule: return "auto_measure_schedule"
+        case .bloodComponentsSample: return "blood_components_sample"
+        case .settingAck: return "setting_ack"
+        case .otaFrame: return "ota_frame"
         case .unknown: return "unknown"
         }
     }
@@ -140,8 +163,9 @@ enum RingDecodedEvent: Sendable {
             return #"{"fatigue":\#(value)}"#
         case let .bloodSugarSample(mgdl, _):
             return #"{"glucose_mgdl":\#(Int(mgdl))}"#
-        case let .firmware(version):
-            return #"{"firmware":"\#(version)"}"#
+        case let .firmware(version, deviceNumber, testVersion):
+            guard let deviceNumber, let testVersion else { return #"{"firmware":"\#(version)"}"# }
+            return #"{"firmware":"\#(version)","device_number":\#(deviceNumber),"test_version":"\#(testVersion)"}"#
         case let .bind(action, state):
             return #"{"bind_action":\#(action),"bind_state":\#(state)}"#
         case let .supportFunctions(capabilities):
@@ -150,8 +174,18 @@ enum RingDecodedEvent: Sendable {
             return #"{"chip_scheme":\#(value)}"#
         case let .wearingStatus(worn, _):
             return #"{"worn":\#(worn)}"#
-        case let .measurementRejected(mode):
-            return #"{"rejected_mode":\#(mode)}"#
+        case let .measurementRejected(mode, reason):
+            return #"{"rejected_mode":\#(mode),"reason":"\#(reason.rawValue)"}"#
+        case let .chargingState(isCharging):
+            return #"{"charging":\#(isCharging)}"#
+        case let .ringCapabilities(capabilities):
+            return capabilities.json
+        case let .autoMeasureSchedule(entries):
+            return #"{"entries":\#(entries.count)}"#
+        case let .bloodComponentsSample(reading, _):
+            return #"{"tcho":\#(reading.totalCholesterolRaw),"tg":\#(reading.triglyceridesRaw),"hdl":\#(reading.hdlRaw),"ldl":\#(reading.ldlRaw),"ua":\#(reading.uricAcidRaw)}"#
+        case let .settingAck(commandId, ok):
+            return #"{"command":\#(commandId),"ok":\#(ok)}"#
         case let .timingHistoryFrame(cmd, day, frameIndex):
             return #"{"cmd":\#(cmd),"day":\#(day),"frameIndex":\#(frameIndex)}"#
         case let .historySyncProgress(stage):
@@ -160,6 +194,8 @@ enum RingDecodedEvent: Sendable {
             return #"{"percent":\#(percent)}"#
         case let .status(address):
             return #"{"address":"\#(address ?? "")"}"#
+        case let .otaFrame(_, summary):
+            return #"{"ota":"\#(summary)"}"#
         default:
             return #"{}"#
         }

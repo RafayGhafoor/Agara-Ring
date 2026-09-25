@@ -49,7 +49,7 @@ struct ActivityTrendsView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .pulseGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .pulseGlass(RoundedRectangle(cornerRadius: PulseRadius.card, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(PulseColors.borderSubtle, lineWidth: 1))
     }
 
@@ -190,6 +190,7 @@ struct ActivityTrendsView: View {
                     .font(PulseFont.title3.weight(.bold))
                     .foregroundStyle(color)
                 Spacer()
+                HelpTip(AgaraHelp.avgPerDay)
                 Text(average ?? "— /day")
                     .font(PulseFont.title3).monospacedDigit()
                     .foregroundStyle(average == nil ? PulseColors.textMuted : PulseColors.textPrimary)
@@ -208,10 +209,22 @@ struct ActivityTrendsView: View {
                 axisLabels: axisLabels(count: values.count, samples: samples)
             )
             .frame(height: 96)
+            // Same count as Android's "Goal days" stat: tracked days at or over the goal.
+            if let goal, period != .twelveMonths {
+                let tracked = values.filter { $0 > 0 }
+                if !tracked.isEmpty {
+                    HStack(spacing: 2) {
+                        Text("Goal met \(tracked.filter { $0 >= goal }.count) of \(tracked.count) days")
+                            .font(PulseFont.caption.weight(.regular))
+                            .foregroundStyle(PulseColors.textSecondary)
+                        HelpTip(AgaraHelp.goalDays, size: 11)
+                    }
+                }
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        .pulseGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .pulseGlass(RoundedRectangle(cornerRadius: PulseRadius.card, style: .continuous))
     }
 
     // MARK: - Derived values

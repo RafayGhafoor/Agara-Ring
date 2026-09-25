@@ -38,9 +38,13 @@ final class CapabilityGatingTests: XCTestCase {
     func testTheAgaraCoordinatorDeclaresTheVerifiedSet() {
         let coordinator = VeepooCoordinator()
         XCTAssertEqual(coordinator.capabilities, [
-            .steps, .realtimeSteps, .sleep, .battery,
+            .steps, .realtimeSteps, .sleep, .remSleep, .battery,   // REM: A5 stage bitmap, verified 2026-09-25
             .heartRate, .spo2, .spo2History, .hrv, .stress, .bloodSugar, .bloodPressure,
             .manualHeartRate, .manualSpo2, .manualBloodPressure,
+            // Measure hub (measure-hub-spec): tests the ring's `a7` packets advertise, the DF series it
+            // fills, and find-device (`b5`).
+            .manualStress, .manualBloodSugar, .manualBloodComponents,
+            .respiration, .met, .cardiacLoad, .bloodComponents, .findDevice,
         ])
         // No per-unit sensor bitmap on this protocol, so nothing is bitmap-gated.
         XCTAssertTrue(coordinator.bitmapGatedCapabilities.isEmpty)

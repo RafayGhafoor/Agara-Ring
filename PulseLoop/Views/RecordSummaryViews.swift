@@ -154,11 +154,11 @@ struct RecordSummaryView: View {
                                     Capsule()
                                         .fill(
                                             LinearGradient(
-                                                colors: [Color.white.opacity(0.16), Color.white.opacity(0.07)],
+                                                colors: [PulseColors.textPrimary.opacity(0.16), PulseColors.textPrimary.opacity(0.07)],
                                                 startPoint: .top, endPoint: .bottom
                                             )
                                         )
-                                        .overlay(Capsule().strokeBorder(.white.opacity(0.12), lineWidth: 0.5))
+                                        .overlay(Capsule().strokeBorder(PulseColors.textPrimary.opacity(0.12), lineWidth: 0.5))
                                 }
                             }
                     }
@@ -175,7 +175,7 @@ struct RecordSummaryView: View {
                 .background(PulseColors.cardSoft, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .strokeBorder(.white.opacity(0.12), lineWidth: 0.5)
+                        .strokeBorder(PulseColors.textPrimary.opacity(0.12), lineWidth: 0.5)
                 )
         }
         .frame(maxWidth: .infinity, alignment: .leading)

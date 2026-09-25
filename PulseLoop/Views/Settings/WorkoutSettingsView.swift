@@ -80,7 +80,7 @@ struct WorkoutSettingsView: View {
                             .pickerStyle(.segmented)
 
                             Text(store.settings.gpsAccuracy.blurb)
-                                .font(.caption)
+                                .font(PulseFont.caption)
                                 .foregroundStyle(PulseColors.textMuted)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)

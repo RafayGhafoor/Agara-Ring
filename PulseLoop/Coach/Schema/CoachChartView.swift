@@ -59,7 +59,7 @@ struct CoachChartView: View {
         .background(PulseColors.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(.white.opacity(0.12), lineWidth: 0.5)
+                .strokeBorder(PulseColors.textPrimary.opacity(0.12), lineWidth: 0.5)
         )
     }
 

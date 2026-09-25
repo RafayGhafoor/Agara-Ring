@@ -50,7 +50,7 @@ struct ProfileSettingsView: View {
             }
             if let importStatus {
                 Text(importStatus)
-                    .font(.caption)
+                    .font(PulseFont.caption)
                     .foregroundStyle(PulseColors.textMuted)
                     .padding(.horizontal, 4)
             }

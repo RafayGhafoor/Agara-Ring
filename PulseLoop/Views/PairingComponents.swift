@@ -51,7 +51,7 @@ struct SignalStrengthDots: View {
         HStack(spacing: 3) {
             ForEach(0..<filledCount, id: \.self) { _ in
                 Circle()
-                    .fill(.white)
+                    .fill(PulseColors.textPrimary)
                     .frame(width: 6, height: 6)
             }
         }

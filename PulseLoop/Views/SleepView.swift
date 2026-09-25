@@ -113,11 +113,11 @@ struct SleepView: View {
             // The "wear your ring" explainer lives in the architecture card ONLY — the hero and
             // stage cards just dash out, so the message isn't repeated all over one page.
             SleepHeroCardView(label: SleepInsights.rangeHeroLabel[.day] ?? "Last Sleep", value: "—", score: nil)
-            VisualizationCard(eyebrow: "Stages", title: "Sleep architecture", legend: false) {
+            VisualizationCard(eyebrow: "Stages", title: "Night timeline", legend: false) {
                 InlineEmptyState(title: "No sleep recorded", message: "Wear your ring overnight to see your hypnogram here.")
                     .frame(height: 180)
             }
-            SleepStageSummaryCardsView(deep: "—", light: "—", awake: "—")
+            SleepStageSummaryCardsView(deep: "—", light: "—", rem: "—", awake: "—")
         } else {
             // The primary (longest) session drives the day-level coach fallback.
             let primary = sessions.max { $0.session.totalMinutes < $1.session.totalMinutes } ?? sessions[0]
@@ -147,13 +147,14 @@ struct SleepView: View {
             score: score.score,
             scoreLabel: score.label.rawValue
         )
-        VisualizationCard(eyebrow: "Stages", title: "Sleep architecture", legend: true) {
+        VisualizationCard(eyebrow: "Stages", title: "Night timeline", legend: true) {
             SleepHypnogramView(blocks: s.blocks, totalMin: s.session.totalMinutes, startTs: s.session.startAt,
                                onScrubActiveChanged: { hypnogramScrubbing = $0 })
         }
         SleepStageSummaryCardsView(
             deep: SleepFormat.duration(s.deepMinutes),
             light: SleepFormat.duration(s.lightMinutes),
+            rem: SleepFormat.duration(s.remMinutes),
             awake: SleepFormat.duration(s.awakeMinutes)
         )
     }
@@ -299,6 +300,7 @@ struct SleepView: View {
         .disabled(!enabled)
         .accessibilityLabel(label)
         .accessibilityHint(enabled ? "" : (disabledHint ?? ""))
+        .help(label)
     }
 
     /// Graphical date picker bounded to [oldest browsable day ... today].
@@ -467,6 +469,7 @@ struct SleepView: View {
             prefix: "Avg ",
             deep: stageAvg.map { SleepFormat.duration($0.deep) } ?? "—",
             light: stageAvg.map { SleepFormat.duration($0.light) } ?? "—",
+            rem: stageAvg.map { SleepFormat.duration($0.rem) } ?? "—",
             awake: stageAvg.map { SleepFormat.duration($0.awake) } ?? "—"
         )
         summaryCard(rangeSummary(range), fallback: coach)

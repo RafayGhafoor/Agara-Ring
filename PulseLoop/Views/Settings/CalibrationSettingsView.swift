@@ -49,7 +49,7 @@ struct CalibrationSettingsView: View {
                     if supportsGlucose { glucoseSection }
                     if ble.state != .connected {
                         Text("Not connected — calibration is saved and applied the next time your ring syncs.")
-                            .font(.caption).foregroundStyle(PulseColors.textMuted)
+                            .font(PulseFont.caption).foregroundStyle(PulseColors.textMuted)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 } else {
@@ -84,7 +84,7 @@ struct CalibrationSettingsView: View {
         }
 
         Text(bpLastMeasuredCopy)
-            .font(.caption).foregroundStyle(PulseColors.textMuted)
+            .font(PulseFont.caption).foregroundStyle(PulseColors.textMuted)
             .frame(maxWidth: .infinity, alignment: .leading)
 
         PrimaryButton(
@@ -98,7 +98,7 @@ struct CalibrationSettingsView: View {
             SecondaryButton(title: "Reset", systemImage: "arrow.counterclockwise") { resetBP() }
         }
         if let bpStatus {
-            Text(bpStatus).font(.caption).foregroundStyle(PulseColors.textMuted)
+            Text(bpStatus).font(PulseFont.caption).foregroundStyle(PulseColors.textMuted)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
@@ -134,7 +134,7 @@ struct CalibrationSettingsView: View {
             SecondaryButton(title: "Reset", systemImage: "arrow.counterclockwise") { resetGlucose() }
         }
         if let glucoseStatus {
-            Text(glucoseStatus).font(.caption).foregroundStyle(PulseColors.textMuted)
+            Text(glucoseStatus).font(PulseFont.caption).foregroundStyle(PulseColors.textMuted)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
     }

@@ -21,6 +21,17 @@ enum MetricKey: String, CaseIterable {
     // Calorie-intake tracking. No wearable capability — gated instead on the
     // NutritionPrefs master toggle (see TodayStore / TodaySettingsView).
     case nutrition
+    // Agara ring DF history series (measure-hub spec §5). `bloodComponents` is the one Vitals card for the
+    // five estimates (a card id, like `nutrition`); the five keys below it are their stored series.
+    case respiratoryRate = "resp_rate"
+    case met
+    case cardiacLoad = "cardiac_load"
+    case bloodComponents = "blood_components"
+    case totalCholesterol = "total_cholesterol"
+    case triglycerides
+    case hdl
+    case ldl
+    case uricAcid = "uric_acid"
 
     /// The wearable capability that must be present for this metric to be shown.
     var requiredCapability: WearableCapability? {
@@ -37,6 +48,22 @@ enum MetricKey: String, CaseIterable {
         case .sleep: return .sleep
         case .battery: return .battery
         case .nutrition: return nil
+        case .respiratoryRate: return .respiration
+        case .met: return .met
+        case .cardiacLoad: return .cardiacLoad
+        case .bloodComponents, .totalCholesterol, .triglycerides, .hdl, .ldl, .uricAcid: return .bloodComponents
+        }
+    }
+
+    /// The feature flag that must be on for this metric's card to show (`docs/config/features.yaml`).
+    /// The data is stored regardless — the flag only gates the UI.
+    var requiredFeature: AgaraFeature? {
+        switch self {
+        case .respiratoryRate: return .vitalsRespiration
+        case .met: return .vitalsMet
+        case .cardiacLoad: return .vitalsCardiacLoad
+        case .bloodComponents, .totalCholesterol, .triglycerides, .hdl, .ldl, .uricAcid: return .bloodComponents
+        default: return nil
         }
     }
 
@@ -44,6 +71,7 @@ enum MetricKey: String, CaseIterable {
     /// same answer from the DB; views that hold a cached snapshot use this so a `body` re-render never
     /// triggers a fetch.
     func isSupported(by capabilities: Set<WearableCapability>) -> Bool {
+        if let feature = requiredFeature, !AgaraFeatureStore.isOn(feature) { return false }
         guard let required = requiredCapability else { return true }
         return capabilities.contains(required)
     }
@@ -136,6 +164,10 @@ struct SleepSummary {
     let deepMinutes: Int
     let awakeMinutes: Int
     let blocks: [SleepStageBlock]
+
+    /// REM minutes from the stage blocks (the Agara ring reports REM: A5 bitmap code 2, A3 offset 23).
+    /// Deep + light + REM + awake adds up to the time in bed.
+    var remMinutes: Int { blocks.filter { $0.stage == .rem }.reduce(0) { $0 + $1.durationMinutes } }
 }
 
 struct SleepRangeSummary {

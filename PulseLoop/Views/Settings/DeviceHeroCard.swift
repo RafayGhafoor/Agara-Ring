@@ -17,6 +17,8 @@ struct DeviceHeroStatus: Equatable {
     let batteryText: String?
     let syncText: String?
     let action: Action
+    /// Connected and on the charger — the card shows "Charging · NN %" with the charging glyph.
+    var isCharging: Bool = false
 
     var actionTitle: String {
         switch action {
@@ -33,16 +35,22 @@ struct DeviceHeroStatus: Equatable {
 
     /// `connectedName` reflects the live connection (nil unless connected); `knownName` is the
     /// last stored device (survives disconnect). Separating them distinguishes "known but
-    /// disconnected" (`.connect`) from "never paired" (`.setUp`).
+    /// disconnected" (`.connect`) from "never paired" (`.setUp`). `nickname` is the user's name for the
+    /// ring; when set it replaces the model name in the title (never the paired/unpaired decision).
     static func make(
         state: RingConnectionState,
         connectedName: String?,
         knownName: String?,
+        nickname: String? = nil,
         batteryPercent: Int?,
         lastSync: Date?,
-        now: Date
+        now: Date,
+        isCharging: Bool = false,
+        chargeEstimate: ChargeEstimator.Estimate? = nil
     ) -> DeviceHeroStatus {
-        let title = connectedName ?? knownName ?? "No ring connected"
+        let title = (connectedName ?? knownName)
+            .map { RingNickname.displayName(nickname: nickname, modelName: $0) }
+            ?? "No ring connected"
 
         let statusLine: String
         let statusTint: Color
@@ -61,6 +69,8 @@ struct DeviceHeroStatus: Equatable {
         }
 
         let batteryText = batteryPercent.map { "\(max(0, min(100, $0)))%" }
+        let charging = isCharging && state == .connected
+        let chargingLine = ChargeEstimator.statusLine(percent: batteryPercent, estimate: chargeEstimate)
 
         let syncText: String?
         if let lastSync {
@@ -82,8 +92,9 @@ struct DeviceHeroStatus: Equatable {
         }
 
         return DeviceHeroStatus(
-            title: title, statusLine: statusLine, statusTint: statusTint,
-            batteryText: batteryText, syncText: syncText, action: action
+            title: title, statusLine: charging ? chargingLine : statusLine,
+            statusTint: charging ? PulseColors.success : statusTint,
+            batteryText: batteryText, syncText: syncText, action: action, isCharging: charging
         )
     }
 }
@@ -96,9 +107,12 @@ struct DeviceHeroCard: View {
     @Environment(RingBLEClient.self) private var ble
     @Environment(RingSyncCoordinator.self) private var coordinator
     @Binding var path: NavigationPath
+    /// Re-read the stored device after a persist (a rename lands here without any BLE state change).
+    @State private var dataChange = PulseDataChange.shared
 
     var body: some View {
         // One SwiftData read for the stored device, reused for name, battery, and art.
+        let _ = dataChange.token
         let device = DeviceRepository.current(context: modelContext)
         let deviceType = ble.activeDeviceType ?? device?.deviceType
         let wearableModel = ble.activeWearableModel ?? WearableModel.model(id: device?.wearableModelID)
@@ -107,16 +121,21 @@ struct DeviceHeroCard: View {
             state: ble.state,
             connectedName: ble.state == .connected ? wearableModel?.displayName ?? ble.activeDeviceType?.displayName : nil,
             knownName: wearableModel?.displayName ?? deviceType?.displayName,
+            nickname: device?.nickname,
             batteryPercent: battery,
             lastSync: coordinator.lastSyncAt,
-            now: Date()
+            now: Date(),
+            isCharging: AgaraFeatureStore.shared.isOn(.chargingState) && ble.isCharging,
+            chargeEstimate: ble.chargeEstimate
         )
 
         // The connected card is purely informational and opens Wearable settings, where Disconnect
         // lives. Setup/reconnect remain available here only when the ring is not connected.
         VStack(spacing: 10) {
             Button { path.append(AppRoute.settingsWearable) } label: {
-                HStack(alignment: .top, spacing: 16) {
+                // Art, text block and the battery + chevron share one centre line; the chip used to sit
+                // at the top-right with the chevron below it, lined up with nothing.
+                HStack(alignment: .center, spacing: 16) {
                     RingArtView(
                         tint: PulseColors.info,
                         size: 72,
@@ -135,6 +154,7 @@ struct DeviceHeroCard: View {
                             .font(PulseFont.footnote.weight(.regular))
                             .foregroundStyle(status.statusTint)
                             .lineLimit(1)
+                            .minimumScaleFactor(0.8)
 
                         if let syncText = status.syncText {
                             Text(syncText)
@@ -147,17 +167,23 @@ struct DeviceHeroCard: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .layoutPriority(1)
 
-                    VStack(alignment: .trailing, spacing: 14) {
-                        if let batteryText = status.batteryText {
+                    HStack(spacing: 6) {
+                        if status.isCharging {
+                            RingBatteryGlyph(percent: battery, dotColor: nil, size: 30, charging: true)
+                                .accessibilityHidden(true)
+                        } else if let batteryText = status.batteryText, let battery, battery > 0 {
+                            // Coloured by the shared battery tiers (it was always green, even at 20 %).
+                            let tint = BatteryTier(percent: battery).color
                             HStack(spacing: 4) {
-                                Image(systemName: "battery.100")
+                                Image(systemName: "battery.\(Int((Double(min(battery, 100)) / 25).rounded()) * 25)percent")
                                 Text(batteryText)
                             }
                                 .font(PulseFont.caption.weight(.semibold))
-                                .foregroundStyle(PulseColors.success)
+                                .foregroundStyle(tint)
                                 .padding(.horizontal, 9)
                                 .padding(.vertical, 6)
-                                .background(PulseColors.success.opacity(0.12), in: Capsule())
+                                .background(tint.opacity(0.12), in: Capsule())
+                                .opacity(ble.state == .connected ? 1 : 0.6)
                                 .fixedSize()
                         }
 

@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 import UIKit
 
 /// The dedicated, modern ring-pairing screen. Swipe a carousel of supported ring models (product art,
@@ -13,6 +14,7 @@ struct PairingView: View {
     @Environment(RingBLEClient.self) private var ble
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.modelContext) private var modelContext
 
     /// Pushed onto the Settings nav stack (no onboarding "Skip"): show our own glass
     /// back button and hide the system nav bar so it doesn't stack a second, empty
@@ -45,7 +47,10 @@ struct PairingView: View {
     @State private var selectedBrand = Self.allBrandsTab
     @State private var isLooking = false
     @State private var didFireConnected = false
-    @State private var connectedAppeared = false
+    /// The "Name your ring" step: shown once a ring connects, until the user saves a name or skips.
+    /// Kept separate from `ble.state` so a link blip mid-typing doesn't throw the step away.
+    @State private var isNaming = false
+    @State private var nameText = RingNickname.defaultName
     /// The ring the user last tapped, kept so a failed attempt can be described by name.
     @State private var lastAttemptedRingID: UUID?
 
@@ -91,6 +96,7 @@ struct PairingView: View {
 
     private var canUseBluetoothUI: Bool { ble.isBluetoothReady || forcePairingUIForTesting }
     private var showsActionFooter: Bool {
+        if isNaming { return true }
         guard ble.state != .connected else { return false }
         return isLooking ? onSkip != nil : (canUseBluetoothUI || onSkip != nil)
     }
@@ -103,7 +109,11 @@ struct PairingView: View {
                     didFireConnected = true
                     isLooking = false
                     successHaptic.notificationOccurred(.success) // §6 success haptic
-                    onConnected?()
+                    // "Name your ring" comes next; `onConnected` fires once it is saved or skipped.
+                    nameText = RingNickname.prefill(
+                        identifier: ble.deviceIdentifier, row: DeviceRepository.current(context: modelContext)
+                    )
+                    isNaming = true
                 }
             }
             .onDisappear { isLooking = false; ble.stopScanning() } // reset so a re-appear doesn't show a frozen scan
@@ -145,6 +155,7 @@ struct PairingView: View {
     /// never clip. `errorText` is nil-friendly and pulled out so both layouts share it.
     private var isFittedDefaultState: Bool {
         canUseBluetoothUI
+            && !isNaming
             && ble.state != .connected
             && !isLooking
             && !dynamicTypeSize.isAccessibilitySize
@@ -195,16 +206,18 @@ struct PairingView: View {
             // whose glass sampled the accent thumb as a purple smear under "Connect ring".
             VStack(spacing: 16) {
                 OnboardingHeader(
-                    title: "Add your ring",
-                    subtitle: "Swipe to find your model, then tap to connect."
+                    title: isNaming ? "Name your ring" : "Add your ring",
+                    subtitle: isNaming
+                        ? "Pick a name you'll recognise. You can change it later in Settings."
+                        : "Swipe to find your model, then tap to connect."
                 )
                 .frame(maxWidth: .infinity) // full-width anchor: forces the column full so the button
                                             // never hugs to the (variable-width) dot row
 
-                if !ble.isBluetoothReady && !forcePairingUIForTesting {
-                    bluetoothOffCard
-                } else if ble.state == .connected {
+                if isNaming || ble.state == .connected {
                     connectedCard
+                } else if !ble.isBluetoothReady && !forcePairingUIForTesting {
+                    bluetoothOffCard
                 } else {
                     carousel(s: 1)
                     if isLooking { scanningArea }
@@ -233,7 +246,7 @@ struct PairingView: View {
         if let error = ble.lastError {
             VStack(spacing: 10) {
                 Text(error)
-                    .font(.caption)
+                    .font(PulseFont.caption)
                     .foregroundStyle(PulseColors.danger)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
@@ -251,7 +264,10 @@ struct PairingView: View {
             TabView(selection: $selectedIndex) {
                 ForEach(Array(models.enumerated()), id: \.element.id) { index, model in
                     VStack(spacing: (10 * s).rounded()) {
-                        RingArtView(tint: model.tint, size: ringSize, imageName: model.imageName)
+                        AnimatedRingArt(
+                            tint: model.tint, size: ringSize, imageName: model.imageName,
+                            phase: isLooking ? .searching : .idle
+                        )
                         Text(model.displayName)
                             .font(PulseFont.numberL)
                             .foregroundStyle(PulseColors.textPrimary)
@@ -322,7 +338,7 @@ struct PairingView: View {
                 } label: {
                     Text(brand)
                         .font(PulseFont.subheadline.weight(.semibold))
-                        .foregroundStyle(isSelected ? .white : PulseColors.textSecondary)
+                        .foregroundStyle(isSelected ? PulseColors.onAccent : PulseColors.textSecondary)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
                         // Selected = accent-tinted interactive glass; others = plain glass.
@@ -342,6 +358,38 @@ struct PairingView: View {
 
     @ViewBuilder
     private var pairingFooterContent: some View {
+        if isNaming {
+            namingFooterContent
+        } else {
+            scanFooterContent
+        }
+    }
+
+    /// Save / Skip for the "Name your ring" step. Skip keeps the default (writes nothing).
+    private var namingFooterContent: some View {
+        VStack(spacing: 10) {
+            PrimaryButton(title: "Save name", systemImage: "checkmark", action: saveName)
+            Button("Skip", action: finishNaming)
+                .font(PulseFont.subheadline.weight(.semibold))
+                .foregroundStyle(PulseColors.textMuted)
+                .frame(height: 44)
+        }
+    }
+
+    private func saveName() {
+        guard RingNickname.isValid(nameText) else { return }
+        DeviceRepository.setNickname(nameText, peripheralIdentifier: ble.deviceIdentifier, context: modelContext)
+        finishNaming()
+    }
+
+    private func finishNaming() {
+        guard isNaming else { return }
+        isNaming = false
+        onConnected?()
+    }
+
+    @ViewBuilder
+    private var scanFooterContent: some View {
         VStack(spacing: 10) {
             if !isLooking, canUseBluetoothUI {
                 PrimaryButton(title: "Connect my ring", systemImage: "dot.radiowaves.left.and.right") {
@@ -378,7 +426,7 @@ struct PairingView: View {
                         Text("Scanning for \(selectedModel.displayName)…") // §4
                     }
                 }
-                .font(.caption)
+                .font(PulseFont.caption)
                 .foregroundStyle(PulseColors.textMuted)
                 .frame(maxWidth: .infinity, alignment: .center) // §4 centered
 
@@ -424,11 +472,11 @@ struct PairingView: View {
             Image(systemName: ring.isLikelyRing ? "circle.hexagongrid.circle.fill" : "dot.radiowaves.left.and.right")
                 .foregroundStyle(ring.isLikelyRing ? PulseColors.accent : PulseColors.textMuted)
             VStack(alignment: .leading, spacing: 2) {
-                Text(ring.name).font(.subheadline.weight(.medium)).foregroundStyle(PulseColors.textPrimary)
+                Text(ring.name).font(PulseFont.subheadline.weight(.medium)).foregroundStyle(PulseColors.textPrimary)
                 if let type = ring.deviceType {
                     HStack(spacing: 6) {
                         Text(WearableModel.model(id: ring.wearableModelID)?.displayName ?? type.displayName)
-                            .font(.caption2)
+                            .font(PulseFont.caption2)
                             .foregroundStyle(PulseColors.accent)
                     }
                 }
@@ -460,35 +508,44 @@ struct PairingView: View {
 
     // MARK: - States
 
+    /// Pairing succeeded: the ring settles with a success flash, the confirmation names it, and the
+    /// "Name your ring" editor sits underneath (Save / Skip live in the footer).
     private var connectedCard: some View {
         VStack(spacing: 16) {
-            ZStack { // §6 success ring wraps RingArtView
-                RingArtView(tint: selectedModel.tint, size: 140, imageName: selectedModel.imageName)
-                Circle()
-                    .strokeBorder(PulseColors.success, lineWidth: 2)
-                    .frame(width: 152, height: 152)
-                    .scaleEffect(connectedAppeared ? 1.0 : 0.7)
-                    .opacity(connectedAppeared ? 1.0 : 0.0)
-                    .animation(.spring(response: 0.5, dampingFraction: 0.6), value: connectedAppeared) // §6
-            }
+            AnimatedRingArt(tint: selectedModel.tint, size: 140, imageName: selectedModel.imageName, phase: .paired)
+                .padding(.vertical, 6)
             HStack(spacing: 8) {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(PulseColors.success)
                     .scaleEffect(didFireConnected ? 1.0 : 0.3) // §6 checkmark spring
                     .animation(.spring(response: 0.45, dampingFraction: 0.55), value: didFireConnected) // §6
-                Text("Connected to \(ble.activeWearableModel?.displayName ?? ble.activeDeviceType?.displayName ?? selectedModel.displayName)")
-                    .font(.headline)
+                Text("Connected to \(connectedRingName)")
+                    .font(PulseFont.headline)
                     .foregroundStyle(PulseColors.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
-            if let onSkip {
+            .accessibilityElement(children: .combine)
+            if isNaming {
+                RingNameEditor(text: $nameText, onSubmit: saveName)
+            } else if let onSkip {
+                // Already connected on arrival (e.g. back-navigating in onboarding): nothing to name.
                 PrimaryButton(title: "Continue", systemImage: "checkmark", action: onSkip)
             }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
-        .onAppear {
-            connectedAppeared = true // §6 triggers success ring scale/fade animation
-        }
+    }
+
+    /// The ring's current name for the "Connected to …" line: its stored nickname, else the model name.
+    private var connectedRingName: String {
+        let modelName = ble.activeWearableModel?.displayName
+            ?? ble.activeDeviceType?.displayName
+            ?? selectedModel.displayName
+        return RingNickname.displayName(
+            nickname: DeviceRepository.current(context: modelContext)?.nickname,
+            modelName: modelName
+        )
     }
 
     private var bluetoothOffCard: some View {
@@ -497,10 +554,10 @@ struct PairingView: View {
                 .font(PulseFont.largeTitle.weight(.regular))
                 .foregroundStyle(PulseColors.textMuted)
             Text("Bluetooth is off")
-                .font(.headline)
+                .font(PulseFont.headline)
                 .foregroundStyle(PulseColors.textPrimary)
             Text("Turn on Bluetooth to find and connect your ring.")
-                .font(.subheadline)
+                .font(PulseFont.subheadline)
                 .foregroundStyle(PulseColors.textMuted)
                 .multilineTextAlignment(.center)
             SecondaryButton(title: "Open Settings", systemImage: "gear") { // §6

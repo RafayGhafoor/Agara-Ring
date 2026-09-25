@@ -17,6 +17,8 @@ enum MeasurementDemoData {
         var secondary: Int?
         /// Populated for the combined sweep.
         var vitals: RingSyncCoordinator.VitalsReading?
+        /// Populated for blood components.
+        var components: BloodComponentsReading?
     }
 
     /// Persist the mock row(s) for `kind` and hand back what the sheet should display.
@@ -33,6 +35,29 @@ enum MeasurementDemoData {
             let metric: MeasurementKind = kind == .hr ? .heartRate : (kind == .spo2 ? .spo2 : .hrv)
             MetricsService.insertMockMeasurement(kind: metric, context: context)
             return Reading(value: latest(metric))
+
+        case .stress:
+            MetricsService.insertMockMeasurement(kind: .stress, context: context)
+            return Reading(value: latest(.stress))
+
+        case .glucose:
+            MetricsService.insertMockMeasurement(kind: .bloodSugar, context: context)
+            return Reading(value: latest(.bloodSugar))
+
+        case .bloodComponents:
+            let kinds: [MeasurementKind] = [.totalCholesterol, .triglycerides, .hdl, .ldl, .uricAcid]
+            for metric in kinds { MetricsService.insertMockMeasurement(kind: metric, context: context) }
+            func exact(_ k: MeasurementKind) -> Double {
+                MetricsService.fetchMeasurements(context).first { $0.kind == k }?.value ?? 0
+            }
+            let reading = BloodComponentsReading(
+                totalCholesterolRaw: Int((exact(.totalCholesterol) * 100).rounded()),
+                triglyceridesRaw: Int((exact(.triglycerides) * 100).rounded()),
+                hdlRaw: Int((exact(.hdl) * 100).rounded()),
+                ldlRaw: Int((exact(.ldl) * 100).rounded()),
+                uricAcidRaw: Int((exact(.uricAcid) * 10).rounded())
+            )
+            return Reading(value: 1, components: reading)
 
         case .bloodPressure:
             // BP is stored as two rows so each trends independently — mock both.

@@ -157,12 +157,12 @@ private struct ActivityTypeButton: View, Equatable {
             HStack(spacing: 10) {
                 Image(systemName: kind.symbol)
                     .font(PulseFont.title3.weight(.regular))
-                    .foregroundStyle(isSelected ? .white : PulseColors.textSecondary)
+                    .foregroundStyle(isSelected ? PulseColors.onAccent : PulseColors.textSecondary)
                     .frame(width: 38, height: 38)
-                    .background(isSelected ? Color.white.opacity(0.22) : PulseColors.cardSoft, in: Circle())
+                    .background(isSelected ? PulseColors.onAccent.opacity(0.22) : PulseColors.cardSoft, in: Circle())
                 Text(kind.label)
                     .font(PulseFont.callout.weight(.semibold))
-                    .foregroundStyle(isSelected ? .white : PulseColors.textPrimary)
+                    .foregroundStyle(isSelected ? PulseColors.onAccent : PulseColors.textPrimary)
                 Spacer(minLength: 0)
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")

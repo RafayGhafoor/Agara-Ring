@@ -7,6 +7,7 @@ struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(RingBLEClient.self) private var ble
     @State private var coachStore = CoachSettingsStore.shared
+    @Query private var profiles: [UserProfile]
     /// Unlocked by tapping the version 7× in About; shows the Developer row.
     @AppStorage("developerUnlocked") private var developerUnlocked = false
     @Binding var path: NavigationPath
@@ -42,6 +43,13 @@ struct SettingsView: View {
         case .backendProxy:
             return "Backend proxy"
         }
+    }
+
+    /// "Ember · System".
+    private var appearanceTrailing: String {
+        let store = AppearanceStore.shared
+        let flavour = AppearanceFlavour.named(store.flavour(sex: profiles.first?.sex))?.name ?? ""
+        return [flavour, store.mode.label].filter { !$0.isEmpty }.joined(separator: " · ")
     }
 
     private var notificationsTrailing: String {
@@ -82,6 +90,10 @@ struct SettingsView: View {
             },
             SettingsRowItem(icon: "lungs", tint: PulseColors.hrv, title: "Physiology") {
                 path.append(AppRoute.settingsPhysiology)
+            },
+            SettingsRowItem(icon: "paintpalette", tint: PulseColors.accent, title: "Appearance",
+                            trailingValue: appearanceTrailing) {
+                path.append(AppRoute.settingsAppearance)
             }
         ]
         // Measurement frequency configures the ring's sampling interval — shown only for rings that

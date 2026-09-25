@@ -60,12 +60,11 @@ struct OnboardingFlowView: View {
         progressStore.savePath(path)
     }
 
+    /// Called once the pairing screen's "Name your ring" step is saved or skipped. The connected
+    /// confirmation was already on screen during that step, so there is nothing left to linger on.
     private func advanceAfterConnection() {
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 700_000_000)
-            guard step == .ring else { return }
-            push(.profile)
-        }
+        guard step == .ring else { return }
+        push(.profile)
     }
 
     private func finish() {
@@ -247,7 +246,7 @@ struct OnboardingWelcomeView: View {
     }
 
     private func logo(size: CGFloat) -> some View {
-        Image("agara-wordmark")
+        Image(ThemeStore.current.isLight ? "agara-wordmark-dark" : "agara-wordmark")
             .resizable()
             .scaledToFit()
             .frame(width: size, height: size)

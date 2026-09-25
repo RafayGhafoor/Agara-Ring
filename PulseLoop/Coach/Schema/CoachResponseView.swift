@@ -146,7 +146,7 @@ struct CoachFollowUpChipLabel: View {
         .background(PulseColors.cardSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(.white.opacity(0.12), lineWidth: 0.5)
+                .strokeBorder(PulseColors.textPrimary.opacity(0.12), lineWidth: 0.5)
         )
     }
 }

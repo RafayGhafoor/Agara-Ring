@@ -28,6 +28,38 @@ extension MetricKind {
         case .fatigue: return .fatigue
         case .glucose: return .bloodSugar
         case .temperature: return .temperature
+        case .respiration: return .respiratoryRate
+        case .met: return .met
+        case .cardiacLoad: return .cardiacLoad
+        case .totalCholesterol: return .totalCholesterol
+        case .triglycerides: return .triglycerides
+        case .hdl: return .hdl
+        case .ldl: return .ldl
+        case .uricAcid: return .uricAcid
+        }
+    }
+}
+
+extension MetricKind {
+    /// The stored measurement kind for single-series metrics; nil for blood pressure (two series).
+    var measurementKind: MeasurementKind? {
+        switch self {
+        case .heartRate: return .heartRate
+        case .spo2: return .spo2
+        case .hrv: return .hrv
+        case .bloodPressure: return nil
+        case .stress: return .stress
+        case .fatigue: return .fatigue
+        case .glucose: return .bloodSugar
+        case .temperature: return .temperature
+        case .respiration: return .respiratoryRate
+        case .met: return .met
+        case .cardiacLoad: return .cardiacLoad
+        case .totalCholesterol: return .totalCholesterol
+        case .triglycerides: return .triglycerides
+        case .hdl: return .hdl
+        case .ldl: return .ldl
+        case .uricAcid: return .uricAcid
         }
     }
 }

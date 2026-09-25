@@ -13,6 +13,9 @@ extension MeasurementSheet.Kind {
         case .hrv: return "Heart Rate Variability"
         case .bloodPressure: return "Blood Pressure"
         case .vitals: return "Vitals"
+        case .stress: return "Stress"
+        case .glucose: return "Blood Glucose"
+        case .bloodComponents: return "Blood Components"
         }
     }
 
@@ -22,6 +25,10 @@ extension MeasurementSheet.Kind {
         case .spo2: return "%"
         case .hrv: return "ms"
         case .bloodPressure: return "mmHg"
+        case .stress: return "score"
+        // Glucose follows the user's unit; the sheet overrides this (see `MeasurementSheet.unit`).
+        case .glucose: return "mg/dL"
+        case .bloodComponents: return ""
         }
     }
 
@@ -31,6 +38,8 @@ extension MeasurementSheet.Kind {
         case .spo2: return PulseColors.spo2
         case .hrv: return PulseColors.hrv
         case .bloodPressure: return PulseColors.bloodPressure
+        case .stress: return PulseColors.stress
+        case .glucose, .bloodComponents: return PulseColors.bloodSugar
         }
     }
 
@@ -40,6 +49,9 @@ extension MeasurementSheet.Kind {
         case .spo2: return "lungs.fill"
         case .hrv: return "waveform.path.ecg"
         case .bloodPressure: return "heart.text.square"
+        case .stress: return "brain.head.profile"
+        case .glucose: return "drop.fill"
+        case .bloodComponents: return "drop.triangle.fill"
         }
     }
 
@@ -51,6 +63,9 @@ extension MeasurementSheet.Kind {
         case .hrv: return "Sit still and breathe normally — HRV needs a steady stretch of beats."
         case .bloodPressure: return "Sit upright, rest your hand at heart height, and stay still."
         case .vitals: return "Sit upright, rest your hand at heart height, and stay still. This takes about a minute."
+        case .stress: return "Sit comfortably, breathe normally, and keep your hand still. This takes about a minute."
+        case .glucose, .bloodComponents:
+            return "Keep the ring snug and your hand still. This takes about a minute."
         }
     }
 
@@ -62,6 +77,9 @@ extension MeasurementSheet.Kind {
         case .hrv: return "Reading heart rate variability…"
         case .bloodPressure: return "Measuring blood pressure…"
         case .vitals: return "Measuring your vitals…"
+        case .stress: return "Reading your stress level…"
+        case .glucose: return "Estimating blood glucose…"
+        case .bloodComponents: return "Estimating blood components…"
         }
     }
 
@@ -80,6 +98,12 @@ extension MeasurementSheet.Kind {
             return "Couldn't get a blood-pressure reading. Wear the ring snugly, rest your hand at heart height, and try again."
         case .vitals:
             return "Couldn't get a reading. Wear the ring snugly, keep still, and try again."
+        case .stress:
+            return "Couldn't get a stress reading. Wear the ring snugly, keep still, and try again."
+        case .glucose:
+            return "Couldn't get a glucose estimate. Wear the ring snugly, keep still, and try again."
+        case .bloodComponents:
+            return "Couldn't get a blood-components estimate. Wear the ring snugly, keep still, and try again."
         }
     }
 
@@ -87,8 +111,11 @@ extension MeasurementSheet.Kind {
     /// state). Deliberately one message for every kind: the fix is the same regardless of which vital
     /// was being measured, and naming the vital here would only bury the one instruction that matters.
     var notWornMessage: String {
-        "The ring isn't detecting your finger. Put it on snugly, then try again."
+        MeasurementRefusal.notWornMessage
     }
+
+    /// Ring estimates (not measurements) carry the shared disclaimer under the ring.
+    var isEstimate: Bool { self == .glucose || self == .bloodComponents }
 
     /// SpO₂ breathes rather than beats — its ambient pulse runs at a slower cadence.
     var slowBreathing: Bool { self == .spo2 }

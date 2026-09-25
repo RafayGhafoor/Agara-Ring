@@ -86,7 +86,7 @@ struct AppleHealthSettingsView: View {
     @ViewBuilder private var accessDeniedHint: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(AgaraCopy.healthPermissionDenied)
-                .font(.caption)
+                .font(PulseFont.caption)
                 .foregroundStyle(PulseColors.danger)
             QuickActionButton(label: "Open Health") { openHealthApp() }
         }
@@ -124,7 +124,7 @@ struct AppleHealthSettingsView: View {
             .disabled(service.isSyncing)
             if let result = service.lastResult {
                 Text(result)
-                    .font(.caption)
+                    .font(PulseFont.caption)
                     .foregroundStyle(PulseColors.textMuted)
                     .padding(.horizontal, 4)
             }

@@ -53,6 +53,8 @@ enum HealthKitTypeMappings {
             // HealthKit has both (`respiratoryRate`, `vo2Max`), but exporting them needs new share
             // types plus their own per-type toggles to keep the sync opt-in per metric. Follow-up.
             return nil
+        case .met, .cardiacLoad, .totalCholesterol, .triglycerides, .hdl, .ldl, .uricAcid:
+            return nil   // Ring estimates with no (or no appropriate) HealthKit type — not exported.
         }
     }
 

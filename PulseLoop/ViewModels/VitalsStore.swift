@@ -20,6 +20,13 @@ final class VitalsStore {
     private(set) var diastolicSamples: [MetricSample]
     private(set) var bloodSugarSamples: [MetricSample]
     private(set) var fatigueSamples: [MetricSample]
+    // Agara ring history series (measure-hub spec §5); their cards sit behind feature flags.
+    private(set) var respirationSamples: [MetricSample] = []
+    private(set) var metSamples: [MetricSample] = []
+    private(set) var cardiacLoadSamples: [MetricSample] = []
+    private(set) var componentSamples: [MetricKind: [MetricSample]] = [:]
+    /// Latest blood-component estimates + abnormal count, for the one "Blood components" card.
+    private(set) var bloodComponents: BloodComponentsSummary?
     private(set) var capabilities: Set<WearableCapability>
     /// Which metric cards are visible (capability + user-hidden), computed once per rebuild so the
     /// view doesn't call `isVisible` (a device fetch each) five times per render.
@@ -56,6 +63,7 @@ final class VitalsStore {
         self.capabilities = MetricsService.deviceCapabilities(modelContext)
         self.visibleMetrics = Self.computeVisible(context: modelContext)
         self.cards = [:]
+        loadExtendedSeries()
         self.signature = Self.currentSignature(context: modelContext, profile: profile)
         applyRebuiltCards()
     }
@@ -97,8 +105,30 @@ final class VitalsStore {
         fatigueSamples = MetricsService.metricRange(metric: .fatigue, range: .twentyFourHours, context: modelContext)
         capabilities = MetricsService.deviceCapabilities(modelContext)
         visibleMetrics = Self.computeVisible(context: modelContext)
+        loadExtendedSeries()
         applyRebuiltCards()
         signature = sig
+    }
+
+    /// Respiration, MET, cardiac load and the five blood components (24 h), plus the latest-values
+    /// summary for the blood-components card (any age — the ring logs them every 30 minutes at most).
+    private func loadExtendedSeries() {
+        respirationSamples = MetricsService.metricRange(metric: .respiratoryRate, range: .twentyFourHours, context: modelContext)
+        metSamples = MetricsService.metricRange(metric: .met, range: .twentyFourHours, context: modelContext)
+        cardiacLoadSamples = MetricsService.metricRange(metric: .cardiacLoad, range: .twentyFourHours, context: modelContext)
+        var series: [MetricKind: [MetricSample]] = [:]
+        var latest: [MetricKind: Double] = [:]
+        var updated: Date?
+        for metric in MetricKind.bloodComponents {
+            series[metric] = MetricsService.metricRange(metric: metric.metricKey, range: .twentyFourHours, context: modelContext)
+            guard let kind = metric.measurementKind,
+                  let row = MetricsRepository.latestMeasurement(kind: kind, context: modelContext) else { continue }
+            latest[metric] = row.value
+            updated = max(updated ?? row.timestamp, row.timestamp)
+        }
+        componentSamples = series
+        bloodComponents = latest.isEmpty ? nil
+            : BloodComponentsSummary(values: latest, updatedAt: updated, sex: BiologicalSex(profileSex: profile?.sex))
     }
 
     /// Assemble every card view-model from the current sample arrays + profile. Runs once per rebuild.
@@ -109,6 +139,8 @@ final class VitalsStore {
             hr: hrSamples, spo2: spo2Samples, hrv: hrvSamples,
             stress: stressSamples, fatigue: fatigueSamples, temperature: tempSamples,
             systolic: systolicSamples, diastolic: diastolicSamples, glucose: bloodSugarSamples,
+            respiration: respirationSamples, met: metSamples, cardiacLoad: cardiacLoadSamples,
+            components: componentSamples,
             summary: summary, range: .twentyFourHours, units: profile?.units ?? .metric
         )
         var result: [MetricKind: VitalCardViewModel] = [:]
@@ -151,6 +183,8 @@ final class VitalsStore {
         return [
             latest(.heartRate), latest(.spo2), latest(.stress), latest(.hrv), latest(.temperature),
             latest(.bloodPressureSystolic), latest(.bloodPressureDiastolic), latest(.bloodSugar), latest(.fatigue),
+            latest(.respiratoryRate), latest(.met), latest(.cardiacLoad), latest(.totalCholesterol), latest(.uricAcid),
+            AgaraFeatureStore.shared.overrides.map { "\($0.key.rawValue)=\($0.value)" }.sorted().joined(separator: ","),
             device.map { "\($0.batteryPercent)/\($0.state.rawValue)" } ?? "·",
             calSig, profileSig, prefSig,
         ].joined(separator: "|")

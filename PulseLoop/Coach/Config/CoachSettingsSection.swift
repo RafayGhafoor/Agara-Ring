@@ -134,7 +134,7 @@ struct CoachSettingsSection: View {
 
         if checkInPermissionDenied {
             Text(AgaraCopy.notificationsDisabled)
-                .font(.caption)
+                .font(PulseFont.caption)
                 .foregroundStyle(PulseColors.danger)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -367,7 +367,7 @@ struct CoachSettingsSection: View {
                     }
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
-                    .font(PulseFont.subheadline.weight(.regular).monospaced())
+                    .font(AgaraFont.face(14, .regular).monospacedDigit())
                     .foregroundStyle(PulseColors.textPrimary)
                     .padding(.horizontal, 14).padding(.vertical, 10)
                     .pulseGlass(Capsule())
@@ -390,9 +390,9 @@ struct CoachSettingsSection: View {
                 }
 
                 if let error {
-                    Text(error).font(.caption).foregroundStyle(PulseColors.danger)
+                    Text(error).font(PulseFont.caption).foregroundStyle(PulseColors.danger)
                 } else {
-                    Text(hint).font(.caption).foregroundStyle(PulseColors.textMuted)
+                    Text(hint).font(PulseFont.caption).foregroundStyle(PulseColors.textMuted)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -423,7 +423,7 @@ struct CoachSettingsSection: View {
                     .font(PulseFont.caption.weight(.regular))
                     .foregroundStyle(PulseColors.textSecondary)
                 Text("On-device coaching gives summaries, check-ins and chat. Charts, AI actions and web search need a cloud provider.")
-                    .font(.caption)
+                    .font(PulseFont.caption)
                     .foregroundStyle(PulseColors.textMuted)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -460,13 +460,13 @@ struct CoachSettingsSection: View {
                 TextField("vendor/model-slug", text: modelBinding)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
-                    .font(PulseFont.subheadline.weight(.regular).monospaced())
+                    .font(AgaraFont.face(14, .regular).monospacedDigit())
                     .foregroundStyle(PulseColors.textPrimary)
                     .padding(.horizontal, 14).padding(.vertical, 10)
                     .pulseGlass(Capsule())
 
                 Text("Any model slug from openrouter.ai/models — e.g. anthropic/claude-sonnet-4.6.")
-                    .font(.caption).foregroundStyle(PulseColors.textMuted)
+                    .font(PulseFont.caption).foregroundStyle(PulseColors.textMuted)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }

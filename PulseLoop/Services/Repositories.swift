@@ -174,16 +174,30 @@ enum MeasurementRepository {
 }
 
 enum SleepRepository {
+    /// The sessions the app shows, sorted by date: per waking day, the paired ring's night when it has one
+    /// (`SleepSourcePolicy`, decision D2). Other sources' sessions stay stored — see `allSessions`.
     @MainActor
     static func sessions(context: ModelContext) -> [SleepSession] {
+        SleepSourcePolicy.visible(allSessions(context: context), pairedSource: pairedSleepSource(context: context))
+    }
+
+    /// Every stored session, whatever its source, sorted by date.
+    @MainActor
+    static func allSessions(context: ModelContext) -> [SleepSession] {
         let descriptor = FetchDescriptor<SleepSession>(sortBy: [SortDescriptor(\.date)])
         return (try? context.fetch(descriptor)) ?? []
     }
-    
+
+    /// The paired ring's sleep source: its peripheral UUID (nil when none is paired, or on the emulator's
+    /// socket transport, which never sets one — `SleepSourcePolicy` then shows the day's largest source).
+    @MainActor
+    static func pairedSleepSource(context: ModelContext) -> String? {
+        DeviceRepository.current(context: context)?.peripheralIdentifier
+    }
+
     @MainActor
     static func latestSession(context: ModelContext) -> SleepSession? {
-        let descriptor = FetchDescriptor<SleepSession>(sortBy: [SortDescriptor(\.startAt, order: .reverse)])
-        return (try? context.fetch(descriptor))?.first
+        sessions(context: context).max { $0.startAt < $1.startAt }
     }
     
     @MainActor

@@ -35,7 +35,7 @@ final class DiagnosticsSubscriber {
         switch event {
         case let .deviceStateChanged(state, _):
             log(.connection, .info, "Connection state: \(state.rawValue)")
-        case let .deviceIdentified(deviceType, wearableModelID, _, capabilities):
+        case let .deviceIdentified(deviceType, wearableModelID, _, capabilities, _):
             activeDeviceType = deviceType
             let displayName = WearableModel.model(id: wearableModelID)?.displayName ?? deviceType.displayName
             log(.connection, .info, "Identified \(displayName)",

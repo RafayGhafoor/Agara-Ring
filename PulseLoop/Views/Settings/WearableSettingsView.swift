@@ -8,6 +8,25 @@ struct WearableSettingsView: View {
     @Environment(RingSyncCoordinator.self) private var coordinator
     @Query private var devices: [Device]
     @Binding var path: NavigationPath
+    @State private var features = AgaraFeatureStore.shared
+    @State private var showsRename = false
+    @State private var firmwareChecker = FirmwareUpdateChecker.shared
+
+    /// The firmware-update lookup key, from the ring's persisted `a1` identity (nil until a connect saw it).
+    private var firmwareIdentity: FirmwareIdentity? {
+        guard let device = devices.first, let number = device.deviceNumber,
+              let version = device.firmwareVersion, let test = device.firmwareTestVersion else { return nil }
+        return FirmwareIdentity(deviceNumber: number, version: version, testVersion: test)
+    }
+
+    private var charging: Bool { features.isOn(.chargingState) && ble.isCharging }
+
+    /// Find ring is offered when the flag is on and the ring says it can (or hasn't said yet).
+    private var canFindRing: Bool {
+        guard features.isOn(.findRing) else { return false }
+        if features.isOn(.capabilityProbe), let caps = devices.first?.ringCapabilities { return caps.findDevice }
+        return true
+    }
 
     /// the ring reports battery in-band (not via a GATT characteristic), so it lands on the persisted
     /// `Device` rather than `ble.batteryPercent`. Mirror the header's fallback so this never shows "--"
@@ -20,6 +39,30 @@ struct WearableSettingsView: View {
             ?? ble.activeDeviceType?.displayName
             ?? devices.first?.deviceType.displayName
             ?? "Connected ring"
+    }
+
+    /// The ring's name as the user sees it everywhere: its nickname, else the model name.
+    private var ringName: String {
+        RingNickname.displayName(nickname: devices.first?.nickname, modelName: wearableDisplayName)
+    }
+
+    /// "Name · <name> · Rename" — opens the same editor as the pairing "Name your ring" step.
+    private var nameRow: some View {
+        FormValueRow(title: "Name") {
+            HStack(spacing: 10) {
+                Text(ringName)
+                    .foregroundStyle(PulseColors.textMuted)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Button("Rename") { showsRename = true }
+                    .font(PulseFont.body.weight(.semibold))
+                    .foregroundStyle(PulseColors.accent)
+                    .buttonStyle(.plain)
+                    .frame(minHeight: 44)
+                    .accessibilityLabel("Rename ring")
+                    .accessibilityValue(ringName)
+            }
+        }
     }
 
     /// Binding into the shared live-streaming preference (default on).
@@ -46,9 +89,44 @@ struct WearableSettingsView: View {
             VStack(alignment: .leading, spacing: 22) {
                 if ble.state == .connected {
                     SettingsGroup(header: "Connected ring") {
+                        nameRow
                         FormValueRow(title: "Device") { Text(wearableDisplayName).foregroundStyle(PulseColors.textMuted) }
-                        FormValueRow(title: "Battery") { Text(batteryPercent.map { "\($0)%" } ?? "--").foregroundStyle(PulseColors.textMuted) }
+                        FormValueRow(title: "Battery") {
+                            if charging {
+                                HStack(spacing: 6) {
+                                    RingBatteryGlyph(percent: batteryPercent, dotColor: nil, size: 22, charging: true)
+                                        .accessibilityHidden(true)
+                                    Text(ChargeEstimator.statusLine(percent: batteryPercent, estimate: ble.chargeEstimate))
+                                        .foregroundStyle(PulseColors.success)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.75)
+                                    if case .fullIn? = ble.chargeEstimate {
+                                        HelpTip(AgaraHelp.chargingEstimate)
+                                    }
+                                }
+                                .accessibilityElement(children: .combine)
+                            } else {
+                                Text(batteryPercent.map { "\($0)%" } ?? "--").foregroundStyle(PulseColors.textMuted)
+                            }
+                        }
+                        if features.isOn(.firmwareCheck), let firmware = devices.first?.firmwareVersion, !firmware.isEmpty {
+                            FirmwareRow(installed: firmware, identity: firmwareIdentity, checker: firmwareChecker)
+                        } else if features.isOn(.capabilityProbe), let firmware = devices.first?.firmwareVersion, !firmware.isEmpty {
+                            FormValueRow(title: "Firmware") { Text(firmware).foregroundStyle(PulseColors.textMuted) }
+                        }
                         FormValueRow(title: "Last synced") { Text(lastSyncedLabel).foregroundStyle(PulseColors.textMuted) }
+                    }
+                    if features.isOn(.autoMeasureSettings), let schedule = devices.first?.autoMeasureSchedule, !schedule.isEmpty {
+                        SettingsGroup(
+                            header: "Automatic measurements",
+                            footer: "How often the ring measures on its own. Read from the ring — editing comes later."
+                        ) {
+                            ForEach(schedule) { entry in
+                                FormValueRow(title: entry.title) {
+                                    Text(entry.summary).foregroundStyle(PulseColors.textMuted)
+                                }
+                            }
+                        }
                     }
                     BatteryHistorySection()
                     // Veepoo/TK20: continuous HR streaming is optional (battery). Other families have
@@ -61,12 +139,25 @@ struct WearableSettingsView: View {
                             FormToggleRow(title: "Live heart rate", isOn: liveHeartRateBinding)
                         }
                     }
-                    SecondaryButton(title: "Sync now", systemImage: "clock.arrow.circlepath") { coordinator.syncNow() }
-                    SecondaryButton(title: "Find ring", systemImage: "bell.fill") { coordinator.findRing() }
-                    SecondaryButton(title: "Disconnect", systemImage: "xmark.circle") { ble.disconnect() }
-                    SecondaryButton(title: "Forget ring", systemImage: "trash") { ble.forget() }
+                    HStack(spacing: 10) {
+                        SecondaryButton(title: "Sync now", systemImage: "arrow.triangle.2.circlepath") { coordinator.syncNow() }
+                        if canFindRing {
+                            // The ring vibrates for up to 10 s; tap again to stop it sooner.
+                            if coordinator.isFindingRing {
+                                SecondaryButton(title: "Stop", systemImage: "stop.fill") { coordinator.stopFindingRing() }
+                            } else {
+                                SecondaryButton(title: "Find ring", systemImage: "bell.fill") { coordinator.findRing() }
+                                    .accessibilityHint(AgaraHelp.findRing)
+                                    .help(AgaraHelp.findRing)
+                            }
+                        }
+                    }
+                    SecondaryButton(title: "Disconnect", systemImage: "xmark") { ble.disconnect() }
+                    // Forget unbinds the ring: the one destructive action here (Android matches).
+                    DestructiveButton(title: "Forget ring", systemImage: "trash") { ble.forget() }
                 } else {
                     SettingsGroup(header: "No ring connected") {
+                        if ble.hasLastKnownRing && devices.first != nil { nameRow }
                         FormValueRow(title: "Status") { Text(ble.state.rawValue.capitalized).foregroundStyle(PulseColors.textMuted) }
                     }
                     PrimaryButton(title: "Add a ring", systemImage: "plus.circle") {
@@ -74,7 +165,7 @@ struct WearableSettingsView: View {
                     }
                     if ble.hasLastKnownRing && ble.state != .reconnecting {
                         SecondaryButton(title: "Reconnect last ring", systemImage: "arrow.clockwise") { ble.connectLastKnown() }
-                        SecondaryButton(title: "Forget ring", systemImage: "trash") { ble.forget() }
+                        DestructiveButton(title: "Forget ring", systemImage: "trash") { ble.forget() }
                     }
                 }
             }
@@ -82,6 +173,12 @@ struct WearableSettingsView: View {
         }
         .background(PulseColors.background)
         .pageChrome("Wearable")
+        .sheet(isPresented: $showsRename) {
+            RenameRingSheet(
+                initialText: RingNickname.prefill(identifier: ble.deviceIdentifier, row: devices.first),
+                peripheralIdentifier: ble.deviceIdentifier
+            )
+        }
     }
 }
 
@@ -101,7 +198,7 @@ private struct BatteryHistorySection: View {
     private func rangeLabel(_ r: MetricRange) -> String { r == .twentyFourHours ? "24h" : "7d" }
 
     private func color(for percent: Double) -> Color {
-        percent <= 20 ? PulseColors.danger : (percent <= 50 ? PulseColors.warning : PulseColors.success)
+        BatteryTier(percent: Int(percent.rounded())).color
     }
 
     var body: some View {
@@ -126,7 +223,7 @@ private struct BatteryHistorySection: View {
                     )
                 } else {
                     Text("Not enough data yet — battery history builds up as your ring reports its level.")
-                        .font(.system(size: 13))
+                        .font(AgaraFont.face(13))
                         .foregroundStyle(PulseColors.textMuted)
                         .frame(maxWidth: .infinity, minHeight: 120, alignment: .center)
                         .multilineTextAlignment(.center)

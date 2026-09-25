@@ -22,8 +22,23 @@ enum MetricKind: String, CaseIterable, Hashable, Identifiable {
     case fatigue
     case glucose
     case temperature
+    // Agara ring DF history series (measure-hub spec §5) — cards behind feature flags. The five blood
+    // components share one Vitals card; each has its own detail screen.
+    case respiration
+    case met
+    case cardiacLoad
+    case totalCholesterol
+    case triglycerides
+    case hdl
+    case ldl
+    case uricAcid
 
     var id: String { rawValue }
+
+    /// The five blood-component estimates, in card order.
+    static let bloodComponents: [MetricKind] = [.totalCholesterol, .triglycerides, .hdl, .ldl, .uricAcid]
+
+    var isBloodComponent: Bool { Self.bloodComponents.contains(self) }
 
     // `metricKey` (the storage-key mapping) lives in Services/VitalsModelBridge.swift so this file
     // stays free of storage types and can be shared with the widget extension.
@@ -38,6 +53,14 @@ enum MetricKind: String, CaseIterable, Hashable, Identifiable {
         case .fatigue: return "Fatigue"
         case .glucose: return "Blood sugar"
         case .temperature: return "Skin temperature"
+        case .respiration: return "Respiration"
+        case .met: return "MET"
+        case .cardiacLoad: return "Cardiac load"
+        case .totalCholesterol: return "Total cholesterol"
+        case .triglycerides: return "Triglycerides"
+        case .hdl: return "HDL"
+        case .ldl: return "LDL"
+        case .uricAcid: return "Uric acid"
         }
     }
 
@@ -51,6 +74,11 @@ enum MetricKind: String, CaseIterable, Hashable, Identifiable {
         case .stress, .fatigue: return ""
         case .glucose: return "mg/dL"
         case .temperature: return "°C"
+        case .respiration: return "br/min"
+        case .met: return "MET"
+        case .cardiacLoad: return ""
+        case .totalCholesterol, .triglycerides, .hdl, .ldl: return "mmol/L"
+        case .uricAcid: return "µmol/L"
         }
     }
 
@@ -143,6 +171,10 @@ extension MetricKind {
         case .fatigue: return PulseColors.fatigue
         case .glucose: return PulseColors.bloodSugar
         case .temperature: return PulseColors.temperature
+        case .respiration: return PulseColors.respiration
+        case .met: return PulseColors.met
+        case .cardiacLoad: return PulseColors.cardiacLoad
+        case .totalCholesterol, .triglycerides, .hdl, .ldl, .uricAcid: return PulseColors.bloodComponents
         }
     }
 }

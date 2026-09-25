@@ -7,6 +7,10 @@ import Foundation
 @MainActor
 protocol RingCommandWriter: AnyObject {
     var deviceIdentifier: String? { get }
+    /// Which link delivered the data now arriving — stamped on sleep records so the store can tell one
+    /// source's revisions from another source's night. The peripheral UUID on BLE; the debug socket
+    /// transport reports `SleepSource.virtualTransport`. Defaults to `deviceIdentifier`.
+    var connectionSource: String? { get }
     func enqueue(_ command: Data)
     /// Completes when the GATT write is acknowledged (or accepted by the without-response buffer).
     func enqueueTracked(_ command: Data, completion: @escaping @MainActor (Result<Void, Error>) -> Void)
@@ -16,6 +20,7 @@ protocol RingCommandWriter: AnyObject {
 
 extension RingCommandWriter {
     var deviceIdentifier: String? { nil }
+    var connectionSource: String? { deviceIdentifier }
     func enqueueTracked(_ command: Data, completion: @escaping @MainActor (Result<Void, Error>) -> Void) {
         enqueue(command)
         completion(.success(()))
@@ -151,10 +156,16 @@ struct UserProfileValues: Sendable, Equatable {
     var age: UInt8
     var heightCm: UInt8
     var weightKg: UInt8
+    /// Daily step goal and sleep goal (minutes) — carried by the Agara ring's `a3` profile frame.
+    var stepGoal: Int = 8000
+    var sleepGoalMinutes: Int = 480
 
     /// Build from stored profile fields, clamping to byte ranges with neutral fallbacks.
-    init(metric: Bool, sex: String?, age: Int?, heightCm: Double?, weightKg: Double?) {
+    init(metric: Bool, sex: String?, age: Int?, heightCm: Double?, weightKg: Double?,
+         stepGoal: Int = 8000, sleepGoalMinutes: Int = 480) {
         self.metric = metric
+        self.stepGoal = stepGoal
+        self.sleepGoalMinutes = sleepGoalMinutes
         switch sex?.lowercased() {
         case "female": gender = 0x00
         case "male": gender = 0x01
@@ -210,7 +221,18 @@ protocol RingSyncEngine: AnyObject {
     func startHRV()
     func stopHRV()
     func findDevice()
+    /// Stop a running find-device vibration. Default no-op.
+    func stopFindDevice()
     func setGoal(steps: Int)
+
+    // On-demand spot tests beyond HR/SpO₂/BP (stress, glucose, blood components). Default no-ops; the
+    // Agara engine runs them like SpO₂/BP (`startSpotTest`), so the poll tick stays silent.
+    func startStress()
+    func stopStress()
+    func startGlucose()
+    func stopGlucose()
+    func startBloodComponents()
+    func stopBloodComponents()
 
     /// Store the user's all-day measurement configuration *without* sending anything — used just before
     /// `runStartup`, which emits the relevant commands as part of the connect handshake (so we don't
@@ -260,9 +282,31 @@ protocol RingSyncEngine: AnyObject {
     /// firmware keys behaviour off their own RTC need this (the ring's sleep detection and day-indexed
     /// history do). Default no-op.
     func resyncTime()
+
+    /// A per-day history pass is in flight — a firmware install waits for it. Default false.
+    var isHistorySyncing: Bool { get }
+
+    /// A firmware install is about to start (`FirmwareUpdateHold` is already set): stop anything this
+    /// engine keeps running on its own (the live stream). Default no-op.
+    func enterFirmwareHold()
+
+    /// The install ended (`FirmwareUpdateHold` cleared): run whatever the hold deferred. Default no-op.
+    func resumeAfterFirmwareHold()
+}
+
+/// Set while a firmware install owns the ring (plan firmware-update, stage 4): sync engines send nothing of
+/// their own — no poll tick, no history pass, no live stream — exactly like the silence a spot test gets, so
+/// nothing interleaves with the update frames. Process-wide because a reconnect mid-install (or the virtual
+/// link's fresh driver) must come up quiet too. Same as Android `FirmwareUpdateHold`.
+enum FirmwareUpdateHold {
+    static var active = false
 }
 
 extension RingSyncEngine {
+    var isHistorySyncing: Bool { false }
+    func enterFirmwareHold() {}
+    func resumeAfterFirmwareHold() {}
+
     /// Stateless engines have no per-link lifecycle work.
     func connectionDidStart() {}
     func connectionDidEnd() {}
@@ -309,4 +353,12 @@ extension RingSyncEngine {
 
     /// Default: devices that report battery over GATT (e.g. the ring) have no in-band battery command.
     func requestBattery() {}
+
+    func stopFindDevice() {}
+    func startStress() {}
+    func stopStress() {}
+    func startGlucose() {}
+    func stopGlucose() {}
+    func startBloodComponents() {}
+    func stopBloodComponents() {}
 }

@@ -233,13 +233,14 @@ enum SleepInsights {
         return Int((Double(total) / Double(valid.count)).rounded())
     }
 
-    static func averageStages(_ valid: [SleepSummary]) -> (deep: Int, light: Int, awake: Int)? {
+    static func averageStages(_ valid: [SleepSummary]) -> (deep: Int, light: Int, rem: Int, awake: Int)? {
         let valid = collapseByDay(valid)
         guard !valid.isEmpty else { return nil }
         let deep = valid.reduce(0) { $0 + $1.deepMinutes } / valid.count
         let light = valid.reduce(0) { $0 + $1.lightMinutes } / valid.count
+        let rem = valid.reduce(0) { $0 + $1.remMinutes } / valid.count
         let awake = valid.reduce(0) { $0 + $1.awakeMinutes } / valid.count
-        return (deep, light, awake)
+        return (deep, light, rem, awake)
     }
 
     /// Population standard deviation of nightly durations (minutes).

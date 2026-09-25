@@ -31,12 +31,14 @@ struct VitalCard<Content: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, compact ? 16 : 22)
             .padding(.vertical, compact ? 16 : 20)
-            .pulseGlass(RoundedRectangle(cornerRadius: compact ? 24 : 30, style: .continuous))
+            .pulseGlass(RoundedRectangle(cornerRadius: PulseRadius.card, style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(onTap == nil)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityText)
+        // The header ⓘ is merged into this element, so VoiceOver gets its sentence as the hint.
+        .accessibilityHint(model.metric.helpText ?? "")
         .accessibilityAddTraits(onTap == nil ? [] : .isButton)
     }
 
@@ -51,6 +53,9 @@ struct VitalCard<Content: View>: View {
             Text(model.title.uppercased())
                 .font(PulseFont.caption2).tracking(1.0)
                 .foregroundStyle(PulseColors.textMuted)
+            if let help = model.metric.helpText, !compact {
+                HelpTip(help, size: 11)
+            }
             Spacer(minLength: 4)
             // "Updated …" lives top-right so it doesn't add a footer row and grow the card height.
             // Suppressed when the ESTIMATED chip is present so the two don't crowd the header.
@@ -81,7 +86,7 @@ struct VitalCard<Content: View>: View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(model.valueText)
-                    .font(.system(size: valueFontSize, weight: .semibold, design: .rounded))
+                    .font(AgaraFont.face(valueFontSize, .semibold).monospacedDigit())
                     .monospacedDigit()
                     .foregroundStyle(PulseColors.textPrimary)
                     .contentTransition(.numericText())

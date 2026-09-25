@@ -11,6 +11,7 @@ enum AppRoute: Hashable {
     case settings
     // Settings detail screens (the top-level `settings` route is the category list).
     case settingsProfile
+    case settingsAppearance
     case settingsPhysiology
     case settingsNotifications
     case settingsCoach
@@ -57,67 +58,104 @@ enum MainTab: String, CaseIterable, Identifiable {
     }
 }
 
-/// Values come from the shared palette catalog (`docs/config/palette.yaml` → `AgaraPalette`), the
-/// same source Android reads — this file is compiled into the app *and* the widgets extension, and the
-/// generated token file is a member of both targets, so neither has a hand-mirrored copy any more.
+/// The theme in effect. Themes are defined in `docs/config/palette.yaml` and generated into `AgaraTheme.all`;
+/// nothing here lists them. Observable: `AppearanceStore` (Settings › Appearance, the system light/dark setting,
+/// the profile default) sets it and every view that read a `PulseColors` role in its body re-renders; the root
+/// additionally re-identifies its content on a change so cached colours are rebuilt too. Debug builds can pin a
+/// theme with `-theme <name>`. The widget and Live Activity extensions never change it (they stay `.dark`).
+@Observable
+nonisolated final class ThemeStore {
+    nonisolated(unsafe) static let shared = ThemeStore()
+
+    var theme: AgaraTheme = .dark
+
+    /// Shorthand for `shared.theme` — what `PulseColors` and the extensions read.
+    static var current: AgaraTheme {
+        get { shared.theme }
+        set { if shared.theme.name != newValue.name { shared.theme = newValue } }
+    }
+
+    /// Select a theme by catalog name; unknown names are ignored (the current theme stays).
+    static func select(_ name: String?) {
+        guard let name, let theme = AgaraTheme.named(name) else { return }
+        current = theme
+    }
+}
+
+/// Colour roles for the current theme — the only way screens get a colour. Values come from the shared
+/// palette catalog (`docs/config/palette.yaml` → `AgaraTheme`), the same source Android reads. This file is
+/// compiled into the app *and* the widgets extension, and the generated file is a member of both targets.
 enum PulseColors {
-    static let background = Color(hex: AgaraPalette.background)
-    static let secondaryBackground = Color(hex: AgaraPalette.secondaryBackground)
-    static let card = Color(hex: AgaraPalette.card)
-    static let cardSoft = Color(hex: AgaraPalette.cardSoft)
-    static let elevated = Color(hex: AgaraPalette.elevated)
-    static let textPrimary = Color(hex: AgaraPalette.textPrimary)
-    static let textSecondary = Color(hex: AgaraPalette.textSecondary)
-    static let textMuted = Color(hex: AgaraPalette.textMuted)
-    static let accent = Color(hex: AgaraPalette.accent)
-    static let accentSoft = Color(hex: AgaraPalette.accent).opacity(0.20)
-    static let success = Color(hex: "#35E0A1")
-    static let warning = Color(hex: "#FFB86B")
-    static let danger = Color(hex: "#FF4D6D")
-    static let info = Color(hex: "#4DDCFF")
-    static let steps = Color(hex: "#35E0A1")
-    static let heartRate = Color(hex: "#FF4D6D")
-    static let spo2 = Color(hex: "#4DDCFF")
-    static let sleep = Color(hex: "#8B7CFF")
-    static let calories = Color(hex: "#FF8A4C")
-    static let distance = Color(hex: "#4DA3FF")
-    static let readiness = Color(hex: "#D6FF65")
-    static let battery = Color(hex: "#A7F3D0")
-    // an earlier ring metrics
-    static let stress = Color(hex: AgaraPalette.stress)
-    static let hrv = Color(hex: "#9D7CFF")
-    static let temperature = Color(hex: "#2DD4D8")
-    // Nutrition macros (intake energy reuses `calories`). Hues picked to be CVD-separable from
-    // each other and from the kcal orange in macro bars/pills.
-    static let macroProtein = Color(hex: "#4DA3FF")   // blue
-    static let macroCarbs = Color(hex: "#35E0A1")     // mint
-    static let macroFat = Color(hex: "#FFD166")       // gold
-    // an earlier protocol metrics
-    static let bloodPressure = Color(hex: "#FF6B9D")
-    static let bloodSugar = Color(hex: AgaraPalette.bloodSugar)
-    static let fatigue = Color(hex: "#C77DFF")
-    // Vitals reference-zone palette. These are the ONLY colors a zone may use, so the chart line,
-    // reference band, gauge arc, stat dot, and status label are always identical for the same zone.
-    static let zoneBlue = Color(hex: "#4DA3FF")     // low / cool
-    static let zoneMint = Color(hex: "#35E0A1")     // optimal / typical
-    static let zoneCyan = Color(hex: "#4DDCFF")     // normal (SpO₂/stress)
-    static let zoneAmber = Color(hex: "#FFB86B")    // caution
-    static let zoneSoftAmber = Color(hex: "#FFD9A0") // slight caution (distinct from amber)
-    static let zoneOrange = Color(hex: "#FF8A4C")   // elevated / low-oxygen / stage 1
-    static let zoneRed = Color(hex: "#FF4D6D")      // high / critical
-    static let zoneCritical = Color(hex: "#FF1744") // no longer used by HR (too close to the HR accent); kept for snapshot decode compat
-    static let zoneDeepRed = Color(hex: "#B3261E")  // HR high — dark red, CVD-safe separation from the pink-red HR accent
-    static let borderSubtle = Color.white.opacity(0.10)   // dark ground: hairlines are light again
-    static let borderStrong = Color.white.opacity(0.16)
+    private static var t: AgaraTheme { ThemeStore.current }
+
+    // Surfaces
+    static var background: Color { t.background }
+    static var secondaryBackground: Color { t.secondaryBackground }
+    static var card: Color { t.card }
+    static var cardSoft: Color { t.cardSoft }
+    static var elevated: Color { t.elevated }
+    static var borderSubtle: Color { t.borderSubtle }
+    static var borderStrong: Color { t.borderStrong }
+    // Text
+    static var textPrimary: Color { t.textPrimary }
+    static var textSecondary: Color { t.textSecondary }
+    static var textMuted: Color { t.textMuted }
+    // Brand / interactive
+    static var accent: Color { t.accent }
+    static var onAccent: Color { t.onAccent }
+    static var accentSoft: Color { t.accentSoft }
+    // Status
+    static var success: Color { t.success }
+    static var warning: Color { t.warning }
+    static var danger: Color { t.danger }
+    static var info: Color { t.info }
+    // Metric series
+    static var steps: Color { t.steps }
+    static var heartRate: Color { t.heartRate }
+    static var spo2: Color { t.spo2 }
+    static var sleep: Color { t.sleep }
+    static var calories: Color { t.calories }
+    static var distance: Color { t.distance }
+    static var readiness: Color { t.readiness }
+    static var battery: Color { t.battery }
+    static var stress: Color { t.stress }
+    static var hrv: Color { t.hrv }
+    static var temperature: Color { t.temperature }
+    static var macroProtein: Color { t.macroProtein }
+    static var macroCarbs: Color { t.macroCarbs }
+    static var macroFat: Color { t.macroFat }
+    static var bloodPressure: Color { t.bloodPressure }
+    static var bloodSugar: Color { t.bloodSugar }
+    static var fatigue: Color { t.fatigue }
+    static var respiration: Color { t.respiration }
+    static var met: Color { t.met }
+    static var cardiacLoad: Color { t.cardiacLoad }
+    static var bloodComponents: Color { t.bloodComponents }
+    // Vitals reference zones. These are the ONLY colors a zone may use, so the chart line, reference band,
+    // gauge arc, stat dot, and status label are always identical for the same zone.
+    static var zoneBlue: Color { t.zoneBlue }
+    static var zoneMint: Color { t.zoneMint }
+    static var zoneCyan: Color { t.zoneCyan }
+    static var zoneAmber: Color { t.zoneAmber }
+    static var zoneSoftAmber: Color { t.zoneSoftAmber }
+    static var zoneOrange: Color { t.zoneOrange }
+    static var zoneRed: Color { t.zoneRed }
+    static var zoneCritical: Color { t.zoneCritical }
+    static var zoneDeepRed: Color { t.zoneDeepRed }
+    // Sleep stages
+    static var stageDeep: Color { t.stageDeep }
+    static var stageLight: Color { t.stageLight }
+    static var stageRem: Color { t.stageRem }
+    static var stageAwake: Color { t.stageAwake }
 }
 
 /// Corner-radius tokens so peer glass surfaces share one radius instead of the
 /// ad-hoc 16/18/20/22/24 mix. `card` for standard glass cards, `compact` for
 /// smaller/inset surfaces, `control` for buttons and small controls.
 enum PulseRadius {
-    static let card: CGFloat = 20
-    static let compact: CGFloat = 16
-    static let control: CGFloat = 12
+    static let card: CGFloat = AgaraShape.radiusCard
+    static let compact: CGFloat = AgaraShape.radiusCompact
+    static let control: CGFloat = AgaraShape.radiusControl
 }
 
 extension Color {
@@ -274,6 +312,27 @@ struct PrimaryButton: View {
                     .clipShape(Capsule())
             }
         }
+    }
+}
+
+/// An action that ends or removes something (Disconnect, Forget, Discard): danger text on a faint danger
+/// tint, capsule like its siblings. Same role as Android's `DestructiveButton`.
+struct DestructiveButton: View {
+    let title: String
+    var systemImage: String?
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage ?? "xmark.circle")
+                .font(PulseFont.callout.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .frame(height: AgaraShape.buttonHeight)
+                .foregroundStyle(PulseColors.danger)
+                .background(PulseColors.danger.opacity(0.12), in: Capsule())
+                .overlay { Capsule().stroke(PulseColors.danger.opacity(0.28), lineWidth: 1) }
+        }
+        .buttonStyle(.plain)
     }
 }
 

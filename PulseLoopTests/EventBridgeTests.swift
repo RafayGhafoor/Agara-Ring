@@ -88,6 +88,8 @@ final class EventBridgeTests: XCTestCase {
             .heartRate: 70, .spo2: 97, .stress: 40, .hrv: 55, .temperature: 36.6,
             .bloodPressureSystolic: 118, .bloodPressureDiastolic: 79, .fatigue: 20,
             .bloodSugar: 99, .respiratoryRate: 14, .vo2max: 42,
+            .met: 1.0, .cardiacLoad: 30, .totalCholesterol: 4.29, .triglycerides: 1.45, .hdl: 0.97,
+            .ldl: 2.46, .uricAcid: 223.3,
         ]
         let now = Date()
         for kind in MeasurementKind.allCases {

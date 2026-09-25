@@ -61,13 +61,13 @@ struct LocalServerSettingsSection: View {
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .keyboardType(.URL)
-                        .font(PulseFont.subheadline.weight(.regular).monospaced())
+                        .font(AgaraFont.face(14, .regular).monospacedDigit())
                         .foregroundStyle(PulseColors.textPrimary)
                         .padding(.horizontal, 14).padding(.vertical, 10)
                         .pulseGlass(Capsule())
 
                     Text(localURLProblem.map(LocalEndpoint.message) ?? Self.addressHint)
-                        .font(.caption)
+                        .font(PulseFont.caption)
                         .foregroundStyle(localURLProblem == nil ? PulseColors.textMuted : PulseColors.danger)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -88,15 +88,15 @@ struct LocalServerSettingsSection: View {
 
                     if localProbeBusy {
                         Text("Sending three tiny test messages. This can take a minute if the model still has to load.")
-                            .font(.caption).foregroundStyle(PulseColors.textMuted)
+                            .font(PulseFont.caption).foregroundStyle(PulseColors.textMuted)
                     }
                     if let localProbeResult {
                         Text(localProbeResult)
-                            .font(.caption)
+                            .font(PulseFont.caption)
                             .foregroundStyle(localProbeOK ? PulseColors.textSecondary : PulseColors.danger)
                     }
                     ForEach(localProbeNotes, id: \.self) { note in
-                        Text(note).font(.caption2).foregroundStyle(PulseColors.textMuted)
+                        Text(note).font(PulseFont.caption2).foregroundStyle(PulseColors.textMuted)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -119,13 +119,13 @@ struct LocalServerSettingsSection: View {
                     TextField("model name", text: localModelBinding)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
-                        .font(PulseFont.subheadline.weight(.regular).monospaced())
+                        .font(AgaraFont.face(14, .regular).monospacedDigit())
                         .foregroundStyle(PulseColors.textPrimary)
                         .padding(.horizontal, 14).padding(.vertical, 10)
                         .pulseGlass(Capsule())
 
                     Text("llama.cpp ignores this unless started with --alias; every other engine needs it to match.")
-                        .font(.caption).foregroundStyle(PulseColors.textMuted)
+                        .font(PulseFont.caption).foregroundStyle(PulseColors.textMuted)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -159,10 +159,10 @@ struct LocalServerSettingsSection: View {
         title: String, placeholder: String, binding: Binding<String>
     ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(title).font(.caption).foregroundStyle(PulseColors.textMuted)
+            Text(title).font(PulseFont.caption).foregroundStyle(PulseColors.textMuted)
             TextField(placeholder, text: binding)
                 .keyboardType(.numberPad)
-                .font(PulseFont.subheadline.weight(.regular).monospaced())
+                .font(AgaraFont.face(14, .regular).monospacedDigit())
                 .foregroundStyle(PulseColors.textPrimary)
                 .padding(.horizontal, 14).padding(.vertical, 10)
                 .pulseGlass(Capsule())

@@ -15,24 +15,25 @@ struct WorkoutLiveActivityWidget: Widget {
             // Lock Screen / banner. Kept deliberately simple + high-contrast (white on black)
             // to guarantee it renders in the Live Activity environment.
             WorkoutLockScreenView(context: context)
+                .font(AgaraFont.body)
                 .widgetURL(URL(string: "pulseloop://workout/\(context.attributes.sessionID)"))
         } dynamicIsland: { context in
             let state = context.state
             return DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
                     Label(context.attributes.activityName, systemImage: WorkoutLAColors.icon(for: state.activityType))
-                        .font(.caption).fontWeight(.semibold)
+                        .font(AgaraFont.caption).fontWeight(.semibold)
                         .foregroundStyle(.white)
                         .lineLimit(1)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     Text(state.lastHeartRate.map { "\($0) bpm" } ?? "—")
-                        .font(.caption).monospacedDigit()
+                        .font(AgaraFont.caption).monospacedDigit()
                         .foregroundStyle(.pink)
                 }
                 DynamicIslandExpandedRegion(.center) {
                     elapsedTimer(state)
-                        .font(.system(size: 26, weight: .semibold, design: .rounded))
+                        .font(AgaraFont.face(26, .semibold).monospacedDigit())
                         .monospacedDigit()
                         .foregroundStyle(.white)
                 }
@@ -61,16 +62,16 @@ struct WorkoutLiveActivityWidget: Widget {
                                 .foregroundStyle(.white)
                         }
                     }
-                    .font(.caption).monospacedDigit()
+                    .font(AgaraFont.caption).monospacedDigit()
                 }
             } compactLeading: {
                 Image(systemName: WorkoutLAColors.icon(for: state.activityType))
                     .foregroundStyle(.purple)
             } compactTrailing: {
                 if let hr = state.lastHeartRate {
-                    Text("\(hr)").font(.caption2).monospacedDigit().foregroundStyle(.white)
+                    Text("\(hr)").font(AgaraFont.caption2).monospacedDigit().foregroundStyle(.white)
                 } else {
-                    elapsedTimer(state).font(.caption2).monospacedDigit().foregroundStyle(.white)
+                    elapsedTimer(state).font(AgaraFont.caption2).monospacedDigit().foregroundStyle(.white)
                 }
             } minimal: {
                 Image(systemName: WorkoutLAColors.icon(for: state.activityType))
@@ -97,15 +98,15 @@ struct WorkoutLockScreenView: View {
                     Image(systemName: isFinished ? "flag.checkered" : WorkoutLAColors.icon(for: state.activityType))
                         .foregroundStyle(isFinished ? .green : .purple)
                     Text(context.attributes.activityName)
-                        .font(.headline)
+                        .font(AgaraFont.headline)
                     if isPaused {
-                        Text("· Paused").font(.subheadline).foregroundStyle(.secondary)
+                        Text("· Paused").font(AgaraFont.subheadline).foregroundStyle(.secondary)
                     } else if isFinished {
-                        Text("· Complete").font(.subheadline).foregroundStyle(.green)
+                        Text("· Complete").font(AgaraFont.subheadline).foregroundStyle(.green)
                     }
                 }
                 elapsedTimer(state)
-                    .font(.system(size: 40, weight: .bold, design: .rounded))
+                    .font(AgaraFont.face(40, .bold).monospacedDigit())
                     .monospacedDigit()
             }
             Spacer()
@@ -131,8 +132,8 @@ struct WorkoutLockScreenView: View {
 
     private func metric(_ title: String, _ value: String, _ color: Color) -> some View {
         HStack(spacing: 6) {
-            Text(title).font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
-            Text(value).font(.subheadline.weight(.semibold)).monospacedDigit().foregroundStyle(color)
+            Text(title).font(AgaraFont.face(10, .semibold)).foregroundStyle(.secondary)
+            Text(value).font(AgaraFont.subheadline.weight(.semibold)).monospacedDigit().foregroundStyle(color)
         }
     }
 }

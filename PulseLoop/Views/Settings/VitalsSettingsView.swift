@@ -62,7 +62,7 @@ struct MetricPrefsSettingsView: View {
                 .pickerStyle(.segmented)
 
                 Text(store.resolution(for: scope).blurb)
-                    .font(.caption)
+                    .font(PulseFont.caption)
                     .foregroundStyle(PulseColors.textMuted)
             }
             .frame(maxWidth: .infinity, alignment: .leading)

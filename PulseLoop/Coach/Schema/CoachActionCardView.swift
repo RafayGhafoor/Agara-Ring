@@ -34,12 +34,12 @@ struct CoachActionCardView: View {
                         // hairline mirrors the Settings icon tile.
                         .background(
                             LinearGradient(
-                                colors: [Color.white.opacity(0.16), Color.white.opacity(0.07)],
+                                colors: [PulseColors.textPrimary.opacity(0.16), PulseColors.textPrimary.opacity(0.07)],
                                 startPoint: .top, endPoint: .bottom
                             ),
                             in: Capsule()
                         )
-                        .overlay(Capsule().strokeBorder(.white.opacity(0.12), lineWidth: 0.5))
+                        .overlay(Capsule().strokeBorder(PulseColors.textPrimary.opacity(0.12), lineWidth: 0.5))
                 }
                 .buttonStyle(.plain)
                 Button(action: onConfirm) {

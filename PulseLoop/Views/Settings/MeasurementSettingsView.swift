@@ -74,10 +74,10 @@ struct MeasurementSettingsView: View {
         PrimaryButton(title: "Save & sync to ring", systemImage: "checkmark") { save() }
 
         if let saveStatus {
-            Text(saveStatus).font(.caption).foregroundStyle(PulseColors.textMuted)
+            Text(saveStatus).font(PulseFont.caption).foregroundStyle(PulseColors.textMuted)
         } else if ble.state != .connected {
             Text("Not connected — changes will apply the next time your ring syncs.")
-                .font(.caption).foregroundStyle(PulseColors.textMuted)
+                .font(PulseFont.caption).foregroundStyle(PulseColors.textMuted)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
@@ -102,7 +102,7 @@ struct MeasurementSettingsView: View {
                 )
                 .tint(PulseColors.accent)
                 Text("More frequent readings give finer trends but use more battery.")
-                    .font(.caption).foregroundStyle(PulseColors.textMuted)
+                    .font(PulseFont.caption).foregroundStyle(PulseColors.textMuted)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }

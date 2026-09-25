@@ -55,7 +55,7 @@ final class AgaraCloudSync {
         }
 
         for (dateString, day) in activityByDay {
-            let sleep = sleepSummary(for: day.date, context: context)
+            let sleep = Self.sleepSummary(for: day.date, context: context)
             let body: [String: Any] = [
                 "user": userID, "date": dateString,
                 "steps": day.steps,
@@ -172,7 +172,8 @@ final class AgaraCloudSync {
                         + [SleepStage](repeating: .awake, count: awake)
                         + [SleepStage](repeating: .unknown, count: other)
                     events.append(.sleepTimeline(
-                        timestamp: Date(timeIntervalSince1970: TimeInterval(start)), stages: stages
+                        timestamp: Date(timeIntervalSince1970: TimeInterval(start)), stages: stages,
+                        source: SleepSource.cloud
                     ))
                 }
             }
@@ -198,11 +199,13 @@ final class AgaraCloudSync {
         }
     }
 
-    /// Aggregate the sleeping-day's stage blocks into the durations the cloud record carries.
-    private func sleepSummary(for day: Date, context: ModelContext) -> (startAt: Date, endAt: Date, deep: Int, light: Int, awake: Int, other: Int, quality: Int)? {
+    /// Aggregate the sleeping-day's stage blocks into the durations the cloud record carries. Only the
+    /// displayed sessions count (the paired ring's night, `SleepSourcePolicy`), and `quality` is the stored
+    /// score — the one the Sleep tab shows (D1). It used to be 0 on iOS because nothing wrote `score`.
+    static func sleepSummary(for day: Date, context: ModelContext) -> (startAt: Date, endAt: Date, deep: Int, light: Int, awake: Int, other: Int, quality: Int)? {
         let calendar = Calendar.current
-        let sessions = (try? context.fetch(FetchDescriptor<SleepSession>()))?
-            .filter { calendar.isDate($0.date, inSameDayAs: day) } ?? []
+        let sessions = SleepRepository.sessions(context: context)
+            .filter { calendar.isDate($0.date, inSameDayAs: day) }
         guard let session = sessions.min(by: { $0.startAt < $1.startAt }) else { return nil }
         let blocks = (try? context.fetch(FetchDescriptor<SleepStageBlock>()))?
             .filter { $0.sessionId == session.id } ?? []

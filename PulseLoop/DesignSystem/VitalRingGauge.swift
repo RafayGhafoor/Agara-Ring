@@ -117,20 +117,20 @@ struct VitalRingGauge: View {
 
             VStack(spacing: 2) {
                 Text(centerValue)
-                    .font(.system(size: size * 0.30, weight: .semibold, design: .rounded))
+                    .font(AgaraFont.face(size * 0.30, .semibold).monospacedDigit())
                     .monospacedDigit()
                     .foregroundStyle(PulseColors.textPrimary)
                     .contentTransition(.numericText())
                 if let centerUnit {
-                    Text(centerUnit).font(.system(size: size * 0.08, weight: .medium)).foregroundStyle(PulseColors.textMuted)
+                    Text(centerUnit).font(AgaraFont.face(size * 0.08, .medium)).foregroundStyle(PulseColors.textMuted)
                 }
                 if let centerStatus {
                     Text(centerStatus.uppercased())
-                        .font(.system(size: size * 0.08, weight: .semibold)).tracking(1.0)
+                        .font(AgaraFont.face(size * 0.08, .semibold)).tracking(1.0)
                         .foregroundStyle(valueColor)
                 }
                 if let subtitle {
-                    Text(subtitle).font(.system(size: size * 0.065)).foregroundStyle(PulseColors.textMuted)
+                    Text(subtitle).font(AgaraFont.face(size * 0.065)).foregroundStyle(PulseColors.textMuted)
                 }
             }
         }

@@ -214,7 +214,7 @@ private struct ReorderDragChip: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: symbol).font(.system(size: 15, weight: .semibold))
-            Text(name).font(.system(size: 14, weight: .semibold)).lineLimit(1)
+            Text(name).font(AgaraFont.face(14, .semibold)).lineLimit(1)
         }
         .foregroundStyle(PulseColors.textPrimary)
         .padding(.horizontal, 14)
@@ -245,7 +245,7 @@ struct HiddenMetricsTray<Item: Hashable>: View {
         if !hidden.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 Text("HIDDEN")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(AgaraFont.face(12, .semibold))
                     .kerning(0.6)
                     .foregroundStyle(PulseColors.textSecondary)
                     .padding(.leading, 4)
@@ -285,7 +285,7 @@ private struct HiddenRow: View {
                     .foregroundStyle(PulseColors.textSecondary)
                     .frame(width: 22)
                 Text(name)
-                    .font(.system(size: 15, weight: .medium))
+                    .font(AgaraFont.face(15, .medium))
                     .foregroundStyle(PulseColors.textPrimary)
                 Spacer(minLength: 8)
                 // A solid disc, not another glass surface: glass inside glass muddies both.
@@ -341,6 +341,7 @@ private struct RemoveBadge: View {
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
+        .help("Hide this card")
     }
 }
 
@@ -354,10 +355,10 @@ struct ReorderDoneBar: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "arrow.up.arrow.down").font(.system(size: 12, weight: .semibold))
-            Text("Drag to reorder").font(.system(size: 14, weight: .semibold))
+            Text("Drag to reorder").font(AgaraFont.face(14, .semibold))
             Spacer(minLength: 12)
             Button(action: done) {
-                Text("Done").font(.system(size: 14, weight: .semibold))
+                Text("Done").font(AgaraFont.face(14, .semibold))
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
             }
@@ -467,6 +468,15 @@ extension MetricKey {
         case .activeMinutes: return "Active minutes"
         case .battery: return "Battery"
         case .nutrition: return "Nutrition"
+        case .respiratoryRate: return MetricKind.respiration.title
+        case .met: return MetricKind.met.title
+        case .cardiacLoad: return MetricKind.cardiacLoad.title
+        case .bloodComponents: return "Blood components"
+        case .totalCholesterol: return MetricKind.totalCholesterol.title
+        case .triglycerides: return MetricKind.triglycerides.title
+        case .hdl: return MetricKind.hdl.title
+        case .ldl: return MetricKind.ldl.title
+        case .uricAcid: return MetricKind.uricAcid.title
         }
     }
 
@@ -488,6 +498,10 @@ extension MetricKey {
         case .activeMinutes: return "figure.run"
         case .battery: return "battery.100"
         case .nutrition: return "fork.knife"
+        case .respiratoryRate: return "wind"
+        case .met: return "flame"
+        case .cardiacLoad: return "heart.circle"
+        case .bloodComponents, .totalCholesterol, .triglycerides, .hdl, .ldl, .uricAcid: return "drop.triangle"
         }
     }
 }

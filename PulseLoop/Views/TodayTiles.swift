@@ -21,6 +21,8 @@ struct TodayTile<Content: View>: View {
     let label: String
     var color: Color
     var onTap: (() -> Void)?
+    /// Shown at the right of the header for tiles whose body is a bare number (a gauge): mg/dL, mmHg.
+    var unit: String? = nil
     @ViewBuilder var content: () -> Content
 
     var body: some View {
@@ -29,11 +31,19 @@ struct TodayTile<Content: View>: View {
                 HStack(spacing: 8) {
                     Circle().fill(color).frame(width: 8, height: 8)
                         .shadow(color: color.opacity(0.7), radius: 5)
-                    Text(label.uppercased())
-                        .font(PulseFont.caption2)
-                        .tracking(0.6)
-                        .foregroundStyle(PulseColors.textMuted)
-                        .lineLimit(1)
+                    // The unit only when the whole name still fits beside it: a truncated "BL…" is
+                    // worse than no unit (large text sizes).
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 4) {
+                            eyebrow
+                            if let unit {
+                                Spacer(minLength: 4)
+                                Text(unit).font(PulseFont.caption2).foregroundStyle(PulseColors.textMuted)
+                                    .lineLimit(1).fixedSize()
+                            }
+                        }
+                        eyebrow
+                    }
                 }
                 content()
             }
@@ -45,6 +55,14 @@ struct TodayTile<Content: View>: View {
         }
         .buttonStyle(.plain)
         .allowsHitTesting(onTap != nil)
+    }
+
+    private var eyebrow: some View {
+        Text(label.uppercased())
+            .font(PulseFont.caption2)
+            .tracking(0.6)
+            .foregroundStyle(PulseColors.textMuted)
+            .lineLimit(1)
     }
 }
 
@@ -339,7 +357,7 @@ struct TodayGaugeTile: View {
     private var gaugeValue: Double { Double(model.valueText) ?? 0 }
 
     var body: some View {
-        TodayTile(label: model.title, color: model.accentColor, onTap: onTap) {
+        TodayTile(label: model.title, color: model.accentColor, onTap: onTap, unit: model.unitText) {
             Spacer(minLength: 0)
             if model.isEmpty {
                 VitalEmptyState(metric: model.metric, compact: true)
@@ -374,7 +392,7 @@ struct TodayBloodPressureTile: View {
     var onTap: () -> Void
 
     var body: some View {
-        TodayTile(label: model.title, color: model.accentColor, onTap: onTap) {
+        TodayTile(label: model.title, color: model.accentColor, onTap: onTap, unit: "mmHg") {
             Spacer(minLength: 0)
             if model.isEmpty || systolic == nil || diastolic == nil {
                 VitalEmptyState(metric: .bloodPressure, compact: true)

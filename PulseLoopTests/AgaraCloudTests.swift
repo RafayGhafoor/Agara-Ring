@@ -128,7 +128,7 @@ final class AgaraCloudTests: XCTestCase {
         XCTAssertEqual(Int(distanceMeters), 8_666)
         XCTAssertEqual(calories, 389.5, accuracy: 0.01)
 
-        guard case let .sleepTimeline(_, stages)? = events.last else {
+        guard case let .sleepTimeline(_, stages, _)? = events.last else {
             return XCTFail("expected a sleep timeline")
         }
         XCTAssertEqual(stages.count, 385)                              // 70 + 250 + 5 + 60

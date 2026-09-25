@@ -74,10 +74,15 @@ struct SpotMeasurementGate {
     }
 
     /// The ring refused `mode`. Honoured only by the in-flight measurement(s) actually running it.
-    mutating func noteRejected(mode: UInt8) {
+    /// Returns whether any in-flight measurement was running it.
+    @discardableResult
+    mutating func noteRejected(mode: UInt8) -> Bool {
+        var matched = false
         for token in inFlight.keys where token.mode == mode {
             inFlight[token] = true
+            matched = true
         }
+        return matched
     }
 
     /// The modes currently mid-poll. Read by tests; the coordinator drives everything through tokens.
@@ -85,14 +90,17 @@ struct SpotMeasurementGate {
 }
 
 /// The mode byte each spot measurement runs under, used only as the gate's key: `SpotMeasurementGate`
-/// matches a ring refusal to the flow that started it. The Agara ring never answers a measurement start
-/// with a verdict, so nothing is refused today — the bytes stay distinct so the gate keeps its identity
-/// guarantee, and a `.measurementRejected` from some future firmware is still honoured.
+/// matches a ring refusal to the flow that started it. The Agara driver maps the ring's status codes
+/// (not worn, busy, low battery, charging) to `.measurementRejected(mode:reason:)` with these bytes. They
+/// are app-side keys, not wire values — they only need to stay distinct.
 enum SpotMode {
     static let heartRate: UInt8 = 0x00
     static let bloodPressure: UInt8 = 0x01
     static let spo2: UInt8 = 0x02
     static let hrv: UInt8 = 0x0a
+    static let glucose: UInt8 = 0x11
+    static let stress: UInt8 = 0x16
+    static let bloodComponents: UInt8 = 0x1a
 }
 
 /// The bpm samples of one spot HR measurement, and the rule for whether they add up to a reading.
@@ -201,6 +209,18 @@ final class RingSyncCoordinator {
     private(set) var bpState: MeasureState = .idle
     /// Combined sweep (all vitals at once). `.done` carries HR; the caller keeps the full reading.
     private(set) var vitalsState: MeasureState = .idle
+    private(set) var stressState: MeasureState = .idle
+    /// `.done` carries mg/dL rounded; read `latestBloodSugarValue` for the exact value.
+    private(set) var glucoseState: MeasureState = .idle
+    /// `.done(1)` on success; read `latestBloodComponents` for the five values.
+    private(set) var bloodComponentsState: MeasureState = .idle
+    /// Why the ring refused the last measurement (not worn, busy, low battery, charging), or nil. Reset
+    /// at the start of every measurement; the measurement sheet turns it into the shared wording.
+    private(set) var measureRefusal: MeasurementRefusal?
+    /// A find-ring vibration is running (auto-stops after `findRingSeconds`).
+    private(set) var isFindingRing = false
+    private var findRingTask: Task<Void, Never>?
+    static let findRingSeconds: UInt64 = 10
     private(set) var lastSyncAt: Date?
 
     /// The latest history-sync stage label (e.g. "Syncing sleep…"), or nil when not syncing.
@@ -233,6 +253,7 @@ final class RingSyncCoordinator {
     private(set) var latestFatigueValue: Int?
     private(set) var latestStressValue: Int?
     private(set) var latestBloodSugarValue: Double?
+    private(set) var latestBloodComponents: BloodComponentsReading?
     private(set) var workoutHRActive = false
     /// Set when the ring reports a completed HR measurement with no usable reading (not worn), so a
     /// spot measurement can fail fast instead of waiting out the full window.
@@ -296,6 +317,23 @@ final class RingSyncCoordinator {
     /// The combined sweep computes every metric, so give it the longest window (observed: the ring
     /// streams empty packets for ~20s before the populated burst).
     private let vitalsMeasureSeconds: UInt64 = 60
+    /// Stress, glucose and blood components are ring-driven with no fixed duration in the SDK; the spec
+    /// gives each leg 60 s (+3 s of headroom). Not yet timed on the real ring.
+    let spotTestMeasureSeconds: UInt64 = 63
+
+    /// Any on-demand measurement (or the workout HR stream) is running — a firmware install waits for it.
+    var measurementActive: Bool {
+        workoutHRActive || [hrState, spo2State, hrvState, bpState, vitalsState, stressState, glucoseState,
+                            bloodComponentsState].contains(.measuring)
+    }
+
+    /// A history sync is running (the progress bar, or the engine's own pass) — a firmware install waits for it.
+    var historySyncing: Bool { isSyncing || engine?.isHistorySyncing == true }
+
+    /// Measuring is blocked while the ring is on its charger (flag `charging_state`).
+    var measuringBlockedByCharging: Bool {
+        AgaraFeatureStore.isOn(.chargingState) && client.isCharging
+    }
 
     private let client: RingBLEClient
     private let context: ModelContext
@@ -390,12 +428,15 @@ final class RingSyncCoordinator {
     }
 
     private func profileValues(from profile: UserProfile) -> UserProfileValues {
-        UserProfileValues(
+        let goals = MetricsRepository.goals(context: context)
+        return UserProfileValues(
             metric: profile.units == .metric,
             sex: profile.sex,
             age: profile.age,
             heightCm: profile.heightCm,
-            weightKg: profile.weightKg
+            weightKg: profile.weightKg,
+            stepGoal: goals?.steps ?? 8000,
+            sleepGoalMinutes: goals?.sleepMinutes ?? 480
         )
     }
 
@@ -475,9 +516,25 @@ final class RingSyncCoordinator {
         engine?.runStartup()
     }
 
+    /// Make the ring vibrate (`b5 0a`) and stop it after `findRingSeconds`, or on `stopFindingRing()`.
     func findRing() {
         guard client.state == .connected else { return }
         engine?.findDevice()
+        isFindingRing = true
+        findRingTask?.cancel()
+        findRingTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: Self.findRingSeconds * 1_000_000_000)
+            guard !Task.isCancelled else { return }
+            self?.stopFindingRing()
+        }
+    }
+
+    func stopFindingRing() {
+        findRingTask?.cancel()
+        findRingTask = nil
+        guard isFindingRing else { return }
+        isFindingRing = false
+        if client.state == .connected { engine?.stopFindDevice() }
     }
 
     func setGoal(steps: Int) {
@@ -491,6 +548,79 @@ final class RingSyncCoordinator {
             context.insert(UserGoal(steps: steps))
         }
         try? context.save()
+        // The Agara ring takes the step goal inside its profile frame (flag `profile_sync`).
+        applyUserProfile()
+    }
+
+    /// Common entry guard for a spot measurement: not while charging (the ring can't read off-finger —
+    /// the charging message says so), and a fresh refusal slot. Returns false when it must not start.
+    private func beginSpotMeasurement() -> Bool {
+        measureRefusal = nil
+        measureNotWorn = false
+        if measuringBlockedByCharging {
+            measureRefusal = .charging
+            return false
+        }
+        return true
+    }
+
+    /// Stress (`89 06`), glucose (`89 01`) and blood components (`8a 01`): start, poll up to the leg
+    /// window for the value, stop. Each runs through the engine's spot-test path so the poll tick stays
+    /// silent, and each aborts the instant the ring refuses it.
+    private func runSpotTest(mode: UInt8, start: () -> Void, stop: () -> Void, value: @escaping () -> Int?) async -> Int? {
+        let token = spot.begin(mode: mode)
+        start()
+        let result = await pollForValue(
+            window: spotTestMeasureSeconds,
+            value: value,
+            abort: { self.spot.isRejected(token) || self.client.state != .connected }
+        )
+        spot.end(token)
+        stop()
+        restartWorkoutHeartRateIfActive()
+        return result
+    }
+
+    @discardableResult
+    func measureStress() async -> Int? {
+        guard stressState != .measuring else { return nil }
+        guard client.state == .connected, beginSpotMeasurement() else { stressState = .failed; return nil }
+        stressState = .measuring
+        latestStressValue = nil
+        let result = await runSpotTest(mode: SpotMode.stress,
+                                       start: { engine?.startStress() }, stop: { engine?.stopStress() },
+                                       value: { self.latestStressValue })
+        stressState = result.map { .done($0) } ?? .failed
+        return result
+    }
+
+    /// Spot glucose estimate, in mg/dL (stored canonical unit).
+    @discardableResult
+    func measureGlucose() async -> Double? {
+        guard glucoseState != .measuring else { return nil }
+        guard client.state == .connected, beginSpotMeasurement() else { glucoseState = .failed; return nil }
+        glucoseState = .measuring
+        latestBloodSugarValue = nil
+        _ = await runSpotTest(mode: SpotMode.glucose,
+                              start: { engine?.startGlucose() }, stop: { engine?.stopGlucose() },
+                              value: { self.latestBloodSugarValue.map { Int($0.rounded()) } })
+        let result = latestBloodSugarValue
+        glucoseState = result.map { .done(Int($0.rounded())) } ?? .failed
+        return result
+    }
+
+    @discardableResult
+    func measureBloodComponents() async -> BloodComponentsReading? {
+        guard bloodComponentsState != .measuring else { return nil }
+        guard client.state == .connected, beginSpotMeasurement() else { bloodComponentsState = .failed; return nil }
+        bloodComponentsState = .measuring
+        latestBloodComponents = nil
+        _ = await runSpotTest(mode: SpotMode.bloodComponents,
+                              start: { engine?.startBloodComponents() }, stop: { engine?.stopBloodComponents() },
+                              value: { self.latestBloodComponents == nil ? nil : 1 })
+        let result = latestBloodComponents
+        bloodComponentsState = result == nil ? .failed : .done(1)
+        return result
     }
 
     /// Start HR streaming, sample the whole window, stop, and return the median of the samples that
@@ -503,7 +633,7 @@ final class RingSyncCoordinator {
     @discardableResult
     func measureHR() async -> Int? {
         guard hrState != .measuring else { return nil }
-        guard client.state == .connected else { hrState = .failed; return nil }
+        guard client.state == .connected, beginSpotMeasurement() else { hrState = .failed; return nil }
         hrState = .measuring
         // NOTE: do *not* clear `latestHRValue` — it's the live value the workout UI shows, so a new
         // measurement keeps the last reading on screen until a fresh one replaces it (no blanking to —).
@@ -558,10 +688,9 @@ final class RingSyncCoordinator {
     @discardableResult
     func measureSpO2() async -> Int? {
         guard spo2State != .measuring else { return nil }
-        guard client.state == .connected else { spo2State = .failed; return nil }
+        guard client.state == .connected, beginSpotMeasurement() else { spo2State = .failed; return nil }
         spo2State = .measuring
         latestSpO2Value = nil
-        measureNotWorn = false
         spo2NotWornReported = false
         let token = spot.begin(mode: SpotMode.spo2)
         engine?.startSpO2()
@@ -612,7 +741,7 @@ final class RingSyncCoordinator {
     @discardableResult
     func measureBloodPressure() async -> BloodPressureReading? {
         guard bpState != .measuring else { return nil }
-        guard client.state == .connected else { bpState = .failed; return nil }
+        guard client.state == .connected, beginSpotMeasurement() else { bpState = .failed; return nil }
         bpState = .measuring
         latestBloodPressureValue = nil
         let token = spot.begin(mode: SpotMode.bloodPressure)
@@ -733,8 +862,8 @@ final class RingSyncCoordinator {
             // `.measurementRejected` has no `PulseEvent` of its own — it is a verdict on a command, not
             // data — so the raw-packet feed (which carries every decoded frame) is where a measurement
             // hears the ring say no.
-            guard case let .measurementRejected(mode) = decoded else { break }
-            spot.noteRejected(mode: mode)
+            guard case let .measurementRejected(mode, reason) = decoded else { break }
+            noteRefusal(mode: mode, reason: reason)
         default:
             mirrorLiveValue(event)
         }
@@ -830,6 +959,15 @@ final class RingSyncCoordinator {
 // MARK: - Live value mirroring
 
 private extension RingSyncCoordinator {
+    /// The ring refused a measurement. A "not worn" frame on the HR stream after a real bpm has landed is
+    /// a finger shifting mid-window, not a refusal of this measurement — `HRSampleWindow` decides that one.
+    func noteRefusal(mode: UInt8, reason: MeasurementRefusal) {
+        if mode == SpotMode.heartRate, measurementReceivedReading { return }
+        guard spot.noteRejected(mode: mode) else { return }
+        measureRefusal = reason
+        if reason == .notWorn { measureNotWorn = true }
+    }
+
     /// Mirror a live spot-measurement value for the UI (`latest*Value`). Split out of `handle(_:)`
     /// purely to keep that switch's complexity down — these cases share one shape: store and done.
     func mirrorLiveValue(_ event: PulseEvent) {
@@ -848,6 +986,8 @@ private extension RingSyncCoordinator {
             latestStressValue = value
         case let .bloodSugarSample(mgdl, _):
             latestBloodSugarValue = mgdl
+        case let .bloodComponentsSample(reading, _):
+            latestBloodComponents = reading
         default:
             break
         }

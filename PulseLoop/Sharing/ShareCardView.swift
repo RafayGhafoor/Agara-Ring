@@ -143,11 +143,11 @@ struct ShareCardView: View {
             .frame(width: 38, height: 38)
             VStack(alignment: .leading, spacing: 3) {
                 Text(model.activityLabel.uppercased())
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(AgaraFont.face(14, .semibold))
                     .tracking(3.0)
                     .foregroundStyle(model.accent)
                 Text(model.dateHeadline)
-                    .font(.system(size: 10, weight: .medium))
+                    .font(AgaraFont.face(10, .medium))
                     .tracking(1.5)
                     .foregroundStyle(PulseColors.textMuted)
             }
@@ -193,7 +193,7 @@ struct ShareCardView: View {
     private func heroBlock(valueSize: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(model.heroStat.label)
-                .font(.system(size: 11, weight: .semibold))
+                .font(AgaraFont.face(11, .semibold))
                 .tracking(2.2)
                 .foregroundStyle(PulseColors.textSecondary)
             HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -244,7 +244,7 @@ struct ShareCardView: View {
                 }
             }
             Text(stat.label.uppercased())
-                .font(.system(size: 9, weight: .semibold))
+                .font(AgaraFont.face(9, .semibold))
                 .tracking(1.6)
                 .foregroundStyle(PulseColors.textMuted)
         }
@@ -257,13 +257,13 @@ struct ShareCardView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text("EFFORT")
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(AgaraFont.face(9, .semibold))
                     .tracking(1.6)
                     .foregroundStyle(PulseColors.textMuted)
                 Spacer()
                 if let caption = model.hrCaption {
                     Text(caption)
-                        .font(.system(size: 9, weight: .medium).monospacedDigit())
+                        .font(AgaraFont.face(9, .medium).monospacedDigit())
                         .foregroundStyle(PulseColors.textSecondary)
                 }
             }
@@ -297,11 +297,11 @@ struct ShareCardView: View {
                 .frame(width: 22, height: 22)
                 .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
             Text(AgaraCopy.shareCardBrand)
-                .font(.system(size: 13, weight: .semibold))
+                .font(AgaraFont.face(13, .semibold))
                 .foregroundStyle(PulseColors.textPrimary)
             Spacer()
             Text(model.dateFooter)
-                .font(.system(size: 10, weight: .medium))
+                .font(AgaraFont.face(10, .medium))
                 .foregroundStyle(PulseColors.textMuted)
         }
     }

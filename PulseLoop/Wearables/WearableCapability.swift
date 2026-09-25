@@ -48,6 +48,18 @@ enum WearableCapability: String, CaseIterable, Codable, Sendable {
     // vitals plan: a device with no `manualSpo2` but with this capability shows the latest logged value
     // instead of pretending it can spot-measure.
     case spo2History
+
+    // Agara ring on-demand tests beyond HR/SpO₂/BP (measure-hub spec §3/§6). The static fallback the
+    // measure hub uses when the ring's own capability packets haven't been seen (or the probe is off).
+    case manualStress
+    case manualBloodSugar
+    case manualBloodComponents
+    // Agara ring DF history metrics (spec §5): respiration (B6), MET (BF), cardiac load (B9), and the
+    // blood-component estimates (C2).
+    case respiration
+    case met
+    case cardiacLoad
+    case bloodComponents
 }
 
 extension Set where Element == WearableCapability {

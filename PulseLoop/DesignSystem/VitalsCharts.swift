@@ -21,10 +21,10 @@ struct ReferenceBand: Identifiable, Equatable {
 
 // MARK: - Modern axis styling
 
-private extension View {
+extension View {
     /// Quiet dashboard axes: ≤4 time labels on X (hidden gridlines), trailing ≤3 value labels with a
     /// single faint horizontal gridline. Mirrors Apple's "highlight a few things" chart guidance.
-    func vitalsAxes(showAxes: Bool, range: MetricRange) -> some View {
+    func vitalsAxes(showAxes: Bool, range: MetricRange, yTicks: [Double]? = nil) -> some View {
         chartXAxis {
             if showAxes {
                 if let stride = VitalsAxisFormat.stride(for: range) {
@@ -50,12 +50,23 @@ private extension View {
         }
         .chartYAxis {
             if showAxes {
-                AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) { _ in
-                    AxisGridLine().foregroundStyle(PulseColors.borderSubtle)
-                    AxisTick().foregroundStyle(.clear)
-                    AxisValueLabel()
-                        .font(PulseFont.micro.weight(.regular))
-                        .foregroundStyle(PulseColors.textMuted)
+                if let yTicks {
+                    // A fixed axis's round ticks (ChartAxes), so the gridlines don't move between readings.
+                    AxisMarks(position: .trailing, values: yTicks) { _ in
+                        AxisGridLine().foregroundStyle(PulseColors.borderSubtle)
+                        AxisTick().foregroundStyle(.clear)
+                        AxisValueLabel()
+                            .font(PulseFont.micro.weight(.regular))
+                            .foregroundStyle(PulseColors.textMuted)
+                    }
+                } else {
+                    AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) { _ in
+                        AxisGridLine().foregroundStyle(PulseColors.borderSubtle)
+                        AxisTick().foregroundStyle(.clear)
+                        AxisValueLabel()
+                            .font(PulseFont.micro.weight(.regular))
+                            .foregroundStyle(PulseColors.textMuted)
+                    }
                 }
             }
         }
@@ -102,10 +113,18 @@ struct ZoneLineChart: View {
     /// Zone boundaries (y-values) where the line color may change. The line is split at each crossing
     /// so a piece never spans two zones. Empty = no splitting (whole-segment color).
     var thresholds: [Double] = []
+    /// Fixed x-range (the calendar day 12am–12am) instead of the samples' own span.
+    var xDomain: ClosedRange<Date>? = nil
+    /// Round gridline values of a fixed y-axis (ChartAxes); nil = automatic.
+    var yTicks: [Double]? = nil
+    /// False draws the readings as dots only — spot readings (SpO₂) are never joined, since a line between
+    /// two readings hours apart invents the values in between.
+    var drawsLine: Bool = true
     /// Injected from the threshold engine: maps a value to the color its segment should take.
     let colorForValue: (Double) -> Color
 
     private var timeDomain: ClosedRange<Date>? {
+        if let xDomain { return xDomain }
         guard let first = samples.first?.timestamp, let last = samples.last?.timestamp, first < last else { return nil }
         return first...last
     }
@@ -124,13 +143,13 @@ struct ZoneLineChart: View {
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
                     .foregroundStyle(PulseColors.textMuted.opacity(0.5))
             }
-            if showPoints {
+            if showPoints || !drawsLine {
                 ForEach(samples) { sample in
                     PointMark(
                         x: .value("Time", sample.timestamp),
                         y: .value("Value", sample.value)
                     )
-                    .symbolSize(showPoints ? 30 : 0)
+                    .symbolSize(showPoints || !drawsLine ? 30 : 0)
                     .foregroundStyle(colorForValue(sample.value))
                     .opacity(sample.quality == .motionArtifact ? 0.4 : 1)
                 }
@@ -140,11 +159,11 @@ struct ZoneLineChart: View {
         .modify { chart in
             if let timeDomain { chart.chartXScale(domain: timeDomain) } else { chart }
         }
-        .vitalsAxes(showAxes: showAxes, range: range)
+        .vitalsAxes(showAxes: showAxes, range: range, yTicks: yTicks)
         .chartOverlay { proxy in
             GeometryReader { geo in
                 Canvas { context, _ in
-                    guard let plotAnchor = proxy.plotFrame else { return }
+                    guard drawsLine, let plotAnchor = proxy.plotFrame else { return }
                     let plot = geo[plotAnchor]
                     let maxGap = ChartSampleBuilder.maxGap(for: range)
                     for segment in ChartSampleBuilder.segments(samples, maxGap: maxGap) {

@@ -14,10 +14,11 @@ struct PulseLoopActivityWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: ActivitySnapshotProvider()) { entry in
             WidgetActivityFullContent(payload: entry.snapshot?.activity, rolledOver: entry.rolledOver)
+                .font(PulseFont.body)
                 .overlay(alignment: .topTrailing) {
                     if let asOf = entry.stalenessDate {
                         Text(asOf, style: .time)
-                            .font(.system(size: 9, weight: .medium))
+                            .font(AgaraFont.face(9, .medium))
                             .foregroundStyle(PulseColors.textMuted.opacity(0.8))
                     }
                 }
@@ -39,6 +40,7 @@ struct PulseLoopMetricWidget: Widget {
         AppIntentConfiguration(kind: kind, intent: SingleMetricConfigIntent.self,
                                provider: SingleMetricProvider()) { entry in
             WidgetMetricTileView(metric: entry.single, entry: entry)
+                .font(PulseFont.body)
                 .containerBackground(PulseColors.card, for: .widget)
         }
         .configurationDisplayName("Metric Tile")
@@ -61,6 +63,7 @@ struct PulseLoopDualMetricWidget: Widget {
                 WidgetMetricTileView(metric: entry.left, entry: entry)
                 WidgetMetricTileView(metric: entry.right, entry: entry)
             }
+            .font(PulseFont.body)
             .containerBackground(PulseColors.card, for: .widget)
         }
         .configurationDisplayName("Two Metric Tiles")

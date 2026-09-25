@@ -112,6 +112,22 @@ enum MetricsService {
             raw = rangeSamples(kind: .fatigue, range: range, context: context)
         case .bloodSugar:
             raw = calibrated(rangeSamples(kind: .bloodSugar, range: range, context: context), kind: .bloodSugar)
+        case .respiratoryRate:
+            raw = rangeSamples(kind: .respiratoryRate, range: range, context: context)
+        case .met:
+            raw = rangeSamples(kind: .met, range: range, context: context)
+        case .cardiacLoad:
+            raw = rangeSamples(kind: .cardiacLoad, range: range, context: context)
+        case .totalCholesterol:
+            raw = rangeSamples(kind: .totalCholesterol, range: range, context: context)
+        case .triglycerides:
+            raw = rangeSamples(kind: .triglycerides, range: range, context: context)
+        case .hdl:
+            raw = rangeSamples(kind: .hdl, range: range, context: context)
+        case .ldl:
+            raw = rangeSamples(kind: .ldl, range: range, context: context)
+        case .uricAcid:
+            raw = rangeSamples(kind: .uricAcid, range: range, context: context)
         case .steps, .calories, .distance, .activeMinutes:
             raw = activitySamples(metric: metric, range: range, context: context)
         default:
@@ -222,6 +238,20 @@ enum MetricsService {
             value = Double(Int.random(in: 12...18))
         case .vo2max:
             value = Double(Int.random(in: 35...50))
+        case .met:
+            value = Double(Int.random(in: 10...30)) / 10
+        case .cardiacLoad:
+            value = Double(Int.random(in: 25...38))
+        case .totalCholesterol:
+            value = Double(Int.random(in: 400...450)) / 100
+        case .triglycerides:
+            value = Double(Int.random(in: 130...155)) / 100
+        case .hdl:
+            value = Double(Int.random(in: 96...106)) / 100
+        case .ldl:
+            value = Double(Int.random(in: 225...270)) / 100
+        case .uricAcid:
+            value = Double(Int.random(in: 2040...2490)) / 10
         }
         let row = MeasurementRepository.insertMeasurement(
             kind: kind,
@@ -633,17 +663,20 @@ enum SleepService {
     }
     
     private static func summary(for session: SleepSession, includeStages: Bool, context: ModelContext) -> SleepSummary {
-        let blocks = SleepRepository.blocks(sessionId: session.id, context: context)
-        let light = blocks.filter { $0.stage == .light }.reduce(0) { $0 + $1.durationMinutes }
-        let deep = blocks.filter { $0.stage == .deep }.reduce(0) { $0 + $1.durationMinutes }
-        let awake = blocks.filter { $0.stage == .awake }.reduce(0) { $0 + $1.durationMinutes }
-        return SleepSummary(
-            session: session,
-            lightMinutes: light,
-            deepMinutes: deep,
-            awakeMinutes: awake,
-            blocks: includeStages ? blocks : []
-        )
+        let full = summary(session: session, blocks: SleepRepository.blocks(sessionId: session.id, context: context))
+        guard !includeStages else { return full }
+        return SleepSummary(session: session, lightMinutes: full.lightMinutes, deepMinutes: full.deepMinutes,
+                            awakeMinutes: full.awakeMinutes, blocks: [])
+    }
+
+    /// The summary the Sleep tab scores, from a session and its blocks. `reconcileWakingDay` scores the same
+    /// summary, which is why the stored score equals the displayed one.
+    static func summary(session: SleepSession, blocks: [SleepStageBlock]) -> SleepSummary {
+        func minutes(_ stage: SleepStage) -> Int {
+            blocks.filter { $0.stage == stage }.reduce(0) { $0 + $1.durationMinutes }
+        }
+        return SleepSummary(session: session, lightMinutes: minutes(.light), deepMinutes: minutes(.deep),
+                            awakeMinutes: minutes(.awake), blocks: blocks)
     }
     
     private static func expectedNights(for range: SleepRangeKey) -> Int {

@@ -30,6 +30,8 @@ struct MetricDetailView: View {
         switch metric {
         case .temperature: return UnitsFormatter.temperatureValue(celsius: raw, units: units)
         case .glucose: return UnitsFormatter.glucoseValue(mgdl: raw, unit: glucoseUnit)
+        case .totalCholesterol, .triglycerides, .hdl, .ldl, .uricAcid:
+            return BloodComponents.displayValue(raw, metric: metric, unit: glucoseUnit)
         default: return raw
         }
     }
@@ -37,6 +39,8 @@ struct MetricDetailView: View {
         switch metric {
         case .temperature: return units == .imperial ? (disp - 32) * 5 / 9 : disp
         case .glucose: return glucoseUnit == .mmol ? disp * 18.0182 : disp
+        case .totalCholesterol, .triglycerides, .hdl, .ldl, .uricAcid:
+            return BloodComponents.canonicalValue(disp, metric: metric, unit: glucoseUnit)
         default: return disp
         }
     }
@@ -44,6 +48,8 @@ struct MetricDetailView: View {
         switch metric {
         case .temperature: return UnitsFormatter.temperatureUnit(units)
         case .glucose: return UnitsFormatter.glucoseUnit(glucoseUnit)
+        case .totalCholesterol, .triglycerides, .hdl, .ldl, .uricAcid:
+            return BloodComponents.displayUnit(metric: metric, unit: glucoseUnit)
         default: return metric.unit
         }
     }
@@ -96,10 +102,30 @@ struct MetricDetailView: View {
 
     // MARK: - Chart
 
+    /// The chart's x-range: the calendar day 12am–12am for Today (as the vendor app draws it — a "today"
+    /// starting 2 PM yesterday couldn't be read against the clock), the data's own span otherwise.
+    private var xDomain: ClosedRange<Date>? { period == .today ? ChartAxes.dayWindow(Date()) : nil }
+
+    /// What the chart plots: 30-min averages (3 h over a week, daily over a month) for continuous signals —
+    /// the raw 1 Hz live + 5-min history mix drew as a jagged wall — and individual readings for spot metrics
+    /// on a day. Stats and the legend still read every raw reading.
+    private func chartSeries(_ samples: [MetricSample]) -> [MetricSample] {
+        let bucket: TimeInterval? = switch period {
+        // Spot metrics stay individual on a day unless the ring logged them all day (5-min history), where
+        // dots on stems merged into a solid wall; same rule as Android (`DENSE_DAY_READINGS`).
+        case .today: ChartAxes.isContinuous(metric) || samples.count > ChartAxes.denseDayReadings ? ChartAxes.halfHour : nil
+        case .week: 3 * ChartAxes.hour
+        case .month: ChartAxes.day
+        }
+        guard let bucket else { return samples }
+        return ChartAxes.bucketAverage(samples, bucket: bucket)
+    }
+
     @ViewBuilder
     private var chartSection: some View {
         let dispPrimary = primary.map { MetricSample(timestamp: $0.timestamp, value: toDisplay($0.value)) }
-        let chart = ChartSampleBuilder.from(dispPrimary)
+        let chart = ChartSampleBuilder.from(chartSeries(dispPrimary))
+        let axis = ChartAxes.fixedAxis(metric, data: chart.map(\.value)) ?? ChartAxes.niceAxis(chart.map(\.value))
         let baseline = baselineForChart
         VStack(alignment: .leading, spacing: 8) {
             if !unitLabel.isEmpty {
@@ -108,7 +134,8 @@ struct MetricDetailView: View {
                     .foregroundStyle(PulseColors.textMuted)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            if chart.count < 2 {
+            // A line needs two points; a bar or a dot is readable on its own.
+            if chart.count < (ChartAxes.style(for: metric) == .line || xDomain == nil ? 2 : 1) {
                 Text("Not enough data for this period.")
                     .font(PulseFont.footnote.weight(.regular)).foregroundStyle(PulseColors.textMuted)
                     .frame(maxWidth: .infinity, minHeight: 120, alignment: .center)
@@ -118,7 +145,7 @@ struct MetricDetailView: View {
                 ZoneLineChart(
                     samples: chart,
                     metric: metric,
-                    yDomain: yDomain(chart),
+                    yDomain: axis.domain,
                     referenceBands: detailBands(baseline: baseline),
                     range: period.range,
                     showPoints: metric == .spo2,
@@ -126,6 +153,9 @@ struct MetricDetailView: View {
                     dashedRules: dashedRules(baseline: baseline).map(toDisplay),
                     height: 240,
                     thresholds: VitalsThresholdEngine.zoneThresholds(for: metric, profile: profile, baseline: baseline).map(toDisplay),
+                    xDomain: xDomain,
+                    yTicks: axis.ticks,
+                    drawsLine: ChartAxes.style(for: metric) != .dots,
                     colorForValue: { value in
                         // Samples are in display units; color lookup needs canonical units.
                         VitalsThresholdEngine.colorToken(forValue: toRaw(value), metric: metric, profile: profile, baseline: baseline).color
@@ -138,45 +168,66 @@ struct MetricDetailView: View {
         .pulseGlass(RoundedRectangle(cornerRadius: PulseRadius.card, style: .continuous))
     }
 
-    /// BP shows two series — systolic in the metric accent, diastolic lighter.
+    /// The BP chart's bucket: an hour on a day, 3 h over a week, a day over a month.
+    private var bpBucket: TimeInterval {
+        switch period {
+        case .today: ChartAxes.hour
+        case .week: 3 * ChartAxes.hour
+        case .month: ChartAxes.day
+        }
+    }
+
+    /// BP: one bar per bucket from the lowest diastolic to the highest systolic, on a fixed 60–180 axis (the
+    /// vendor app's shape). Two joined lines on an axis cropped to the data squashed diastolic against the floor.
     private var bloodPressureChart: some View {
-        let sys = ChartSampleBuilder.from(primary)
-        let dia = ChartSampleBuilder.from(secondary)
-        let allValues = (primary + secondary).map(\.value).filter { $0 > 0 }
-        let lo = (allValues.min() ?? 50) - 10
-        let hi = (allValues.max() ?? 160) + 10
+        let bars = ChartAxes.rangeBuckets(systolic: primary, diastolic: secondary, bucket: bpBucket)
+        let axis = ChartAxes.fixedAxis(.bloodPressure, data: bars.flatMap { [$0.low, $0.high] })!
         return Chart {
-            ForEach(sys) { s in
-                LineMark(x: .value("Time", s.timestamp), y: .value("Systolic", s.value), series: .value("Series", "Systolic"))
-                    .foregroundStyle(PulseColors.bloodPressure)
-                    .interpolationMethod(.monotone)
-            }
-            ForEach(dia) { s in
-                LineMark(x: .value("Time", s.timestamp), y: .value("Diastolic", s.value), series: .value("Series", "Diastolic"))
-                    .foregroundStyle(PulseColors.bloodPressure.opacity(0.5))
-                    .interpolationMethod(.monotone)
+            ForEach(bars, id: \.time) { bar in
+                let (time, sys, dia) = (bar.time, bar.high, bar.low)
+                RuleMark(x: .value("Time", time), yStart: .value("Diastolic", dia), yEnd: .value("Systolic", sys))
+                    .lineStyle(StrokeStyle(lineWidth: 6, lineCap: .round))
+                    .foregroundStyle(PulseColors.bloodPressure.opacity(0.28))
+                PointMark(x: .value("Time", time), y: .value("Systolic", sys))
+                    .symbolSize(28).foregroundStyle(PulseColors.bloodPressure)
+                PointMark(x: .value("Time", time), y: .value("Diastolic", dia))
+                    .symbolSize(28).foregroundStyle(PulseColors.bloodPressure.opacity(0.55))
             }
         }
-        .chartYScale(domain: lo...hi)
-        .frame(height: 200)
+        .chartYScale(domain: axis.domain)
+        .modify { chart in
+            if let xDomain { chart.chartXScale(domain: xDomain) } else { chart }
+        }
+        .vitalsAxes(showAxes: true, range: period.range, yTicks: axis.ticks)
+        .frame(height: 220)
     }
 
     // MARK: - Stat tiles
 
     private var statTiles: some View {
         let values = primary.map(\.value).filter { $0 > 0 }
-        let latest = values.last.map { fmt(toDisplay($0)) } ?? "--"
-        let avg = values.isEmpty ? "--" : fmt(toDisplay(values.reduce(0, +) / Double(values.count)))
-        let lo = values.min().map { fmt(toDisplay($0)) } ?? "--"
-        let hi = values.max().map { fmt(toDisplay($0)) } ?? "--"
+        let dia = secondary.map(\.value).filter { $0 > 0 }
+        // BP as SYS/DIA pairs: one number over both series put a diastolic "min" next to a systolic "max".
+        func pair(_ a: Double?, _ b: Double?) -> String {
+            guard let a, let b else { return "--" }
+            return "\(Int(a.rounded()))/\(Int(b.rounded()))"
+        }
+        func mean(_ v: [Double]) -> Double? { v.isEmpty ? nil : v.reduce(0, +) / Double(v.count) }
+        let isBP = metric == .bloodPressure
+        let latest = isBP ? pair(values.last, dia.last) : values.last.map { fmt(toDisplay($0)) } ?? "--"
+        let avg = isBP ? pair(mean(values), mean(dia)) : mean(values).map { fmt(toDisplay($0)) } ?? "--"
+        let lo = isBP ? pair(values.min(), dia.min()) : values.min().map { fmt(toDisplay($0)) } ?? "--"
+        let hi = isBP ? pair(values.max(), dia.max()) : values.max().map { fmt(toDisplay($0)) } ?? "--"
+        // One size for the whole row, set by its longest value (Android's DetailStat does the same).
+        let longest = [latest, avg, lo, hi].map(\.count).max() ?? 0
         return HStack(spacing: 0) {
-            stat("Latest", latest)
+            stat("Latest", latest, longest: longest)
             statDivider
-            stat("Average", avg)
+            stat("Average", avg, longest: longest)
             statDivider
-            stat("Min", lo)
+            stat("Min", lo, longest: longest)
             statDivider
-            stat("Max", hi)
+            stat("Max", hi, longest: longest)
         }
         .padding(.vertical, 14)
         .padding(.horizontal, 10)
@@ -184,14 +235,15 @@ struct MetricDetailView: View {
         .pulseGlass(RoundedRectangle(cornerRadius: PulseRadius.card, style: .continuous))
     }
 
-    private func stat(_ title: String, _ value: String) -> some View {
+    private func stat(_ title: String, _ value: String, longest: Int) -> some View {
         VStack(spacing: 8) {
             Text(title.uppercased())
                 .font(PulseFont.caption2).tracking(0.6)
                 .foregroundStyle(PulseColors.textMuted)
                 .lineLimit(1)
+            // Step down for long values (a BP pair like 127/80), row-wide so neighbours match.
             Text(value)
-                .font(PulseFont.numberXL).monospacedDigit()
+                .font(longest <= 4 ? PulseFont.numberXL : PulseFont.numberL).monospacedDigit()
                 .foregroundStyle(PulseColors.textPrimary)
                 .minimumScaleFactor(0.5)
                 .lineLimit(1)
@@ -255,11 +307,14 @@ struct MetricDetailView: View {
     // MARK: - Data
 
     private func reload() {
+        // Today is the calendar day: the 24 h fetch always covers midnight onwards, so trim to it.
+        let dayStart = Calendar.current.startOfDay(for: Date())
+        func window(_ s: [MetricSample]) -> [MetricSample] { period == .today ? s.filter { $0.timestamp >= dayStart } : s }
         if metric == .bloodPressure {
-            primary = MetricsService.metricRange(metric: .bloodPressureSystolic, range: period.range, context: modelContext)
-            secondary = MetricsService.metricRange(metric: .bloodPressureDiastolic, range: period.range, context: modelContext)
+            primary = window(MetricsService.metricRange(metric: .bloodPressureSystolic, range: period.range, context: modelContext))
+            secondary = window(MetricsService.metricRange(metric: .bloodPressureDiastolic, range: period.range, context: modelContext))
         } else {
-            primary = MetricsService.metricRange(metric: metric.metricKey, range: period.range, context: modelContext)
+            primary = window(MetricsService.metricRange(metric: metric.metricKey, range: period.range, context: modelContext))
             secondary = []
         }
     }
@@ -286,14 +341,6 @@ struct MetricDetailView: View {
         return []
     }
 
-    private func yDomain(_ samples: [ChartSample]) -> ClosedRange<Double> {
-        if metric == .spo2 { return 88...100 }
-        if metric == .stress || metric == .fatigue { return 0...100 }
-        let values = samples.map(\.value).filter { $0 > 0 }
-        guard let lo = values.min(), let hi = values.max(), lo < hi else { return 0...100 }
-        let pad = (hi - lo) * 0.1 + 1
-        return (lo - pad)...(hi + pad)
-    }
 
     // MARK: - Formatting helpers
 
@@ -301,6 +348,10 @@ struct MetricDetailView: View {
     private func fmt(_ value: Double) -> String {
         if metric == .temperature { return String(format: "%.1f", value) }
         if metric == .glucose, glucoseUnit == .mmol { return String(format: "%.1f", value) }
+        if metric == .met { return String(format: "%.1f", value) }
+        if metric.isBloodComponent {
+            return BloodComponents.format(toRaw(value), metric: metric, unit: glucoseUnit)
+        }
         return "\(Int(value.rounded()))"
     }
 
@@ -315,7 +366,7 @@ struct MetricDetailView: View {
     }
 
     private var isEstimatedMetric: Bool {
-        metric == .glucose
+        metric == .glucose || metric.isBloodComponent
     }
 
     private var explainerText: String {
@@ -345,6 +396,26 @@ struct MetricDetailView: View {
         case .temperature:
             return "Skin temperature from the ring runs cooler than core body temperature. "
                 + "Trends over time matter more than any single reading."
+        case .respiration:
+            return "Breaths per minute, logged by the ring every 5 minutes. A resting adult typically breathes "
+                + "12–20 times a minute; activity and stress raise it."
+        case .met:
+            return "Metabolic equivalent: how hard you're working compared with sitting still (1 MET). "
+                + "Brisk walking is about 3–4; running 8 or more."
+        case .cardiacLoad:
+            return "A relative score the ring derives from your heart-rate pattern. It has no clinical reference "
+                + "range — compare it with your own trend."
+        case .totalCholesterol:
+            return "Total cholesterol in the blood, estimated optically by the ring. Only a blood test measures it."
+        case .triglycerides:
+            return "Triglycerides — blood fats that rise after meals — estimated optically by the ring."
+        case .hdl:
+            return "HDL (\u{201C}good\u{201D}) cholesterol, estimated optically by the ring."
+        case .ldl:
+            return "LDL cholesterol, estimated optically by the ring. Only a blood test measures it."
+        case .uricAcid:
+            return "Uric acid, estimated optically by the ring. The reference range depends on sex, "
+                + "set in Settings → Profile."
         }
     }
 
@@ -356,6 +427,8 @@ struct MetricDetailView: View {
         case .bloodPressure:
             return "Ring blood pressure is an estimate. Calibrate against a validated cuff in Settings → Calibration, "
                 + "and talk to a clinician about persistent high or low readings."
+        case .totalCholesterol, .triglycerides, .hdl, .ldl, .uricAcid:
+            return AgaraCopy.estimateDisclaimer
         default: return ""
         }
     }

@@ -42,6 +42,12 @@ final class VirtualRingLink {
     private var buffer = Data()
     private weak var client: RingBLEClient?
     private var isAttached = false
+    /// A connection attempt is under way (between `attach` and ready/failed).
+    private var isConnecting = false
+    /// The 2 s retry after a failure is pending.
+    private var reconnectScheduled = false
+    /// Bumped per `attach`, so a late callback from a previous connection can't tear down the current one.
+    private var generation = 0
 
     private let writeUUID = CBUUID(string: VeepooUUIDs.commandWrite)
 
@@ -132,21 +138,41 @@ final class VirtualRingLink {
 
     func attach(client: RingBLEClient, port: UInt16, host: String = "127.0.0.1") {
         self.client = client
-        self.client = client
         guard let endpointPort = NWEndpoint.Port(rawValue: port) else { return }
         let connection = NWConnection(host: NWEndpoint.Host(host), port: endpointPort, using: .tcp)
         self.connection = connection
-        connection.stateUpdateHandler = { [weak self] state in
-            Task { @MainActor in self?.handle(state: state) }
+        generation += 1
+        let gen = generation
+        isConnecting = true
+        buffer.removeAll()
+        // `self` is the process-wide singleton, so a strong capture costs nothing (and keeps the Sendable
+        // hop free of a captured weak var).
+        connection.stateUpdateHandler = { state in
+            Task { @MainActor in self.handle(state: state, generation: gen) }
         }
         connection.start(queue: .global(qos: .userInitiated))
         NSLog("[VirtualRing] connecting to ring-emulator at \(host):\(port)")
     }
 
-    /// Feed a frame out to the emulator, exactly as a GATT write would leave the device.
-    func send(_ frame: Data) {
+    /// Connect again with the last arguments — used by the firmware installer after the emulator drops the
+    /// link (`--ota-fail-at`) or restarts the ring after an update. No-op while a link is up, a connect is
+    /// under way or the automatic retry is already pending (the emulator serves one client at a time, so
+    /// two parallel connections would queue behind each other).
+    func reattach() {
+        guard !isAttached, !isConnecting, !reconnectScheduled, let client else { return }
+        NSLog("[VirtualRing] re-attaching for the firmware update")
+        connection?.cancel()
+        connection = nil
+        attach(client: client, port: Self.configuredPort ?? UInt16(AgaraConfig.Emulator.defaultPort))
+    }
+
+    /// Feed a frame out to the emulator, exactly as a GATT write would leave the device. `characteristic`
+    /// is the write target on the wire: the ring's command channel by default, `F032` for a firmware update
+    /// (the emulator routes those to its AB-OTA responder).
+    func send(_ frame: Data, characteristic: String? = nil) {
         guard !frame.isEmpty else { return }
-        let line = "W \(writeUUID.uuidString) \(frame.map { String(format: "%02x", $0) }.joined())\n"
+        let target = characteristic ?? writeUUID.uuidString
+        let line = "W \(target) \(frame.map { String(format: "%02x", $0) }.joined())\n"
         connection?.send(content: Data(line.utf8), completion: .contentProcessed { error in
             if let error { NSLog("[VirtualRing] send failed: \(error)") }
         })
@@ -154,33 +180,58 @@ final class VirtualRingLink {
 
     // MARK: Internals
 
+    /// A callback from the connection of `generation`; ignored when a newer `attach` replaced it.
+    private func handle(state: NWConnection.State, generation gen: Int) {
+        guard gen == generation else { return }
+        handle(state: state)
+    }
+
     private func handle(state: NWConnection.State) {
         switch state {
         case .ready:
             NSLog("[VirtualRing] connected — starting the virtual link")
             isAttached = true
-            client?.beginVirtualConnection(sink: { [weak self] frame in
-                Task { @MainActor in self?.send(frame) }
+            isConnecting = false
+            // Called on the main actor already: send in order, without a Task hop per frame (a firmware
+            // update writes hundreds of frames back to back).
+            client?.beginVirtualConnection(sink: { [weak self] characteristic, frame in
+                self?.send(frame, characteristic: characteristic)
             })
             receive()
         case let .failed(error):
             NSLog("[VirtualRing] failed: \(error) — retrying in 2 s")
+            let wasAttached = isAttached
             isAttached = false
-            client?.endVirtualConnection()
+            isConnecting = false
+            if wasAttached { client?.endVirtualConnection() }
+            scheduleReconnect()
+        case let .waiting(error):
+            // Nobody listening (the emulator isn't up yet / restarting): NWConnection would wait for a
+            // network change that never comes. Treat it as a failure and retry on the usual 2 s cadence.
+            NSLog("[VirtualRing] waiting: \(error) — retrying in 2 s")
+            isConnecting = false
+            if isAttached {
+                isAttached = false
+                client?.endVirtualConnection()
+            }
             scheduleReconnect()
         case .cancelled:
             isAttached = false
+            isConnecting = false
         default:
             break
         }
     }
 
     private func scheduleReconnect() {
-        guard let connection else { return }
+        guard let connection, !reconnectScheduled else { return }
         let port = connection.endpoint.debugDescription
+        reconnectScheduled = true
         Task { [weak self] in
             try? await Task.sleep(nanoseconds: 2_000_000_000)
-            guard let self, let client = self.client else { return }
+            guard let self else { return }
+            self.reconnectScheduled = false
+            guard let client = self.client, !self.isAttached else { return }
             NSLog("[VirtualRing] reconnecting (\(port))")
             self.connection?.cancel()
             self.connection = nil
@@ -189,20 +240,25 @@ final class VirtualRingLink {
     }
 
     private func receive() {
-        connection?.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) { [weak self] data, _, isComplete, error in
+        let gen = generation
+        connection?.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) { data, _, isComplete, error in
             Task { @MainActor in
-                guard let self else { return }
-                if let data, !data.isEmpty {
-                    self.buffer.append(data)
-                    self.drainBuffer()
-                }
-                if let error { NSLog("[VirtualRing] receive error: \(error)") }
-                if isComplete || error != nil {
-                    self.handle(state: .failed(NWError.posix(.ECONNRESET)))
-                } else {
-                    self.receive()
-                }
+                self.received(data: data, isComplete: isComplete, error: error, generation: gen)
             }
+        }
+    }
+
+    private func received(data: Data?, isComplete: Bool, error: NWError?, generation gen: Int) {
+        guard gen == generation else { return }
+        if let data, !data.isEmpty {
+            buffer.append(data)
+            drainBuffer()
+        }
+        if let error { NSLog("[VirtualRing] receive error: \(error)") }
+        if isComplete || error != nil {
+            handle(state: .failed(NWError.posix(.ECONNRESET)))
+        } else {
+            receive()
         }
     }
 

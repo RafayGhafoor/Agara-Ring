@@ -116,8 +116,8 @@ final class VeepooDecoderTests: XCTestCase {
         XCTAssertEqual(summary?.totalMinutes, 283)
         XCTAssertEqual(summary?.deepMinutes, 60)
         XCTAssertEqual(summary?.lightMinutes, 160)
-        XCTAssertEqual(summary?.otherMinutes, 63)
-        XCTAssertEqual(summary?.awakeMinutes, 0)    // total - deep - light - other
+        XCTAssertEqual(summary?.remMinutes, 63)     // A3 offset 23 — REM, not "other"
+        XCTAssertEqual(summary?.awakeMinutes, 0)    // total - deep - light - REM
         XCTAssertEqual(summary?.quality, 3)
         XCTAssertEqual(summary?.efficiencyScore, 90)
         XCTAssertEqual(summary?.firstDeepMinutes, 35)
@@ -130,13 +130,51 @@ final class VeepooDecoderTests: XCTestCase {
         XCTAssertEqual(end.hour, 5)
         XCTAssertEqual(end.minute, 24)
 
-        // Stage expansion keeps the verified counts, one minute each.
+        // No A5 bitmap in this synthetic payload: stages fall back to the counts, one minute each.
         let stages = summary!.stages
+        XCTAssertNil(summary?.timeline)
         XCTAssertEqual(stages.filter { $0 == .deep }.count, 60)
         XCTAssertEqual(stages.filter { $0 == .light }.count, 160)
         XCTAssertEqual(stages.filter { $0 == .awake }.count, 0)
-        XCTAssertEqual(stages.filter { $0 == .unknown }.count, 63)
+        XCTAssertEqual(stages.filter { $0 == .rem }.count, 63)
         XCTAssertEqual(stages.count, 283)
+    }
+
+    /// Real pages, 2026-09-25 night, cross-checked against the vendor app: deep 2h15, light 6h19, REM 1h38,
+    /// awake 38m over 00:21–11:11. Same fixture as Android's `VeepooDecoderTest`.
+    func testSleepA5BitmapDecodesTheRealTimelineWithREM() {
+        let pages = [
+            "e00001000000000000555555a602000000000000", "e00101000000000000000015555555aaaaa00000",
+            "e0020100aaaaa5555000005555555555aaaaaaa8", "e0030100aaa55500157fffffffff555555aaaaaa",
+            "e0040100aa9555555555557fffff55555555aaaa", "e0050100555555556aaa800000005555555555aa",
+            "e006010000001555555555555555555555500155", "e007010055555555555400556aaaaaaaaa800000",
+            "e008010055540055400555555555555555555555", "e0090100400ffff5555555555555555555555555",
+            "e00a01000000a58a025555555555555555555555", "e00b010000000000000000000000000000000000",
+            "e00c010000000000000000000000000000000000", "e00d01003c0002a42d0000000000000000000000",
+            "e00e0100000087007b0162008a022d0026002f00", "e00f010019001509190b0b030000000101000003",
+            "e0100100a10c01a208bf1730cf28f1396ea32409",
+        ].map { hex -> [UInt8] in
+            stride(from: 0, to: hex.count, by: 2).map {
+                let i = hex.index(hex.startIndex, offsetBy: $0)
+                return UInt8(hex[i..<hex.index(i, offsetBy: 2)], radix: 16)!
+            }
+        }
+        // Assemble like the engine: descending page index, 4-byte frame header stripped.
+        let payload = pages.sorted { $0[1] > $1[1] }.flatMap { $0.dropFirst(4) }
+
+        let summary = decoder().sleepSummary(payload: payload)
+        let timeline = summary?.timeline ?? []
+        XCTAssertEqual(timeline.count, 650)
+        XCTAssertEqual(timeline.filter { $0 == .deep }.count, 135)
+        XCTAssertEqual(timeline.filter { $0 == .light }.count, 379)
+        XCTAssertEqual(timeline.filter { $0 == .rem }.count, 98)
+        XCTAssertEqual(timeline.filter { $0 == .awake }.count, 38)
+        XCTAssertEqual(summary?.remMinutes, 98)
+        XCTAssertEqual(summary?.awakeMinutes, 38)
+        XCTAssertTrue(timeline.prefix(45).allSatisfy { $0 == .light })   // first deep after 45 min
+        XCTAssertEqual(timeline[45], .deep)
+        XCTAssertEqual(summary?.stages, timeline)
+        XCTAssertEqual(zip(timeline, timeline.dropFirst()).filter { $0 != $1 }.count + 1, 38)
     }
 
     /// One-shot measurement streams, pinned by `tools/veepoo_live.py --measure`: D0 heart rate
@@ -148,8 +186,11 @@ final class VeepooDecoderTests: XCTestCase {
     }
 
     func testOxygenStreamDecodes() {
-        XCTAssertEqual(decoder().oxygen(frame: Data([0x80, 0x01, 0x00, 0x00, 0x61, 0x00])), 97)
-        XCTAssertNil(decoder().oxygen(frame: Data([0x80, 0x01, 0x00, 0x00, 0x00, 0x00])), "warm-up reads 0")
+        // Real frames, 2026-09-25: the value is byte 3; byte 4 is always 0.
+        XCTAssertEqual(decoder().oxygen(frame: Data([0x80, 0x01, 0x00, 0x60, 0x00, 0x64])), 96)
+        XCTAssertEqual(decoder().oxygen(frame: Data([0x80, 0x01, 0x00, 0x63, 0x00, 0x64])), 99)
+        XCTAssertNil(decoder().oxygen(frame: Data([0x80, 0x01, 0x00, 0x00, 0x00, 0x64])), "warm-up reads 0")
+        XCTAssertNil(decoder().oxygen(frame: Data([0x80, 0x02, 0x02, 0x62, 0x00, 0x64])), "the ring's stop reply")
         XCTAssertNil(decoder().oxygen(frame: Data([0x80, 0x01])), "too short")
     }
 

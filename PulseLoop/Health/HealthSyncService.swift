@@ -360,9 +360,12 @@ final class HealthSyncService {
         )
         let sessions = (try? context.fetch(descriptor)) ?? []
         guard !sessions.isEmpty else { return }
+        // Only the nights the app shows go to Health: another source's night (the emulator, a second ring)
+        // stays stored but unexported, like it stays undisplayed (`SleepSourcePolicy`).
+        let shown = Set(SleepRepository.sessions(context: context).map(\.id))
 
         var samples: [HKCategorySample] = []
-        for session in sessions {
+        for session in sessions where shown.contains(session.id) {
             samples.append(contentsOf: sleepSamples(session: session, type: sleepType, context: context, now: now, device: device))
         }
         if !samples.isEmpty {

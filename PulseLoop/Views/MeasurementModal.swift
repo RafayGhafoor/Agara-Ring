@@ -23,7 +23,7 @@ import SwiftData
 struct MeasurementSheet: View {
     /// `.vitals` is one sweep that returns every metric the ring computes (the ring's `0x24` packet);
     /// the rest are single-metric spot readings on devices that measure one thing at a time.
-    enum Kind: Hashable { case hr, spo2, hrv, bloodPressure, vitals }
+    enum Kind: Hashable { case hr, spo2, hrv, bloodPressure, vitals, stress, glucose, bloodComponents }
 
     /// The measurement lifecycle. `searching` is the working state — counting down (HR) or up (rest).
     enum Stage { case preparing, searching, locking, result, error }
@@ -36,6 +36,8 @@ struct MeasurementSheet: View {
     @Environment(RingBLEClient.self) private var ble
     @Environment(RingSyncCoordinator.self) private var coordinator
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Query private var profiles: [UserProfile]
+    @State private var features = AgaraFeatureStore.shared
 
     // MARK: State
     @State private var stage: Stage = .preparing
@@ -44,6 +46,10 @@ struct MeasurementSheet: View {
     @State private var secondaryValue: Int?
     /// Populated for `.vitals`: every metric the sweep returned.
     @State private var vitals: RingSyncCoordinator.VitalsReading?
+    /// Populated for `.bloodComponents`: the five estimates.
+    @State private var components: BloodComponentsReading?
+    /// A formatted reading that isn't a whole number (glucose in mmol/L), shown instead of `value`.
+    @State private var formattedValue: String?
     /// Wall-clock anchor for the ring. `TimelineView` derives fill + elapsed/remaining from it.
     @State private var measureStart: Date?
     /// Bumping this cancels the in-flight `.task` and starts a fresh run — that's the whole retry
@@ -78,8 +84,14 @@ struct MeasurementSheet: View {
 
     private var color: Color { kind.tint }
     private var name: String { kind.title }
-    private var unit: String { kind.unit }
+    private var unit: String {
+        kind == .glucose ? UnitsFormatter.glucoseUnit(glucoseUnit) : kind.unit
+    }
     private var instruction: String { kind.instruction }
+    private var glucoseUnit: GlucoseUnit { UserPhysiologyProfile(profiles.first).preferredGlucoseUnit }
+    private var sex: BiologicalSex { BiologicalSex(profileSex: profiles.first?.sex) }
+    /// The ring is on its charger (flag `charging_state`): measuring is blocked, with a banner.
+    private var ringCharging: Bool { features.isOn(.chargingState) && ble.isCharging }
 
     /// The one measurement with a fixed, known duration — so the only one we can honestly count down.
     /// Sourced from the coordinator: copying the literal is how the ring and the measurement desync.
@@ -91,6 +103,8 @@ struct MeasurementSheet: View {
 
     /// The big number in the ring. Blood pressure shows the systolic/diastolic pair.
     private var readingText: String? {
+        if kind == .bloodComponents { return nil }   // five values: shown in the result grid, not the ring
+        if let formattedValue { return formattedValue }
         guard let value else { return nil }
         if kind == .bloodPressure, let secondaryValue { return "\(value)/\(secondaryValue)" }
         return "\(value)"
@@ -99,7 +113,7 @@ struct MeasurementSheet: View {
     /// Explicit Done (vs auto-dismiss) is required under VoiceOver or Switch Control — and for the
     /// combined sweep, which has several numbers to read.
     private var needsExplicitDone: Bool {
-        if kind == .vitals { return true }
+        if kind == .vitals || kind == .bloodComponents { return true }
         #if canImport(UIKit)
         return UIAccessibility.isVoiceOverRunning || UIAccessibility.isSwitchControlRunning
         #else
@@ -114,8 +128,16 @@ struct MeasurementSheet: View {
 
             // The combined sweep returns a whole grid rather than one number, so at result it replaces
             // the ring entirely (see `VitalsResultsView`). Every other kind keeps the ring.
+            if ringCharging, stage != .result {
+                ChargingBanner()
+                    .padding(.horizontal, 24)
+            }
             if stage == .result, kind == .vitals, let vitals {
                 VitalsResultsView(vitals: vitals)
+                Spacer(minLength: 0)
+            } else if stage == .result, kind == .bloodComponents, let components {
+                BloodComponentsResultView(reading: components, unit: glucoseUnit, sex: sex)
+                    .padding(.horizontal, 24)
                 Spacer(minLength: 0)
             } else {
                 measuringContent
@@ -198,6 +220,15 @@ struct MeasurementSheet: View {
                 copyLine
                     .padding(.top, 24)
                     .padding(.horizontal, 24)
+
+                if kind.isEstimate {
+                    Text(AgaraCopy.estimateDisclaimer)
+                        .font(PulseFont.caption)
+                        .foregroundStyle(PulseColors.textMuted)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: 280)
+                        .padding(.top, 10)
+                }
             }
 
             Spacer()
@@ -312,6 +343,9 @@ struct MeasurementSheet: View {
         guard ble.state == .connected else {
             return "Your ring isn't connected. Reconnect it and try again."
         }
+        // The ring is on its charger, or said why it refused (busy, low battery, charging, not worn).
+        if ringCharging { return MeasurementRefusal.chargingMessage }
+        if let message = coordinator.measureRefusal?.message(isCharging: ble.isCharging) { return message }
         // The ring told us it wasn't on the finger, so the generic "keep still" advice would send the
         // user to fix the wrong thing — an optical sensor with no skin contact cannot read at all.
         if coordinator.measureNotWorn { return kind.notWornMessage }
@@ -345,6 +379,7 @@ struct MeasurementSheet: View {
                 let count = vitals.map { VitalsResultsView.tiles(for: $0).count } ?? 0
                 return "Reading complete. \(count) results. Saved."
             }
+            if kind == .bloodComponents { return "Estimate complete. Five results. Saved." }
             guard let readingText else { return "Complete" }
             return "\(readingText) \(unit). Saved."
         case .error: return errorMessage
@@ -419,6 +454,8 @@ struct MeasurementSheet: View {
         value = nil
         secondaryValue = nil
         vitals = nil
+        components = nil
+        formattedValue = nil
         measureStart = nil
         elapsed = 0
         ringColor = .clear
@@ -477,6 +514,14 @@ struct MeasurementSheet: View {
             let reading = await coordinator.measureBloodPressure()
             secondaryValue = reading?.diastolic
             result = reading?.systolic
+        case .stress: result = await coordinator.measureStress()
+        case .glucose:
+            let mgdl = await coordinator.measureGlucose()
+            formattedValue = mgdl.map { UnitsFormatter.glucose(mgdl: $0, unit: glucoseUnit).value }
+            result = mgdl.map { Int($0.rounded()) }
+        case .bloodComponents:
+            components = await coordinator.measureBloodComponents()
+            result = components == nil ? nil : 1
         case .vitals: return   // handled above
         }
         if Task.isCancelled { return }
@@ -503,6 +548,10 @@ struct MeasurementSheet: View {
         let demo = MeasurementDemoData.seed(kind, context: modelContext)
         secondaryValue = demo.secondary
         vitals = demo.vitals
+        components = demo.components
+        if kind == .glucose, let mgdl = demo.value {
+            formattedValue = UnitsFormatter.glucose(mgdl: Double(mgdl), unit: glucoseUnit).value
+        }
         if kind == .vitals {
             await revealVitals()
         } else {

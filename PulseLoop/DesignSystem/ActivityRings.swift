@@ -57,7 +57,7 @@ extension Text {
     /// text only shrinks when the string genuinely doesn't fit (six-digit steps in the
     /// narrowest widget column).
     func activityValueStyle(size: CGFloat) -> some View {
-        self.font(.system(size: size, weight: .semibold))
+        self.font(AgaraFont.face(size, .semibold))
             .monospacedDigit()
             .foregroundStyle(PulseColors.textPrimary)
             .lineLimit(1)

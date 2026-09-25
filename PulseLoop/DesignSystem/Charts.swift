@@ -4,13 +4,13 @@ import Charts
 /// Native Swift Charts ports of the web app's Recharts components, plus the
 /// custom sleep hypnogram. Colors/domains mirror `frontend/src/components/charts`.
 
-// MARK: - Sleep stage palette (matches Sleep.tsx STAGE_COLORS, not PulseColors)
+// MARK: - Sleep stage palette (catalog roles stage_*, same as Android PulseColors.stage*)
 
 enum SleepStageColors {
-    static let deep = Color(hex: "#3F2DD8")
-    static let light = Color(hex: "#7C5CFF")
-    static let rem = Color(hex: "#2DD4D8")
-    static let awake = Color(hex: "#FFB86B")
+    static var deep: Color { PulseColors.stageDeep }
+    static var light: Color { PulseColors.stageLight }
+    static var rem: Color { PulseColors.stageRem }
+    static var awake: Color { PulseColors.stageAwake }
 
     static func color(for stage: SleepStage) -> Color {
         switch stage {
@@ -246,7 +246,7 @@ struct StepBarsChart: View {
         .chartYAxis(.hidden)
         .chartXAxis {
             AxisMarks { _ in
-                AxisValueLabel().foregroundStyle(PulseColors.textMuted)
+                AxisValueLabel().font(PulseFont.micro.weight(.regular)).foregroundStyle(PulseColors.textMuted)
             }
         }
         .chartValueMarker(
@@ -402,7 +402,7 @@ struct SleepDurationHistogramChart: View {
                     .clipShape(UnevenRoundedRectangle(topLeadingRadius: r, topTrailingRadius: r))
                     .foregroundStyle(
                         LinearGradient(
-                            colors: [Color(hex: "#8B7CFF"), Color(hex: "#3F2DD8")],
+                            colors: [PulseColors.sleep, PulseColors.stageDeep],
                             startPoint: .top, endPoint: .bottom
                         )
                     )
@@ -430,7 +430,7 @@ struct SleepDurationHistogramChart: View {
                 if let key = value.as(String.self),
                    let label = key.split(separator: ":").last.map(String.init) {
                     AxisValueLabel {
-                        Text(label).foregroundStyle(PulseColors.textMuted)
+                        Text(label).font(PulseFont.micro.weight(.regular)).foregroundStyle(PulseColors.textMuted)
                     }
                 }
             }
@@ -542,7 +542,7 @@ struct SleepHypnogramView: View {
                         path.addLine(to: CGPoint(x: cx, y: laneY(cur.stage, in: size)))
                         context.stroke(
                             path,
-                            with: .color(Color(hex: "#D2CDFF").opacity(0.46)),
+                            with: .color(PulseColors.textPrimary.opacity(0.36)),
                             style: StrokeStyle(lineWidth: 1.2, lineCap: .round, dash: [2.5, 3])
                         )
                     }

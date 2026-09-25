@@ -9,9 +9,14 @@ struct VitalsView: View {
     let isActive: Bool
     @Environment(\.modelContext) private var modelContext
     @Environment(RingSyncCoordinator.self) private var coordinator
+    @Environment(RingBLEClient.self) private var ble
     @Environment(\.zoomNamespace) private var zoomNS
     @Query private var profiles: [UserProfile]
-    @State private var measuring: MeasurementSheet.Kind?
+    @Query private var devices: [Device]
+    /// The measure hub, or the measurement ring it hands off to — one sheet slot, so picking a tile
+    /// swaps the hub for the ring.
+    @State private var sheet: VitalsSheet?
+    @State private var features = AgaraFeatureStore.shared
     @State private var dataChange = PulseDataChange.shared
     /// Owns the prepared vitals state. Created lazily in `.task` (never in `body`) so a `body`
     /// re-render never triggers DB work — it just reads the already-prepared store.
@@ -28,7 +33,9 @@ struct VitalsView: View {
 
     /// Canonical Vitals card order (used until the user reorders). Card id = `MetricKey`.
     private static let defaultOrder: [MetricKey] = [
-        .heartRate, .spo2, .bloodPressureSystolic, .hrv, .stress, .fatigue, .bloodSugar, .temperature
+        .heartRate, .spo2, .bloodPressureSystolic, .hrv, .stress, .fatigue, .bloodSugar, .temperature,
+        // Behind feature flags (see `MetricKey.requiredFeature`).
+        .respiratoryRate, .met, .cardiacLoad, .bloodComponents,
     ]
 
     private var profile: UserProfile? { profiles.first }
@@ -41,7 +48,7 @@ struct VitalsView: View {
 
         return AnyView(ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                measureRow(activeStore)
+                header(activeStore)
                 grid(activeStore)
             }
             .padding(.horizontal, 16)
@@ -76,37 +83,63 @@ struct VitalsView: View {
         .onChange(of: dataChange.token) { _, _ in if isActive { store?.refreshIfNeeded() } }
         .onChange(of: isActive) { _, active in if active { store?.updateProfile(profile) } }
         .onChange(of: profile?.updatedAt) { _, _ in store?.updateProfile(profile) }
-        .sheet(item: Binding(get: { measuring.map(VitalsMeasuringItem.init) }, set: { measuring = $0?.kind })) { item in
-            MeasurementSheet(kind: item.kind)
+        .sheet(item: $sheet) { sheet in
+            switch sheet {
+            case .hub:
+                MeasureHubSheet(kinds: measureKinds(activeStore), isCharging: ringCharging) { kind in
+                    self.sheet = .measure(kind.sheetKind)
+                }
+            case let .measure(kind):
+                MeasurementSheet(kind: kind)
+            }
         })
     }
 
-    // MARK: - Measure row
+    // MARK: - Header
 
+    /// Title row with the one "Measure" button on the right (it replaced the row of measure pills). The
+    /// button opens the measure hub; it is hidden when the ring offers no on-demand test.
     @ViewBuilder
-    private func measureRow(_ store: VitalsStore) -> some View {
-        // On-demand spot measurements are capability-gated. Rings whose PPG sweep computes every metric
-        // at once (the ring: one `0x23` measurement returns HR + BP + SpO₂ + fatigue in a single `0x24`
-        // packet) get a single "Measure Vitals" action. Everything else measures one metric at a time.
-        let caps = store.capabilities
-        if caps.contains(.combinedVitalsMeasurement) {
-            QuickActionButton(label: "Measure Vitals", accent: true) { measuring = .vitals }
-        } else {
-            let spots: [(WearableCapability, String, MeasurementSheet.Kind)] = [
-                (.manualHeartRate, "Measure HR", .hr),
-                (.manualSpo2, "Measure SpO₂", .spo2),
-                (.manualHrv, "Measure HRV", .hrv),
-            ]
-            let available = spots.filter { caps.contains($0.0) }
-            if !available.isEmpty {
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: available.count), spacing: 8) {
-                    ForEach(available, id: \.2) { _, label, kind in
-                        QuickActionButton(label: label, accent: kind == .hr) { measuring = kind }
-                    }
+    private func header(_ store: VitalsStore) -> some View {
+        let kinds = measureKinds(store)
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Vitals")
+                    .font(PulseFont.title2.weight(.semibold))
+                    .foregroundStyle(PulseColors.textPrimary)
+                    .accessibilityAddTraits(.isHeader)
+                Text("Today's readings from your ring")
+                    .font(PulseFont.footnote)
+                    .foregroundStyle(PulseColors.textMuted)
+            }
+            Spacer(minLength: 8)
+            if !kinds.isEmpty {
+                Button { sheet = .hub } label: {
+                    Label("Measure", systemImage: "waveform.path.ecg")
+                        .font(PulseFont.subheadline.weight(.semibold))
+                        .foregroundStyle(PulseColors.onAccent)
+                        .padding(.horizontal, 16)
+                        .frame(minHeight: 40)
+                        .background(PulseColors.accent, in: Capsule())
                 }
+                .buttonStyle(.plain)
+                .accessibilityHint("Choose a measurement to take with your ring.")
+                .help("Take a measurement now")
+                .coachMark(CoachMarkStore.measure, text: AgaraHelp.hintMeasure)
             }
         }
+        .padding(.top, 4)
     }
+
+    /// The tests the hub offers: flags on, and supported by the ring (its own capability packets when
+    /// the probe has run, otherwise the family's capability list).
+    private func measureKinds(_ store: VitalsStore) -> [MeasureKind] {
+        MeasureKind.available(capabilities: store.capabilities,
+                              ring: devices.first?.ringCapabilities,
+                              isOn: { features.isOn($0) })
+    }
+
+    private var ringCharging: Bool { features.isOn(.chargingState) && ble.isCharging }
 
     // MARK: - Grid
 
@@ -203,7 +236,23 @@ struct VitalsView: View {
         case .bloodSugar:
             if let g = card(store, .glucose) { VitalGlucoseCard(model: g) { open(.glucose) } }
         case .temperature: chartCard(store, .temperature, physiology)
+        case .respiratoryRate: chartCard(store, .respiration, physiology)
+        case .met: chartCard(store, .met, physiology)
+        case .cardiacLoad: chartCard(store, .cardiacLoad, physiology)
+        case .bloodComponents: bloodComponentsCard(store)
         default: EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    private func bloodComponentsCard(_ store: VitalsStore) -> some View {
+        if let summary = store.bloodComponents {
+            VitalBloodComponentsCard(summary: summary, unit: UserPhysiologyProfile(profile).preferredGlucoseUnit,
+                                     sex: BiologicalSex(profileSex: profile?.sex)) { open($0) }
+        } else {
+            VitalEmptyState(metric: .totalCholesterol)
+                .padding(.vertical, 20)
+                .pulseGlass(RoundedRectangle(cornerRadius: PulseRadius.card, style: .continuous))
         }
     }
 
@@ -278,7 +327,10 @@ struct VitalsView: View {
     }
 }
 
-private struct VitalsMeasuringItem: Identifiable {
-    let kind: MeasurementSheet.Kind
-    var id: MeasurementSheet.Kind { kind }
+/// The Vitals screen's one sheet slot: the measure hub, or the measurement ring for a chosen test.
+private enum VitalsSheet: Identifiable, Hashable {
+    case hub
+    case measure(MeasurementSheet.Kind)
+
+    var id: Self { self }
 }

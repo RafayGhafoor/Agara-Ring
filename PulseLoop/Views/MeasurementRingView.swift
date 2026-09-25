@@ -178,7 +178,7 @@ struct MeasurementRingView: View {
             }
             Group {
                 if let size {
-                    Text(text).font(.system(size: size, weight: .semibold, design: .rounded))
+                    Text(text).font(AgaraFont.face(size, .semibold).monospacedDigit())
                 } else {
                     Text(text).font(PulseFont.numberHero)
                 }

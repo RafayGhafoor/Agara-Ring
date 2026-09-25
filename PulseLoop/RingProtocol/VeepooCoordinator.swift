@@ -16,7 +16,8 @@ import Foundation
 /// Deliberately **absent** — the verified subset ends where the ring's abilities do:
 ///
 /// - No `.realtimeHeartRate`: the ring has no push HR stream outside the one-shot D0 test.
-/// - No `.findDevice`, `.powerOff`, `.measurementInterval`, `.setGoal`: no verified opcodes exist.
+/// - No `.powerOff`, `.measurementInterval`: not implemented. `.findDevice` (`b5 0a`/`0b`) is claimed
+///   since the measure-hub work; the ring's capability packet 3 byte 8 says it has it.
 /// - Fatigue (0x81) and breathing-rate (0x82) tests exist in the SDK and the python client, but no
 ///   reply decode has been pinned for them yet — the `tools/` harness raw-dumps those streams until a
 ///   live run defines the byte maps; the app will claim them once that lands.
@@ -25,8 +26,8 @@ import Foundation
 ///   measurement (0x80) rides too, with the byte-map note carried in `VeepooDecoder.oxygen` (byte 4
 ///   read constant at 100 on the confirming run).
 ///
-/// MET, the C2 lipid panel (cholesterol/triglycerides/HDL/LDL/uric acid) and B2 sport codes are
-/// decoded by the harness but have no `MeasurementKind` / UI here, so they stay out of the promise.
+/// MET (BF), respiration (B6), cardiac load (B9 20–24) and the C2 blood components are decoded and
+/// stored; their cards sit behind feature flags (`docs/config/features.yaml`).
 @MainActor
 final class VeepooCoordinator: WearableCoordinator {
     nonisolated deinit {}   // skip the main-actor isolated-deinit hop (crashes on older sim runtimes)
@@ -57,9 +58,14 @@ final class VeepooCoordinator: WearableCoordinator {
     /// builders drive (heart-rate D0, SpO₂ 0x80, BP 0x90), whose start/stop frames were verified
     /// against the ring via `tools/veepoo_live.py --measure`.
     let capabilities: Set<WearableCapability> = [
-        .steps, .realtimeSteps, .sleep, .battery,
+        .steps, .realtimeSteps, .sleep, .remSleep, .battery,   // REM: A5 stage bitmap, verified 2026-09-25
         .heartRate, .spo2, .spo2History, .hrv, .stress, .bloodSugar, .bloodPressure,
         .manualHeartRate, .manualSpo2, .manualBloodPressure,
+        // Measure hub (docs/process/plans/measure-hub-spec.md): tests the ring's capability packets
+        // advertise (`a7`), the DF history series it fills, and find-device (`b5`). The hub still asks
+        // `RingCapabilities` per unit when the probe has run; this is the static fallback.
+        .manualStress, .manualBloodSugar, .manualBloodComponents,
+        .respiration, .met, .cardiacLoad, .bloodComponents, .findDevice,
     ]
 
     let iconSystemName = "circle.circle.fill"

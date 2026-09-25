@@ -33,7 +33,7 @@ struct StravaSettingsView: View {
 
                 if let connectError {
                     Text(connectError)
-                        .font(.caption)
+                        .font(PulseFont.caption)
                         .foregroundStyle(PulseColors.danger)
                         .padding(.horizontal, 4)
                 }

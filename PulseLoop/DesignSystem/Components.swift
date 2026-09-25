@@ -19,7 +19,7 @@ enum ChipTone {
 
     var background: Color {
         switch self {
-        case .neutral: return Color.white.opacity(0.10)
+        case .neutral: return PulseColors.textPrimary.opacity(0.10)
         case .up: return PulseColors.success.opacity(0.15)
         case .down: return PulseColors.danger.opacity(0.15)
         case .warn: return PulseColors.warning.opacity(0.15)
@@ -378,7 +378,7 @@ struct SleepHeroCardView: View {
                     .tracking(1.8)
                     .foregroundStyle(PulseColors.textMuted)
                 Text(value)
-                    .font(.system(size: noData ? 24 : 40, weight: .semibold))
+                    .font(AgaraFont.face(noData ? 24 : 40, .semibold))
                     .monospacedDigit()
                     .foregroundStyle(PulseColors.textPrimary)
                     .padding(.top, 4)
@@ -391,10 +391,13 @@ struct SleepHeroCardView: View {
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 4) {
-                Text(score.map { "\($0)" } ?? "—")
-                    .font(PulseFont.largeTitle)
-                    .monospacedDigit()
-                    .foregroundStyle(Color(hex: "#8B7CFF"))
+                HStack(alignment: .center, spacing: 2) {
+                    HelpTip(AgaraHelp.sleepScore)
+                    Text(score.map { "\($0)" } ?? "—")
+                        .font(PulseFont.largeTitle)
+                        .monospacedDigit()
+                        .foregroundStyle(PulseColors.sleep)
+                }
                 if let scoreLabel, score != nil {
                     Text(scoreLabel)
                         .font(PulseFont.subheadline)
@@ -413,17 +416,25 @@ struct SleepHeroCardView: View {
     }
 }
 
+/// Stage duration cards in a 2×2 grid: deep, light, REM, awake, which add up to the time in bed. Two per
+/// row keeps a value like "6h 19m" on one line (Android's SleepStageSummaryCards, same layout).
 struct SleepStageSummaryCardsView: View {
     var prefix: String = ""
     let deep: String
     let light: String
+    let rem: String
     let awake: String
 
     var body: some View {
-        HStack(spacing: 12) {
-            stat("\(prefix)Deep", deep, SleepStageColors.deep)
-            stat("\(prefix)Light", light, SleepStageColors.light)
-            stat("\(prefix)Awake", awake, SleepStageColors.awake)
+        VStack(spacing: 12) {
+            HStack(spacing: 12) {
+                stat("\(prefix)Deep", deep, SleepStageColors.deep)
+                stat("\(prefix)Light", light, SleepStageColors.light)
+            }
+            HStack(spacing: 12) {
+                stat("\(prefix)REM", rem, SleepStageColors.rem)
+                stat("\(prefix)Awake", awake, SleepStageColors.awake)
+            }
         }
     }
 
@@ -441,6 +452,8 @@ struct SleepStageSummaryCardsView: View {
                 .font(PulseFont.title2)
                 .monospacedDigit()
                 .foregroundStyle(PulseColors.textPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
                 .padding(.top, 12)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -495,14 +508,14 @@ struct QuickActionButton: View {
         if #available(iOS 26, *), !reduceTransparency {
             // Accent variant = tinted prominent glass; neutral = plain glass.
             Button(action: action) {
-                text.foregroundStyle(accent ? .white : PulseColors.textPrimary)
+                text.foregroundStyle(accent ? PulseColors.onAccent : PulseColors.textPrimary)
             }
             .modifier(QuickActionGlass(accent: accent))
             .clipShape(Capsule())
         } else {
             Button(action: action) {
                 text
-                    .foregroundStyle(accent ? .white : PulseColors.textPrimary)
+                    .foregroundStyle(accent ? PulseColors.onAccent : PulseColors.textPrimary)
                     .background(accent ? PulseColors.accent : PulseColors.card)
                     .clipShape(Capsule())
                     .overlay(Capsule().stroke(accent ? Color.clear : PulseColors.borderSubtle, lineWidth: 1))
