@@ -21,9 +21,12 @@ struct SleepView: View {
     /// True while a press-and-hold scrub is active on a hypnogram. Pauses this screen's scroll
     /// views (outer vertical + session carousel) so the scrub drag doesn't pan them.
     @State private var hypnogramScrubbing = false
+    /// Memo for the tab's store reads (see `body`). A reference type, so filling it during a body pass
+    /// doesn't count as a state change.
+    @State private var tabCache = SleepTabCache()
 
     init() {
-        let raw = UserDefaults.standard.string(forKey: "startSleepRange")
+        let raw = DebugLaunch.string("startSleepRange")
         _range = State(initialValue: SleepRangeKey.allCases.first { $0.rawValue == raw } ?? .day)
     }
 
@@ -41,11 +44,22 @@ struct SleepView: View {
         // Day view is anchored on a selectable night: shift `now` back `dayOffset` days and let
         // `sleepRange`/`dayReferenceNight` apply the usual 4 AM "last night" flip. Week/Month/Year
         // keep their own anchor (dayOffset is ignored there).
-        let _ = dataChange.token   // subscribe: re-run the body (and re-fetch below) on each synced batch
+        let token = dataChange.token   // subscribe: re-run the body (and re-fetch below) on each synced batch
         let effectiveNow = Calendar.current.date(byAdding: .day, value: -dayOffset, to: Date()) ?? Date()
-        let summary = SleepService.sleepRange(range, context: modelContext, now: range == .day ? effectiveNow : Date())
-        let goalMin = MetricsRepository.goals(context: modelContext)?.sleepMinutes
-        let activitySteps = MetricsRepository.latestActivity(context: modelContext)?.steps
+        // The fetches run once per (range, day, data batch, reference night) — not on every body pass (a
+        // scrub, a carousel page or a sheet toggle re-runs the body; the Year range is a year of nights).
+        let anchor = range == .day ? SleepService.dayReferenceNight(now: effectiveNow) : Calendar.current.startOfDay(for: Date())
+        let loaded = tabCache.value(for: "\(range.rawValue)|\(dayOffset)|\(token)|\(anchor.timeIntervalSince1970)") {
+            SleepTabData(
+                summary: SleepService.sleepRange(range, context: modelContext, now: range == .day ? effectiveNow : Date()),
+                goalMinutes: MetricsRepository.goals(context: modelContext)?.sleepMinutes,
+                activitySteps: MetricsRepository.latestActivity(context: modelContext)?.steps,
+                earliestDay: SleepRepository.sessions(context: modelContext).first.map { Calendar.current.startOfDay(for: $0.date) }
+            )
+        }
+        let summary = loaded.summary
+        let goalMin = loaded.goalMinutes
+        let activitySteps = loaded.activitySteps
 
         ScrollView {
             VStack(spacing: 16) {
@@ -328,7 +342,7 @@ struct SleepView: View {
 
     /// Earliest recorded night (sessions are sorted ascending by date), start-of-day.
     private var earliestDataDay: Date? {
-        SleepRepository.sessions(context: modelContext).first.map { Calendar.current.startOfDay(for: $0.date) }
+        tabCache.earliestDay ?? SleepRepository.sessions(context: modelContext).first.map { Calendar.current.startOfDay(for: $0.date) }
     }
     /// How many days back the stepper may travel: up to one week before the earliest recorded
     /// night, clamped to a 1-year floor. 0 (locked to today) when there's no data at all.
@@ -513,5 +527,28 @@ private struct VisualizationCard<Content: View>: View {
             Circle().fill(color).frame(width: 6, height: 6)
             Text(label).font(PulseFont.nano.weight(.regular)).foregroundStyle(PulseColors.textSecondary)
         }
+    }
+}
+
+/// What the Sleep tab reads from the store for one (range, day, data batch).
+struct SleepTabData {
+    let summary: SleepRangeSummary
+    let goalMinutes: Int?
+    let activitySteps: Int?
+    let earliestDay: Date?
+}
+
+/// One-entry memo for `SleepView`'s fetches, keyed by what they depend on.
+final class SleepTabCache {
+    private var key: String?
+    private var data: SleepTabData?
+    var earliestDay: Date? { data?.earliestDay }
+
+    func value(for key: String, _ load: () -> SleepTabData) -> SleepTabData {
+        if key == self.key, let data { return data }
+        let fresh = load()
+        self.key = key
+        data = fresh
+        return fresh
     }
 }

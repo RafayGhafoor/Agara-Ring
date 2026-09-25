@@ -28,7 +28,10 @@ final class CoachNotificationScheduler {
     func register(serviceProvider: @escaping (TimeInterval) -> CoachNotificationService) {
         self.serviceProvider = serviceProvider
         isRegistered = true
-        let handler: (BGTask) -> Void = { task in
+        // `@Sendable`: the closure is formed on the main actor but BGTaskScheduler calls it on its own
+        // queue. Without the annotation Swift infers it main-actor isolated and the runtime's isolation
+        // check traps when the background queue invokes it (Swift 6 runtime, iOS 18+).
+        let handler: @Sendable (BGTask) -> Void = { task in
             // `using: nil` runs the launch handler on a private background queue,
             // so hop to the main actor rather than asserting we're already on it.
             Task { @MainActor in Self.shared.handle(task) }

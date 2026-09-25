@@ -345,7 +345,7 @@ struct VitalsView: View {
 
     private func autoMeasureIfRequested() async {
         guard !Self.didAutoMeasure, isActive,
-              let id = UserDefaults.standard.string(forKey: "autoMeasure") else { return }
+              let id = DebugLaunch.string("autoMeasure") else { return }
         Self.didAutoMeasure = true
         for _ in 0..<120 where ble.state != .connected {
             try? await Task.sleep(for: .milliseconds(500))

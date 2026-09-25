@@ -178,7 +178,7 @@ final class WorkoutSensorPollingService: ObservableObject {
     /// record the stall and re-issue the stream command (firmware occasionally drops the stream).
     private func checkStreamHealth() {
         guard let sessionID,
-              let session = ActivityRepository.sessions(context: context).first(where: { $0.id == sessionID }),
+              let session = ActivityRepository.session(id: sessionID, context: context),
               session.status == .recording else { return }
         let hrKind = MeasurementKind.heartRate.rawValue
         // Recovery freshness counts any HR sample (ring-log backfill included) …
@@ -232,7 +232,7 @@ final class WorkoutSensorPollingService: ObservableObject {
         let kindRaw = kind == .heartRate ? "hr" : "spo2"
 
         // Defensive: a finished/cancelled/missing session should never trigger a real read.
-        guard let session = ActivityRepository.sessions(context: context).first(where: { $0.id == sessionID }),
+        guard let session = ActivityRepository.session(id: sessionID, context: context),
               session.status == .recording else {
             record(kind: kindRaw, status: "skipped")
             return true

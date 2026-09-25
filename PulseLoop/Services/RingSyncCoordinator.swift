@@ -113,11 +113,19 @@ enum SpotMode {
 ///  * **Scatter.** Finger motion and poor contact make the PPG estimate jump around instead of holding
 ///    within a few beats. A majority of the window must agree (`band`, `majority`) or we report nothing:
 ///    a heart rate the user has no reason to doubt, but shouldn't trust, is worse than an honest retry.
-private struct HRSampleWindow {
+struct HRSampleWindow {
     /// Discard window for the cached echo described above.
     private let warmup: TimeInterval = 5
     /// A gap this long between collected samples means we've stopped getting real data (ring slipped).
-    private let contactGap: TimeInterval = 3
+    static let contactGap: TimeInterval = 3
+    /// The gap allowed while a history transfer shares the link: the ring serialises its notifications,
+    /// so its `D0` samples queue behind the DF frames already on the wire and land in bursts several
+    /// seconds apart — not a slipped ring (post-connect sync, 2026-09-26).
+    static let contactGapDuringSync: TimeInterval = 10
+    /// Whatever the base gap, allow a few of the stream's own observed intervals: a ring (or link) that
+    /// delivers every ~2.5 s would otherwise trip a fixed 3 s check on normal jitter.
+    private let cadenceFactor = 3.0
+    private let maxContactGap: TimeInterval = 12
     private let minSamples = 6
     private let band = 8            // bpm neighbourhood around the median
     private let majority = 0.6      // this much of the window must sit inside that band
@@ -125,22 +133,37 @@ private struct HRSampleWindow {
     private var startedAt: Date?
     private var samples: [Int] = []
     private var lastSampleAt: Date?
+    private var intervals: [TimeInterval] = []
+    private var baseGap: TimeInterval = HRSampleWindow.contactGap
 
     /// True once a *real* (post-warm-up) reading has landed — which is what distinguishes a fresh
     /// measurement from the stale `latestHRValue` still on screen from the last one.
     var receivedReading: Bool { !samples.isEmpty }
 
-    mutating func begin(at now: Date = Date()) {
+    /// - Parameter historySyncing: a history transfer is running on the same link — use the wider gap.
+    mutating func begin(at now: Date = Date(), historySyncing: Bool = false) {
         startedAt = now
         samples = []
         lastSampleAt = nil
+        intervals = []
+        baseGap = historySyncing ? Self.contactGapDuringSync : Self.contactGap
     }
 
     /// Collect a sample, unless it's still inside the warm-up echo.
     mutating func collect(_ bpm: Int, at now: Date = Date()) {
         guard let startedAt, now.timeIntervalSince(startedAt) >= warmup else { return }
+        if let lastSampleAt { intervals.append(now.timeIntervalSince(lastSampleAt)) }
         samples.append(bpm)
         lastSampleAt = now
+    }
+
+    /// The gap that counts as lost contact: the base gap, widened to a few of the stream's own median
+    /// intervals (capped), so a slower-but-steady stream isn't mistaken for a slipped ring.
+    var contactGap: TimeInterval {
+        guard intervals.count >= 2 else { return baseGap }
+        let sorted = intervals.sorted()
+        let median = sorted[sorted.count / 2]
+        return min(maxContactGap, max(baseGap, median * cadenceFactor))
     }
 
     /// Contact lost: readings had begun, and then stopped arriving. Never true during the warm-up,
@@ -308,6 +331,8 @@ final class RingSyncCoordinator {
     /// this is the one real fixed window, and `MeasurementSheet` derives its countdown from it rather
     /// than copying the literal (a copy would silently desync the ring's fill from the measurement).
     let hrMeasureSeconds: UInt64 = 30
+    /// Extra window when a spot HR starts during a history transfer (the transfer on the wire drains first).
+    let hrSyncExtraSeconds: UInt64 = 15
     /// **Raised from 40 s.** A successful SpO₂ sweep took 38 s — inside a 40 s window by two
     /// seconds — and an earlier attempt in the same session ran past 41 s with no result. At 40 s the
     /// outcome was a coin toss: the user watched the ring's red LED work and got an error anyway. 60 s
@@ -644,7 +669,11 @@ final class RingSyncCoordinator {
         // measurement keeps the last reading on screen until a fresh one replaces it (no blanking to —).
         hrNoReadingReported = false
         measureNotWorn = false
-        hrWindow.begin()
+        // A history transfer on the link delays the samples (see `HRSampleWindow.contactGapDuringSync`); the
+        // engine pauses its day loop for the test, but the transfer already on the wire still has to drain,
+        // so allow the wider gap and a longer window.
+        let historySyncing = engine?.isHistorySyncing == true
+        hrWindow.begin(historySyncing: historySyncing)
         // Spot reading: the engine picks the right command (the live stream this ring answers with).
         // Always stop the stream when we're done so the ring doesn't keep measuring.
         let token = spot.begin(mode: SpotMode.heartRate)
@@ -654,7 +683,7 @@ final class RingSyncCoordinator {
         // collects the rest into `hrSamples`. We break out early only where continuing is pointless —
         // and each of those is an abort, not a short-but-usable reading, so none of them report a value.
         var aborted = false
-        let steps = Int(hrMeasureSeconds) * 2   // 0.5s granularity
+        let steps = Int(hrMeasureSeconds + (historySyncing ? hrSyncExtraSeconds : 0)) * 2   // 0.5s granularity
         for _ in 0..<steps {
             if Task.isCancelled { aborted = true; break }
             // The ring reported "worn incorrectly", or refused the measurement outright.
@@ -1078,6 +1107,9 @@ private extension RingSyncCoordinator {
     /// now" without a byte on the wire.
     func resyncHistoryIfStale(now: Date = Date()) {
         guard isConnected, !isSyncing, !workoutHRActive else { return }
+        // Never start a history pass under a running spot measurement: every HR sample calls this, so the
+        // first test after a connect used to kick the pass itself and starve its own samples.
+        guard !measurementActive, spot.modesInFlight.isEmpty else { return }
         // A kicked sync takes a moment before `isSyncing` reflects it; don't re-enter meanwhile.
         if let last = lastResyncKickAt, now.timeIntervalSince(last) < 60 { return }
         let lastFullSync = DeviceRepository.current(context: context)?.lastFullSyncAt ?? .distantPast

@@ -241,7 +241,7 @@ final class VeepooDriver: WearableDriver {
     /// costs almost nothing; `-historyDays N` (launch argument) widens it for tooling — e.g. rendering a
     /// two-month week/month/year view against the ring emulator.
     static var configuredHistoryDays: Int {
-        let requested = UserDefaults.standard.integer(forKey: "historyDays")
+        let requested = DebugLaunch.integer("historyDays")
         return (1...400).contains(requested) ? requested : AgaraConfig.Ring.historyDays
     }
 }

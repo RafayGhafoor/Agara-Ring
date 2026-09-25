@@ -200,6 +200,20 @@ enum SleepRepository {
         sessions(context: context).max { $0.startAt < $1.startAt }
     }
     
+    /// Blocks of several sessions in one fetch, grouped by session and sorted by minute — for range views
+    /// that used to issue one fetch per night (365 for the Year tab).
+    @MainActor
+    static func blocks(sessionIds: [UUID], context: ModelContext) -> [UUID: [SleepStageBlock]] {
+        guard !sessionIds.isEmpty else { return [:] }
+        if sessionIds.count == 1, let id = sessionIds.first { return [id: blocks(sessionId: id, context: context)] }
+        let ids = sessionIds
+        let descriptor = FetchDescriptor<SleepStageBlock>(
+            predicate: #Predicate { ids.contains($0.sessionId) },
+            sortBy: [SortDescriptor(\.startMinute)]
+        )
+        return Dictionary(grouping: (try? context.fetch(descriptor)) ?? [], by: \.sessionId)
+    }
+
     @MainActor
     static func blocks(sessionId: UUID, context: ModelContext) -> [SleepStageBlock] {
         let descriptor = FetchDescriptor<SleepStageBlock>(
@@ -217,6 +231,14 @@ enum ActivityRepository {
         return (try? context.fetch(descriptor)) ?? []
     }
     
+    /// One session by id (a keyed fetch, not a scan of the table).
+    @MainActor
+    static func session(id: UUID, context: ModelContext) -> ActivitySession? {
+        var descriptor = FetchDescriptor<ActivitySession>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        return try? context.fetch(descriptor).first
+    }
+
     @MainActor
     static func samples(sessionId: UUID, context: ModelContext) -> [ActivitySample] {
         let descriptor = FetchDescriptor<ActivitySample>(
@@ -543,6 +565,20 @@ enum DebugRepository {
     @MainActor
     static func queryPackets(context: ModelContext) -> [RawPacketRow] {
         queryPackets(filter: DebugPacketFilter(), context: context)
+    }
+
+    /// How long the audit tables (`DerivedUpdateRow`, `WearableLog`) keep rows. Both are diagnostics that
+    /// nothing reads back past a few days, and both grew without bound (audit batch B).
+    static let auditRetentionDays = 7
+
+    /// Delete audit rows older than `auditRetentionDays` in two batch deletes (no fetch), then save.
+    /// Run once per launch.
+    @MainActor
+    static func pruneAuditTables(now: Date = Date(), context: ModelContext) {
+        let cutoff = now.addingTimeInterval(-Double(auditRetentionDays) * 86_400)
+        try? context.delete(model: DerivedUpdateRow.self, where: #Predicate { $0.timestamp < cutoff })
+        try? context.delete(model: WearableLog.self, where: #Predicate { $0.timestamp < cutoff })
+        try? context.save()
     }
 
     /// Cap the raw-packet debug table to its most recent `maxRows` rows, deleting older ones.

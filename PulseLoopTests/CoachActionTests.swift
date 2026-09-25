@@ -164,4 +164,21 @@ final class CoachChartDomainTests: XCTestCase {
         XCTAssertLessThanOrEqual(d.upperBound, 100)
         XCTAssertLessThan(d.lowerBound, 96)
     }
+
+    /// Model output is untrusted: negative magnitudes, NaN/∞ and out-of-range SpO₂ must not trap.
+    func testHostileValuesNeverBuildAnInvalidRange() {
+        let cases: [([Double], CoachChartType, CoachChartMetric)] = [
+            ([-200, -100], .bar, .calories), ([-5], .bar, .steps), ([-3, -3], .bar, .sleep),
+            ([.nan, 70], .line, .hr), ([.infinity], .dot, .hr), ([.nan], .bar, .steps),
+            ([150, 160], .dot, .spo2), ([100], .line, .spo2), ([-1, 4], .bar, .distance),
+        ]
+        for (values, type, metric) in cases {
+            let d = CoachChartView.yDomain(values: values, chartType: type, metric: metric)
+            XCTAssertTrue(d.lowerBound.isFinite && d.upperBound.isFinite, "\(values)")
+            XCTAssertLessThan(d.lowerBound, d.upperBound, "\(values)")
+            for v in values where v.isFinite && metric != .spo2 {
+                XCTAssertTrue(d.contains(v), "\(v) outside \(d)")
+            }
+        }
+    }
 }

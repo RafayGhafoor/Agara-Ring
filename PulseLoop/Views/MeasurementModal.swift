@@ -117,7 +117,7 @@ struct MeasurementSheet: View {
         #if DEBUG
         // `-measureHoldResult YES` (E2E tooling): keep the result on screen until Done, so a UI test can
         // read it instead of racing the 1.3 s auto-dismiss.
-        if UserDefaults.standard.bool(forKey: "measureHoldResult") { return true }
+        if DebugLaunch.bool("measureHoldResult") { return true }
         #endif
         #if canImport(UIKit)
         return UIAccessibility.isVoiceOverRunning || UIAccessibility.isSwitchControlRunning

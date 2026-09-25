@@ -30,24 +30,8 @@ nonisolated struct StravaKeychainTokenStore: StravaTokenStoring {
         self.account = account
     }
 
-    private var baseQuery: [String: Any] {
-        [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-        ]
-    }
-
     func read() throws -> StravaTokens? {
-        var query = baseQuery
-        query[kSecReturnData as String] = true
-        query[kSecMatchLimit as String] = kSecMatchLimitOne
-
-        var item: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &item)
-        if status == errSecItemNotFound { return nil }
-        guard status == errSecSuccess else { throw KeychainError.unexpectedStatus(status) }
-        guard let data = item as? Data else { return nil }
+        guard let data = try KeychainItem.read(service: service, account: account) else { return nil }
         return try? Self.decoder.decode(StravaTokens.self, from: data)
     }
 
@@ -58,27 +42,11 @@ nonisolated struct StravaKeychainTokenStore: StravaTokenStoring {
         } catch {
             throw KeychainError.dataEncoding
         }
-
-        // Upsert: update if present, otherwise add.
-        let attributes: [String: Any] = [kSecValueData as String: data]
-        let updateStatus = SecItemUpdate(baseQuery as CFDictionary, attributes as CFDictionary)
-        if updateStatus == errSecSuccess { return }
-        if updateStatus == errSecItemNotFound {
-            var insert = baseQuery
-            insert[kSecValueData as String] = data
-            insert[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
-            let addStatus = SecItemAdd(insert as CFDictionary, nil)
-            guard addStatus == errSecSuccess else { throw KeychainError.unexpectedStatus(addStatus) }
-            return
-        }
-        throw KeychainError.unexpectedStatus(updateStatus)
+        try KeychainItem.write(data, service: service, account: account)
     }
 
     func delete() throws {
-        let status = SecItemDelete(baseQuery as CFDictionary)
-        guard status == errSecSuccess || status == errSecItemNotFound else {
-            throw KeychainError.unexpectedStatus(status)
-        }
+        try KeychainItem.delete(service: service, account: account)
     }
 
     // Epoch-seconds dates so the blob stays stable across encoder defaults.

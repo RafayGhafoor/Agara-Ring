@@ -15,7 +15,7 @@ enum PendingActionExecutor {
         }
 
         guard let id = UUID(uuidString: action.activityId),
-              let session = ActivityRepository.sessions(context: context).first(where: { $0.id == id }) else {
+              let session = ActivityRepository.session(id: id, context: context) else {
             return "That workout no longer exists."
         }
         let typeLabel = ActivityMeta.label(session.type)

@@ -16,7 +16,7 @@ import Foundation
 ///
 /// For each day 0…`historyDays`-1: write E0 `<day>` and wait until the sleep transfer completes —
 /// either its last-page marker (`E0 00 <sessions>`) or its no-data marker (`E0 ?? 00`) — then write
-/// `DF 01 <day> 00` and wait for the `DF FF FF` end marker, then move on. Both completions were
+/// `DF 01 00 <day>` (position 1 of that day — `DF <posLo> <posHi> <day>`) and wait for the `DF FF FF` end marker, then move on. Both completions were
 /// observed on hardware: days 0–2 returned sleep, days 3–6 replied no-data immediately, and the DF
 /// transfers for days 1–6 completed empty. A ring that goes silent mid-transfer stalls at that day —
 /// the buffered frames stay put and the next connect re-runs the loop (`connectionDidStart` clears
@@ -69,6 +69,15 @@ final class VeepooSyncEngine: RingSyncEngine {
     /// 1 would fire at the first tick after any progress (0–30 s). Same value as Android's.
     static let stallTicks = 2
 
+    /// A spot heart-rate test (`measureHeartRateSpot`) is running. The ring serialises its notifications, so
+    /// a history transfer running next to the test queues the 1 Hz `D0` samples behind hundreds of DF
+    /// frames — they arrive seconds apart and the measurement fails its contact-gap check ("Couldn't get a
+    /// steady reading" during the post-connect sync, 2026-09-26). While set, the day loop issues no new
+    /// request: the transfer already on the wire finishes, the next E0/DF waits in `pendingHistoryRequest`.
+    private var spotHeartRateActive = false
+    /// The history request held back while `spotHeartRateActive`; sent when the test stops.
+    private var pendingHistoryRequest: Data?
+
     /// The auth ack arrived while `FirmwareUpdateHold` was set; the post-auth sequence waits for its release.
     private var postAuthDeferred = false
 
@@ -106,6 +115,8 @@ final class VeepooSyncEngine: RingSyncEngine {
         historyFinished = false
         historyInFlight = false
         postAuthDeferred = false
+        spotHeartRateActive = false
+        pendingHistoryRequest = nil
         crcFailures = 0
         stopPolling()
     }
@@ -156,9 +167,9 @@ final class VeepooSyncEngine: RingSyncEngine {
         if isFeatureOn(.autoMeasureSettings) {
             writer?.enqueue(VeepooEncoder.autoMeasureRead())
         }
-        writer?.enqueue(VeepooEncoder.sleepHistory(dayOffset: 0))
         historyInFlight = true
         lastProgressTick = pollTick
+        requestHistory(VeepooEncoder.sleepHistory(dayOffset: 0))
         startPolling()
     }
 
@@ -186,7 +197,7 @@ final class VeepooSyncEngine: RingSyncEngine {
         if pollTick.isMultiple(of: 2) {
             writer?.enqueue(VeepooEncoder.battery())
         }
-        if historyInFlight, pollTick - lastProgressTick >= Self.stallTicks {
+        if historyInFlight, pendingHistoryRequest == nil, pollTick - lastProgressTick >= Self.stallTicks {
             watchdogAdvance()
         }
         reconcileLiveStream()
@@ -257,7 +268,28 @@ final class VeepooSyncEngine: RingSyncEngine {
         sleepComplete = true
         lastProgressTick = pollTick
         emitSleepSummary()
-        writer?.enqueue(VeepooEncoder.dailyHistory(dayOffset: currentDay))
+        requestHistory(VeepooEncoder.dailyHistory(dayOffset: currentDay))
+    }
+
+    /// Send the day loop's next request — or hold it while a spot HR test runs (`spotHeartRateActive`).
+    private func requestHistory(_ frame: Data) {
+        if spotHeartRateActive {
+            pendingHistoryRequest = frame
+        } else {
+            writer?.enqueue(frame)
+        }
+    }
+
+    /// The spot HR test ended: send the held-back request, and restart the stall clock so the paused
+    /// time doesn't count as silence.
+    private func resumeHistoryAfterSpotHeartRate() {
+        guard spotHeartRateActive else { return }
+        spotHeartRateActive = false
+        lastProgressTick = pollTick
+        if let frame = pendingHistoryRequest {
+            pendingHistoryRequest = nil
+            writer?.enqueue(frame)
+        }
     }
 
     /// Assemble the sleep payload exactly as the harness did — pages sorted descending, frame header
@@ -314,7 +346,7 @@ final class VeepooSyncEngine: RingSyncEngine {
             dailyComplete = false
             sleepFrames.removeAll()
             dailyFrames.removeAll()
-            writer?.enqueue(VeepooEncoder.sleepHistory(dayOffset: currentDay))
+            requestHistory(VeepooEncoder.sleepHistory(dayOffset: currentDay))
         } else {
             writer?.emit(.historySyncFinished)
             historyFinished = true
@@ -464,6 +496,16 @@ final class VeepooSyncEngine: RingSyncEngine {
 
     func stopHeartRate() {
         writer?.enqueue(VeepooEncoder.heartRateStop())
+        // `D0 00` ends whatever `D0` stream was open, the live one included; the tick restarts it.
+        liveStreamStarted = false
+        resumeHistoryAfterSpotHeartRate()
+    }
+
+    /// Spot HR: the same `D0 01` stream, but the day loop pauses between requests until `stopHeartRate`
+    /// (see `spotHeartRateActive`). Workout and live streams use `startHeartRate` and don't pause it.
+    func measureHeartRateSpot() {
+        spotHeartRateActive = true
+        writer?.enqueue(VeepooEncoder.heartRateStart())
     }
 
     // SpO₂ and BP take the sensor from the live HR stream: mark the stream stopped (the ring drops it
@@ -563,12 +605,14 @@ final class VeepooSyncEngine: RingSyncEngine {
         dailyComplete = false
         sleepFrames.removeAll()
         dailyFrames.removeAll()
-        if liveStreamStarted {
+        // Stop the live stream for the pass — but not under a spot HR test, whose samples ride the same
+        // stream: the pass starts paused instead and the test's own stop ends the stream.
+        if liveStreamStarted, !spotHeartRateActive {
             liveStreamStarted = false
             writer?.enqueue(VeepooEncoder.heartRateStop())
         }
         historyInFlight = true
         lastProgressTick = pollTick
-        writer?.enqueue(VeepooEncoder.sleepHistory(dayOffset: 0))
+        requestHistory(VeepooEncoder.sleepHistory(dayOffset: 0))
     }
 }

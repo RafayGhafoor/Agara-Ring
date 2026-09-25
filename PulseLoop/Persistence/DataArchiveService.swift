@@ -1,3 +1,4 @@
+import Compression
 import Foundation
 import SwiftData
 
@@ -24,7 +25,8 @@ nonisolated enum DataArchiveError: LocalizedError, Sendable {
 }
 
 /// Full-app export/import: everything in SwiftData plus the settings blobs and coach attachments,
-/// as one plain JSON file (see `PulseArchive`). Privacy-first — nothing leaves the device unless
+/// as one gzip-compressed JSON file in Android's archive layout (see `PulseArchive`). Import reads gzip
+/// (detected by its `1f 8b` magic, not the name) or the plain `.json` earlier builds wrote. Privacy-first — nothing leaves the device unless
 /// the user shares the file themselves. Keychain API keys are deliberately excluded.
 ///
 /// Concurrency: SwiftData stays on the main actor (the whole app runs on `container.mainContext`),
@@ -59,65 +61,116 @@ enum DataArchiveService {
 
     // MARK: - Export
 
-    /// Snapshots the entire store into archive JSON. Safe to call from the UI; yields regularly.
+    /// Snapshots the entire store into archive JSON (uncompressed, in memory). Kept for tests and the
+    /// DEBUG headless export; the share-sheet path is `exportFile`, which streams gzip to disk.
     static func exportArchive(
         context: ModelContext,
         defaults: UserDefaults = .standard,
-        attachmentsDirectory: URL? = nil
+        attachmentsDirectory: URL? = nil,
+        includeRawPackets: Bool = false
     ) async throws -> Data {
         try beginExclusiveOperation()
         defer { isBusy = false }
-        let archive = try await buildArchive(
-            context: context,
-            defaults: defaults,
-            attachmentsDirectory: attachmentsDirectory ?? Self.defaultAttachmentsDirectory()
+        let sink = ArchiveDataSink()
+        try await writeArchive(
+            to: sink, context: context, defaults: defaults,
+            attachmentsDirectory: attachmentsDirectory ?? Self.defaultAttachmentsDirectory(),
+            includeRawPackets: includeRawPackets
         )
-        // Encoding tens of thousands of rows is the single most expensive CPU step — run it off-main.
-        return try await Task.detached(priority: .userInitiated) {
-            try ArchiveCoding.makeEncoder().encode(archive)
-        }.value
+        return sink.data
     }
 
-    /// Exports to a shareable temp file (`pulseloop-export-<date>.json`) for the share sheet.
-    static func exportFile(context: ModelContext) async throws -> URL {
-        let data = try await exportArchive(context: context)
+    /// The export's file name — Android's: `agara-export-<yyyy-MM-dd-HHmm>.json.gz`.
+    static func exportFileName(now: Date = Date()) -> String {
         let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd-HHmm"
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("pulseloop-export-\(formatter.string(from: Date())).json")
-        try data.write(to: url, options: .atomic)
+        return "agara-export-\(formatter.string(from: now)).json.gz"
+    }
+
+    /// Streams the archive through gzip into a shareable temp file for the share sheet. Earlier exports
+    /// and diagnostics reports are deleted first (`ExportFiles.freshDirectory`) — they are copies the user
+    /// already shared, and each one holds their whole health history.
+    /// Raw BLE packets are included only when `includeRawPackets` is set (Android's "include diagnostics").
+    static func exportFile(context: ModelContext, includeRawPackets: Bool = false) async throws -> URL {
+        try beginExclusiveOperation()
+        defer { isBusy = false }
+        let url = try ExportFiles.freshDirectory().appendingPathComponent(exportFileName())
+        let sink = try GzipFileSink(url: url)
+        do {
+            try await writeArchive(
+                to: sink, context: context, defaults: .standard,
+                attachmentsDirectory: Self.defaultAttachmentsDirectory(), includeRawPackets: includeRawPackets
+            )
+            try await Task.detached(priority: .userInitiated) { try sink.finish() }.value
+        } catch {
+            sink.abandon()
+            try? FileManager.default.removeItem(at: url)
+            throw error
+        }
         return url
     }
 
-    private static func buildArchive(
+    /// Writes the archive as one JSON document, row by row — the whole file is never in memory. Same
+    /// layout as Android's `ArchiveCodec.write`: scalars first, tables in `AgaraArchive` order, `counts`
+    /// last (the rows actually written). iOS-only `settings` / `attachments` go before `counts`.
+    /// Models are read on the main actor in chunks; each chunk is JSON-encoded and compressed off-main.
+    static func writeArchive(
+        to sink: ArchiveSink,
         context: ModelContext,
         defaults: UserDefaults,
-        attachmentsDirectory: URL
-    ) async throws -> PulseArchive {
-        let devices = try await collect(Device.self, context) { ArchiveDevice($0) }
-        let activityDailies = try await collect(ActivityDaily.self, context) { ArchiveActivityDaily($0) }
-        let measurements = try await collect(PulseLoop.Measurement.self, context) { ArchiveMeasurement($0) }
-        let batterySamples = try await collect(BatterySample.self, context) { ArchiveBatterySample($0) }
-        let sleepSessions = try await collect(SleepSession.self, context) { ArchiveSleepSession($0) }
-        let sleepStageBlocks = try await collect(SleepStageBlock.self, context) { ArchiveSleepStageBlock($0) }
-        let rawPackets = try await collect(RawPacketRow.self, context) { ArchiveRawPacket($0) }
-        let derivedUpdates = try await collect(DerivedUpdateRow.self, context) { ArchiveDerivedUpdate($0) }
-        let userProfiles = try await collect(UserProfile.self, context) { ArchiveUserProfile($0) }
-        let userGoals = try await collect(UserGoal.self, context) { ArchiveUserGoal($0) }
-        let deviceMeasurementConfigs = try await collect(DeviceMeasurementConfig.self, context) { ArchiveDeviceMeasurementConfig($0) }
-        let activitySessions = try await collect(ActivitySession.self, context) { ArchiveActivitySession($0) }
-        let activitySamples = try await collect(ActivitySample.self, context) { ArchiveActivitySample($0) }
-        let activityBucketSamples = try await collect(ActivityBucketSample.self, context) { ArchiveActivityBucketSample($0) }
-        let activityGpsPoints = try await collect(ActivityGpsPoint.self, context) { ArchiveActivityGpsPoint($0) }
-        let activityEvents = try await collect(ActivityEvent.self, context) { ArchiveActivityEvent($0) }
-        let activitySensorPollEvents = try await collect(ActivitySensorPollEvent.self, context) { ArchiveActivitySensorPollEvent($0) }
-        let coachConversations = try await collect(CoachConversation.self, context) { ArchiveCoachConversation($0) }
-        let coachMessages = try await collect(CoachMessage.self, context) { ArchiveCoachMessage($0) }
-        let coachMemories = try await collect(CoachMemory.self, context) { ArchiveCoachMemory($0) }
-        let coachToolCalls = try await collect(CoachToolCall.self, context) { ArchiveCoachToolCall($0) }
-        let coachNotificationRecords = try await collect(CoachNotificationRecord.self, context) { ArchiveCoachNotificationRecord($0) }
-        let coachSummaries = try await collect(CoachSummary.self, context) { ArchiveCoachSummary($0) }
-        let wearableLogs = try await collect(WearableLog.self, context) { ArchiveWearableLog($0) }
+        attachmentsDirectory: URL,
+        includeRawPackets: Bool
+    ) async throws {
+        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
+        let head = "{\"formatVersion\":\(PulseArchive.currentFormatVersion),\"exportedAt\":"
+            + "\(ArchiveCoding.millis(Date())),\"appVersion\":" + jsonString(appVersion)
+        try sink.write(Data(head.utf8))
+
+        var counts: [(String, Int)] = []
+        func table<T: PersistentModel, D: Encodable & Sendable>(
+            _ key: String, _ tableName: String, _ type: T.Type, skip: Bool = false, _ map: (T) -> D
+        ) async throws {
+            try sink.write(Data(",\"\(key)\":[".utf8))
+            let n = skip ? 0 : try await streamRows(type, context, sink, map)
+            try sink.write(Data("]".utf8))
+            counts.append((tableName, n))
+        }
+        try await table("devices", "devices", Device.self) { ArchiveDevice($0) }
+        try await table("measurements", "measurements", PulseLoop.Measurement.self) { ArchiveMeasurement($0) }
+        try await table("activityDaily", "activity_daily", ActivityDaily.self) { ArchiveActivityDaily($0) }
+        try await table("activityBuckets", "activity_buckets", ActivityBucketSample.self) { ArchiveActivityBucketSample($0) }
+        try await table("batterySamples", "battery_samples", BatterySample.self) { ArchiveBatterySample($0) }
+        try await table("deviceMeasurementConfigs", "device_measurement_configs", DeviceMeasurementConfig.self) {
+            ArchiveDeviceMeasurementConfig($0)
+        }
+        try await table("activitySessions", "activity_sessions", ActivitySession.self) { ArchiveActivitySession($0) }
+        try await table("activityGpsPoints", "activity_gps_points", ActivityGpsPoint.self) { ArchiveActivityGpsPoint($0) }
+        try await table("activityEvents", "activity_events", ActivityEvent.self) { ArchiveActivityEvent($0) }
+        try await table("activitySamples", "activity_samples", ActivitySample.self) { ArchiveActivitySample($0) }
+        try await table("activitySensorPolls", "activity_sensor_polls", ActivitySensorPollEvent.self) {
+            ArchiveActivitySensorPollEvent($0)
+        }
+        try await table("sleepSessions", "sleep_sessions", SleepSession.self) { ArchiveSleepSession($0) }
+        try await table("sleepStageBlocks", "sleep_stage_blocks", SleepStageBlock.self) { ArchiveSleepStageBlock($0) }
+        try await table("coachConversations", "coach_conversations", CoachConversation.self) { ArchiveCoachConversation($0) }
+        try await table("coachMessages", "coach_messages", CoachMessage.self) { ArchiveCoachMessage($0) }
+        try await table("coachMemories", "coach_memories", CoachMemory.self) { ArchiveCoachMemory($0) }
+        try await table("coachToolCalls", "coach_tool_calls", CoachToolCall.self) { ArchiveCoachToolCall($0) }
+        try await table("userProfiles", "user_profiles", UserProfile.self) { ArchiveUserProfile($0) }
+        try await table("userGoals", "user_goals", UserGoal.self) { ArchiveUserGoal($0) }
+        try await table("rawPackets", "raw_packets", RawPacketRow.self, skip: !includeRawPackets) { ArchiveRawPacket($0) }
+        try await table("derivedUpdates", "derived_updates", DerivedUpdateRow.self) { ArchiveDerivedUpdate($0) }
+        try await table("coachSummaries", "coach_summaries", CoachSummary.self) { ArchiveCoachSummary($0) }
+        try await table("wearableLogs", "wearable_logs", WearableLog.self) { ArchiveWearableLog($0) }
+        try await table("coachNotificationRecords", "coach_notification_records", CoachNotificationRecord.self) {
+            ArchiveCoachNotificationRecord($0)
+        }
+        try await table("mealEntries", "meal_entries", MealEntry.self) { ArchiveMealEntry($0) }
+        try await table("foodProducts", "food_products", CachedFoodProduct.self) { ArchiveFoodProduct($0) }
+        // Android's deletion tombstones: no iOS model yet, written empty so the shape matches.
+        try sink.write(Data(",\"measurementDeletions\":[]".utf8))
+        counts.append(("measurement_deletions", 0))
 
         var settings: [String: String] = [:]
         for key in settingsKeys {
@@ -125,85 +178,57 @@ enum DataArchiveService {
                 settings[key] = blob
             }
         }
-
-        let counts: [String: Int] = [
-            "devices": devices.count,
-            "activityDailies": activityDailies.count,
-            "measurements": measurements.count,
-            "batterySamples": batterySamples.count,
-            "sleepSessions": sleepSessions.count,
-            "sleepStageBlocks": sleepStageBlocks.count,
-            "rawPackets": rawPackets.count,
-            "derivedUpdates": derivedUpdates.count,
-            "userProfiles": userProfiles.count,
-            "userGoals": userGoals.count,
-            "deviceMeasurementConfigs": deviceMeasurementConfigs.count,
-            "activitySessions": activitySessions.count,
-            "activitySamples": activitySamples.count,
-            "activityBucketSamples": activityBucketSamples.count,
-            "activityGpsPoints": activityGpsPoints.count,
-            "activityEvents": activityEvents.count,
-            "activitySensorPollEvents": activitySensorPollEvents.count,
-            "coachConversations": coachConversations.count,
-            "coachMessages": coachMessages.count,
-            "coachMemories": coachMemories.count,
-            "coachToolCalls": coachToolCalls.count,
-            "coachNotificationRecords": coachNotificationRecords.count,
-            "coachSummaries": coachSummaries.count,
-            "wearableLogs": wearableLogs.count
-        ]
-
-        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
-
-        return PulseArchive(
-            formatVersion: PulseArchive.currentFormatVersion,
-            exportedAt: Date(),
-            appVersion: appVersion,
-            counts: counts,
-            devices: devices,
-            activityDailies: activityDailies,
-            measurements: measurements,
-            batterySamples: batterySamples,
-            sleepSessions: sleepSessions,
-            sleepStageBlocks: sleepStageBlocks,
-            rawPackets: rawPackets,
-            derivedUpdates: derivedUpdates,
-            userProfiles: userProfiles,
-            userGoals: userGoals,
-            deviceMeasurementConfigs: deviceMeasurementConfigs,
-            activitySessions: activitySessions,
-            activitySamples: activitySamples,
-            activityBucketSamples: activityBucketSamples,
-            activityGpsPoints: activityGpsPoints,
-            activityEvents: activityEvents,
-            activitySensorPollEvents: activitySensorPollEvents,
-            coachConversations: coachConversations,
-            coachMessages: coachMessages,
-            coachMemories: coachMemories,
-            coachToolCalls: coachToolCalls,
-            coachNotificationRecords: coachNotificationRecords,
-            coachSummaries: coachSummaries,
-            wearableLogs: wearableLogs,
-            settings: settings,
-            attachments: collectAttachments(from: attachmentsDirectory)
-        )
+        let encoder = ArchiveCoding.makeEncoder()
+        try sink.write(Data(",\"settings\":".utf8))
+        try sink.write(try encoder.encode(settings))
+        try sink.write(Data(",\"attachments\":[".utf8))
+        for (index, attachment) in collectAttachments(from: attachmentsDirectory).enumerated() {
+            if index > 0 { try sink.write(Data(",".utf8)) }
+            try sink.write(try encoder.encode(attachment))
+        }
+        try sink.write(Data("],\"counts\":{".utf8))
+        let countsJSON = counts.map { "\(jsonString($0.0)):\($0.1)" }.joined(separator: ",")
+        try sink.write(Data((countsJSON + "}}").utf8))
     }
 
-    /// Fetches every row of one model and maps it to its DTO, yielding between chunks so the main
-    /// thread stays responsive during large exports.
-    private static func collect<T: PersistentModel, D>(
+    /// A JSON string literal for `value` (quotes + escapes).
+    private static func jsonString(_ value: String) -> String {
+        (try? String(data: JSONEncoder().encode(value), encoding: .utf8) ?? "\"\"") ?? "\"\""
+    }
+
+    /// Streams every row of one model into `sink` as comma-separated JSON objects and returns the count.
+    /// Rows are faulted in batches (`fetch(_:batchSize:)`), mapped to DTOs on the main actor a chunk at a
+    /// time, then encoded + compressed off-main, so neither the UI nor memory holds the whole table.
+    private static func streamRows<T: PersistentModel, D: Encodable & Sendable>(
         _ type: T.Type,
         _ context: ModelContext,
-        map: (T) -> D
-    ) async throws -> [D] {
-        let rows = try context.fetch(FetchDescriptor<T>())
-        var out: [D] = []
-        out.reserveCapacity(rows.count)
-        for (index, row) in rows.enumerated() {
-            out.append(map(row))
-            if index.isMultiple(of: chunkSize) { await Task.yield() }
+        _ sink: ArchiveSink,
+        _ map: (T) -> D
+    ) async throws -> Int {
+        // Batched fetches can't include unsaved changes; commit them first (the app autosaves anyway).
+        if context.hasChanges { try context.save() }
+        var descriptor = FetchDescriptor<T>()
+        descriptor.includePendingChanges = false
+        let rows = try context.fetch(descriptor, batchSize: chunkSize)
+        var written = 0
+        var index = rows.startIndex
+        while index < rows.endIndex {
+            let end = rows.index(index, offsetBy: chunkSize, limitedBy: rows.endIndex) ?? rows.endIndex
+            let chunk = rows[index..<end].map(map)
+            let leadingComma = written > 0
+            try await Task.detached(priority: .userInitiated) {
+                let encoder = ArchiveCoding.makeEncoder()
+                var buffer = Data()
+                for (i, dto) in chunk.enumerated() {
+                    if leadingComma || i > 0 { buffer.append(0x2C) }   // ","
+                    buffer.append(try encoder.encode(dto))
+                }
+                try sink.write(buffer)
+            }.value
+            written += chunk.count
+            index = end
         }
-        return out
+        return written
     }
 
     private static func collectAttachments(from directory: URL) -> [ArchiveAttachment] {
@@ -229,7 +254,7 @@ enum DataArchiveService {
     /// `refreshStores: false` lets unit tests run against injected defaults/directories without
     /// touching the shared singletons.
     static func importArchive(
-        _ data: Data,
+        _ fileData: Data,
         context: ModelContext,
         defaults: UserDefaults = .standard,
         attachmentsDirectory: URL? = nil,
@@ -237,6 +262,18 @@ enum DataArchiveService {
     ) async throws {
         try beginExclusiveOperation()
         defer { isBusy = false }
+
+        // 0. A gzip archive (Android's and this app's `.json.gz`) is inflated first; plain JSON as is.
+        let data: Data
+        if Gzip.isGzip(fileData) {
+            do {
+                data = try await Task.detached(priority: .userInitiated) { try Gzip.decompress(fileData) }.value
+            } catch {
+                throw DataArchiveError.invalidFile(details: "gzip: \(error)")
+            }
+        } else {
+            data = fileData
+        }
 
         // 1. Cheap version probe first, so a newer-format file gets a clear error instead of a
         //    generic decode failure.
@@ -281,8 +318,13 @@ enum DataArchiveService {
 
         // 5. Side stores, only after the SwiftData commit succeeded. An attachment write failure
         //    degrades one chat image, not the whole import.
-        applySettings(archive.settings, defaults: defaults)
-        restoreAttachments(archive.attachments, to: attachmentsDirectory ?? Self.defaultAttachmentsDirectory())
+        // An archive without these keys (Android's) leaves this device's settings and attachment files alone.
+        if let settings = archive.settings {
+            applySettings(settings, defaults: defaults)
+        }
+        if let attachments = archive.attachments {
+            restoreAttachments(attachments, to: attachmentsDirectory ?? Self.defaultAttachmentsDirectory())
+        }
         if refreshStores {
             refreshSharedStores()
         }
@@ -302,10 +344,11 @@ enum DataArchiveService {
             || has(ActivityEvent.self) || has(ActivitySensorPollEvent.self) || has(CoachConversation.self)
             || has(CoachMessage.self) || has(CoachMemory.self) || has(CoachToolCall.self)
             || has(CoachNotificationRecord.self) || has(CoachSummary.self) || has(WearableLog.self)
+            || has(MealEntry.self) || has(CachedFoodProduct.self)
     }
 
-    /// Deletes every row of every model in the schema — all 24 types, unlike `SeedData.clearAll`
-    /// (which predates six of them). Tracked deletes, no save, and deliberately synchronous — see
+    /// Deletes every row of every archived model — the 24 core types plus the nutrition log and food
+    /// cache (like Android's restore, which empties every table), unlike `SeedData.clearAll`. Tracked deletes, no save, and deliberately synchronous — see
     /// the atomicity note in `importArchive`.
     static func wipeAllData(context: ModelContext) throws {
         try deleteAll(Device.self, context)
@@ -332,6 +375,8 @@ enum DataArchiveService {
         try deleteAll(CoachNotificationRecord.self, context)
         try deleteAll(CoachSummary.self, context)
         try deleteAll(WearableLog.self, context)
+        try deleteAll(MealEntry.self, context)
+        try deleteAll(CachedFoodProduct.self, context)
     }
 
     private static func deleteAll<T: PersistentModel>(_ type: T.Type, _ context: ModelContext) throws {
@@ -365,6 +410,8 @@ enum DataArchiveService {
         insert(archive.coachNotificationRecords, context)
         insert(archive.coachSummaries, context)
         insert(archive.wearableLogs, context)
+        insert(archive.mealEntries, context)
+        insert(archive.foodProducts, context)
     }
 
     private static func insert(_ rows: [some ArchiveInsertable], _ context: ModelContext) {
@@ -389,7 +436,7 @@ enum DataArchiveService {
         try requireUnique(archive.deviceMeasurementConfigs.map(\.deviceId), entity: "measurement config")
         try requireUnique(archive.activitySessions.map(\.id), entity: "workout")
         try requireUnique(archive.activitySamples.map(\.id), entity: "workout sample")
-        try requireUnique(archive.activityBucketSamples.map(\.startEpoch), entity: "activity bucket")
+        try requireUnique(archive.activityBucketSamples.map(\.startSeconds), entity: "activity bucket")
         try requireUnique(archive.activityGpsPoints.map(\.id), entity: "GPS point")
         try requireUnique(archive.activityEvents.map(\.id), entity: "workout event")
         try requireUnique(archive.activitySensorPollEvents.map(\.id), entity: "sensor poll")
@@ -400,9 +447,11 @@ enum DataArchiveService {
         try requireUnique(archive.coachNotificationRecords.map(\.id), entity: "notification record")
         try requireUnique(archive.coachSummaries.map(\.id), entity: "coach summary")
         try requireUnique(archive.wearableLogs.map(\.id), entity: "wearable log")
+        try requireUnique(archive.mealEntries.map(\.id), entity: "meal")
+        try requireUnique(archive.foodProducts.map(\.code), entity: "food product")
 
         // Attachment names come from the file — never let one escape coach_attachments/.
-        for attachment in archive.attachments {
+        for attachment in archive.attachments ?? [] {
             let name = attachment.file
             if name.isEmpty || name.contains("/") || name.contains("..") || name.hasPrefix(".") {
                 throw DataArchiveError.invalidFile(details: "unsafe attachment name: \(name)")
@@ -503,3 +552,269 @@ extension ArchiveCoachToolCall: ArchiveInsertable {}
 extension ArchiveCoachNotificationRecord: ArchiveInsertable {}
 extension ArchiveCoachSummary: ArchiveInsertable {}
 extension ArchiveWearableLog: ArchiveInsertable {}
+extension ArchiveMealEntry: ArchiveInsertable {}
+extension ArchiveFoodProduct: ArchiveInsertable {}
+
+// MARK: - Streaming sinks
+
+/// Where `DataArchiveService.writeArchive` sends the archive's bytes, in order. Written from one task
+/// at a time (the export awaits each chunk), never concurrently.
+nonisolated protocol ArchiveSink: AnyObject, Sendable {
+    func write(_ data: Data) throws
+}
+
+/// Collects the archive in memory (tests, the DEBUG headless export).
+nonisolated final class ArchiveDataSink: ArchiveSink, @unchecked Sendable {
+    private(set) var data = Data()
+    func write(_ chunk: Data) throws { data.append(chunk) }
+}
+
+/// Streams the archive through gzip into a file: a 10-byte RFC 1952 header, raw DEFLATE from the
+/// Compression framework (`COMPRESSION_ZLIB` is raw RFC 1951 deflate, no zlib wrapper), then the
+/// CRC-32 + ISIZE trailer. The same bytes Java's `GZIPOutputStream` frames (Android's export).
+nonisolated final class GzipFileSink: ArchiveSink, @unchecked Sendable {
+    private let handle: FileHandle
+    private let deflater: GzipDeflater
+
+    init(url: URL) throws {
+        guard FileManager.default.createFile(atPath: url.path, contents: nil) else {
+            throw CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: url.path])
+        }
+        let handle = try FileHandle(forWritingTo: url)
+        self.handle = handle
+        deflater = try GzipDeflater { try handle.write(contentsOf: $0) }
+    }
+
+    func write(_ data: Data) throws { try deflater.write(data) }
+
+    /// Flush the deflate stream, write the trailer and close the file.
+    func finish() throws {
+        try deflater.finish()
+        try handle.close()
+    }
+
+    /// Release the stream after a failed export (the caller deletes the partial file).
+    func abandon() {
+        deflater.abandon()
+        try? handle.close()
+    }
+}
+
+/// Incremental gzip writer over raw DEFLATE. `output` receives compressed bytes as they are produced.
+nonisolated final class GzipDeflater: @unchecked Sendable {
+    private let output: (Data) throws -> Void
+    private let stream = UnsafeMutablePointer<compression_stream>.allocate(capacity: 1)
+    private let bufferSize = 64 * 1024
+    private let buffer: UnsafeMutablePointer<UInt8>
+    private var crc: UInt32 = 0
+    private var size: UInt32 = 0     // ISIZE is the input length mod 2^32
+    private var open = true
+
+    init(output: @escaping (Data) throws -> Void) throws {
+        self.output = output
+        buffer = .allocate(capacity: bufferSize)
+        guard compression_stream_init(stream, COMPRESSION_STREAM_ENCODE, COMPRESSION_ZLIB) == COMPRESSION_STATUS_OK else {
+            buffer.deallocate()
+            stream.deallocate()
+            throw Gzip.Failure.stream("deflate init")
+        }
+        // ID1 ID2 CM=deflate FLG=0 MTIME=0 XFL=0 OS=3 (Unix) — what GZIPOutputStream writes, too.
+        try output(Data([0x1F, 0x8B, 0x08, 0x00, 0, 0, 0, 0, 0x00, 0x03]))
+    }
+
+    deinit { abandon() }
+
+    func write(_ data: Data) throws {
+        guard !data.isEmpty else { return }
+        crc = Gzip.crc32(data, seed: crc)
+        size &+= UInt32(truncatingIfNeeded: data.count)
+        try data.withUnsafeBytes { raw in
+            stream.pointee.src_ptr = raw.bindMemory(to: UInt8.self).baseAddress!
+            stream.pointee.src_size = raw.count
+            try pump(finalize: false)
+        }
+    }
+
+    func finish() throws {
+        guard open else { return }
+        stream.pointee.src_size = 0
+        try pump(finalize: true)
+        var trailer = Data(capacity: 8)
+        for value in [crc, size] {
+            for shift in stride(from: 0, to: 32, by: 8) { trailer.append(UInt8(truncatingIfNeeded: value >> UInt32(shift))) }
+        }
+        try output(trailer)
+        abandon()
+    }
+
+    func abandon() {
+        guard open else { return }
+        open = false
+        compression_stream_destroy(stream)
+        stream.deallocate()
+        buffer.deallocate()
+    }
+
+    private func pump(finalize: Bool) throws {
+        let flags = finalize ? Int32(COMPRESSION_STREAM_FINALIZE.rawValue) : 0
+        while true {
+            stream.pointee.dst_ptr = buffer
+            stream.pointee.dst_size = bufferSize
+            let status = compression_stream_process(stream, flags)
+            let produced = bufferSize - stream.pointee.dst_size
+            if produced > 0 { try output(Data(bytes: buffer, count: produced)) }
+            switch status {
+            case COMPRESSION_STATUS_END:
+                return
+            case COMPRESSION_STATUS_OK:
+                // Input consumed and the output buffer had room left: nothing more to drain for now.
+                if !finalize, stream.pointee.src_size == 0, produced < bufferSize { return }
+            default:
+                throw Gzip.Failure.stream("deflate")
+            }
+        }
+    }
+}
+
+/// gzip framing (RFC 1952) around the Compression framework's raw DEFLATE.
+nonisolated enum Gzip {
+    enum Failure: Error, Equatable {
+        case notGzip
+        case unsupportedMethod
+        case truncated
+        case stream(String)
+        case checksumMismatch
+        case sizeMismatch
+    }
+
+    /// Starts with the gzip magic `1f 8b`.
+    static func isGzip(_ data: Data) -> Bool {
+        data.count >= 2 && data[data.startIndex] == 0x1F && data[data.startIndex + 1] == 0x8B
+    }
+
+    /// Compress `data` into one gzip member (tests and small payloads; the export streams instead).
+    static func compress(_ data: Data) throws -> Data {
+        var out = Data()
+        let deflater = try GzipDeflater { out.append($0) }
+        try deflater.write(data)
+        try deflater.finish()
+        return out
+    }
+
+    /// Inflate a single-member gzip file (what `GZIPOutputStream` and this app write), checking its CRC-32
+    /// and size. The Compression decoder reads its input greedily, so it can't report where the deflate
+    /// stream ended; the trailer is therefore taken as the file's last 8 bytes.
+    static func decompress(_ data: Data) throws -> Data {
+        let bytes = [UInt8](data)
+        var out = Data()
+        try inflateMember(bytes, into: &out)
+        return out
+    }
+
+    private static func inflateMember(_ bytes: [UInt8], into out: inout Data) throws {
+        let start = 0
+        guard bytes.count - start >= 18 else { throw Failure.truncated }
+        guard bytes[start] == 0x1F, bytes[start + 1] == 0x8B else { throw Failure.notGzip }
+        guard bytes[start + 2] == 0x08 else { throw Failure.unsupportedMethod }
+        let flags = bytes[start + 3]
+        var p = start + 10
+        if flags & 0x04 != 0 {                                  // FEXTRA
+            guard p + 2 <= bytes.count else { throw Failure.truncated }
+            p += 2 + (Int(bytes[p]) | (Int(bytes[p + 1]) << 8))
+        }
+        for flag: UInt8 in [0x08, 0x10] where flags & flag != 0 {   // FNAME, FCOMMENT: zero-terminated
+            while p < bytes.count, bytes[p] != 0 { p += 1 }
+            p += 1
+        }
+        if flags & 0x02 != 0 { p += 2 }                         // FHCRC
+        let trailer = bytes.count - 8
+        guard p < trailer else { throw Failure.truncated }
+
+        let before = out.count
+        try inflateRaw(bytes, from: p, to: trailer, into: &out)
+        func le32(_ i: Int) -> UInt32 {
+            UInt32(bytes[i]) | UInt32(bytes[i + 1]) << 8 | UInt32(bytes[i + 2]) << 16 | UInt32(bytes[i + 3]) << 24
+        }
+        let member = out.subdata(in: before..<out.count)
+        guard crc32(member) == le32(trailer) else { throw Failure.checksumMismatch }
+        guard UInt32(truncatingIfNeeded: member.count) == le32(trailer + 4) else { throw Failure.sizeMismatch }
+    }
+
+    /// Inflate the raw DEFLATE stream in `bytes[start..<end]`.
+    private static func inflateRaw(_ bytes: [UInt8], from start: Int, to end: Int, into out: inout Data) throws {
+        let stream = UnsafeMutablePointer<compression_stream>.allocate(capacity: 1)
+        defer { stream.deallocate() }
+        guard compression_stream_init(stream, COMPRESSION_STREAM_DECODE, COMPRESSION_ZLIB) == COMPRESSION_STATUS_OK else {
+            throw Failure.stream("inflate init")
+        }
+        defer { compression_stream_destroy(stream) }
+        let bufferSize = 256 * 1024
+        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+        defer { buffer.deallocate() }
+        try bytes.withUnsafeBufferPointer { all in
+            let total = end - start
+            stream.pointee.src_ptr = all.baseAddress! + start
+            stream.pointee.src_size = total
+            while true {
+                stream.pointee.dst_ptr = buffer
+                stream.pointee.dst_size = bufferSize
+                // FINALIZE: all the input is here; the decoder stops at the end of the deflate stream.
+                let status = compression_stream_process(stream, Int32(COMPRESSION_STREAM_FINALIZE.rawValue))
+                let produced = bufferSize - stream.pointee.dst_size
+                if produced > 0 { out.append(buffer, count: produced) }
+                switch status {
+                case COMPRESSION_STATUS_END:
+                    return
+                case COMPRESSION_STATUS_OK:
+                    if produced == 0, stream.pointee.src_size == 0 { throw Failure.truncated }
+                default:
+                    throw Failure.stream("inflate")
+                }
+            }
+        }
+    }
+
+    private static let crcTable: [UInt32] = (0..<256).map { n -> UInt32 in
+        var c = UInt32(n)
+        for _ in 0..<8 { c = (c & 1) != 0 ? 0xEDB8_8320 ^ (c >> 1) : c >> 1 }
+        return c
+    }
+
+    /// CRC-32 (IEEE 802.3, the gzip/zlib polynomial). `seed` continues a running checksum.
+    static func crc32(_ data: Data, seed: UInt32 = 0) -> UInt32 {
+        var c = ~seed
+        crcTable.withUnsafeBufferPointer { table in
+            data.withUnsafeBytes { raw in
+                for byte in raw.bindMemory(to: UInt8.self) {
+                    c = table[Int((c ^ UInt32(byte)) & 0xFF)] ^ (c >> 8)
+                }
+            }
+        }
+        return ~c
+    }
+}
+
+// MARK: - Export temp files
+
+/// Shareable export files live in one folder under the temp directory, emptied before every export
+/// (backup or diagnostics) — Android's `ExportFiles.freshDir`. Each one is a full copy of the user's
+/// health data that has already been handed to the share sheet; keeping them only grows the disk
+/// footprint and the exposure.
+nonisolated enum ExportFiles {
+    static let directoryName = "exports"
+    /// Names earlier builds wrote straight into the temp directory.
+    static let legacyPrefixes = ["pulseloop-export-", "pulseloop-diagnostics-", "agara-export-", "agara-diagnostics-"]
+
+    static func freshDirectory(base: URL = FileManager.default.temporaryDirectory) throws -> URL {
+        let fm = FileManager.default
+        if let old = try? fm.contentsOfDirectory(at: base, includingPropertiesForKeys: nil) {
+            for url in old where legacyPrefixes.contains(where: { url.lastPathComponent.hasPrefix($0) }) {
+                try? fm.removeItem(at: url)
+            }
+        }
+        let dir = base.appendingPathComponent(directoryName, isDirectory: true)
+        try? fm.removeItem(at: dir)
+        try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+}

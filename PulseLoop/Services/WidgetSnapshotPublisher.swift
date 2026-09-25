@@ -26,6 +26,11 @@ final class WidgetSnapshotPublisher {
     private var lastContentHash: Int?
 
     private static let debounceSeconds: Double = 2
+    /// Data-change publishes (the snapshot rebuild is a dozen store fetches) run at most this often; a
+    /// scene-phase publish (foreground) always runs. A change inside the window schedules one trailing
+    /// publish at the window's end, so the widget still lands on the latest data.
+    static let dataChangeMinInterval: TimeInterval = 5 * 60
+    private var lastBuildAt: Date?
     private static let backgroundReloadMinInterval: TimeInterval = 20 * 60
     /// Chart payloads carry at most this many points — plenty for a 56 pt-tall axis-less widget
     /// chart, and it keeps the snapshot file small enough to decode in the extension instantly.
@@ -50,8 +55,9 @@ final class WidgetSnapshotPublisher {
                 guard let self else { return }
                 self.observeDataChange()
                 self.debounceTask?.cancel()
+                let wait = Self.dataChangeDelay(lastBuildAt: self.lastBuildAt, now: Date())
                 self.debounceTask = Task { [weak self] in
-                    try? await Task.sleep(for: .seconds(Self.debounceSeconds))
+                    try? await Task.sleep(for: .seconds(max(Self.debounceSeconds, wait)))
                     guard !Task.isCancelled else { return }
                     self?.publish(reason: .dataChange)
                 }
@@ -59,8 +65,16 @@ final class WidgetSnapshotPublisher {
         }
     }
 
+    /// Seconds a data-change publish waits so builds stay `dataChangeMinInterval` apart (0 = now).
+    static func dataChangeDelay(lastBuildAt: Date?, now: Date) -> TimeInterval {
+        guard let lastBuildAt, now >= lastBuildAt else { return 0 }
+        return max(0, dataChangeMinInterval - now.timeIntervalSince(lastBuildAt))
+    }
+
     func publish(reason: Reason) {
         guard let url = PulseWidgetStore.fileURL else { return }
+        if reason == .scenePhase { debounceTask?.cancel() }   // this build covers a pending trailing one
+        lastBuildAt = Date()
         var snapshot = buildSnapshot()
 
         // Content comparison with a fixed timestamp: an unchanged snapshot skips write + reload

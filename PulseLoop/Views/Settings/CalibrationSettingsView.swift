@@ -29,6 +29,8 @@ struct CalibrationSettingsView: View {
     /// When the ring last produced a blood-pressure reading, so the user can tell whether the offset
     /// we're about to derive is based on anything recent.
     @State private var bpLastMeasuredAt: Date?
+    /// Which calibration the user asked to reset — confirmed before clearing (Android matches).
+    @State private var pendingReset: CalibrationResetTarget?
 
     private var capabilities: Set<WearableCapability> {
         MetricsService.activeCapabilities(context: modelContext, ble: ble)
@@ -66,6 +68,21 @@ struct CalibrationSettingsView: View {
         .background(PulseColors.background)
         .pageChrome("Calibration")
         .onAppear(perform: loadIfNeeded)
+        .alert(
+            pendingReset?.title ?? "",
+            isPresented: Binding(get: { pendingReset != nil }, set: { if !$0 { pendingReset = nil } }),
+            presenting: pendingReset
+        ) { target in
+            Button("Reset", role: .destructive) {
+                switch target {
+                case .bloodPressure: resetBP()
+                case .glucose: resetGlucose()
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text("Readings go back to the ring's uncalibrated values. You can calibrate again any time.")
+        }
     }
 
     // MARK: - Blood pressure
@@ -95,7 +112,7 @@ struct CalibrationSettingsView: View {
         }
         .disabled(bpMeasuring)
         if store.settings.hasBPReference, !bpMeasuring {
-            SecondaryButton(title: "Reset", systemImage: "arrow.counterclockwise") { resetBP() }
+            SecondaryButton(title: "Reset", systemImage: "arrow.counterclockwise") { pendingReset = .bloodPressure }
         }
         if let bpStatus {
             Text(bpStatus).font(PulseFont.caption).foregroundStyle(PulseColors.textMuted)
@@ -131,7 +148,7 @@ struct CalibrationSettingsView: View {
 
         PrimaryButton(title: "Calibrate blood sugar", systemImage: "checkmark") { saveGlucose() }
         if store.settings.isGlucoseCalibrated {
-            SecondaryButton(title: "Reset", systemImage: "arrow.counterclockwise") { resetGlucose() }
+            SecondaryButton(title: "Reset", systemImage: "arrow.counterclockwise") { pendingReset = .glucose }
         }
         if let glucoseStatus {
             Text(glucoseStatus).font(PulseFont.caption).foregroundStyle(PulseColors.textMuted)
@@ -233,5 +250,17 @@ struct CalibrationSettingsView: View {
         store.resetGlucose()
         glucoseRefText = ""
         glucoseStatus = "Calibration cleared."
+    }
+}
+
+/// The calibration a Reset button targets; drives the confirmation alert's title.
+enum CalibrationResetTarget: Equatable {
+    case bloodPressure, glucose
+
+    var title: String {
+        switch self {
+        case .bloodPressure: return "Reset blood pressure calibration?"
+        case .glucose: return "Reset glucose calibration?"
+        }
     }
 }

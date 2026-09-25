@@ -142,25 +142,32 @@ struct CoachChartView: View {
     /// data; hr/spo2 always autoscale (a 0 baseline is meaningless for them) and
     /// spo2 is clamped to ≤100. Pure + static so it can be unit-tested.
     static func yDomain(values: [Double], chartType: CoachChartType, metric: CoachChartMetric) -> ClosedRange<Double> {
-        guard let lo = values.min(), let hi = values.max() else { return 0...1 }
+        // Model output is untrusted: drop NaN/∞ (they make any range invalid) and never build a
+        // `ClosedRange` whose lower bound exceeds its upper — that traps. Negative magnitudes (a model
+        // emitting "-200 kcal") used to produce `0...negative`.
+        let finite = values.filter(\.isFinite)
+        guard let lo = finite.min(), let hi = finite.max() else { return 0...1 }
 
         let magnitudeBar = chartType == .bar
             && [.steps, .calories, .distance, .activeMinutes, .sleep].contains(metric)
 
-        let range: ClosedRange<Double>
+        var lower: Double
+        var upper: Double
         if lo == hi {
             let pad = Swift.max(abs(lo) * 0.1, 1)
-            range = (magnitudeBar ? 0 : lo - pad)...(hi + pad)
+            lower = magnitudeBar ? Swift.min(0, lo - pad) : lo - pad
+            upper = hi + pad
         } else if magnitudeBar {
-            range = 0...(hi * 1.15)
+            lower = Swift.min(0, lo * 1.15)
+            upper = Swift.max(0, hi * 1.15)
         } else {
-            let pad = Swift.max((hi - lo) * 0.15, hi * 0.02, 1)
-            range = (lo - pad)...(hi + pad)
+            let pad = Swift.max((hi - lo) * 0.15, abs(hi) * 0.02, 1)
+            lower = lo - pad
+            upper = hi + pad
         }
-
-        guard metric == .spo2 else { return range }
-        let upper = Swift.min(range.upperBound, 100)
-        return range.lowerBound...Swift.max(upper, range.lowerBound + 1)
+        if metric == .spo2 { upper = Swift.min(upper, 100) }
+        if !(upper > lower) { upper = lower + 1 }
+        return lower...upper
     }
 
     // MARK: - Sleep hypnogram (reuses the Sleep page component)

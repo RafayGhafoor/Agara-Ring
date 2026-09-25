@@ -19,9 +19,13 @@ struct PrivacyDataSettingsView: View {
 
     /// Which destructive App-data action is awaiting confirmation.
     @State private var pendingReset: ResetAction?
+    /// "Clear captured packets" / "Clear demo data" / "Reseed demo data" awaiting confirmation.
+    @State private var pendingClear: ClearAction?
 
     // Backup (full export/import) state.
     @State private var exportURL: URL?
+    /// Include captured raw BLE packets in the backup (Android's "include diagnostics"; off by default).
+    @State private var exportIncludesPackets = false
     @State private var showImporter = false
     /// File picked while the app still has data — held until the user confirms the replace.
     @State private var pendingImportURL: URL?
@@ -29,6 +33,55 @@ struct PrivacyDataSettingsView: View {
     @State private var workingLabel: String?
     @State private var backupError: String?
     @State private var showImportSuccess = false
+
+    /// The destructive clears in Diagnostics / Demo data — each confirmed first (audit batch B).
+    enum ClearAction: Equatable {
+        case capturedPackets, demoData, reseedDemo
+
+        var title: String {
+            switch self {
+            case .capturedPackets: return "Clear captured packets?"
+            case .demoData: return "Clear demo data?"
+            case .reseedDemo: return "Replace data with demo data?"
+            }
+        }
+
+        var message: String {
+            switch self {
+            case .capturedPackets:
+                return "The Bluetooth packets captured for diagnostics are deleted. Your health data stays."
+            case .demoData:
+                return "Everything stored in the app is deleted — demo and ring data alike. This can't be undone."
+            case .reseedDemo:
+                return "Everything stored in the app is deleted and replaced with sample data. This can't be undone."
+            }
+        }
+
+        var confirmLabel: String {
+            switch self {
+            case .capturedPackets, .demoData: return "Clear"
+            case .reseedDemo: return "Replace"
+            }
+        }
+    }
+
+    private func performClear(_ action: ClearAction) {
+        switch action {
+        case .capturedPackets:
+            DebugRepository.pruneRawPackets(maxRows: 0, context: modelContext)
+            try? modelContext.save()
+        case .demoData:
+            SeedData.clearAll(modelContext)
+            let fresh = UserProfile()
+            fresh.onboardingCompleted = true
+            fresh.baselineCompleted = true
+            modelContext.insert(fresh)
+            try? modelContext.save()
+        case .reseedDemo:
+            SeedData.clearAll(modelContext)
+            SeedData.seedDemo(modelContext, completeOnboarding: true)
+        }
+    }
 
     private enum ResetAction: Identifiable {
         case unpairRing
@@ -71,13 +124,27 @@ struct PrivacyDataSettingsView: View {
             VStack(alignment: .leading, spacing: 22) {
                 SettingsGroup(
                     header: "Backup",
-                    footer: "Export everything — metrics, sleep, workouts, coach history, settings — to a JSON file "
-                        + "you can save, AirDrop, or analyze. Importing a backup replaces all data in the app. "
-                        + "API keys are never included."
+                    footer: "Export everything — metrics, sleep, workouts, coach history, meals, settings — to a "
+                        + "compressed JSON file (.json.gz) you can save, AirDrop, analyze, or import on Android. "
+                        + "Importing a backup replaces all data in the app. API keys are never included."
                 ) {
                     actionRow("Export all data", systemImage: "square.and.arrow.up.on.square") {
                         exportAllData()
                     }
+                    HStack(spacing: 12) {
+                        Image(systemName: "dot.radiowaves.left.and.right")
+                            .font(PulseFont.body)
+                            .foregroundStyle(PulseColors.textPrimary)
+                            .frame(width: 24)
+                        Toggle(isOn: $exportIncludesPackets) {
+                            Text("Include Bluetooth packets")
+                                .font(PulseFont.body)
+                                .foregroundStyle(PulseColors.textPrimary)
+                        }
+                        .tint(PulseColors.accent)
+                    }
+                    .padding(.horizontal, 16)
+                    .frame(minHeight: 50)
                     actionRow("Import data…", systemImage: "square.and.arrow.down") {
                         showImporter = true
                     }
@@ -113,8 +180,7 @@ struct PrivacyDataSettingsView: View {
                     .padding(.horizontal, 16)
                     .frame(minHeight: 50)
                     actionRow("Clear captured packets", systemImage: "trash") {
-                        DebugRepository.pruneRawPackets(maxRows: 0, context: modelContext)
-                        try? modelContext.save()
+                        pendingClear = .capturedPackets
                     }
                 }
 
@@ -138,16 +204,10 @@ struct PrivacyDataSettingsView: View {
                     footer: "Sample data for exploring the app without a ring."
                 ) {
                     actionRow("Clear demo data", systemImage: "trash") {
-                        SeedData.clearAll(modelContext)
-                        let fresh = UserProfile()
-                        fresh.onboardingCompleted = true
-                        fresh.baselineCompleted = true
-                        modelContext.insert(fresh)
-                        try? modelContext.save()
+                        pendingClear = .demoData
                     }
                     actionRow("Reseed demo data", systemImage: "arrow.clockwise") {
-                        SeedData.clearAll(modelContext)
-                        SeedData.seedDemo(modelContext, completeOnboarding: true)
+                        pendingClear = .reseedDemo
                     }
                 }
             }
@@ -169,13 +229,23 @@ struct PrivacyDataSettingsView: View {
             }
         }
         .disabled(workingLabel != nil)
+        .alert(
+            pendingClear?.title ?? "",
+            isPresented: Binding(get: { pendingClear != nil }, set: { if !$0 { pendingClear = nil } }),
+            presenting: pendingClear
+        ) { action in
+            Button(action.confirmLabel, role: .destructive) { performClear(action) }
+            Button("Cancel", role: .cancel) {}
+        } message: { action in
+            Text(action.message)
+        }
         .sheet(item: $diagnosticsURL) { url in
             DiagnosticsShareSheet(items: [url])
         }
         .sheet(item: $exportURL) { url in
             DiagnosticsShareSheet(items: [url])
         }
-        .fileImporter(isPresented: $showImporter, allowedContentTypes: [.json]) { result in
+        .fileImporter(isPresented: $showImporter, allowedContentTypes: [.json, .gzip, .data]) { result in
             guard case let .success(url) = result else { return }
             if DataArchiveService.hasAnyData(context: modelContext) {
                 pendingImportURL = url   // destructive — confirm below before touching anything
@@ -267,7 +337,9 @@ struct PrivacyDataSettingsView: View {
         Task {
             defer { workingLabel = nil }
             do {
-                exportURL = try await DataArchiveService.exportFile(context: modelContext)
+                exportURL = try await DataArchiveService.exportFile(
+                    context: modelContext, includeRawPackets: exportIncludesPackets
+                )
             } catch {
                 backupError = error.localizedDescription
             }

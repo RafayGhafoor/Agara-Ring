@@ -22,9 +22,11 @@ final class StubURLProtocol: URLProtocol {
     nonisolated(unsafe) static var statusCode = 200
     nonisolated(unsafe) static var lastRequestURL: URL?
     nonisolated(unsafe) static var lastRequestBody: Data?
+    nonisolated(unsafe) static var lastRequestHeaders: [String: String] = [:]
 
     override class func canInit(with request: URLRequest) -> Bool {
         Self.lastRequestURL = request.url
+        Self.lastRequestHeaders = request.allHTTPHeaderFields ?? [:]
         Self.lastRequestBody = request.httpBody ?? request.httpBodyStream.flatMap { stream in
             stream.open(); defer { stream.close() }
             var data = Data()
@@ -368,6 +370,24 @@ final class GeminiClientTests: XCTestCase {
         let url = StubURLProtocol.lastRequestURL?.absoluteString ?? ""
         XCTAssertTrue(url.contains("/models/gemini-2.5-pro:generateContent"),
                       "expected gemini-2.5-pro endpoint, got \(url)")
+    }
+
+    /// The API key travels in the `x-goog-api-key` header; the URL carries no key.
+    func testSendsKeyInHeaderNotURL() async throws {
+        StubURLProtocol.statusCode = 200
+        StubURLProtocol.responseBody = Data(#"{"candidates":[{"content":{"parts":[{"text":"ok"}]}}]}"#.utf8)
+
+        let client = GeminiClient(apiKey: "AIza-test", session: session())
+        let body = try OpenAIRequestBuilder.data(
+            model: "gemini-2.5-flash", input: [], tools: [], textFormat: nil,
+            previousResponseId: nil, reasoningEffort: nil)
+        _ = try await client.send(requestBody: body)
+
+        let url = StubURLProtocol.lastRequestURL?.absoluteString ?? ""
+        XCTAssertFalse(url.contains("AIza-test"), "key leaked into the URL: \(url)")
+        XCTAssertFalse(url.contains("key="), "query key in \(url)")
+        let header = StubURLProtocol.lastRequestHeaders.first { $0.key.lowercased() == "x-goog-api-key" }?.value
+        XCTAssertEqual(header, "AIza-test")
     }
 
     /// The request the orchestrator builds carries OpenAI tool specs and a strict

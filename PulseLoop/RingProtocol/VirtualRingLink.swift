@@ -46,14 +46,14 @@ final class VirtualRingLink {
 
     /// The port from the launch argument or environment, or nil when the virtual transport is off.
     static var configuredPort: UInt16? {
-        if let raw = UserDefaults.standard.string(forKey: "virtualRing"), let port = UInt16(raw) {
+        if let raw = DebugLaunch.string("virtualRing"), let port = UInt16(raw) {
             return port
         }
-        if let raw = ProcessInfo.processInfo.environment["PULSELOOP_VIRTUAL_RING"], let port = UInt16(raw) {
+        if let raw = DebugLaunch.environment("PULSELOOP_VIRTUAL_RING"), let port = UInt16(raw) {
             return port
         }
         // A bare `-virtualRing` (no value) means "on, default port".
-        if UserDefaults.standard.object(forKey: "virtualRing") != nil { return UInt16(AgaraConfig.Emulator.defaultPort) }
+        if DebugLaunch.isSet("virtualRing") { return UInt16(AgaraConfig.Emulator.defaultPort) }
         return nil
     }
 

@@ -65,26 +65,44 @@ enum SleepScore {
         return .needsWork
     }
 
+    /// Same inputs as Android's `SleepScore.calculate` (audit batch B): two denominators. `total` is time
+    /// **asleep** (every stage except awake — `UNKNOWN` minutes were slept too): the duration band and the
+    /// stage shares are judged against it. `span` (first block to last, the stored `totalMinutes`) is time
+    /// in bed: the awake share and the "does this ring label awake at all" test use it. REM folds into deep
+    /// (the model has no REM band; both are restorative). Without blocks the summary's minutes are used.
     static func calculate(_ sleep: SleepSummary) -> SleepScoreResult {
-        let total = sleep.session.totalMinutes > 0 ? Double(sleep.session.totalMinutes) : 0
-        let deep = Double(max(0, sleep.deepMinutes))
-        let light = Double(max(0, sleep.lightMinutes))
-        let awake = Double(max(0, sleep.awakeMinutes))
-        let coveredStageMin = sleep.blocks.reduce(0.0) { sum, block in
-            switch block.stage {
-            case .deep, .light, .awake: return sum + Double(max(0, block.durationMinutes))
-            default: return sum
+        let deep: Double
+        let light: Double
+        let awake: Double
+        let asleep: Double
+        let coveredStageMin: Double
+        if sleep.blocks.isEmpty {
+            deep = Double(max(0, sleep.deepMinutes) + max(0, sleep.remMinutes))
+            light = Double(max(0, sleep.lightMinutes))
+            awake = Double(max(0, sleep.awakeMinutes))
+            asleep = Double(max(0, sleep.session.totalMinutes)) - awake
+            coveredStageMin = 0
+        } else {
+            func minutes(_ stages: Set<SleepStage>) -> Double {
+                sleep.blocks.reduce(0.0) { $0 + (stages.contains($1.stage) ? Double(max(0, $1.durationMinutes)) : 0) }
             }
+            deep = minutes([.deep, .rem])
+            light = minutes([.light])
+            awake = minutes([.awake])
+            coveredStageMin = sleep.blocks.reduce(0.0) { $0 + Double(max(0, $1.durationMinutes)) }
+            asleep = coveredStageMin - awake
         }
+        let total = max(0, asleep)
+        let span = sleep.session.totalMinutes > 0 ? Double(sleep.session.totalMinutes) : total
         let hasAwakeSignal =
             sleep.blocks.contains { $0.stage == .awake } ||
             awake > 0 ||
-            (total > 0 && coveredStageMin >= total * 0.95)
+            (span > 0 && coveredStageMin >= span * 0.95)
 
         let totalHours = total / 60
         let deepPct = total > 0 ? (deep / total) * 100 : 0
         let lightPct = total > 0 ? (light / total) * 100 : 0
-        let awakePct: Double? = (total > 0 && hasAwakeSignal) ? (awake / total) * 100 : nil
+        let awakePct: Double? = (span > 0 && hasAwakeSignal) ? (awake / span) * 100 : nil
 
         let duration = bandScore(totalHours, idealLow: 7.5, idealHigh: 8.5, softLow: 6, softHigh: 9.5, hardLow: 3, hardHigh: 12, points: 35)
         let deepScore = bandScore(deepPct, idealLow: 13, idealHigh: 23, softLow: 5, softHigh: 35, hardLow: 0, hardHigh: 45, points: 30)

@@ -25,6 +25,8 @@ struct MealAnalysisSheet: View {
     @State private var describeText = ""
     @State private var image: UIImage?
     @State private var showCamera = false
+    /// The library picker, opened in place of the camera where there is none (Mac, simulator).
+    @State private var showLibrary = false
     @State private var photosItem: PhotosPickerItem?
     // Review-phase editable fields (prefilled from the estimate).
     @State private var name = ""
@@ -78,12 +80,13 @@ struct MealAnalysisSheet: View {
             guard !loaded else { return }
             loaded = true
             mealType = presetMealType ?? .inferred()
-            if startWithCamera { showCamera = true }
+            if startWithCamera { openCamera() }
         }
         .fullScreenCover(isPresented: $showCamera) {
             CameraPicker { image = $0 }
                 .ignoresSafeArea()
         }
+        .photosPicker(isPresented: $showLibrary, selection: $photosItem, matching: .images)
         .onChange(of: photosItem) { _, item in
             guard let item else { return }
             Task {
@@ -92,6 +95,15 @@ struct MealAnalysisSheet: View {
                 }
                 photosItem = nil
             }
+        }
+    }
+
+    /// Presenting `UIImagePickerController` with `.camera` where no camera exists raises an
+    /// exception (Mac "Designed for iPad", simulator) — fall back to the photo library there.
+    private func openCamera() {
+        switch CameraPicker.route(cameraAvailable: UIImagePickerController.cameraAvailable) {
+        case .camera: showCamera = true
+        case .library: showLibrary = true
         }
     }
 
@@ -111,11 +123,13 @@ struct MealAnalysisSheet: View {
                                 .font(PulseFont.title3)
                                 .foregroundStyle(.white.opacity(0.9))
                                 .padding(8)
+                                .minTapTarget(visualSize: 40)
                         }
+                        .accessibilityLabel("Remove photo")
                     }
             } else {
                 HStack(spacing: 12) {
-                    photoButton("camera", "Camera") { showCamera = true }
+                    photoButton("camera", "Camera") { openCamera() }
                     PhotosPicker(selection: $photosItem, matching: .images) {
                         photoLabel("photo.on.rectangle", "Library")
                     }

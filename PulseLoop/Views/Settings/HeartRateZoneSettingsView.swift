@@ -60,15 +60,15 @@ struct HeartRateZoneSettingsView: View {
                 SettingsGroup(header: "Boundaries", footer: boundariesFooter) {
                     if mode == .custom {
                         stepperRow("Low ends below", value: $lowUpper,
-                                   range: 30...((athleteMode ? athleticUpper : elevatedStart) - 5))
+                                   range: Self.stepRange(30, (athleteMode ? athleticUpper : elevatedStart) - 5))
                         if athleteMode {
                             stepperRow("Athletic ends below", value: $athleticUpper,
-                                       range: (lowUpper + 5)...(elevatedStart - 5))
+                                       range: Self.stepRange(lowUpper + 5, elevatedStart - 5))
                         }
                         stepperRow("Elevated starts at", value: $elevatedStart,
-                                   range: ((athleteMode ? athleticUpper : lowUpper) + 5)...(highStart - 5))
+                                   range: Self.stepRange((athleteMode ? athleticUpper : lowUpper) + 5, highStart - 5))
                         stepperRow("High starts at", value: $highStart,
-                                   range: (elevatedStart + 5)...220)
+                                   range: Self.stepRange(elevatedStart + 5, 220))
                     } else {
                         valueRow("Low ends below", Int(effective.thresholds.lowUpper))
                         if let athletic = effective.thresholds.athleticUpper {
@@ -156,6 +156,21 @@ struct HeartRateZoneSettingsView: View {
         }
     }
 
+    /// A stepper range that can't trap: `lo...hi` with `hi < lo` is a runtime crash, and learned or
+    /// stored boundaries closer than the 5 bpm gap (e.g. a seeded athletic 60 above a learned low 58 + 5)
+    /// produced exactly that.
+    static func stepRange(_ lo: Int, _ hi: Int) -> ClosedRange<Int> { lo...max(lo, hi) }
+
+    /// Seeded boundaries pushed into order with the 5 bpm gaps the steppers enforce.
+    static func orderedDrafts(low: Int, athletic: Int, elevated: Int, high: Int, athlete: Bool)
+        -> (low: Int, athletic: Int, elevated: Int, high: Int) {
+        let low = min(max(low, 30), 200)
+        let athletic = athlete ? max(athletic, low + 5) : athletic
+        let elevated = max(elevated, (athlete ? athletic : low) + 5)
+        let high = max(high, elevated + 5)
+        return (low, athletic, elevated, high)
+    }
+
     private func valueRow(_ title: String, _ value: Int) -> some View {
         FormValueRow(title: title) {
             Text("\(value) bpm")
@@ -202,10 +217,15 @@ struct HeartRateZoneSettingsView: View {
     }
 
     private func seedDrafts(from thresholds: HeartRateThresholds) {
-        lowUpper = Int(thresholds.lowUpper)
-        athleticUpper = Int(thresholds.athleticUpper ?? 60)
-        elevatedStart = Int(thresholds.elevatedStart)
-        highStart = Int(thresholds.highStart)
+        let safe: (Double) -> Int = { $0.isFinite ? Int($0) : 0 }
+        let drafts = Self.orderedDrafts(
+            low: safe(thresholds.lowUpper), athletic: safe(thresholds.athleticUpper ?? 60),
+            elevated: safe(thresholds.elevatedStart), high: safe(thresholds.highStart), athlete: athleteMode
+        )
+        lowUpper = drafts.low
+        athleticUpper = drafts.athletic
+        elevatedStart = drafts.elevated
+        highStart = drafts.high
     }
 
     private func save() {

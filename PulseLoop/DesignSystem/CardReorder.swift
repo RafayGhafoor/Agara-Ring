@@ -320,7 +320,7 @@ private struct HiddenRow: View {
 private struct RemoveBadge: View {
     /// Visible disc. The tap target is `hitSize`, centred on it.
     static let size: CGFloat = 24
-    private static let hitSize: CGFloat = 36
+    private static let hitSize: CGFloat = 44   // HIG minimum (audit batch B)
     /// How far the *hit frame* must be offset for the visible disc to straddle the card's corner.
     static let cornerOffset: CGFloat = -6 - (hitSize - size) / 2
 
@@ -338,9 +338,10 @@ private struct RemoveBadge: View {
                 // explicit shape the button's target collapses to the minus glyph's strokes. Widen it
                 // past the disc too — 24pt is a small thing to hit while every card is wiggling.
                 .frame(width: Self.hitSize, height: Self.hitSize)
-                .contentShape(Circle())
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("Hide this card")
         .help("Hide this card")
     }
 }

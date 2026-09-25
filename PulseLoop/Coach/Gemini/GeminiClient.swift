@@ -68,7 +68,9 @@ final class GeminiClient: ResponsesClient, @unchecked Sendable {
         let geminiBody = buildGeminiBody(tools: convertTools(tools), textFormat: textFormat)
         let geminiData = try JSONSerialization.data(withJSONObject: geminiBody)
 
-        let urlStr = "\(baseURL)/\(model):generateContent?key=\(apiKey)"
+        // The key rides the `x-goog-api-key` header, never the query string, so it can't end up in a URL
+        // that gets logged, cached or shown in an error.
+        let urlStr = "\(baseURL)/\(model):generateContent"
         guard let url = URL(string: urlStr) else {
             throw ResponsesError.decoding("GeminiClient: could not build endpoint URL")
         }
@@ -76,6 +78,7 @@ final class GeminiClient: ResponsesClient, @unchecked Sendable {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
         request.httpBody = geminiData
         request.timeoutInterval = 60
 

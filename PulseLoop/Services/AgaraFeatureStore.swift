@@ -95,3 +95,26 @@ final class AgaraFeatureStore {
         return result
     }
 }
+
+/// Launch-argument tooling (`-seedDemo YES`, `-virtualRing 9909`, `-cloudBaseUrl …`, `-historyDays N`, …) arrives
+/// through the UserDefaults argument domain. It exists for the simulator/E2E rigs only: a Release build ignores
+/// every such key, so nobody can reshape a shipped app's data or endpoints by launching it with arguments.
+/// Every launch-argument read goes through here.
+nonisolated enum DebugLaunch {
+    static var isEnabled: Bool {
+        #if DEBUG
+        return true
+        #else
+        return false
+        #endif
+    }
+
+    static func string(_ key: String) -> String? { isEnabled ? UserDefaults.standard.string(forKey: key) : nil }
+    static func bool(_ key: String) -> Bool { isEnabled && UserDefaults.standard.bool(forKey: key) }
+    static func integer(_ key: String) -> Int { isEnabled ? UserDefaults.standard.integer(forKey: key) : 0 }
+    /// The key is present at all (a bare `-virtualRing`).
+    static func isSet(_ key: String) -> Bool { isEnabled && UserDefaults.standard.object(forKey: key) != nil }
+    static func environment(_ name: String) -> String? {
+        isEnabled ? ProcessInfo.processInfo.environment[name] : nil
+    }
+}

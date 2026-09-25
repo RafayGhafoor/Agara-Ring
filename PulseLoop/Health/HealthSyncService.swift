@@ -27,6 +27,8 @@ final class HealthSyncService {
 
     /// True while an export run is in flight (drives the Settings button state).
     private(set) var isSyncing = false
+    /// When today's activity totals were last written (`shouldExportActivity`).
+    @ObservationIgnored private var lastActivityExportAt: Date?
     /// Human-readable result of the most recent export, shown under the action button.
     private(set) var lastResult: String?
 
@@ -237,6 +239,14 @@ final class HealthSyncService {
 
     // MARK: - Daily activity pass
 
+    /// Minimum spacing of today-only activity exports.
+    static let activityMinInterval: TimeInterval = 15 * 60
+
+    static func shouldExportActivity(todayOnly: Bool, lastExportAt: Date?, now: Date) -> Bool {
+        guard todayOnly, let lastExportAt else { return true }
+        return now.timeIntervalSince(lastExportAt) >= activityMinInterval || now < lastExportAt
+    }
+
     private func exportActivity(context: ModelContext, state: inout AppleHealthSyncState,
                                 counts: inout SyncCounts, now: Date, device: HKDevice?) async throws {
         guard prefsStore.prefs.syncActivity else { return }
@@ -248,6 +258,12 @@ final class HealthSyncService {
         )
         let rows = (try? context.fetch(descriptor)) ?? []
         guard !rows.isEmpty else { return }
+        // Today's running total changes with every step poll; re-writing its day samples each time kept
+        // Health busy all day. Today-only changes export at most every 15 min (the watermark stays put, so
+        // the next pass picks them up); a finished day always goes straight out.
+        let todayOnly = rows.allSatisfy { Calendar.current.isDate($0.date, inSameDayAs: now) }
+        guard Self.shouldExportActivity(todayOnly: todayOnly, lastExportAt: lastActivityExportAt, now: now) else { return }
+        lastActivityExportAt = now
 
         let netting = workoutNetting(context: context)
         var samples: [HKQuantitySample] = []

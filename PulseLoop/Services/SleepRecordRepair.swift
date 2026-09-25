@@ -117,6 +117,7 @@ extension SleepService {
     /// trace (`SleepRecordRepair`), then re-derive every waking day once so each row gets its stored score
     /// (rows written before D1 have none, so their cloud `quality` was 0). `UserDefaults`-gated and idempotent.
     static func migrateSleepSourcesIfNeeded(context: ModelContext) {
+        defer { rescoreSleepIfNeeded(context: context) }
         guard !UserDefaults.standard.bool(forKey: sleepSourceMigrationKey) else { return }
         SleepRecordRepair.run(context: context)
         try? context.save()
@@ -130,5 +131,24 @@ extension SleepService {
         }
         try? context.save()
         UserDefaults.standard.set(true, forKey: sleepSourceMigrationKey)
+    }
+
+    static let sleepScoreInputsKey = "sleepScore.androidInputs.v1"
+
+    /// One-time: re-store every night's score after the score inputs changed to Android's (asleep minutes,
+    /// deep = DEEP + REM — audit batch B), so the cloud `quality`, insights and the coach read the number
+    /// the Sleep tab now shows. Writes only rows whose score changed.
+    static func rescoreSleepIfNeeded(context: ModelContext) {
+        guard !UserDefaults.standard.bool(forKey: sleepScoreInputsKey) else { return }
+        let sessions = (try? context.fetch(FetchDescriptor<SleepSession>())) ?? []
+        let blocksBySession = Dictionary(grouping: (try? context.fetch(FetchDescriptor<SleepStageBlock>())) ?? [],
+                                         by: { $0.sessionId })
+        var changed = 0
+        for row in sessions {
+            let score = SleepScore.calculate(SleepService.summary(session: row, blocks: blocksBySession[row.id] ?? [])).score
+            if row.score != score { row.score = score; changed += 1 }
+        }
+        if changed > 0 { try? context.save() }
+        UserDefaults.standard.set(true, forKey: sleepScoreInputsKey)
     }
 }

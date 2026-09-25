@@ -105,7 +105,9 @@ enum MetricConfidence: String {
 }
 
 struct MetricSample: Identifiable {
-    let id = UUID()
+    /// Stable across recomputes (a fresh `UUID()` per build made every chart diff treat every point as
+    /// new, re-animating and re-laying out the whole series on each data batch).
+    var id: String { "\(timestamp.timeIntervalSince1970)|\(value)" }
     let timestamp: Date
     let value: Double
 }
@@ -164,10 +166,15 @@ struct SleepSummary {
     let deepMinutes: Int
     let awakeMinutes: Int
     let blocks: [SleepStageBlock]
+    /// REM minutes carried by a summary whose blocks were dropped (range views keep only the totals).
+    var remMinutesWithoutBlocks: Int? = nil
 
     /// REM minutes from the stage blocks (the Agara ring reports REM: A5 bitmap code 2, A3 offset 23).
     /// Deep + light + REM + awake adds up to the time in bed.
-    var remMinutes: Int { blocks.filter { $0.stage == .rem }.reduce(0) { $0 + $1.durationMinutes } }
+    var remMinutes: Int {
+        if blocks.isEmpty, let remMinutesWithoutBlocks { return remMinutesWithoutBlocks }
+        return blocks.filter { $0.stage == .rem }.reduce(0) { $0 + $1.durationMinutes }
+    }
 }
 
 struct SleepRangeSummary {

@@ -21,7 +21,6 @@ struct CoachView: View {
     var onOpenMeal: ((UUID) -> Void)?
     @Environment(\.modelContext) private var modelContext
     @Environment(RingSyncCoordinator.self) private var coordinator
-    @Query(sort: \CoachMessage.createdAt) private var allMessages: [CoachMessage]
     @Query(sort: \CoachConversation.updatedAt, order: .reverse) private var conversations: [CoachConversation]
     @State private var draft = ""
     @State private var viewModel = CoachViewModel()
@@ -64,17 +63,20 @@ struct CoachView: View {
             .first(where: \.isKeyWindow)?.safeAreaInsets.bottom ?? 0
     }
 
-    /// Messages for the currently selected conversation.
-    private var messages: [CoachMessage] {
-        guard let id = activeConversationId else { return allMessages }
-        return allMessages.filter { $0.conversationId == id }
-    }
-
-    private var showColdStart: Bool {
+    private func showColdStart(_ messages: [CoachMessage]) -> Bool {
         !viewModel.isSending && (messages.isEmpty || messages.last?.role == "assistant")
     }
 
+    /// Only the active conversation's messages are queried (it used to query every message of every
+    /// conversation and filter in the body, on each keystroke and trace event — audit batch B).
     var body: some View {
+        CoachMessagesReader(conversationId: activeConversationId) { messages in
+            content(messages)
+        }
+    }
+
+    @ViewBuilder
+    private func content(_ messages: [CoachMessage]) -> some View {
         VStack(spacing: 0) {
             header
 
@@ -111,7 +113,7 @@ struct CoachView: View {
             }
 
             VStack(spacing: 0) {
-                if showColdStart {
+                if showColdStart(messages) {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 6) {
                             ForEach(coldStartPrompts, id: \.self) { prompt in
@@ -152,7 +154,7 @@ struct CoachView: View {
         }
         .onAppear {
             if activeConversationId == nil {
-                activeConversationId = allMessages.last?.conversationId ?? conversations.first?.id
+                activeConversationId = latestMessageConversationId() ?? conversations.first?.id
             }
             if nav.requestedConversationId != nil { openRequestedConversation() }
         }
@@ -171,6 +173,19 @@ struct CoachView: View {
                 settings: settingsStore.settings
             )
         }
+    }
+
+    /// The conversation of the newest message (one-row fetch).
+    private func latestMessageConversationId() -> UUID? {
+        var descriptor = FetchDescriptor<CoachMessage>(sortBy: [SortDescriptor(\.createdAt, order: .reverse)])
+        descriptor.fetchLimit = 1
+        return (try? modelContext.fetch(descriptor))?.first?.conversationId
+    }
+
+    private func hasMessages(in conversationId: UUID) -> Bool {
+        var descriptor = FetchDescriptor<CoachMessage>(predicate: #Predicate { $0.conversationId == conversationId })
+        descriptor.fetchLimit = 1
+        return ((try? modelContext.fetchCount(descriptor)) ?? 0) > 0
     }
 
     /// The currently selected conversation object (for usage totals).
@@ -205,15 +220,21 @@ struct CoachView: View {
                 Button { composerFocused = false; showUsage = true } label: {
                     Image(systemName: "info.circle").font(PulseFont.body).foregroundStyle(PulseColors.textSecondary)
                         .frame(width: 36, height: 36).pulseGlass(Circle(), interactive: true)
+                        .minTapTarget(visualSize: 36)
                 }
+                .accessibilityLabel("Usage and privacy")
                 Button { newConversation() } label: {
                     Image(systemName: "plus").font(PulseFont.body).foregroundStyle(PulseColors.textSecondary)
                         .frame(width: 36, height: 36).pulseGlass(Circle(), interactive: true)
+                        .minTapTarget(visualSize: 36)
                 }
+                .accessibilityLabel("New conversation")
                 Button { composerFocused = false; showHistory = true } label: {
                     Image(systemName: "clock.arrow.circlepath").font(PulseFont.body).foregroundStyle(PulseColors.textSecondary)
                         .frame(width: 36, height: 36).pulseGlass(Circle(), interactive: true)
+                        .minTapTarget(visualSize: 36)
                 }
+                .accessibilityLabel("Conversation history")
             }
             .pulseGlassContainer(spacing: 8)
         }
@@ -241,6 +262,7 @@ struct CoachView: View {
                             .frame(width: 36, height: 36).pulseGlass(Circle(), interactive: true)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Add a photo")
                 }
                 TextField("Ask the coach...", text: $draft)
                     .focused($composerFocused)
@@ -257,6 +279,7 @@ struct CoachView: View {
                         .pulseGlass(Circle(), interactive: true, tint: canSend ? PulseColors.accent : nil)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Send")
                 .disabled(!canSend)
             }
             // Camera / field / send glass share one container so they render/blend together.
@@ -287,8 +310,10 @@ struct CoachView: View {
                     Image(systemName: "xmark.circle.fill")
                         .font(PulseFont.title3.weight(.regular))
                         .foregroundStyle(.white, Color.black.opacity(0.55))
+                        .minTapTarget(visualSize: 24)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Remove photo")
                 .offset(x: 6, y: -6)
             }
             Spacer(minLength: 0)
@@ -331,7 +356,7 @@ struct CoachView: View {
         // Title a fresh conversation from its opening message.
         if let convo = conversations.first(where: { $0.id == conversationId }),
            isDefaultTitle(convo.title),
-           !allMessages.contains(where: { $0.conversationId == conversationId }) {
+           !hasMessages(in: conversationId) {
             let seed = trimmed.isEmpty ? "Photo" : String(trimmed.prefix(40))
             convo.title = seed
             try? modelContext.save()
@@ -697,4 +722,22 @@ private struct CoachBubbleSurface: ViewModifier {
             content.pulseGlass(RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
     }
+}
+
+/// Queries one conversation's messages (all messages only while no conversation exists yet) and hands
+/// them to `content` — a `@Query` predicate is fixed at init, so the view is rebuilt per conversation.
+private struct CoachMessagesReader<Content: View>: View {
+    @Query private var messages: [CoachMessage]
+    private let content: ([CoachMessage]) -> Content
+
+    init(conversationId: UUID?, @ViewBuilder content: @escaping ([CoachMessage]) -> Content) {
+        if let id = conversationId {
+            _messages = Query(filter: #Predicate<CoachMessage> { $0.conversationId == id }, sort: \CoachMessage.createdAt)
+        } else {
+            _messages = Query(sort: \CoachMessage.createdAt)
+        }
+        self.content = content
+    }
+
+    var body: some View { content(messages) }
 }

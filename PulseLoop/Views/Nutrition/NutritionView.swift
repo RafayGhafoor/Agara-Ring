@@ -19,6 +19,8 @@ struct NutritionView: View {
     @State private var hasEverLogged = true
     @State private var logSheet: LogSheetRequest?
     @State private var analysisSheet: AnalysisRequest?
+    /// Meal picked for deletion from a row's context menu — confirmed first (Android matches).
+    @State private var pendingDelete: MealEntry?
 
     private struct LogSheetRequest: Identifiable {
         let id = UUID()
@@ -93,6 +95,7 @@ struct NutritionView: View {
                     .foregroundStyle(PulseColors.textPrimary)
                     .frame(width: 36, height: 36)
                     .pulseGlass(Circle(), interactive: true)
+                    .minTapTarget(visualSize: 36)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Nutrition settings")
@@ -105,6 +108,18 @@ struct NutritionView: View {
         }
         .sheet(item: $analysisSheet) { request in
             MealAnalysisSheet(day: selectedDay, startWithCamera: request.startWithCamera)
+        }
+        .alert(
+            "Delete this meal?",
+            isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
+            presenting: pendingDelete
+        ) { entry in
+            Button("Delete", role: .destructive) {
+                NutritionRepository.delete(id: entry.id, context: modelContext)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { entry in
+            Text("\(entry.name) is removed from your food log.")
         }
     }
 
@@ -178,8 +193,10 @@ struct NutritionView: View {
                 .foregroundStyle(enabled ? PulseColors.textPrimary : PulseColors.textMuted.opacity(0.4))
                 .frame(width: 32, height: 32)
                 .pulseGlass(Circle(), interactive: true)
+                .minTapTarget(visualSize: 32)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(symbol == "chevron.left" ? "Previous day" : "Next day")
         .disabled(!enabled)
     }
 
@@ -217,6 +234,7 @@ struct NutritionView: View {
                         .foregroundStyle(PulseColors.textPrimary)
                         .frame(width: 28, height: 28)
                         .pulseGlass(Circle(), interactive: true)
+                        .minTapTarget(visualSize: 28)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Add \(mealType.label.lowercased())")
@@ -233,7 +251,7 @@ struct NutritionView: View {
                                 Label("Edit", systemImage: "pencil")
                             }
                             Button(role: .destructive) {
-                                NutritionRepository.delete(id: entry.id, context: modelContext)
+                                pendingDelete = entry
                             } label: {
                                 Label("Delete", systemImage: "trash")
                             }

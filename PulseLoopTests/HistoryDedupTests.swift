@@ -107,10 +107,12 @@ final class HistoryDedupTests: XCTestCase {
         }
     }
 
-    /// Live samples are events, not log slots: two readings at the same instant both persist.
+    /// Live samples are events, not log slots: while every sample is kept (a workout or a spot test), two
+    /// readings at the same instant both persist.
     func testLiveSamplesAreNotDeduplicated() throws {
         let context = try TestSupport.makeContext()
         let subscriber = EventPersistenceSubscriber(context: context)
+        subscriber.keepEveryHeartRateSample = { true }
         let ts = Date(timeIntervalSince1970: 1_700_000_000)
 
         subscriber.persist(.heartRateSample(bpm: 70, timestamp: ts))
@@ -118,5 +120,22 @@ final class HistoryDedupTests: XCTestCase {
         subscriber.flush()
 
         XCTAssertEqual(try heartRateRows(context).count, 2)
+    }
+
+    /// Outside a workout / spot test the ~1 Hz live stream is stored at most once per 5 s (Android's
+    /// `LiveHeartRateThrottle`); a clock step backwards always stores.
+    func testLiveHeartRateIsStoredAtMostEveryFiveSeconds() throws {
+        let context = try TestSupport.makeContext()
+        let subscriber = EventPersistenceSubscriber(context: context)
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        for second in 0..<20 {
+            subscriber.persist(.heartRateSample(bpm: 70 + second % 3, timestamp: t0.addingTimeInterval(Double(second))))
+        }
+        subscriber.persist(.heartRateSample(bpm: 80, timestamp: t0.addingTimeInterval(-60)))
+        subscriber.flush()
+        let stamps = try heartRateRows(context).map(\.timestamp).sorted()
+        XCTAssertEqual(stamps.map { Int($0.timeIntervalSince(t0)) }, [-60, 0, 5, 10, 15])
+        XCTAssertTrue(LiveHeartRateThrottle.shouldStore(lastStoredAt: t0, at: t0.addingTimeInterval(1), keepAll: true))
+        XCTAssertFalse(LiveHeartRateThrottle.shouldStore(lastStoredAt: t0, at: t0.addingTimeInterval(4.9), keepAll: false))
     }
 }

@@ -725,6 +725,7 @@
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Agara Ring connects to your ring over Bluetooth to sync steps, sleep and vitals.";
 				INFOPLIST_KEY_NSBluetoothPeripheralUsageDescription = "Agara Ring connects to your ring to sync activity, heart rate, SpO2 and sleep.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Attach a photo to ask the AI Coach about it.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Save share cards and images from Agara Ring to your photo library.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Agara Ring reads your Health profile (age, sex, height, weight) to personalize calorie and vitals insights.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Agara Ring writes your ring's heart rate, blood oxygen, HRV, temperature, sleep, activity, and workouts to Apple Health — only for the data types you enable.";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Agara Ring connects to the AI model server you run on your own network, so coaching can happen without sending your health data to a cloud provider.";
@@ -771,6 +772,7 @@
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Agara Ring connects to your ring over Bluetooth to sync steps, sleep and vitals.";
 				INFOPLIST_KEY_NSBluetoothPeripheralUsageDescription = "Agara Ring connects to your ring to sync activity, heart rate, SpO2 and sleep.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Attach a photo to ask the AI Coach about it.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Save share cards and images from Agara Ring to your photo library.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Agara Ring reads your Health profile (age, sex, height, weight) to personalize calorie and vitals insights.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Agara Ring writes your ring's heart rate, blood oxygen, HRV, temperature, sleep, activity, and workouts to Apple Health — only for the data types you enable.";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Agara Ring connects to the AI model server you run on your own network, so coaching can happen without sending your health data to a cloud provider.";

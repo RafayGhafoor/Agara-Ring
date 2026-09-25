@@ -89,6 +89,135 @@ final class VeepooSyncEngineTests: XCTestCase {
         engine.connectionDidEnd()
     }
 
+    // MARK: Spot HR during a history pass
+
+    /// The day loop issues no new E0/DF while a spot HR test runs (its samples would queue behind the
+    /// transfer); the held request goes out when the test stops, and the watchdog doesn't fire meanwhile.
+    func testSpotHeartRatePausesTheDayLoopUntilItStops() {
+        let engine = engineInDailyPhase()                          // DF for day 0 is on the wire
+        engine.measureHeartRateSpot()
+        XCTAssertEqual(writer.commands.last, VeepooEncoder.heartRateStart())
+        frame(engine, part1)
+        frame(engine, part2)
+        frame(engine, hex("dfffff58" + String(repeating: "00", count: 16)))   // day 0 finishes
+        XCTAssertEqual(writer.heartRates.count, 5, "the finished day is still published")
+        XCTAssertFalse(writer.asked(VeepooEncoder.sleepHistory(dayOffset: 1)), "day 1 asked mid-test")
+        for _ in 0..<4 { engine.pollTickFired() }                  // a long test: no watchdog advance
+        XCTAssertFalse(writer.asked(VeepooEncoder.sleepHistory(dayOffset: 1)))
+        XCTAssertTrue(engine.isHistorySyncing)
+
+        engine.stopHeartRate()
+        XCTAssertEqual(Array(writer.commands.suffix(2)),
+                       [VeepooEncoder.heartRateStop(), VeepooEncoder.sleepHistory(dayOffset: 1)])
+        engine.connectionDidEnd()
+    }
+
+    /// A pass kicked while the test runs starts paused and begins when it stops.
+    func testSyncHistoryDuringASpotHeartRateStartsWhenItEnds() {
+        writer = RecordingWriter()
+        let engine = VeepooSyncEngine(writer: writer, decoder: VeepooDecoder(), historyDays: 1)
+        engine.connectionDidStart()
+        engine.handle(.commandAck(commandId: 0xA1))
+        frame(engine, hex("e0000000" + String(repeating: "00", count: 16)))
+        frame(engine, hex("dfffff58" + String(repeating: "00", count: 16)))   // startup pass done
+        XCTAssertFalse(engine.isHistorySyncing)
+        engine.measureHeartRateSpot()
+        writer.commands.removeAll()
+        engine.syncHistory()
+        XCTAssertTrue(writer.commands.isEmpty, "\(writer.commands.map { [UInt8]($0) })")
+        engine.stopHeartRate()
+        XCTAssertEqual(writer.commands, [VeepooEncoder.heartRateStop(), VeepooEncoder.sleepHistory(dayOffset: 0)])
+        engine.connectionDidEnd()
+    }
+
+    /// Workout / live streams use `startHeartRate` and never hold the loop.
+    func testWorkoutStreamDoesNotPauseTheDayLoop() {
+        let engine = engineInDailyPhase()
+        engine.startHeartRate()
+        frame(engine, hex("dfffff58" + String(repeating: "00", count: 16)))
+        XCTAssertTrue(writer.asked(VeepooEncoder.sleepHistory(dayOffset: 1)))
+        engine.connectionDidEnd()
+    }
+
+    /// The contact-gap rule: 3 s normally, 10 s while a transfer shares the link, and widened to a few of
+    /// the stream's own intervals for a slow-but-steady stream.
+    func testHeartRateContactGapFollowsSyncAndCadence() {
+        let t0 = Date(timeIntervalSince1970: 1_790_000_000)
+        var window = HRSampleWindow()
+        window.begin(at: t0)
+        window.collect(70, at: t0.addingTimeInterval(6))
+        XCTAssertFalse(window.contactLost(at: t0.addingTimeInterval(8.9)))
+        XCTAssertTrue(window.contactLost(at: t0.addingTimeInterval(9.5)), "3 s gap outside a sync")
+
+        var syncing = HRSampleWindow()
+        syncing.begin(at: t0, historySyncing: true)
+        syncing.collect(70, at: t0.addingTimeInterval(6))
+        XCTAssertFalse(syncing.contactLost(at: t0.addingTimeInterval(14)), "burst gap during a sync is not contact loss")
+        XCTAssertTrue(syncing.contactLost(at: t0.addingTimeInterval(16.5)))
+
+        // A steady 2.5 s cadence: the gap widens to 7.5 s, still capped.
+        var slow = HRSampleWindow()
+        slow.begin(at: t0)
+        for i in 0..<8 { slow.collect(70 + i % 2, at: t0.addingTimeInterval(6 + Double(i) * 2.5)) }
+        XCTAssertEqual(slow.contactGap, 7.5, accuracy: 0.01)
+        XCTAssertEqual(slow.stableValue.map { $0 >= 70 && $0 <= 71 }, true)
+        let last = t0.addingTimeInterval(6 + 7 * 2.5)
+        XCTAssertFalse(slow.contactLost(at: last.addingTimeInterval(5)))
+        XCTAssertTrue(slow.contactLost(at: last.addingTimeInterval(8)))
+    }
+
+    // MARK: History request layout (A0)
+
+    /// `DF <posLo> <posHi> <day>` (vendor SDK layout). Same assertions as Android's `VeepooDecoderTest`.
+    func testDailyHistoryRequestIsPositionThenDay() {
+        let daily = [UInt8](VeepooEncoder.dailyHistory(dayOffset: 3))
+        XCTAssertEqual(daily.count, 20)
+        XCTAssertEqual(Array(daily.prefix(4)), [0xDF, 0x01, 0x00, 0x03])
+        XCTAssertEqual(Array([UInt8](VeepooEncoder.dailyHistory(dayOffset: 0)).prefix(4)), [0xDF, 0x01, 0x00, 0x00])
+        // Position is a little-endian u16; out-of-range positions clamp to 1…65535.
+        XCTAssertEqual(Array([UInt8](VeepooEncoder.dailyHistory(dayOffset: 6, position: 0x0123)).prefix(4)),
+                       [0xDF, 0x23, 0x01, 0x06])
+        XCTAssertEqual(Array([UInt8](VeepooEncoder.dailyHistory(dayOffset: 2, position: 0)).prefix(4)),
+                       [0xDF, 0x01, 0x00, 0x02])
+        XCTAssertEqual(Array([UInt8](VeepooEncoder.dailyHistory(dayOffset: 2, position: 70_000)).prefix(4)),
+                       [0xDF, 0xFF, 0xFF, 0x02])
+        // Regression guard: never the old `DF 01 <day> 00` (= position day*256+1 of day 0).
+        for day in 1...6 {
+            XCTAssertNotEqual(Array([UInt8](VeepooEncoder.dailyHistory(dayOffset: day)).prefix(4)),
+                              [0xDF, 0x01, UInt8(day), 0x00])
+        }
+        // A day offset outside a byte clamps instead of trapping.
+        XCTAssertEqual([UInt8](VeepooEncoder.dailyHistory(dayOffset: 300))[3], 0xFF)
+        XCTAssertEqual([UInt8](VeepooEncoder.sleepHistory(dayOffset: -1))[1], 0x00)
+    }
+
+    /// The whole day loop asks each day for its records from position 1: `DF 01 00 <day>`.
+    func testDayLoopAsksEachDayFromPositionOne() {
+        writer = RecordingWriter()
+        let days = 7
+        let engine = VeepooSyncEngine(writer: writer, decoder: VeepooDecoder(), historyDays: days)
+        engine.connectionDidStart()
+        engine.handle(.commandAck(commandId: 0xA1))
+        let end = hex("dfffff58" + String(repeating: "00", count: 16))
+        for day in 0..<days {
+            XCTAssertTrue(writer.asked(VeepooEncoder.sleepHistory(dayOffset: day)), "E0 for day \(day)")
+            frame(engine, hex("e00000" + String(format: "%02x", day) + String(repeating: "00", count: 16)))
+            var expected = Data([0xDF, 0x01, 0x00, UInt8(day)])
+            expected.append(Data(count: 16))
+            XCTAssertTrue(writer.asked(expected), "DF for day \(day)")
+            let before = writer.heartRates.count
+            frame(engine, part1)
+            frame(engine, part2)
+            frame(engine, end)
+            XCTAssertEqual(writer.heartRates.count - before, 5, "day \(day)'s records")
+        }
+        XCTAssertTrue(writer.emitted.contains { if case .historySyncFinished = $0 { return true }; return false })
+        let df = writer.commands.filter { $0.first == 0xDF }.map { [UInt8]($0) }
+        XCTAssertEqual(df.map { Int($0[3]) }, Array(0..<days))
+        XCTAssertTrue(df.allSatisfy { $0[1] == 0x01 && $0[2] == 0x00 })
+        engine.connectionDidEnd()
+    }
+
 
     // MARK: Day-loop guards
 

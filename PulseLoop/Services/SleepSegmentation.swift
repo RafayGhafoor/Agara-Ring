@@ -206,7 +206,9 @@ extension SleepService {
         for (source, blocks) in Dictionary(grouping: dayBlocks, by: { $0.sourceAddress }) {
             for group in SleepSegmentation.segment(blocks) {
                 guard let start = group.first?.startAt else { continue }
-                let end = group.map(\.endAt).max() ?? start
+                // Clamp: a block with a negative duration (corrupt row, bad import) gives an end before the
+                // start, and `start...end` below traps on it.
+                let end = max(start, group.map(\.endAt).max() ?? start)
                 segments.append(Segment(blocks: group, start: start, end: end, source: source))
             }
         }

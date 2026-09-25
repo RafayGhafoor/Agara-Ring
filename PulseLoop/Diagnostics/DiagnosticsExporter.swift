@@ -28,12 +28,13 @@ enum DiagnosticsExporter {
         return json
     }
 
-    /// Write the report to a temporary file and return its URL (for a share sheet).
+    /// Write the report to a temporary file and return its URL (for a share sheet). Earlier exports and
+    /// reports are deleted first (`ExportFiles.freshDirectory`) — they were already shared.
     static func exportFile(context: ModelContext) -> URL? {
         let json = exportJSON(context: context)
         let stamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("pulseloop-diagnostics-\(stamp).json")
         do {
+            let url = try ExportFiles.freshDirectory().appendingPathComponent("agara-diagnostics-\(stamp).json")
             try json.data(using: .utf8)?.write(to: url)
             return url
         } catch {

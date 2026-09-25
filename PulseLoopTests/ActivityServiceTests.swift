@@ -44,6 +44,27 @@ final class ActivityServiceTests: XCTestCase {
         XCTAssertEqual(afterUpdate?.steps, 400 - 100 + 999, "updated bucket replaces its old value")
     }
 
+    /// Audit batch B: a day of buckets is applied without a `save()` per bucket, still sums correctly and
+    /// still yields exactly one day row and one sample per bucket.
+    func testADayOfBucketsNeedsNoSavePerBucket() throws {
+        let context = try TestSupport.makeContext()
+        let day = Calendar.current.startOfDay(for: Date().addingTimeInterval(-3 * 86_400))
+        for slot in 0..<96 {
+            ActivityService.applyActivityBucket(date: day.addingTimeInterval(Double(slot) * 900),
+                                                steps: 10, distanceMeters: 7, context: context)
+        }
+        XCTAssertTrue(context.hasChanges, "the batch is left for the caller's coalesced save")
+        let rows = try context.fetch(FetchDescriptor<ActivityDaily>()).filter { Calendar.current.isDate($0.date, inSameDayAs: day) }
+        XCTAssertEqual(rows.count, 1)
+        XCTAssertEqual(rows.first?.steps, 960)
+        XCTAssertEqual(rows.first?.distanceMeters ?? 0, 672, accuracy: 0.001)
+        // Re-sending a bucket inside the same unsaved batch replaces it.
+        ActivityService.applyActivityBucket(date: day, steps: 110, distanceMeters: 7, context: context)
+        XCTAssertEqual(MetricsRepository.activity(on: day, context: context)?.steps, 1060)
+        try context.save()
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<ActivityBucketSample>()), 96)
+    }
+
     func testHRActiveMinutesLiveDense() throws {
         let context = try TestSupport.makeContext()
         // 6 dense live samples in one minute, all above the active threshold (>=100 bpm floor).

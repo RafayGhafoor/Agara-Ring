@@ -11,6 +11,7 @@ final class DiagnosticsSubscriber {
     private let context: ModelContext
     private var task: Task<Void, Never>?
     private var activeDeviceType: RingDeviceType?
+    private var lastLoggedBattery: Int?
 
     init(context: ModelContext) {
         self.context = context
@@ -44,6 +45,10 @@ final class DiagnosticsSubscriber {
             log(.connection, .info, "Forgot wearable")
             activeDeviceType = nil
         case let .batteryLevel(percent):
+            // The poll re-reads the battery every minute; log a change, not every read (it was a row +
+            // a save per minute while connected).
+            guard percent != lastLoggedBattery else { return }
+            lastLoggedBattery = percent
             log(.battery, .info, "Battery \(percent)%")
         case let .syncProgress(stage):
             log(.sync, .info, "Sync: \(stage)")

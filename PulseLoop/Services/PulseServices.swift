@@ -141,10 +141,16 @@ enum MetricsService {
     /// source of truth for the vitals sparkline/chart shape, so any caller that runs it over the same
     /// samples gets a byte-identical result — used by both `metricRange` (Vitals) and
     /// `buildTodaySummary` (Today) so the two pages never disagree on a metric's range/graph.
+    /// Upper bound on the points any vitals series hands to a chart.
+    static let maxChartPoints = 480
+
     static func displaySamples(_ raw: [MetricSample], range: MetricRange,
                                scope: MetricScope = .vitals) -> [MetricSample] {
         let targetBuckets = MetricPrefsStore.shared.resolution(for: scope).targetBuckets(for: range)
-        return MetricDownsampler.bucketAverage(raw, targetBuckets: targetBuckets)
+        // "Full" resolution is still capped: Swift Charts lays out every mark, and a day of live samples
+        // is thousands of them for a chart a few hundred points wide.
+        let buckets = targetBuckets > 0 ? min(targetBuckets, maxChartPoints) : maxChartPoints
+        return MetricDownsampler.bucketAverage(raw, targetBuckets: buckets)
     }
     
     /// Apply the user's calibration display offset to a series before it reaches the UI. Raw stored
@@ -274,10 +280,71 @@ enum MetricsService {
         let rows: [Measurement]
         if isDemo {
             rows = MetricsRepository.measurementsAll(kind: kind, context: context)
+        } else if let plan = SampledRange.plan(for: range) {
+            // Long windows: the old "newest 5000 rows" covered only the last ~3.5 days of per-minute ring
+            // history, so the 7-day, 30-day and 12-month charts all showed the same few days.
+            return sampledAverages(kind: kind, start: cutoff(for: range), end: Date(), plan: plan, context: context)
         } else {
             rows = MetricsRepository.measurements(kind: kind, start: cutoff(for: range), end: Date(), limit: 5000, context: context)
         }
         return samplesSinceCutoff(rows: rows, range: range, includeAll: isDemo)
+    }
+
+    /// How a long range is read: `buckets` equal time buckets across the window (one averaged point each),
+    /// each read as `slices` evenly spaced sub-windows of at most `perSlice` rows — so a year of per-minute
+    /// history costs a few hundred small indexed fetches instead of half a million rows, and every part of
+    /// the window is represented.
+    struct SampledRange: Equatable {
+        let buckets: Int
+        let slices: Int
+        let perSlice: Int
+
+        static func plan(for range: MetricRange) -> SampledRange? {
+            switch range {
+            case .twentyFourHours: return nil
+            case .sevenDays: return SampledRange(buckets: 56, slices: 3, perSlice: 20)     // 3 h buckets
+            case .thirtyDays: return SampledRange(buckets: 60, slices: 2, perSlice: 30)    // 12 h buckets
+            case .twelveMonths: return SampledRange(buckets: 73, slices: 3, perSlice: 20)  // 5-day buckets
+            }
+        }
+    }
+
+    static func sampledAverages(kind: MeasurementKind, start: Date, end: Date, plan: SampledRange,
+                                context: ModelContext) -> [MetricSample] {
+        let span = end.timeIntervalSince(start)
+        guard span > 0, plan.buckets > 0, plan.slices > 0 else { return [] }
+        let raw = kind.rawValue
+        let bucketWidth = span / Double(plan.buckets)
+        let sliceWidth = bucketWidth / Double(plan.slices)
+        var out: [MetricSample] = []
+        out.reserveCapacity(plan.buckets)
+        for bucket in 0..<plan.buckets {
+            let bucketStart = start.addingTimeInterval(Double(bucket) * bucketWidth)
+            var sum = 0.0
+            var count = 0
+            var first: Date?
+            var last: Date?
+            for slice in 0..<plan.slices {
+                let lo = bucketStart.addingTimeInterval(Double(slice) * sliceWidth)
+                let hi = lo.addingTimeInterval(sliceWidth)
+                var descriptor = FetchDescriptor<Measurement>(
+                    predicate: #Predicate { $0.kindRaw == raw && $0.timestamp >= lo && $0.timestamp < hi },
+                    sortBy: [SortDescriptor(\.timestamp)]
+                )
+                descriptor.fetchLimit = plan.perSlice
+                for row in (try? context.fetch(descriptor)) ?? [] where row.value.isFinite {
+                    sum += row.value
+                    count += 1
+                    if first == nil { first = row.timestamp }
+                    last = row.timestamp
+                }
+            }
+            guard count > 0, let first, let last else { continue }
+            // Stamp at the readings' own midpoint (a bucket with one reading keeps its real time).
+            out.append(MetricSample(timestamp: first.addingTimeInterval(last.timeIntervalSince(first) / 2),
+                                    value: sum / Double(count)))
+        }
+        return out
     }
 
     /// Start date for a metric range window (mirrors `samplesSinceCutoff`'s non-demo cutoff so the
@@ -638,9 +705,14 @@ enum SleepService {
         // End-of-day cap on the anchor so sessions stored mid-day are included.
         let end = Calendar.current.date(byAdding: .day, value: 1, to: anchor)?.addingTimeInterval(-1) ?? anchor
         let includeStages = range == .day
-        let sessions = SleepRepository.sessions(context: context)
-            .filter { $0.date >= start && $0.date <= end }
-            .map { summary(for: $0, includeStages: includeStages, context: context) }
+        let rows = SleepRepository.sessions(context: context).filter { $0.date >= start && $0.date <= end }
+        let blocksBySession = SleepRepository.blocks(sessionIds: rows.map(\.id), context: context)
+        let sessions = rows.map { row -> SleepSummary in
+            let full = summary(session: row, blocks: blocksBySession[row.id] ?? [])
+            guard !includeStages else { return full }
+            return SleepSummary(session: row, lightMinutes: full.lightMinutes, deepMinutes: full.deepMinutes,
+                                awakeMinutes: full.awakeMinutes, blocks: [], remMinutesWithoutBlocks: full.remMinutes)
+        }
         return SleepRangeSummary(range: range, start: start, end: anchor, expectedNights: expected, sessions: sessions)
     }
 
@@ -666,7 +738,7 @@ enum SleepService {
         let full = summary(session: session, blocks: SleepRepository.blocks(sessionId: session.id, context: context))
         guard !includeStages else { return full }
         return SleepSummary(session: session, lightMinutes: full.lightMinutes, deepMinutes: full.deepMinutes,
-                            awakeMinutes: full.awakeMinutes, blocks: [])
+                            awakeMinutes: full.awakeMinutes, blocks: [], remMinutesWithoutBlocks: full.remMinutes)
     }
 
     /// The summary the Sleep tab scores, from a session and its blocks. `reconcileWakingDay` scores the same
@@ -761,25 +833,54 @@ enum ActivityService {
     
     @discardableResult
     static func applyActivityUpdate(_ update: ActivityDailyUpdate, context: ModelContext) -> ActivityDaily {
+        applyActivityUpdateIfChanged(update, context: context).row
+    }
+
+    /// The ratchet, writing only what moved. The ring's `D8` poll repeats the same totals every 30 s while
+    /// the wearer sits still; stamping `updatedAt`/`syncedAt` regardless made every tick a store write, a
+    /// save and a data-change signal (widget publish, Health export, every `@Query`). `changed` is false
+    /// when nothing moved, and then the row is left untouched.
+    static func applyActivityUpdateIfChanged(_ update: ActivityDailyUpdate, context: ModelContext) -> (row: ActivityDaily, changed: Bool) {
         let row: ActivityDaily
+        var changed = false
         if let existing = MetricsRepository.activity(on: update.date, context: context) {
             row = existing
         } else {
             row = ActivityDaily(date: update.date, source: update.source)
             context.insert(row)
+            changed = true
         }
-        if let steps = update.steps { row.steps = max(row.steps, steps) }
-        if let calories = update.calories { row.calories = max(row.calories, calories) }
-        if let distanceMeters = update.distanceMeters { row.distanceMeters = max(row.distanceMeters, distanceMeters) }
-        if let activeMinutes = update.activeMinutes { row.activeMinutes = max(row.activeMinutes, activeMinutes) }
-        row.source = update.source
+        if let steps = update.steps, steps > row.steps { row.steps = steps; changed = true }
+        if let calories = update.calories, calories > row.calories { row.calories = calories; changed = true }
+        if let distanceMeters = update.distanceMeters, distanceMeters > row.distanceMeters {
+            row.distanceMeters = distanceMeters; changed = true
+        }
+        if let activeMinutes = update.activeMinutes, activeMinutes > row.activeMinutes {
+            row.activeMinutes = activeMinutes; changed = true
+        }
+        if row.source != update.source { row.source = update.source; changed = true }
+        guard changed else { return (row, false) }
         row.syncedAt = update.syncedAt
         row.updatedAt = Date()
-        return row
+        return (row, true)
     }
 
     /// Tag for days whose totals are summed from ring history buckets (vs. live cumulative updates).
     static let ringHistorySource = "ring_history"
+
+    /// Buckets inserted by `applyActivityBucket` and not yet known to be visible to fetches, by start
+    /// epoch. Entries from another context, or deleted/detached ones, are dropped on the next call; the map
+    /// is also emptied once it passes a day's worth of history for a week.
+    @MainActor private static var pendingBuckets: [Int: ActivityBucketSample] = [:]
+
+    @MainActor private static func prunePendingBuckets(context: ModelContext) {
+        guard !pendingBuckets.isEmpty else { return }
+        if pendingBuckets.count > 96 * 8 {
+            pendingBuckets.removeAll(keepingCapacity: true)
+            return
+        }
+        pendingBuckets = pendingBuckets.filter { $0.value.modelContext === context && !$0.value.isDeleted }
+    }
 
     /// Persist one intraday activity **bucket** from ring history (e.g. a the ring quarter-hour `0x43`
     /// sample) and recompute its day's total. The bucket is **upserted by its start time** into
@@ -792,26 +893,39 @@ enum ActivityService {
         let dayStart = Calendar.current.startOfDay(for: timestamp)
         let epoch = Int(timestamp.timeIntervalSince1970)
 
-        // Upsert the bucket sample by its unique start epoch (replace on re-sync).
-        if let existing = (try? context.fetch(FetchDescriptor<ActivityBucketSample>(
+        // Upsert the bucket sample by its unique start epoch (replace on re-sync). Buckets inserted
+        // earlier in this (unsaved) batch are found in `pendingBuckets` — SwiftData fetches don't always
+        // include pending inserts, which is why this used to `save()` after every bucket (a store write per
+        // quarter-hour of history; audit batch B).
+        prunePendingBuckets(context: context)
+        let unchanged: Bool
+        if let pending = pendingBuckets[epoch] {
+            unchanged = pending.steps == steps && pending.distanceMeters == distanceMeters
+            if !unchanged { pending.steps = steps; pending.distanceMeters = distanceMeters; pending.updatedAt = Date() }
+        } else if let existing = (try? context.fetch(FetchDescriptor<ActivityBucketSample>(
             predicate: #Predicate { $0.startEpoch == epoch }
         )))?.first {
-            existing.steps = steps
-            existing.distanceMeters = distanceMeters
-            existing.updatedAt = Date()
+            unchanged = existing.steps == steps && existing.distanceMeters == distanceMeters
+            if !unchanged { existing.steps = steps; existing.distanceMeters = distanceMeters; existing.updatedAt = Date() }
         } else {
-            context.insert(ActivityBucketSample(timestamp: timestamp, steps: steps, distanceMeters: distanceMeters, source: ringHistorySource))
+            let sample = ActivityBucketSample(timestamp: timestamp, steps: steps, distanceMeters: distanceMeters, source: ringHistorySource)
+            context.insert(sample)
+            pendingBuckets[epoch] = sample
+            unchanged = false
         }
-        // Persist the upsert so the recompute fetch below reliably sees it (SwiftData fetches don't
-        // always include pending inserts).
-        try? context.save()
+        if unchanged, let row = MetricsRepository.activity(on: dayStart, context: context) {
+            return row   // a re-synced bucket with the same numbers: nothing to recompute or write
+        }
 
-        // Recompute the day's total from all its buckets (sum of distinct samples).
-        let buckets = (try? context.fetch(FetchDescriptor<ActivityBucketSample>(
+        // Recompute the day's total from all its buckets (sum of distinct samples): the stored ones plus
+        // this batch's pending inserts, deduplicated by start epoch.
+        var byEpoch: [Int: ActivityBucketSample] = [:]
+        for bucket in (try? context.fetch(FetchDescriptor<ActivityBucketSample>(
             predicate: #Predicate { $0.date == dayStart }
-        ))) ?? []
-        let totalSteps = buckets.reduce(0) { $0 + $1.steps }
-        let totalDistance = buckets.reduce(0.0) { $0 + $1.distanceMeters }
+        ))) ?? [] { byEpoch[bucket.startEpoch] = bucket }
+        for (key, bucket) in pendingBuckets where bucket.date == dayStart { byEpoch[key] = bucket }
+        let totalSteps = byEpoch.values.reduce(0) { $0 + $1.steps }
+        let totalDistance = byEpoch.values.reduce(0.0) { $0 + $1.distanceMeters }
 
         let row: ActivityDaily
         if let existing = MetricsRepository.activity(on: dayStart, context: context) {
@@ -1206,29 +1320,58 @@ enum ActivityRecorderService {
         confidence: DecodeConfidence,
         context: ModelContext
     ) -> ActivitySample? {
-        let sessions = ActivityRepository.sessions(context: context)
+        // Hot path: every stored sample (thousands per history sync) comes through here. Fetch only the
+        // sessions that could own it — recording/paused, or finished inside the backfill window — instead
+        // of the whole session table, and probe the session's samples with limited queries instead of
+        // loading them all (audit batch B).
+        let now = Date()
+        let recording = ActivitySessionStatus.recording.rawValue
+        let paused = ActivitySessionStatus.paused.rawValue
+        let finished = ActivitySessionStatus.finished.rawValue
+        let finishedSince = now.addingTimeInterval(-backfillLinkWindowSeconds)
+        var candidatesDescriptor = FetchDescriptor<ActivitySession>(
+            predicate: #Predicate { session in
+                session.startedAt <= timestamp && (
+                    session.statusRaw == recording || session.statusRaw == paused
+                        || (session.statusRaw == finished && session.endedAt != nil)
+                )
+            },
+            sortBy: [SortDescriptor(\.startedAt, order: .reverse)]
+        )
+        candidatesDescriptor.fetchLimit = 16
+        let sessions = (try? context.fetch(candidatesDescriptor)) ?? []
         let active = sessions.first { session in
-            (session.status == .recording || session.status == .paused) && timestamp >= session.startedAt && timestamp <= Date()
+            (session.status == .recording || session.status == .paused) && timestamp >= session.startedAt && timestamp <= now
         }
         // Ring-log backfill: history samples arrive *after* finish (post-workout sync / reconnect),
         // so also match a just-finished session whose window contains the sample.
         let target = active ?? sessions.first { session in
-            guard session.status == .finished, let ended = session.endedAt else { return false }
-            return Date().timeIntervalSince(ended) < backfillLinkWindowSeconds
-                && timestamp >= session.startedAt && timestamp <= ended
+            guard session.status == .finished, let ended = session.endedAt, ended >= finishedSince else { return false }
+            return timestamp >= session.startedAt && timestamp <= ended
         }
         guard let target else { return nil }
-        let existing = ActivityRepository.samples(sessionId: target.id, context: context)
-        if let measurementId, existing.contains(where: { $0.measurementId == measurementId }) {
-            return nil
+        let sessionId = target.id
+        if let measurementId {
+            var linked = FetchDescriptor<ActivitySample>(
+                predicate: #Predicate { $0.sessionId == sessionId && $0.measurementId == measurementId }
+            )
+            linked.fetchLimit = 1
+            if ((try? context.fetchCount(linked)) ?? 0) > 0 { return nil }
         }
         // Gap-fill rule: ring-log samples only fill stretches the live stream missed.
-        if source == .history, existing.contains(where: {
-            $0.kind == kind.rawValue
-                && $0.source != MeasurementSource.history.rawValue
-                && abs($0.timestamp.timeIntervalSince(timestamp)) <= historyDedupeSeconds
-        }) {
-            return nil
+        if source == .history {
+            let kindRaw = kind.rawValue
+            let historyRaw = MeasurementSource.history.rawValue
+            let lo = timestamp.addingTimeInterval(-historyDedupeSeconds)
+            let hi = timestamp.addingTimeInterval(historyDedupeSeconds)
+            var nearby = FetchDescriptor<ActivitySample>(
+                predicate: #Predicate {
+                    $0.sessionId == sessionId && $0.kind == kindRaw && $0.source != historyRaw
+                        && $0.timestamp >= lo && $0.timestamp <= hi
+                }
+            )
+            nearby.fetchLimit = 1
+            if ((try? context.fetchCount(nearby)) ?? 0) > 0 { return nil }
         }
         let sample = ActivitySample(
             sessionId: target.id,

@@ -105,6 +105,7 @@ struct MealLogSheet: View {
                                     .foregroundStyle(PulseColors.textMuted)
                             }
                             .buttonStyle(.plain)
+                            .accessibilityLabel("Clear search")
                         }
                     }
                     .padding(.horizontal, 14)

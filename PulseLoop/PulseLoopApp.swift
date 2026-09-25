@@ -62,12 +62,15 @@ struct PulseLoopApp: App {
         #endif
 
         let container: ModelContainer
-        do {
+        if runningTests {
             // Under tests, use an isolated in-memory store instead of the on-disk `default.store`
             // (which fails to create in the sandboxed CI simulator).
-            container = try ModelContainerFactory.make(inMemory: runningTests)
-        } catch {
-            fatalError("Failed to create SwiftData container: \(error)")
+            // swiftlint:disable:next force_try
+            container = try! ModelContainerFactory.make(inMemory: true)
+        } else {
+            // A store that can't be opened is moved aside and replaced (with a one-time notice) rather
+            // than a `fatalError` that would crash every launch until the app is deleted.
+            container = ModelContainerFactory.makeRecovering().container
         }
         self.container = container
 
@@ -120,7 +123,7 @@ struct PulseLoopApp: App {
         // Ring firmware install (stage 4, debug + `firmwareInstall`): gates read the live client + coordinator.
         FirmwareInstallController.shared.attach(client: client, coordinator: coordinator)
         #if DEBUG
-        if useVirtualRing, UserDefaults.standard.bool(forKey: VirtualRingLink.onPairKey) {
+        if useVirtualRing, DebugLaunch.bool(VirtualRingLink.onPairKey) {
             // `-virtualRingOnPair YES` (E2E): leave onboarding alone and connect only when the pairing
             // screen's "Connect my ring" starts a scan, so the real pairing → "Name your ring" path runs.
             VirtualRingLink.shared.deferAttach(client: client)
@@ -140,6 +143,10 @@ struct PulseLoopApp: App {
         _liveWorkout = State(initialValue: LiveWorkoutManager(coordinator: coordinator, gps: gps, context: container.mainContext))
 
         let subscriber = EventPersistenceSubscriber(context: container.mainContext)
+        subscriber.keepEveryHeartRateSample = { [weak coordinator] in
+            guard let coordinator else { return false }
+            return coordinator.workoutHRActive || coordinator.hrState == .measuring
+        }
         self.persistence = subscriber
         self.summaryCoordinator = CoachSummaryCoordinator(context: container.mainContext)
         self.anomalyMonitor = CoachAnomalyMonitor(context: container.mainContext)

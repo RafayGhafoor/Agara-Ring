@@ -9,8 +9,11 @@ import SwiftData
 /// higher-level human-readable timeline that ships in the diagnostics export.
 @Model
 final class WearableLog {
+    // Audit batch B: retention prune and the diagnostics timeline read by timestamp.
+    #Index<WearableLog>([\.timestamp])
     @Attribute(.unique) var id: UUID
-    var timestamp: Date
+    // The hash modifier makes an upgraded store migrate, which is what creates the new index there.
+    @Attribute(hashModifier: "idx-2026-09") var timestamp: Date
     var deviceTypeRaw: String
     var categoryRaw: String
     var levelRaw: String

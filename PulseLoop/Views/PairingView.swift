@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreBluetooth
 import SwiftData
 import UIKit
 
@@ -24,7 +25,7 @@ struct PairingView: View {
     private var forcePairingUIForTesting: Bool {
         #if DEBUG
         #if targetEnvironment(simulator)
-        UserDefaults.standard.bool(forKey: "forcePairingUI")
+        DebugLaunch.bool("forcePairingUI")
         #else
         false
         #endif
@@ -132,6 +133,7 @@ struct PairingView: View {
                             .foregroundStyle(PulseColors.textPrimary)
                             .frame(width: 36, height: 36)
                             .pulseGlass(Circle(), interactive: true)
+                            .minTapTarget(visualSize: 36)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Back")
@@ -549,23 +551,73 @@ struct PairingView: View {
     }
 
     private var bluetoothOffCard: some View {
-        VStack(spacing: 14) { // §6 spacing bumped to 14
-            Image(systemName: "antenna.radiowaves.left.and.right.slash")
+        // "Off" and "not allowed" need different fixes (Android's pairing card makes the same split).
+        let copy = BluetoothUnavailableCopy(ble.bluetoothAvailability)
+        return VStack(spacing: 14) { // §6 spacing bumped to 14
+            Image(systemName: copy.symbol)
                 .font(PulseFont.largeTitle.weight(.regular))
                 .foregroundStyle(PulseColors.textMuted)
-            Text("Bluetooth is off")
+            Text(copy.title)
                 .font(PulseFont.headline)
                 .foregroundStyle(PulseColors.textPrimary)
-            Text("Turn on Bluetooth to find and connect your ring.")
+            Text(copy.body)
                 .font(PulseFont.subheadline)
                 .foregroundStyle(PulseColors.textMuted)
                 .multilineTextAlignment(.center)
-            SecondaryButton(title: "Open Settings", systemImage: "gear") { // §6
-                UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!)
+            if let action = copy.settingsButton, let url = URL(string: UIApplication.openSettingsURLString) {
+                SecondaryButton(title: action, systemImage: "gear") { // §6
+                    UIApplication.shared.open(url)
+                }
             }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 32)
         .pulseGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+    }
+}
+
+/// Why CoreBluetooth can't be used right now, from `CBCentralManager.state`.
+enum BluetoothAvailability: Equatable {
+    case ready, off, notAllowed, unsupported, unknown
+
+    init(_ state: CBManagerState) {
+        switch state {
+        case .poweredOn: self = .ready
+        case .poweredOff: self = .off
+        case .unauthorized: self = .notAllowed
+        case .unsupported: self = .unsupported
+        default: self = .unknown
+        }
+    }
+}
+
+/// Pairing-card copy for an unusable Bluetooth. Titles/bodies match Android's pairing card. iOS can't
+/// deep-link to the Bluetooth switch, so "off" points at Control Center instead of offering a button that
+/// would only open this app's settings page; "not allowed" opens that page, where the permission lives.
+struct BluetoothUnavailableCopy: Equatable {
+    let title: String
+    let body: String
+    let symbol: String
+    /// Label of the "open this app's Settings" button, or nil when Settings can't fix it.
+    let settingsButton: String?
+
+    init(_ availability: BluetoothAvailability) {
+        switch availability {
+        case .notAllowed:
+            title = "Bluetooth isn't allowed"
+            body = "Allow Bluetooth permission for this app in its settings to find and connect your ring."
+            symbol = "lock.shield"
+            settingsButton = "Open app settings"
+        case .unsupported:
+            title = "Bluetooth isn't available"
+            body = "This device doesn't support Bluetooth Low Energy, which the ring needs."
+            symbol = "antenna.radiowaves.left.and.right.slash"
+            settingsButton = nil
+        case .off, .unknown, .ready:
+            title = "Bluetooth is off"
+            body = "Turn on Bluetooth in Control Center or Settings to find and connect your ring."
+            symbol = "antenna.radiowaves.left.and.right.slash"
+            settingsButton = nil
+        }
     }
 }

@@ -52,7 +52,7 @@ struct ShareCardSheet: View {
         model = built
         renderShareImage()
         #if DEBUG
-        if UserDefaults.standard.bool(forKey: "shareCardDump") {
+        if DebugLaunch.bool("shareCardDump") {
             ShareCardRenderer.dumpToDocuments(model: built)
         }
         #endif

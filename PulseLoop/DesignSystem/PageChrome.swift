@@ -65,6 +65,7 @@ struct PageHeader<Trailing: View>: View {
                         .foregroundStyle(PulseColors.textPrimary)
                         .frame(width: 36, height: 36)
                         .pulseGlass(Circle(), interactive: true)
+                        .minTapTarget(visualSize: 36)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Back")
@@ -100,5 +101,17 @@ extension View {
         }
         .toolbar(.hidden, for: .navigationBar)
         .enablesBackSwipe()
+    }
+}
+
+extension View {
+    /// Grows a small icon control's tappable area to the 44 pt HIG minimum without moving anything: the label
+    /// is framed at 44 × 44 with a rectangular hit shape, and the extra space is handed back with negative
+    /// padding, so the layout (and what's drawn) stays at `visualSize`. Apply after the glass/background.
+    func minTapTarget(visualSize: CGFloat, minimum: CGFloat = 44) -> some View {
+        let side = max(minimum, visualSize)
+        return frame(width: side, height: side)
+            .contentShape(Rectangle())
+            .padding(-(side - visualSize) / 2)
     }
 }

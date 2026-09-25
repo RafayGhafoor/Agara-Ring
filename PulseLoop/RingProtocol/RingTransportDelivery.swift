@@ -5,8 +5,12 @@ import Foundation
 enum RingNotificationDelivery {
     static func receive(_ data: Data, decode: () -> [RingDecodedEvent],
                         publish: (PulseEvent) -> Void, deliver: (RingDecodedEvent) -> Void) {
-        publish(.rawPacket(direction: .incoming, data: data,
-                           decoded: .unknown(commandId: data.first ?? 0, raw: data)))
+        // Only when capture is on: otherwise nobody stores it, and every notification still cost a bus
+        // hop through every collector (audit batch B).
+        if RawPacketCapture.isEnabled {
+            publish(.rawPacket(direction: .incoming, data: data,
+                               decoded: .unknown(commandId: data.first ?? 0, raw: data)))
+        }
         for event in decode() { deliver(event) }
     }
 

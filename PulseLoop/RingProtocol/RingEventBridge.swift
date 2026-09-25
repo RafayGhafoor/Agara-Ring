@@ -276,7 +276,7 @@ enum RingEventBridge {
 
     /// The horizon used by `isWithinHistoryWindow`: 8 days unless `-historyWindowDays N` says otherwise.
     static var historyWindowDays: Double {
-        let requested = UserDefaults.standard.integer(forKey: "historyWindowDays")
+        let requested = DebugLaunch.integer("historyWindowDays")
         return (1...730).contains(requested) ? Double(requested) : Double(AgaraConfig.Ring.historyWindowDays)
     }
 }

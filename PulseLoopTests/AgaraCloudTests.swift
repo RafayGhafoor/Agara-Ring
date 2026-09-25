@@ -1,3 +1,4 @@
+import Security
 import XCTest
 @testable import PulseLoop
 
@@ -163,6 +164,39 @@ final class AgaraCloudTests: XCTestCase {
         XCTAssertEqual(value, 72)
     }
 
+    /// Audit batch B: a day row with negative (or absurd) stage minutes must not trap in
+    /// `Array(repeating:count:)`; counts clamp to 0…1440.
+    func testNegativeOrHugeSleepCountsAreClamped() {
+        let day: [String: Any] = [
+            "date": "2026-09-16", "sleep_start": 1_789_500_000, "sleep_end": 1_789_520_000,
+            "deep": -30, "light": 120, "awake": 9_999_999, "other": Double.nan,
+        ]
+        let events = AgaraCloudSync.mapping.events(days: [day], measurements: [])
+        guard case let .sleepTimeline(_, stages, _)? = events.last else { return XCTFail("expected a sleep timeline") }
+        XCTAssertEqual(stages.filter { $0 == .deep }.count, 0)
+        XCTAssertEqual(stages.filter { $0 == .light }.count, 120)
+        XCTAssertEqual(stages.filter { $0 == .awake }.count, 1440)
+        XCTAssertEqual(stages.filter { $0 == .unknown }.count, 0)
+    }
+
+    /// Push uses the short key (same as Android since batch A); pull also accepts the Kotlin enum names
+    /// older Android builds pushed.
+    func testCloudKindIsTheShortKeyAndPullAcceptsAndroidEnumNames() {
+        XCTAssertEqual(AgaraCloudSync.mapping.cloudKind(.heartRate), "hr")
+        XCTAssertEqual(AgaraCloudSync.mapping.cloudKind(.bloodPressureSystolic), "bp_sys")
+        XCTAssertEqual(AgaraCloudSync.mapping.kind(fromCloud: "HEART_RATE"), .heartRate)
+        XCTAssertEqual(AgaraCloudSync.mapping.kind(fromCloud: "BLOOD_PRESSURE_DIASTOLIC"), .bloodPressureDiastolic)
+        XCTAssertEqual(AgaraCloudSync.mapping.kind(fromCloud: "SPO2"), .spo2)
+        XCTAssertEqual(AgaraCloudSync.mapping.kind(fromCloud: "URIC_ACID"), .uricAcid)
+        XCTAssertEqual(AgaraCloudSync.mapping.kind(fromCloud: "resp_rate"), .respiratoryRate)
+        XCTAssertNil(AgaraCloudSync.mapping.kind(fromCloud: "NOT_A_KIND"))
+        // Every kind round-trips through the wire key.
+        for kind in MeasurementKind.allCases {
+            XCTAssertEqual(AgaraCloudSync.mapping.kind(fromCloud: AgaraCloudSync.mapping.cloudKind(kind)), kind)
+            XCTAssertEqual(AgaraCloudSync.mapping.kind(fromCloud: AgaraCloudSync.mapping.androidEnumName(kind)), kind)
+        }
+    }
+
     // MARK: Client contract against a stub server
 
     @MainActor
@@ -250,5 +284,132 @@ final class AgaraCloudTests: XCTestCase {
         let client = AgaraCloudClient(store: MemorySession())
         XCTAssertEqual(client.baseURL.absoluteString, AgaraConfig.Cloud.baseUrl)
         XCTAssertTrue(client.baseURL.absoluteString.hasPrefix("https://"))
+    }
+}
+
+/// The cloud session lives in the Keychain (`AfterFirstUnlockThisDeviceOnly`); builds before 2026-09-26 kept it
+/// in `UserDefaults`, which the first session moves over and deletes.
+@MainActor
+final class AgaraKeychainSessionTests: XCTestCase {
+
+    private final class MemorySecrets: AgaraSecretStore {
+        var values: [String: String] = [:]
+        func string(for account: String) -> String? { values[account] }
+        func set(_ value: String, for account: String) { values[account] = value }
+        func remove(_ account: String) { values[account] = nil }
+    }
+
+    private func legacyDefaults() -> UserDefaults {
+        let name = "AgaraKeychainSessionTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defaults.removePersistentDomain(forName: name)
+        return defaults
+    }
+
+    func testLegacyDefaultsMoveIntoTheSecretStoreAndAreDeleted() {
+        let defaults = legacyDefaults()
+        defaults.set("tok-123", forKey: AgaraKeychainSession.LegacyKey.token)
+        defaults.set("user-1", forKey: AgaraKeychainSession.LegacyKey.userID)
+        defaults.set("a@b.c", forKey: AgaraKeychainSession.LegacyKey.email)
+        let secrets = MemorySecrets()
+
+        let session = AgaraKeychainSession(secrets: secrets, legacyDefaults: defaults)
+
+        XCTAssertEqual(session.token, "tok-123")
+        XCTAssertEqual(session.userID, "user-1")
+        XCTAssertEqual(session.email, "a@b.c")
+        XCTAssertTrue(session.isSignedIn)
+        for key in AgaraKeychainSession.LegacyKey.all {
+            XCTAssertNil(defaults.object(forKey: key), "\(key) left in UserDefaults")
+        }
+        // A second launch finds nothing to migrate and keeps the session.
+        let again = AgaraKeychainSession(secrets: secrets, legacyDefaults: defaults)
+        XCTAssertEqual(again.token, "tok-123")
+    }
+
+    func testMigrationNeverOverwritesANewerKeychainSession() {
+        let defaults = legacyDefaults()
+        defaults.set("stale", forKey: AgaraKeychainSession.LegacyKey.token)
+        let secrets = MemorySecrets()
+        secrets.values["auth_token"] = "fresh"
+        let session = AgaraKeychainSession(secrets: secrets, legacyDefaults: defaults)
+        XCTAssertEqual(session.token, "fresh")
+        XCTAssertNil(defaults.object(forKey: AgaraKeychainSession.LegacyKey.token))
+    }
+
+    func testSaveAndClearDoNotTouchUserDefaults() {
+        let defaults = legacyDefaults()
+        let secrets = MemorySecrets()
+        let session = AgaraKeychainSession(secrets: secrets, legacyDefaults: defaults)
+        session.saveSession(token: "t", userID: "u", email: "e@x.y")
+        XCTAssertEqual(secrets.values.count, 3)
+        for key in AgaraKeychainSession.LegacyKey.all { XCTAssertNil(defaults.object(forKey: key)) }
+        session.clear()
+        XCTAssertTrue(secrets.values.isEmpty)
+        XCTAssertFalse(session.isSignedIn)
+    }
+
+    // MARK: Real Keychain (the unit tests run hosted in the app, so the simulator Keychain is available)
+
+    private let service = "com.agara.tests.keychain-\(UUID().uuidString)"
+
+    private func accessibility(account: String) throws -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnAttributes as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        if status == -34018 { throw XCTSkip("no Keychain entitlement in this test host") }
+        XCTAssertEqual(status, errSecSuccess)
+        return (item as? [String: Any])?[kSecAttrAccessible as String] as? String
+    }
+
+    func testKeychainItemsAreThisDeviceOnly() throws {
+        do {
+            try KeychainItem.writeString("secret", service: service, account: "a")
+        } catch KeychainError.unexpectedStatus(-34018) {
+            throw XCTSkip("no Keychain entitlement in this test host")
+        }
+        XCTAssertEqual(try KeychainItem.readString(service: service, account: "a"), "secret")
+        XCTAssertEqual(try accessibility(account: "a"), kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly as String)
+        try KeychainItem.delete(service: service, account: "a")
+        XCTAssertNil(try KeychainItem.readString(service: service, account: "a"))
+    }
+
+    func testOldAccessibilityItemIsMigratedOnRead() throws {
+        let insert: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: "a",
+            kSecValueData as String: Data("legacy".utf8),
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
+        ]
+        let status = SecItemAdd(insert as CFDictionary, nil)
+        if status == -34018 { throw XCTSkip("no Keychain entitlement in this test host") }
+        XCTAssertEqual(status, errSecSuccess)
+        XCTAssertEqual(try accessibility(account: "a"), kSecAttrAccessibleAfterFirstUnlock as String)
+
+        XCTAssertEqual(try KeychainItem.readString(service: service, account: "a"), "legacy")
+
+        XCTAssertEqual(try accessibility(account: "a"), kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly as String)
+        XCTAssertEqual(try KeychainItem.readString(service: service, account: "a"), "legacy")
+        try KeychainItem.delete(service: service, account: "a")
+    }
+
+    func testKeychainSessionRoundTripsThroughTheRealKeychain() throws {
+        let secrets = AgaraKeychainSecretStore(service: service)
+        let defaults = legacyDefaults()
+        defaults.set("legacy-token", forKey: AgaraKeychainSession.LegacyKey.token)
+        let session = AgaraKeychainSession(secrets: secrets, legacyDefaults: defaults)
+        guard session.token != nil else { throw XCTSkip("Keychain unavailable in this test host") }
+        XCTAssertEqual(session.token, "legacy-token")
+        XCTAssertNil(defaults.object(forKey: AgaraKeychainSession.LegacyKey.token))
+        XCTAssertEqual(try accessibility(account: "auth_token"), kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly as String)
+        session.clear()
+        XCTAssertNil(session.token)
     }
 }

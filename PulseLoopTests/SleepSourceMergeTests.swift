@@ -276,9 +276,9 @@ final class SleepSourceMergeTests: XCTestCase {
         guard let tab = SleepService.sleepForDate(night, context: context) else { return XCTFail("no night") }
         let displayed = SleepScore.calculate(tab).score
         XCTAssertEqual(tab.session.score, displayed)
-        // iOS's own formula on this night (span 650 min, deep = DEEP only). Android's differs (64) — the
-        // d3f1805 input split, still to be reconciled; this pins the iOS number so a change is deliberate.
-        XCTAssertEqual(displayed, 76)
+        // Android's inputs (asleep minutes, deep = DEEP + REM, awake share of the 650-min span) — the same
+        // 64 Android's `SleepSourceMergeTest` pins for ring B's night (audit batch B).
+        XCTAssertEqual(displayed, 64)
         XCTAssertEqual(AgaraCloudSync.sleepSummary(for: night, context: context)?.quality, displayed,
                        "the cloud `quality` is the displayed score, not 0")
         // Every stored row carries its own displayed score, emulator rows included.

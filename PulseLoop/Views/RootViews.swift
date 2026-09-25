@@ -21,13 +21,15 @@ struct RootAppView: View {
 
     private var forceOnboardingForTesting: Bool {
         #if DEBUG
-        UserDefaults.standard.bool(forKey: "forceOnboarding")
+        DebugLaunch.bool("forceOnboarding")
         #else
         false
         #endif
     }
 
     @Namespace private var zoomNS
+    /// Shown once when the store couldn't be opened and was moved aside at launch.
+    @State private var storeNotice: String? = StoreRecoveryNotice.consume()
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -52,14 +54,14 @@ struct RootAppView: View {
                     return
                 }
                 Self.didRunLaunchTasks = true
-                if UserDefaults.standard.bool(forKey: "seedDemo") {
+                if DebugLaunch.bool("seedDemo") {
                     SeedData.clearAll(modelContext)
                     SeedData.seedDemo(modelContext, completeOnboarding: true)
                 }
                 // Test tooling: `-demoEstimatedCalories YES` reshapes the seeded recent days into
                 // what a phone-away ring-history sync produces (source `ring_history`, no device
                 // calories) so the on-device estimated-total path is visible in the UI.
-                if UserDefaults.standard.bool(forKey: "demoEstimatedCalories") {
+                if DebugLaunch.bool("demoEstimatedCalories") {
                     for offset in 0...2 {
                         guard let day = Calendar.current.date(byAdding: .day, value: -offset, to: Date()),
                               let row = MetricsRepository.activity(on: day, context: modelContext) else { continue }
@@ -71,7 +73,7 @@ struct RootAppView: View {
                 }
                 // Test tooling: fake a connected Strava account. Must run before anything touches
                 // StravaAuthService.shared (it reads the token store at init).
-                if UserDefaults.standard.bool(forKey: "demoStravaConnected") {
+                if DebugLaunch.bool("demoStravaConnected") {
                     StravaDemoState.apply()
                 }
                 #if DEBUG
@@ -103,34 +105,34 @@ struct RootAppView: View {
                 }
                 #endif
                 // Test tooling: flip the (off-by-default) nutrition feature on via launch arg.
-                if UserDefaults.standard.bool(forKey: "enableNutrition") {
+                if DebugLaunch.bool("enableNutrition") {
                     NutritionPrefsStore.shared.prefs.masterEnabled = true
                     PulseDataChange.shared.notify()
                 }
-                if UserDefaults.standard.bool(forKey: "openNutrition") {
+                if DebugLaunch.bool("openNutrition") {
                     path.append(AppRoute.nutrition)
                 }
                 // Test tooling: `-openAppearance YES` opens Settings › Appearance for screenshots.
-                if UserDefaults.standard.bool(forKey: "openAppearance") {
+                if DebugLaunch.bool("openAppearance") {
                     path.append(AppRoute.settingsAppearance)
                 }
                 // Test tooling: `-openGoals YES` opens Settings › Goals for screenshots.
-                if UserDefaults.standard.bool(forKey: "openGoals") {
+                if DebugLaunch.bool("openGoals") {
                     path.append(AppRoute.settingsGoals)
                 }
-                if UserDefaults.standard.bool(forKey: "openNutritionSettings") {
+                if DebugLaunch.bool("openNutritionSettings") {
                     path.append(AppRoute.settingsNutrition)
                 }
                 // Test tooling: deep-link straight to a seeded workout's detail (route map).
-                if UserDefaults.standard.bool(forKey: "openWorkout"),
+                if DebugLaunch.bool("openWorkout"),
                    let session = ActivityRepository.sessions(context: modelContext).first(where: { $0.status == .finished && $0.useGps }) {
                     path.append(AppRoute.activityDetail(session.id))
                 }
-                if UserDefaults.standard.bool(forKey: "openRecord") {
+                if DebugLaunch.bool("openRecord") {
                     path.append(AppRoute.recordSelect)
                 }
                 // Test tooling: `-openMetric heartRate` opens a metric's detail chart for screenshots.
-                if let raw = UserDefaults.standard.string(forKey: "openMetric"),
+                if let raw = DebugLaunch.string("openMetric"),
                    let metric = MetricKind(rawValue: raw) {
                     path.append(AppRoute.metricDetail(metric))
                 }
@@ -220,6 +222,13 @@ struct RootAppView: View {
                 }
             }
         }
+        .alert("Data store reset", isPresented: Binding(
+            get: { storeNotice != nil }, set: { if !$0 { storeNotice = nil } }
+        )) {
+            Button("OK", role: .cancel) { storeNotice = nil }
+        } message: {
+            Text(storeNotice ?? "")
+        }
         // A theme change rebuilds the whole stack (the path survives — it lives in this view's state), so
         // colours captured outside a body (styles, cached values) are recomputed too.
         .id(themeStore.theme.name)
@@ -274,7 +283,7 @@ struct MainTabView: View {
     init(path: Binding<NavigationPath>) {
         self._path = path
         // Optional `-startTab vitals` launch arg (parsed into UserDefaults) for screenshot tooling.
-        let raw = UserDefaults.standard.string(forKey: "startTab")
+        let raw = DebugLaunch.string("startTab")
         let requested = MainTab.allCases.first { $0.rawValue.lowercased() == raw } ?? .today
         // Coach is no longer a tab (it opens as a sheet), so `-startTab coach`
         // just lands on Today.

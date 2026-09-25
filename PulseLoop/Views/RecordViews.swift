@@ -603,6 +603,7 @@ struct RecordLiveView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     Button { confirmDiscard = true } label: { Image(systemName: "xmark") }
                         .tint(PulseColors.textSecondary)
+                        .accessibilityLabel("Discard workout")
                 }
             }
             .sheet(isPresented: $confirmFinish) {

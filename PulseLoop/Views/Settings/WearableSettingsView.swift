@@ -10,6 +10,7 @@ struct WearableSettingsView: View {
     @Binding var path: NavigationPath
     @State private var features = AgaraFeatureStore.shared
     @State private var showsRename = false
+    @State private var confirmsForget = false
     @State private var firmwareChecker = FirmwareUpdateChecker.shared
 
     /// The firmware-update lookup key, from the ring's persisted `a1` identity (nil until a connect saw it).
@@ -154,7 +155,7 @@ struct WearableSettingsView: View {
                     }
                     SecondaryButton(title: "Disconnect", systemImage: "xmark") { ble.disconnect() }
                     // Forget unbinds the ring: the one destructive action here (Android matches).
-                    DestructiveButton(title: "Forget ring", systemImage: "trash") { ble.forget() }
+                    DestructiveButton(title: "Forget ring", systemImage: "trash") { confirmsForget = true }
                 } else {
                     SettingsGroup(header: "No ring connected") {
                         if ble.hasLastKnownRing && devices.first != nil { nameRow }
@@ -165,7 +166,7 @@ struct WearableSettingsView: View {
                     }
                     if ble.hasLastKnownRing && ble.state != .reconnecting {
                         SecondaryButton(title: "Reconnect last ring", systemImage: "arrow.clockwise") { ble.connectLastKnown() }
-                        DestructiveButton(title: "Forget ring", systemImage: "trash") { ble.forget() }
+                        DestructiveButton(title: "Forget ring", systemImage: "trash") { confirmsForget = true }
                     }
                 }
             }
@@ -173,6 +174,13 @@ struct WearableSettingsView: View {
         }
         .background(PulseColors.background)
         .pageChrome("Wearable")
+        // Same copy as Android's confirmation (audit batch A #24).
+        .alert("Forget this ring?", isPresented: $confirmsForget) {
+            Button("Forget", role: .destructive) { ble.forget() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The ring is unbound and removed from the app. Your stored history stays. You can pair it again later.")
+        }
         .sheet(isPresented: $showsRename) {
             RenameRingSheet(
                 initialText: RingNickname.prefill(identifier: ble.deviceIdentifier, row: devices.first),

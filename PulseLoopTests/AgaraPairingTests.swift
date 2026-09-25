@@ -1,5 +1,6 @@
 import XCTest
 import UIKit
+import CoreBluetooth
 @testable import PulseLoop
 
 /// The pairing/catalog surface of an **Agara-only** build.
@@ -142,5 +143,35 @@ final class AgaraPairingTests: XCTestCase {
         // No app names to switch to any more — the old copy told users to pick a different vendor app.
         XCTAssertFalse(message.lowercased().contains("qrring"))
         XCTAssertFalse(message.lowercased().contains("smarthealth"))
+    }
+
+    // MARK: Bluetooth off vs not allowed (audit batch B, Android parity)
+
+    func testBluetoothStateMapsToAvailability() {
+        XCTAssertEqual(BluetoothAvailability(.poweredOn), .ready)
+        XCTAssertEqual(BluetoothAvailability(.poweredOff), .off)
+        XCTAssertEqual(BluetoothAvailability(.unauthorized), .notAllowed)
+        XCTAssertEqual(BluetoothAvailability(.unsupported), .unsupported)
+        XCTAssertEqual(BluetoothAvailability(.resetting), .unknown)
+        XCTAssertEqual(BluetoothAvailability(.unknown), .unknown)
+    }
+
+    func testPairingCardSaysOffAndNotAllowedDifferently() {
+        let off = BluetoothUnavailableCopy(.off)
+        let denied = BluetoothUnavailableCopy(.notAllowed)
+        XCTAssertEqual(off.title, "Bluetooth is off")
+        XCTAssertEqual(denied.title, "Bluetooth isn't allowed")
+        XCTAssertNotEqual(off.body, denied.body)
+        // Only the permission can be fixed from this app's Settings page; iOS can't open the Bluetooth switch.
+        XCTAssertEqual(denied.settingsButton, "Open app settings")
+        XCTAssertNil(off.settingsButton)
+        XCTAssertNil(BluetoothUnavailableCopy(.unsupported).settingsButton)
+        // Before CoreBluetooth reports a state, the card reads as "off" (the previous copy).
+        XCTAssertEqual(BluetoothUnavailableCopy(.unknown), off)
+    }
+
+    func testCalibrationResetConfirmationNamesTheCalibration() {
+        XCTAssertEqual(CalibrationResetTarget.glucose.title, "Reset glucose calibration?")
+        XCTAssertEqual(CalibrationResetTarget.bloodPressure.title, "Reset blood pressure calibration?")
     }
 }

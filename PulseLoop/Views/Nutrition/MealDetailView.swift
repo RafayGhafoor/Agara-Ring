@@ -67,7 +67,9 @@ struct MealDetailView: View {
                         .foregroundStyle(PulseColors.textPrimary)
                         .frame(width: 36, height: 36)
                         .pulseGlass(Circle(), interactive: true)
+                        .minTapTarget(visualSize: 36)
                 }
+                .accessibilityLabel("Meal actions")
             }
         }
         .pulseScrollEdges()

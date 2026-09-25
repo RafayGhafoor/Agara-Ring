@@ -418,7 +418,7 @@ final class LiveWorkoutManager {
               let command = defaults.string(forKey: WorkoutAppGroup.commandKey),
               let sessionString = defaults.string(forKey: WorkoutAppGroup.commandSessionKey),
               let sessionID = UUID(uuidString: sessionString),
-              let session = ActivityRepository.sessions(context: context).first(where: { $0.id == sessionID })
+              let session = ActivityRepository.session(id: sessionID, context: context)
         else { return }
         defaults.removeObject(forKey: WorkoutAppGroup.commandKey)
         defaults.removeObject(forKey: WorkoutAppGroup.commandSessionKey)

@@ -103,7 +103,7 @@ struct AgaraCloudSettingsView: View {
         }
         .task {
             // Prefill the last-used email so signing back in is quick.
-            if email.isEmpty, let known = UserDefaults.standard.string(forKey: "agara.email") {
+            if email.isEmpty, let known = client.email {
                 email = known
             }
         }

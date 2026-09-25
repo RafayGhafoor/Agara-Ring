@@ -69,8 +69,17 @@ enum VeepooEncoder {
     static func session() -> Data { padded([0xF4, 0x02, 0x02, 0x00, 0x01]) }
     static func battery() -> Data { padded([0xA0]) }
     static func steps() -> Data { padded([0xD8]) }
-    static func sleepHistory(dayOffset: Int) -> Data { padded([0xE0, UInt8(dayOffset)]) }
-    static func dailyHistory(dayOffset: Int) -> Data { padded([0xDF, 0x01, UInt8(dayOffset), 0x00]) }
+    static func sleepHistory(dayOffset: Int) -> Data { padded([0xE0, UInt8(clamping: dayOffset)]) }
+
+    /// Daily-record request `DF <posLo> <posHi> <day>`: a 1-based record position (LE u16) to start from,
+    /// then the day offset (spec §4; vendor SDK layout, decompile `kf/l1.java:1088-1092`). Position 1 = the
+    /// whole day. The frame used to be `DF 01 <day> 00`, which the ring reads as position `day*256+1` of
+    /// **day 0** — right for day 0 by accident, and for every past day an immediate `DF FF FF` with no
+    /// records. Same builder as Android's `VeepooEncoder.dailyHistory`.
+    static func dailyHistory(dayOffset: Int, position: Int = 1) -> Data {
+        let pos = min(max(position, 1), 0xFFFF)
+        return padded([0xDF, UInt8(pos & 0xFF), UInt8((pos >> 8) & 0xFF), UInt8(clamping: dayOffset)])
+    }
 
     // One-shot measurements, from the SDK's per-test builders (veepooSDKTestHeartStart /
     // TestOxygenStart / TestBloodStart) — the same frames `tools/veepoo_live.py --measure` sends.

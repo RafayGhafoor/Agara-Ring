@@ -77,19 +77,19 @@ final class AgaraCloudSync {
             pushedDays += 1
         }
 
-        let measurements = try context.fetch(
-            FetchDescriptor<Measurement>(sortBy: [SortDescriptor(\.timestamp, order: .reverse)])
-        ).prefix(maxMeasurements)
+        var recent = FetchDescriptor<Measurement>(sortBy: [SortDescriptor(\.timestamp, order: .reverse)])
+        recent.fetchLimit = max(0, maxMeasurements)
+        let measurements = try context.fetch(recent)
         // Dedupe by client key (kind+epoch+source), newest first — same unique-index protection as
         // the day dedupe above.
         var measurementsByKey: [String: Measurement] = [:]
         for measurement in measurements {
-            let key = mapping.clientKey(kind: measurement.kind.rawValue, timestamp: measurement.timestamp, source: measurement.sourceRaw)
+            let key = mapping.clientKey(kind: mapping.cloudKind(measurement.kind), timestamp: measurement.timestamp, source: measurement.sourceRaw)
             if measurementsByKey[key] == nil { measurementsByKey[key] = measurement }
         }
         for (key, measurement) in measurementsByKey {
             let body: [String: Any] = [
-                "user": userID, "kind": measurement.kind.rawValue,
+                "user": userID, "kind": mapping.cloudKind(measurement.kind),
                 "value": measurement.value, "unit": measurement.unit,
                 "timestamp": Int(measurement.timestamp.timeIntervalSince1970),
                 "source": measurement.sourceRaw, "client_key": key,
@@ -163,10 +163,7 @@ final class AgaraCloudSync {
                 let start = (day["sleep_start"] as? NSNumber)?.intValue ?? 0
                 let end = (day["sleep_end"] as? NSNumber)?.intValue ?? 0
                 if start > 0, end > start {
-                    let deep = (day["deep"] as? NSNumber)?.intValue ?? 0
-                    let light = (day["light"] as? NSNumber)?.intValue ?? 0
-                    let awake = (day["awake"] as? NSNumber)?.intValue ?? 0
-                    let other = (day["other"] as? NSNumber)?.intValue ?? 0
+                    let (deep, light, awake, other) = sleepMinutes(day)
                     let stages = [SleepStage](repeating: .deep, count: deep)
                         + [SleepStage](repeating: .light, count: light)
                         + [SleepStage](repeating: .awake, count: awake)
@@ -179,7 +176,7 @@ final class AgaraCloudSync {
             }
             for measurement in measurements {
                 guard let kindRaw = measurement["kind"] as? String,
-                      let kind = MeasurementKind(rawValue: kindRaw),
+                      let kind = kind(fromCloud: kindRaw),
                       let value = (measurement["value"] as? NSNumber)?.doubleValue,
                       let epoch = (measurement["timestamp"] as? NSNumber)?.intValue
                 else { continue }
@@ -189,6 +186,38 @@ final class AgaraCloudSync {
                 ))
             }
             return events
+        }
+
+        /// The wire `kind`: always the short key (`"hr"`, `"spo2"`) — `MeasurementKind.rawValue`, the same
+        /// `MeasurementKind.key` Android pushes since audit batch A.
+        static func cloudKind(_ kind: MeasurementKind) -> String { kind.rawValue }
+
+        /// A pulled `kind`: the short key, or — for rows pushed by an Android build before batch A — the
+        /// Kotlin enum name (`"HEART_RATE"`, `"BLOOD_PRESSURE_SYSTOLIC"`).
+        static func kind(fromCloud raw: String) -> MeasurementKind? {
+            if let kind = MeasurementKind(rawValue: raw) { return kind }
+            return MeasurementKind.allCases.first { androidEnumName($0) == raw }
+        }
+
+        /// `heartRate` → `HEART_RATE`, `spo2` → `SPO2` (Android's enum constant for the same kind).
+        static func androidEnumName(_ kind: MeasurementKind) -> String {
+            var out = ""
+            for ch in String(describing: kind) {
+                if ch.isUppercase, !out.isEmpty { out.append("_") }
+                out.append(ch)
+            }
+            return out.uppercased()
+        }
+
+        /// Stage minutes from a cloud day row, each clamped to 0…one day: a negative count makes
+        /// `Array(repeating:count:)` trap, and a huge one would allocate millions of stages.
+        static func sleepMinutes(_ day: [String: Any]) -> (deep: Int, light: Int, awake: Int, other: Int) {
+            func minutes(_ key: String) -> Int {
+                let raw = (day[key] as? NSNumber)?.doubleValue ?? 0
+                guard raw.isFinite else { return 0 }
+                return Int(min(max(raw, 0), 24 * 60))
+            }
+            return (minutes("deep"), minutes("light"), minutes("awake"), minutes("other"))
         }
 
         /// `yyyy-MM-dd` → start of that day, or nil when the string is not a date.

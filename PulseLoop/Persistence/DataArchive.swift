@@ -2,8 +2,17 @@ import Foundation
 import SwiftData
 
 // The full-app export archive: a versioned, Codable snapshot of every SwiftData model plus the
-// UserDefaults settings blobs and coach attachment images. One JSON file in, one JSON file out —
-// plain JSON so users can analyze their data outside the app (jq / pandas / spreadsheets).
+// UserDefaults settings blobs and coach attachment images. Exported as gzip-compressed JSON
+// (`agara-export-<date>.json.gz`, streamed row by row — see `DataArchiveService`); the JSON inside
+// stays plain so users can analyze their data outside the app (gunzip + jq / pandas).
+//
+// Cross-platform format (audit 2026-09-26, Batch B): the JSON is Android's `AgaraArchive`
+// (`ArchiveCodec.kt`) — same top-level keys, same row field names, epoch-millisecond timestamps, and
+// Android's enum spellings for the values both apps interpret (`kindRaw` "HEART_RATE", sleep
+// `stageRaw` "LIGHT", log category/level "SYNC"/"INFO"). iOS-only fields ride along as extra keys
+// (Android ignores unknown keys), and the importer still reads every older iOS archive (ISO-8601 dates,
+// `activityDailies` / `activityBucketSamples` / `activitySensorPollEvents`, `attachmentsJSON`,
+// `message`/`metadataJSON`, unix-second bucket keys, iOS enum spellings).
 //
 // Design rules (see `DataArchiveService` for the read/write side):
 // - Every DTO mirrors its model's stored raw fields verbatim (`kindRaw`, `stateRaw`, `*JSON`
@@ -20,13 +29,16 @@ import SwiftData
 
 // MARK: - Envelope
 
-nonisolated struct PulseArchive: Codable, Sendable {
+/// The decoded archive (import side). The export never builds one of these — it streams rows straight
+/// to the file (`DataArchiveService.writeArchive`) — so this type only needs to *read* both the current
+/// (Android-shaped) layout and every older iOS one.
+nonisolated struct PulseArchive: Decodable, Sendable {
     static let currentFormatVersion = 1
 
     var formatVersion: Int
     var exportedAt: Date
     var appVersion: String
-    /// Per-entity row counts — quick validation and an at-a-glance summary for external tools.
+    /// Per-table row counts — informational (keyed by Android table name in new files, by entity key in old ones).
     var counts: [String: Int]
 
     var devices: [ArchiveDevice]
@@ -53,12 +65,120 @@ nonisolated struct PulseArchive: Codable, Sendable {
     var coachNotificationRecords: [ArchiveCoachNotificationRecord]
     var coachSummaries: [ArchiveCoachSummary]
     var wearableLogs: [ArchiveWearableLog]
+    var mealEntries: [ArchiveMealEntry]
+    var foodProducts: [ArchiveFoodProduct]
 
     /// Raw UserDefaults JSON blobs keyed by their storage key (metric prefs, workout prefs,
     /// calibration, coach settings, Apple Health prefs). Opaque pass-through — never re-encoded.
-    var settings: [String: String]
-    /// `Documents/coach_attachments/*` image files, base64-encoded.
-    var attachments: [ArchiveAttachment]
+    /// Nil when the file has no `settings` key (an Android archive): the import then leaves this
+    /// device's settings alone instead of resetting them.
+    var settings: [String: String]?
+    /// `Documents/coach_attachments/*` image files, base64-encoded. Nil for an Android archive.
+    var attachments: [ArchiveAttachment]?
+
+    /// Archive keys: Android's names first; the old iOS spelling second where they differ.
+    enum Key: String, CodingKey {
+        case formatVersion, exportedAt, appVersion, counts
+        case devices, measurements, batterySamples, sleepSessions, sleepStageBlocks, rawPackets,
+             derivedUpdates, userProfiles, userGoals, deviceMeasurementConfigs, activitySessions,
+             activitySamples, activityGpsPoints, activityEvents, coachConversations, coachMessages,
+             coachMemories, coachToolCalls, coachNotificationRecords, coachSummaries, wearableLogs,
+             mealEntries, foodProducts, measurementDeletions, settings, attachments
+        case activityDaily, activityDailies
+        case activityBuckets, activityBucketSamples
+        case activitySensorPolls, activitySensorPollEvents
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: Key.self)
+        func list<T: Decodable>(_ key: Key, or legacy: Key? = nil) throws -> [T] {
+            if let rows = try c.decodeIfPresent([T].self, forKey: key) { return rows }
+            if let legacy, let rows = try c.decodeIfPresent([T].self, forKey: legacy) { return rows }
+            return []
+        }
+        formatVersion = try c.decode(Int.self, forKey: .formatVersion)
+        // Required, like Android's `AgaraArchive`: a file with only a version is not an archive.
+        exportedAt = try c.decode(Date.self, forKey: .exportedAt)
+        appVersion = try c.decode(String.self, forKey: .appVersion)
+        counts = try c.decodeIfPresent([String: Int].self, forKey: .counts) ?? [:]
+        devices = try list(.devices)
+        activityDailies = try list(.activityDaily, or: .activityDailies)
+        measurements = try list(.measurements)
+        batterySamples = try list(.batterySamples)
+        sleepSessions = try list(.sleepSessions)
+        sleepStageBlocks = try list(.sleepStageBlocks)
+        rawPackets = try list(.rawPackets)
+        derivedUpdates = try list(.derivedUpdates)
+        userProfiles = try list(.userProfiles)
+        userGoals = try list(.userGoals)
+        deviceMeasurementConfigs = try list(.deviceMeasurementConfigs)
+        activitySessions = try list(.activitySessions)
+        activitySamples = try list(.activitySamples)
+        activityBucketSamples = try list(.activityBuckets, or: .activityBucketSamples)
+        activityGpsPoints = try list(.activityGpsPoints)
+        activityEvents = try list(.activityEvents)
+        activitySensorPollEvents = try list(.activitySensorPolls, or: .activitySensorPollEvents)
+        coachConversations = try list(.coachConversations)
+        coachMessages = try list(.coachMessages)
+        coachMemories = try list(.coachMemories)
+        coachToolCalls = try list(.coachToolCalls)
+        coachNotificationRecords = try list(.coachNotificationRecords)
+        coachSummaries = try list(.coachSummaries)
+        wearableLogs = try list(.wearableLogs)
+        mealEntries = try list(.mealEntries)
+        foodProducts = try list(.foodProducts)
+        // `measurementDeletions` (Android's tombstones) has no iOS model yet — read past it.
+        settings = try c.decodeIfPresent([String: String].self, forKey: .settings)
+        attachments = try c.decodeIfPresent([ArchiveAttachment].self, forKey: .attachments)
+    }
+}
+
+/// Value spellings shared with Android's archive. Android persists enum *names* ("HEART_RATE",
+/// "LIGHT", "SYNC"); iOS persists raw values ("hr", "light", "sync"). The archive carries Android's
+/// spelling; import maps either spelling back to iOS's.
+nonisolated enum ArchiveInterop {
+    /// iOS `MeasurementKind.rawValue` → Android `MeasurementKind.name`.
+    static let androidKindNames: [String: String] = [
+        "hr": "HEART_RATE", "spo2": "SPO2", "stress": "STRESS", "fatigue": "FATIGUE", "hrv": "HRV",
+        "temp": "TEMPERATURE", "bp_sys": "BLOOD_PRESSURE_SYSTOLIC", "bp_dia": "BLOOD_PRESSURE_DIASTOLIC",
+        "glucose": "BLOOD_SUGAR", "resp_rate": "RESPIRATORY_RATE", "vo2max": "VO2MAX", "met": "MET",
+        "cardiac_load": "CARDIAC_LOAD", "total_cholesterol": "TOTAL_CHOLESTEROL",
+        "triglycerides": "TRIGLYCERIDES", "hdl": "HDL", "ldl": "LDL", "uric_acid": "URIC_ACID",
+    ]
+    static let iosKindKeys: [String: String] = Dictionary(uniqueKeysWithValues: androidKindNames.map { ($1, $0) })
+
+    static func exportKind(_ raw: String) -> String { androidKindNames[raw] ?? raw }
+    static func importKind(_ raw: String) -> String { iosKindKeys[raw] ?? raw }
+
+    /// Enums that differ only in case (sleep stage, log category / level).
+    static func exportCaseEnum(_ raw: String) -> String { raw.uppercased() }
+    static func importCaseEnum(_ raw: String) -> String { raw.lowercased() }
+
+    /// A row id as a UUID. Android's raw-packet ids are integers ("42"); any string that isn't a UUID
+    /// maps to a stable name-based one, so every reference to the same id still lands on the same row.
+    static func uuid(_ string: String) -> UUID {
+        if let id = UUID(uuidString: string) { return id }
+        var bytes = [UInt8](repeating: 0, count: 16)
+        // Two FNV-1a 64 passes (different offsets) → 128 bits; stamped as an RFC 4122 v5-style UUID.
+        func fnv(_ seed: UInt64) -> UInt64 {
+            var h = seed
+            for b in string.utf8 { h ^= UInt64(b); h = h &* 0x100000001b3 }
+            return h
+        }
+        let a = fnv(0xcbf29ce484222325), b = fnv(0x84222325cbf29ce4)
+        for i in 0..<8 { bytes[i] = UInt8(truncatingIfNeeded: a >> (8 * UInt64(i))) }
+        for i in 0..<8 { bytes[8 + i] = UInt8(truncatingIfNeeded: b >> (8 * UInt64(i))) }
+        bytes[6] = (bytes[6] & 0x0F) | 0x50
+        bytes[8] = (bytes[8] & 0x3F) | 0x80
+        return UUID(uuid: (bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
+                           bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]))
+    }
+
+    /// Bucket keys: Android stores epoch milliseconds, iOS unix seconds. Anything past year 5138 in
+    /// seconds is really milliseconds.
+    static func bucketSeconds(_ value: Int64) -> Int {
+        Int(value > 100_000_000_000 ? value / 1000 : value)
+    }
 }
 
 /// Minimal first-pass decode used to give a clear "newer app version" error before attempting the
@@ -76,9 +196,9 @@ nonisolated struct ArchiveAttachment: Codable, Sendable {
 
 // MARK: - JSON coding
 
-/// Shared encoder/decoder configuration for the archive. ISO8601 with fractional seconds keeps the
-/// file human-readable and externally parseable; the decoder also accepts plain ISO8601 (no
-/// fraction) for tolerance.
+/// Shared encoder/decoder configuration for the archive. Dates are written as epoch milliseconds
+/// (Android's `Long` timestamps); the decoder reads those and the ISO-8601 strings (with or without
+/// a fraction) every earlier iOS archive carried.
 nonisolated enum ArchiveCoding {
     // ISO8601DateFormatter is documented thread-safe, so sharing one instance across the detached
     // encode/decode tasks is sound.
@@ -95,18 +215,25 @@ nonisolated enum ArchiveCoding {
 
     static func makeEncoder() -> JSONEncoder {
         let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys]
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         encoder.dateEncodingStrategy = .custom { date, encoder in
             var container = encoder.singleValueContainer()
-            try container.encode(isoFractional.string(from: date))
+            try container.encode(millis(date))
         }
         return encoder
+    }
+
+    static func millis(_ date: Date) -> Int64 {
+        Int64((date.timeIntervalSince1970 * 1000).rounded())
     }
 
     static func makeDecoder() -> JSONDecoder {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .custom { decoder in
             let container = try decoder.singleValueContainer()
+            if let ms = try? container.decode(Double.self) {
+                return Date(timeIntervalSince1970: ms / 1000)
+            }
             let string = try container.decode(String.self)
             if let date = isoFractional.date(from: string) ?? isoPlain.date(from: string) {
                 return date
@@ -196,6 +323,8 @@ nonisolated struct ArchiveActivityDaily: Codable, Sendable {
     var syncedAt: Date?
     var createdAt: Date
     var updatedAt: Date
+    /// Optional: absent from older iOS archives.
+    var estimatedActiveCalories: Double?
 
     @MainActor init(_ m: ActivityDaily) {
         id = m.id
@@ -208,6 +337,7 @@ nonisolated struct ArchiveActivityDaily: Codable, Sendable {
         syncedAt = m.syncedAt
         createdAt = m.createdAt
         updatedAt = m.updatedAt
+        estimatedActiveCalories = m.estimatedActiveCalories
     }
 
     @MainActor func insert(into context: ModelContext) {
@@ -222,6 +352,7 @@ nonisolated struct ArchiveActivityDaily: Codable, Sendable {
         m.syncedAt = syncedAt
         m.createdAt = createdAt
         m.updatedAt = updatedAt
+        m.estimatedActiveCalories = estimatedActiveCalories
         context.insert(m)
     }
 }
@@ -235,30 +366,31 @@ nonisolated struct ArchiveMeasurement: Codable, Sendable {
     var sourceRaw: String
     var confidenceRaw: String
     var activitySessionId: UUID?
-    var rawPacketId: UUID?
+    /// A string, not a UUID: Android's raw-packet ids are integers. Mapped with `ArchiveInterop.uuid`.
+    var rawPacketId: String?
     var createdAt: Date
 
     @MainActor init(_ m: PulseLoop.Measurement) {
         id = m.id
-        kindRaw = m.kindRaw
+        kindRaw = ArchiveInterop.exportKind(m.kindRaw)
         value = m.value
         unit = m.unit
         timestamp = m.timestamp
         sourceRaw = m.sourceRaw
         confidenceRaw = m.confidenceRaw
         activitySessionId = m.activitySessionId
-        rawPacketId = m.rawPacketId
+        rawPacketId = m.rawPacketId?.uuidString
         createdAt = m.createdAt
     }
 
     @MainActor func insert(into context: ModelContext) {
         let m = PulseLoop.Measurement(kind: .heartRate, value: value, unit: unit, timestamp: timestamp)
         m.id = id
-        m.kindRaw = kindRaw
+        m.kindRaw = ArchiveInterop.importKind(kindRaw)
         m.sourceRaw = sourceRaw
         m.confidenceRaw = confidenceRaw
         m.activitySessionId = activitySessionId
-        m.rawPacketId = rawPacketId
+        m.rawPacketId = rawPacketId.map(ArchiveInterop.uuid)
         m.createdAt = createdAt
         context.insert(m)
     }
@@ -297,6 +429,8 @@ nonisolated struct ArchiveSleepSession: Codable, Sendable {
     var updatedAt: Date
     /// Optional, so archives written before sleep was source-stamped still decode (as unsourced).
     var sourceAddress: String?
+    /// Android's session origin ("ring"). iOS has no such column: written as "ring", ignored on import.
+    var sourceRaw: String?
 
     @MainActor init(_ m: SleepSession) {
         id = m.id
@@ -309,6 +443,7 @@ nonisolated struct ArchiveSleepSession: Codable, Sendable {
         createdAt = m.createdAt
         updatedAt = m.updatedAt
         sourceAddress = m.sourceAddress
+        sourceRaw = "ring"
     }
 
     @MainActor func insert(into context: ModelContext) {
@@ -339,22 +474,25 @@ nonisolated struct ArchiveSleepStageBlock: Codable, Sendable {
         startAt = m.startAt
         startMinute = m.startMinute
         durationMinutes = m.durationMinutes
-        stageRaw = m.stageRaw
+        stageRaw = ArchiveInterop.exportCaseEnum(m.stageRaw)
         recordStartAt = m.recordStartAt
         sourceAddress = m.sourceAddress
     }
 
     @MainActor func insert(into context: ModelContext) {
+        // Android writes 0 for "unknown record start" (its column is non-null); iOS models that as nil.
+        let recordStart = recordStartAt.flatMap { $0.timeIntervalSince1970 == 0 ? nil : $0 }
         let m = SleepStageBlock(sessionId: sessionId, startAt: startAt, startMinute: startMinute, durationMinutes: durationMinutes,
-                                stage: .unknown, recordStartAt: recordStartAt, sourceAddress: sourceAddress)
+                                stage: .unknown, recordStartAt: recordStart, sourceAddress: sourceAddress)
         m.id = id
-        m.stageRaw = stageRaw
+        m.stageRaw = ArchiveInterop.importCaseEnum(stageRaw)
         context.insert(m)
     }
 }
 
 nonisolated struct ArchiveRawPacket: Codable, Sendable {
-    var id: UUID
+    /// A string: Android's raw-packet ids are integers. Mapped with `ArchiveInterop.uuid` on import.
+    var id: String
     var timestamp: Date
     var directionRaw: String
     var commandId: Int
@@ -365,7 +503,7 @@ nonisolated struct ArchiveRawPacket: Codable, Sendable {
     var createdAt: Date
 
     @MainActor init(_ m: RawPacketRow) {
-        id = m.id
+        id = m.id.uuidString
         timestamp = m.timestamp
         directionRaw = m.directionRaw
         commandId = m.commandId
@@ -378,7 +516,7 @@ nonisolated struct ArchiveRawPacket: Codable, Sendable {
 
     @MainActor func insert(into context: ModelContext) {
         let m = RawPacketRow(timestamp: timestamp, direction: .incoming, commandId: commandId, hexPayload: hexPayload, decodedKind: decodedKind, decodedJSON: decodedJSON)
-        m.id = id
+        m.id = ArchiveInterop.uuid(id)
         m.directionRaw = directionRaw
         m.confidenceRaw = confidenceRaw
         m.createdAt = createdAt
@@ -417,14 +555,16 @@ nonisolated struct ArchiveUserProfile: Codable, Sendable {
     var sex: String?
     var heightCm: Double?
     var weightKg: Double?
-    var unitsRaw: String
+    // iOS-only fields are optional so an Android archive (which lacks them) still decodes; nil keeps
+    // the model's default.
+    var unitsRaw: String?
     var onboardingCompleted: Bool
     var baselineCompleted: Bool
-    var athleteMode: Bool
+    var athleteMode: Bool?
     var altitudeMeters: Double?
     var usesBetaBlockers: Bool?
     var hasKnownLungCondition: Bool?
-    var preferredGlucoseUnitRaw: String
+    var preferredGlucoseUnitRaw: String?
     var hrZoneModeRaw: String
     var hrRestingBaseline: Double?
     var hrRestingBaselineUpdatedAt: Date?
@@ -469,14 +609,14 @@ nonisolated struct ArchiveUserProfile: Codable, Sendable {
         m.sex = sex
         m.heightCm = heightCm
         m.weightKg = weightKg
-        m.unitsRaw = unitsRaw
+        if let unitsRaw { m.unitsRaw = unitsRaw }
         m.onboardingCompleted = onboardingCompleted
         m.baselineCompleted = baselineCompleted
-        m.athleteMode = athleteMode
+        if let athleteMode { m.athleteMode = athleteMode }
         m.altitudeMeters = altitudeMeters
         m.usesBetaBlockers = usesBetaBlockers
         m.hasKnownLungCondition = hasKnownLungCondition
-        m.preferredGlucoseUnitRaw = preferredGlucoseUnitRaw
+        if let preferredGlucoseUnitRaw { m.preferredGlucoseUnitRaw = preferredGlucoseUnitRaw }
         m.hrZoneModeRaw = hrZoneModeRaw
         m.hrRestingBaseline = hrRestingBaseline
         m.hrRestingBaselineUpdatedAt = hrRestingBaselineUpdatedAt
@@ -499,6 +639,11 @@ nonisolated struct ArchiveUserGoal: Codable, Sendable {
     var distanceMeters: Double
     var calories: Int
     var updatedAt: Date
+    // Intake goals (Android: Double?; iOS stores whole numbers). Optional for older archives.
+    var intakeCalories: Double?
+    var intakeProteinG: Double?
+    var intakeCarbsG: Double?
+    var intakeFatG: Double?
 
     @MainActor init(_ m: UserGoal) {
         id = m.id
@@ -509,10 +654,18 @@ nonisolated struct ArchiveUserGoal: Codable, Sendable {
         distanceMeters = m.distanceMeters
         calories = m.calories
         updatedAt = m.updatedAt
+        intakeCalories = m.intakeCalories.map(Double.init)
+        intakeProteinG = m.intakeProteinG.map(Double.init)
+        intakeCarbsG = m.intakeCarbsG.map(Double.init)
+        intakeFatG = m.intakeFatG.map(Double.init)
     }
 
     @MainActor func insert(into context: ModelContext) {
         let m = UserGoal(id: id, steps: steps, sleepMinutes: sleepMinutes, activeMinutes: activeMinutes, workoutsPerWeek: workoutsPerWeek, distanceMeters: distanceMeters, calories: calories)
+        m.intakeCalories = intakeCalories.map { Int($0.rounded()) }
+        m.intakeProteinG = intakeProteinG.map { Int($0.rounded()) }
+        m.intakeCarbsG = intakeCarbsG.map { Int($0.rounded()) }
+        m.intakeFatG = intakeFatG.map { Int($0.rounded()) }
         m.updatedAt = updatedAt
         context.insert(m)
     }
@@ -578,7 +731,8 @@ nonisolated struct ArchiveActivitySession: Codable, Sendable {
     var liveActivityID: String?
     var lastSensorPollAt: Date?
     var lastGpsPointAt: Date?
-    var vitalsModeRaw: String
+    /// iOS-only; optional so an Android archive decodes.
+    var vitalsModeRaw: String?
     var createdAt: Date
     var updatedAt: Date
 
@@ -635,7 +789,7 @@ nonisolated struct ArchiveActivitySession: Codable, Sendable {
         m.liveActivityID = liveActivityID
         m.lastSensorPollAt = lastSensorPollAt
         m.lastGpsPointAt = lastGpsPointAt
-        m.vitalsModeRaw = vitalsModeRaw
+        if let vitalsModeRaw { m.vitalsModeRaw = vitalsModeRaw }
         m.createdAt = createdAt
         m.updatedAt = updatedAt
         context.insert(m)
@@ -674,16 +828,22 @@ nonisolated struct ArchiveActivitySample: Codable, Sendable {
 }
 
 nonisolated struct ArchiveActivityBucketSample: Codable, Sendable {
-    var startEpoch: Int
+    /// Epoch **milliseconds** in the file (Android's key); older iOS archives hold unix seconds —
+    /// `ArchiveInterop.bucketSeconds` reads either.
+    var startEpoch: Int64
     var date: Date
-    var timestamp: Date
+    /// iOS-only; an Android archive derives it from `startEpoch`.
+    var timestamp: Date?
     var steps: Int
     var distanceMeters: Double
     var source: String
     var updatedAt: Date
 
+    /// The stored unique key (unix seconds), whichever unit the file used.
+    var startSeconds: Int { ArchiveInterop.bucketSeconds(startEpoch) }
+
     @MainActor init(_ m: ActivityBucketSample) {
-        startEpoch = m.startEpoch
+        startEpoch = Int64(m.startEpoch) * 1000
         date = m.date
         timestamp = m.timestamp
         steps = m.steps
@@ -693,12 +853,13 @@ nonisolated struct ArchiveActivityBucketSample: Codable, Sendable {
     }
 
     @MainActor func insert(into context: ModelContext) {
-        let m = ActivityBucketSample(timestamp: timestamp, steps: steps, distanceMeters: distanceMeters, source: source)
+        let instant = timestamp ?? Date(timeIntervalSince1970: TimeInterval(startSeconds))
+        let m = ActivityBucketSample(timestamp: instant, steps: steps, distanceMeters: distanceMeters, source: source)
         // The init re-derives startEpoch/date from the local timezone; restore the exact stored
         // values — startEpoch is the unique upsert key.
-        m.startEpoch = startEpoch
+        m.startEpoch = startSeconds
         m.date = date
-        m.timestamp = timestamp
+        m.timestamp = instant
         m.updatedAt = updatedAt
         context.insert(m)
     }
@@ -824,14 +985,25 @@ nonisolated struct ArchiveCoachMessage: Codable, Sendable {
     var body: String
     var cardsJSON: String?
     var pendingActionJSON: String?
+    /// Written as Android's `attachmentsJson`; `legacyAttachmentsJSON` reads older iOS archives.
     var attachmentsJSON: String?
+    var legacyAttachmentsJSON: String?
     var inputTokens: Int?
     var outputTokens: Int?
     var costUSD: Double?
     var modelUsed: String?
     var providerUsed: String?
     var loggedActivityIdsJSON: String?
+    /// iOS-only; absent from older archives.
+    var loggedMealIdsJSON: String?
     var createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id, conversationId, role, body, cardsJSON, pendingActionJSON, inputTokens, outputTokens,
+             costUSD, modelUsed, providerUsed, loggedActivityIdsJSON, loggedMealIdsJSON, createdAt
+        case attachmentsJSON = "attachmentsJson"
+        case legacyAttachmentsJSON = "attachmentsJSON"
+    }
 
     @MainActor init(_ m: CoachMessage) {
         id = m.id
@@ -847,16 +1019,17 @@ nonisolated struct ArchiveCoachMessage: Codable, Sendable {
         modelUsed = m.modelUsed
         providerUsed = m.providerUsed
         loggedActivityIdsJSON = m.loggedActivityIdsJSON
+        loggedMealIdsJSON = m.loggedMealIdsJSON
         createdAt = m.createdAt
     }
 
     @MainActor func insert(into context: ModelContext) {
         let m = CoachMessage(
             id: id, conversationId: conversationId, role: role, body: body, cardsJSON: cardsJSON,
-            pendingActionJSON: pendingActionJSON, attachmentsJSON: attachmentsJSON,
+            pendingActionJSON: pendingActionJSON, attachmentsJSON: attachmentsJSON ?? legacyAttachmentsJSON,
             inputTokens: inputTokens, outputTokens: outputTokens, costUSD: costUSD,
             modelUsed: modelUsed, providerUsed: providerUsed,
-            loggedActivityIdsJSON: loggedActivityIdsJSON, createdAt: createdAt
+            loggedActivityIdsJSON: loggedActivityIdsJSON, loggedMealIdsJSON: loggedMealIdsJSON, createdAt: createdAt
         )
         context.insert(m)
     }
@@ -932,8 +1105,9 @@ nonisolated struct ArchiveCoachToolCall: Codable, Sendable {
 
 nonisolated struct ArchiveCoachNotificationRecord: Codable, Sendable {
     var id: UUID
-    var slotRaw: String
-    var dateKey: String
+    // iOS-only; optional so an Android archive decodes (slot → morning, day → the local creation day).
+    var slotRaw: String?
+    var dateKey: String?
     var title: String
     var body: String
     var createdAt: Date
@@ -948,7 +1122,14 @@ nonisolated struct ArchiveCoachNotificationRecord: Codable, Sendable {
     }
 
     @MainActor func insert(into context: ModelContext) {
-        let m = CoachNotificationRecord(id: id, slotRaw: slotRaw, dateKey: dateKey, title: title, body: body)
+        let day: String = dateKey ?? {
+            let f = DateFormatter()
+            f.calendar = Calendar(identifier: .gregorian)
+            f.locale = Locale(identifier: "en_US_POSIX")
+            f.dateFormat = "yyyy-MM-dd"
+            return f.string(from: createdAt)
+        }()
+        let m = CoachNotificationRecord(id: id, slotRaw: slotRaw ?? "morning", dateKey: day, title: title, body: body)
         m.createdAt = createdAt
         context.insert(m)
     }
@@ -989,30 +1170,178 @@ nonisolated struct ArchiveCoachSummary: Codable, Sendable {
     }
 }
 
+/// Android's field names: `event` (the message), `detail` (metadata JSON), `deviceId` (device type),
+/// upper-case category/level. The `legacy*` fields read the names older iOS archives used.
 nonisolated struct ArchiveWearableLog: Codable, Sendable {
     var id: UUID
     var timestamp: Date
-    var deviceTypeRaw: String
-    var categoryRaw: String
-    var levelRaw: String
-    var message: String
-    var metadataJSON: String?
+    var event: String?
+    var detail: String?
+    var deviceId: String?
+    var categoryRaw: String?
+    var levelRaw: String?
+    var legacyMessage: String?
+    var legacyMetadataJSON: String?
+    var legacyDeviceTypeRaw: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, timestamp, event, detail, deviceId, categoryRaw, levelRaw
+        case legacyMessage = "message"
+        case legacyMetadataJSON = "metadataJSON"
+        case legacyDeviceTypeRaw = "deviceTypeRaw"
+    }
 
     @MainActor init(_ m: WearableLog) {
         id = m.id
         timestamp = m.timestamp
-        deviceTypeRaw = m.deviceTypeRaw
-        categoryRaw = m.categoryRaw
-        levelRaw = m.levelRaw
-        message = m.message
-        metadataJSON = m.metadataJSON
+        event = m.message
+        detail = m.metadataJSON
+        deviceId = m.deviceTypeRaw
+        categoryRaw = ArchiveInterop.exportCaseEnum(m.categoryRaw)
+        levelRaw = ArchiveInterop.exportCaseEnum(m.levelRaw)
     }
 
     @MainActor func insert(into context: ModelContext) {
-        let m = WearableLog(id: id, timestamp: timestamp, category: .connection, level: .info, message: message, metadataJSON: metadataJSON)
-        m.deviceTypeRaw = deviceTypeRaw
-        m.categoryRaw = categoryRaw
-        m.levelRaw = levelRaw
+        let m = WearableLog(id: id, timestamp: timestamp, category: .connection, level: .info,
+                            message: event ?? legacyMessage ?? "", metadataJSON: detail ?? legacyMetadataJSON)
+        m.deviceTypeRaw = deviceId ?? legacyDeviceTypeRaw ?? ""
+        m.categoryRaw = ArchiveInterop.importCaseEnum(categoryRaw ?? WearableLogCategory.connection.rawValue)
+        m.levelRaw = ArchiveInterop.importCaseEnum(levelRaw ?? WearableLogLevel.info.rawValue)
+        context.insert(m)
+    }
+}
+
+// MARK: - Nutrition (Android's `mealEntries` / `foodProducts`)
+
+nonisolated struct ArchiveMealEntry: Codable, Sendable {
+    var id: UUID
+    var date: Date
+    var timestamp: Date
+    var name: String
+    var mealTypeRaw: String
+    var calories: Double
+    var proteinG: Double
+    var carbsG: Double
+    var fatG: Double
+    var fiberG: Double?
+    var sugarG: Double?
+    var sodiumMg: Double?
+    var sourceRaw: String
+    var offProductCode: String?
+    var servingDescription: String?
+    var servingGrams: Double?
+    var quantity: Double
+    var confidenceRaw: String
+    var userEdited: Bool
+    var notes: String?
+    var loggedByCoach: Bool
+    var createdAt: Date
+    /// Optional: Android archives before its phase 6 lack it (then `createdAt`).
+    var updatedAt: Date?
+    /// iOS-only: the photo reference the meal was logged from.
+    var photoRefJSON: String?
+
+    @MainActor init(_ m: MealEntry) {
+        id = m.id
+        date = m.date
+        timestamp = m.timestamp
+        name = m.name
+        mealTypeRaw = m.mealTypeRaw
+        calories = m.calories
+        proteinG = m.proteinG
+        carbsG = m.carbsG
+        fatG = m.fatG
+        fiberG = m.fiberG
+        sugarG = m.sugarG
+        sodiumMg = m.sodiumMg
+        sourceRaw = m.sourceRaw
+        offProductCode = m.offProductCode
+        servingDescription = m.servingDescription
+        servingGrams = m.servingGrams
+        quantity = m.quantity
+        confidenceRaw = m.confidenceRaw
+        userEdited = m.userEdited
+        notes = m.notes
+        loggedByCoach = m.loggedByCoach
+        createdAt = m.createdAt
+        updatedAt = m.updatedAt
+        photoRefJSON = m.photoRefJSON
+    }
+
+    @MainActor func insert(into context: ModelContext) {
+        let m = MealEntry(id: id, timestamp: timestamp, name: name, mealType: .snack, calories: calories)
+        m.date = date   // init re-derives startOfDay in the local timezone; restore the exact value
+        m.mealTypeRaw = mealTypeRaw
+        m.proteinG = proteinG
+        m.carbsG = carbsG
+        m.fatG = fatG
+        m.fiberG = fiberG
+        m.sugarG = sugarG
+        m.sodiumMg = sodiumMg
+        m.sourceRaw = sourceRaw
+        m.offProductCode = offProductCode
+        m.servingDescription = servingDescription
+        m.servingGrams = servingGrams
+        m.quantity = quantity
+        m.confidenceRaw = confidenceRaw
+        m.userEdited = userEdited
+        m.notes = notes
+        m.loggedByCoach = loggedByCoach
+        m.photoRefJSON = photoRefJSON
+        m.createdAt = createdAt
+        m.updatedAt = (updatedAt?.timeIntervalSince1970 ?? 0) > 0 ? updatedAt! : createdAt
+        context.insert(m)
+    }
+}
+
+nonisolated struct ArchiveFoodProduct: Codable, Sendable {
+    var code: String
+    var name: String
+    var brand: String?
+    var energyKcal100g: Double
+    var protein100g: Double
+    var carbs100g: Double
+    var fat100g: Double
+    var fiber100g: Double?
+    var sugars100g: Double?
+    var saturatedFat100g: Double?
+    var sodiumMg100g: Double?
+    var servingSizeText: String?
+    var servingQuantityG: Double?
+    var lastUsedAt: Date
+    var useCount: Int
+    /// iOS-only.
+    var fetchedAt: Date?
+
+    @MainActor init(_ m: CachedFoodProduct) {
+        code = m.code
+        name = m.name
+        brand = m.brand
+        energyKcal100g = m.energyKcal100g
+        protein100g = m.protein100g
+        carbs100g = m.carbs100g
+        fat100g = m.fat100g
+        fiber100g = m.fiber100g
+        sugars100g = m.sugars100g
+        saturatedFat100g = m.saturatedFat100g
+        sodiumMg100g = m.sodiumMg100g
+        servingSizeText = m.servingSizeText
+        servingQuantityG = m.servingQuantityG
+        lastUsedAt = m.lastUsedAt
+        useCount = m.useCount
+        fetchedAt = m.fetchedAt
+    }
+
+    @MainActor func insert(into context: ModelContext) {
+        let m = CachedFoodProduct(
+            code: code, name: name, brand: brand, energyKcal100g: energyKcal100g, protein100g: protein100g,
+            carbs100g: carbs100g, fat100g: fat100g, fiber100g: fiber100g, sugars100g: sugars100g,
+            saturatedFat100g: saturatedFat100g, sodiumMg100g: sodiumMg100g, servingSizeText: servingSizeText,
+            servingQuantityG: servingQuantityG
+        )
+        m.lastUsedAt = lastUsedAt
+        m.useCount = useCount
+        m.fetchedAt = fetchedAt ?? lastUsedAt
         context.insert(m)
     }
 }

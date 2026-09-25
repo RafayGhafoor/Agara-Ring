@@ -81,6 +81,8 @@ final class RingBLEClient: NSObject {
     /// first, so the charging event picks this up for the first reading of a charge.
     @ObservationIgnored private var lastBatteryReading: ChargeEstimator.Reading?
     private(set) var isBluetoothReady = false
+    /// Why Bluetooth isn't usable (off vs not allowed vs unsupported) — the pairing card words it differently.
+    private(set) var bluetoothAvailability: BluetoothAvailability = .unknown
     private(set) var lastError: String?
 
     /// The level from the ring's own battery frame (`a0`, in-band) on this connection; nil until one arrived.
@@ -228,7 +230,25 @@ final class RingBLEClient: NSObject {
 
     // MARK: - Public API
 
-    func startScanning() {
+    /// Pairing scans list every named peripheral; a reconnect scan looks for the one known ring.
+    enum ScanMode: Equatable { case pairing, reconnect }
+
+    /// The Agara ring's advertised service (`docs/ring/veepoo-protocol.md` §1: name, `FEE7`, `f8f8` data).
+    static let ringAdvertisedService = CBUUID(string: "FEE7")
+    /// An unfiltered scan is the most expensive radio mode; it runs this long before narrowing.
+    static let scanTimeoutSeconds: UInt64 = 30
+    private var scanMode: ScanMode = .pairing
+    private var scanTimeoutTask: Task<Void, Never>?
+
+    func startScanning() { startScanning(mode: .pairing) }
+
+    /// - `.pairing`: unfiltered for `scanTimeoutSeconds` (so a firmware that hides its service is still
+    ///   listed), then narrowed to a `FEE7`-filtered scan — cheap enough to leave running while the
+    ///   pairing screen is up, and stopped by `stopScanning`.
+    /// - `.reconnect`: `FEE7`-filtered from the start, connects to the last known ring when it shows up,
+    ///   and gives up after `scanTimeoutSeconds` (the next foreground or pull-to-refresh tries again).
+    ///   It used to be an unfiltered scan with no end and no auto-connect.
+    func startScanning(mode: ScanMode) {
         #if DEBUG
         // E2E: a deferred virtual ring (`-virtualRingOnPair YES`) "is found" by the scan and connects.
         if VirtualRingLink.shared.attachDeferredIfNeeded() {
@@ -246,14 +266,75 @@ final class RingBLEClient: NSObject {
         lastError = nil
         autoReconnect = true
         state = .scanning
-        // Scan with no service filter so we also catch firmwares that don't advertise their service
-        // UUID; matching is done in didDiscover via the coordinator registry.
-        central?.scanForPeripherals(withServices: nil, options: [CBCentralManagerScanOptionAllowDuplicatesKey: false])
+        scanMode = mode
+        // Pairing: no service filter so we also catch firmwares that don't advertise their service UUID;
+        // matching is done in didDiscover via the coordinator registry.
+        central?.scanForPeripherals(withServices: mode == .pairing ? nil : [Self.ringAdvertisedService],
+                                    options: [CBCentralManagerScanOptionAllowDuplicatesKey: false])
+        armScanTimeout()
+    }
+
+    private func armScanTimeout() {
+        scanTimeoutTask?.cancel()
+        scanTimeoutTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: Self.scanTimeoutSeconds * 1_000_000_000)
+            guard let self, !Task.isCancelled, self.state == .scanning else { return }
+            self.scanTimedOut()
+        }
+    }
+
+    private func scanTimedOut() {
+        central?.stopScan()
+        switch Self.scanAfterTimeout(mode: scanMode) {
+        case .filtered:
+            central?.scanForPeripherals(withServices: [Self.ringAdvertisedService],
+                                        options: [CBCentralManagerScanOptionAllowDuplicatesKey: false])
+        case .stop:
+            state = .idle
+        }
+    }
+
+    enum ScanTimeoutAction: Equatable { case filtered, stop }
+
+    /// What a scan does when its unfiltered/initial window ends (pure, for tests).
+    static func scanAfterTimeout(mode: ScanMode) -> ScanTimeoutAction {
+        mode == .pairing ? .filtered : .stop
     }
 
     func stopScanning() {
+        scanTimeoutTask?.cancel()
+        scanTimeoutTask = nil
         central?.stopScan()
         if state == .scanning { state = .idle }
+    }
+
+    // MARK: Reconnect backoff
+
+    /// Re-dials after a failed or dropped link. The first retry is an immediate pending connect (the
+    /// normal CoreBluetooth pattern: it costs nothing until the ring is in range); a link that keeps
+    /// failing or flapping backs off 2, 4, 8 … 60 s instead of re-dialing in a tight loop.
+    private var reconnectAttempts = 0
+    private var reconnectTask: Task<Void, Never>?
+
+    static func reconnectDelay(attempt: Int) -> TimeInterval {
+        guard attempt > 0 else { return 0 }
+        return min(60, pow(2, Double(min(attempt, 6))))
+    }
+
+    private func scheduleReconnect(_ target: CBPeripheral) {
+        let delay = Self.reconnectDelay(attempt: reconnectAttempts)
+        reconnectAttempts += 1
+        reconnectTask?.cancel()
+        guard delay > 0 else {
+            central?.connect(target, options: nil)
+            return
+        }
+        reconnectTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            guard let self, !Task.isCancelled, self.autoReconnect, self.peripheral?.identifier == target.identifier,
+                  self.state == .reconnecting else { return }
+            self.central?.connect(target, options: nil)
+        }
     }
 
     /// - Parameter preferredFamily: the family the *user* declared at pairing (the app-type picker on a
@@ -299,12 +380,14 @@ final class RingBLEClient: NSObject {
                 advertisedName: known.name
             )
         } else {
-            startScanning()
+            startScanning(mode: .reconnect)
         }
     }
 
     func disconnect() {
         autoReconnect = false
+        reconnectTask?.cancel()
+        scanTimeoutTask?.cancel()
         #if DEBUG
         if VirtualRingLink.shared.userDisconnect() { return }
         #endif
@@ -426,6 +509,9 @@ final class RingBLEClient: NSObject {
         userInitiated: Bool = false
     ) {
         central?.stopScan()
+        scanTimeoutTask?.cancel()
+        reconnectTask?.cancel()
+        reconnectAttempts = 0
         autoReconnect = true
         // Force-close any stale connection (incl. a different peripheral) before opening a new one, so
         // a reconnect after an idle drop can't collide with an orphaned handle. iOS analogue of
@@ -661,6 +747,7 @@ final class RingBLEClient: NSObject {
     }
 
     private func publishRawPacket(direction: PacketDirection, data: Data) {
+        guard RawPacketCapture.isEnabled else { return }   // nobody stores it; skip the bus hop
         // Outgoing frames are logged raw for the debug feed. We do NOT route them through the
         // driver's `ingest` (that is the inbound path and, for big-data devices, would corrupt the
         // reassembly buffer). The command id is enough annotation for the trace.
@@ -902,6 +989,7 @@ extension RingBLEClient {
 
     /// The raw-packet capture keeps each OTA frame's header/offset/status (never block payloads).
     private func publishOtaPacket(_ frame: Data, outgoing: Bool) {
+        guard RawPacketCapture.isEnabled else { return }
         let event = PulseEvent.rawPacket(
             direction: outgoing ? .outgoing : .incoming,
             data: AbOta.logBytes(frame, outgoing: outgoing),
@@ -962,6 +1050,7 @@ extension RingBLEClient: CBCentralManagerDelegate {
     nonisolated func centralManagerDidUpdateState(_ central: CBCentralManager) {
         MainActor.assumeIsolated {
             isBluetoothReady = (central.state == .poweredOn)
+            bluetoothAvailability = BluetoothAvailability(central.state)
             switch central.state {
             case .poweredOn:
                 if let restored = peripheral, state != .connected {
@@ -997,6 +1086,13 @@ extension RingBLEClient: CBCentralManagerDelegate {
         rssi RSSI: NSNumber
     ) {
         MainActor.assumeIsolated {
+            // Reconnect scan: the known ring showed up — connect to it and stop looking.
+            if scanMode == .reconnect, state == .scanning, peripheral.identifier == lastKnownIdentifier {
+                stopScanning()
+                beginConnect(to: peripheral, deviceType: lastKnownDeviceType,
+                             selectedModelID: lastKnownWearableModelID, advertisedName: peripheral.name)
+                return
+            }
             let name = (advertisementData[CBAdvertisementDataLocalNameKey] as? String) ?? peripheral.name
             let matchedType = matchDeviceType(name: name, advertisementData: advertisementData)
             let matchedModel = WearableModel.model(advertisedName: name)
@@ -1055,7 +1151,7 @@ extension RingBLEClient: CBCentralManagerDelegate {
             if autoReconnect, let peripheral = self.peripheral {
                 state = .reconnecting
                 publish(.deviceStateChanged(state: .reconnecting, address: nil))
-                central.connect(peripheral, options: nil)
+                scheduleReconnect(peripheral)
             } else {
                 state = .failed
                 publish(.deviceStateChanged(state: .failed, address: nil))
@@ -1090,7 +1186,7 @@ extension RingBLEClient: CBCentralManagerDelegate {
             publish(.deviceStateChanged(state: .disconnected, address: nil))
             if autoReconnect {
                 state = .reconnecting
-                central.connect(peripheral, options: nil)
+                scheduleReconnect(peripheral)
             } else {
                 // A connect-attempt timeout has already parked us in `.failed` with an explanatory
                 // message, and the cancel *it* issued is what brought us here — it must not overwrite
@@ -1185,6 +1281,8 @@ extension RingBLEClient: CBPeripheralDelegate {
             let required = driver.requiredSubscriptionsBeforeConnected
             guard required.allSatisfy(subscribedNotifyUUIDs.contains) else { return }
             guard state != .connected else { return }
+            reconnectAttempts = 0   // a link that reached `.connected` resets the backoff
+            reconnectTask?.cancel()
             state = .connected
             cancelConnectTimeout()   // the attempt landed
             UserDefaults.standard.set(peripheral.identifier.uuidString, forKey: Self.lastPeripheralKey)

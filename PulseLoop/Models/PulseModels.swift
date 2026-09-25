@@ -210,8 +210,11 @@ final class Device {
 
 @Model
 final class ActivityDaily {
+    // Audit batch B: the per-session / per-day / time-window reads this model serves.
+    #Index<ActivityDaily>([\.date])
     @Attribute(.unique) var id: UUID
-    var date: Date
+    // The hash modifier makes an upgraded store migrate, which is what creates the new index there.
+    @Attribute(hashModifier: "idx-2026-09") var date: Date
     var steps: Int
     var calories: Double
     var distanceMeters: Double
@@ -251,7 +254,7 @@ final class ActivityDaily {
 final class Measurement {
     // Indexes for the hot read paths: time-window scans (timestamp), per-kind windows + latest
     // value (kindRaw, timestamp), and demo detection (sourceRaw). Additive, non-destructive.
-    #Index<Measurement>([\.timestamp], [\.kindRaw, \.timestamp], [\.sourceRaw])
+    #Index<Measurement>([\.timestamp], [\.kindRaw, \.timestamp], [\.sourceRaw], [\.createdAt])
     @Attribute(.unique) var id: UUID
     var kindRaw: String
     var value: Double
@@ -261,7 +264,8 @@ final class Measurement {
     var confidenceRaw: String
     var activitySessionId: UUID?
     var rawPacketId: UUID?
-    var createdAt: Date
+    // The hash modifier makes an upgraded store migrate, which is what creates the new index there.
+    @Attribute(hashModifier: "idx-2026-09") var createdAt: Date
     
     init(
         id: UUID = UUID(),
@@ -352,8 +356,11 @@ final class SleepSession {
 
 @Model
 final class SleepStageBlock {
+    // Audit batch B: the per-session / per-day / time-window reads this model serves.
+    #Index<SleepStageBlock>([\.sessionId])
     @Attribute(.unique) var id: UUID
-    var sessionId: UUID
+    // The hash modifier makes an upgraded store migrate, which is what creates the new index there.
+    @Attribute(hashModifier: "idx-2026-09") var sessionId: UUID
     var startAt: Date
     var startMinute: Int
     var durationMinutes: Int
@@ -390,8 +397,11 @@ final class SleepStageBlock {
 
 @Model
 final class RawPacketRow {
+    // Audit batch B: the per-session / per-day / time-window reads this model serves.
+    #Index<RawPacketRow>([\.timestamp])
     @Attribute(.unique) var id: UUID
-    var timestamp: Date
+    // The hash modifier makes an upgraded store migrate, which is what creates the new index there.
+    @Attribute(hashModifier: "idx-2026-09") var timestamp: Date
     var directionRaw: String
     var commandId: Int
     var hexPayload: String
@@ -427,8 +437,11 @@ final class RawPacketRow {
 
 @Model
 final class DerivedUpdateRow {
+    // Audit batch B: the per-session / per-day / time-window reads this model serves.
+    #Index<DerivedUpdateRow>([\.timestamp])
     @Attribute(.unique) var id: UUID
-    var timestamp: Date
+    // The hash modifier makes an upgraded store migrate, which is what creates the new index there.
+    @Attribute(hashModifier: "idx-2026-09") var timestamp: Date
     var kind: String
     var entityType: String
     var entityId: String
@@ -693,8 +706,11 @@ final class ActivitySession {
 
 @Model
 final class ActivitySample {
+    // Audit batch B: the per-session / per-day / time-window reads this model serves.
+    #Index<ActivitySample>([\.sessionId])
     @Attribute(.unique) var id: UUID
-    var sessionId: UUID
+    // The hash modifier makes an upgraded store migrate, which is what creates the new index there.
+    @Attribute(hashModifier: "idx-2026-09") var sessionId: UUID
     var measurementId: UUID?
     var kind: String
     var value: Double
@@ -732,9 +748,12 @@ final class ActivitySample {
 /// is the GadgetBridge model and the fix for daily totals drifting upward across repeated syncs.
 @Model
 final class ActivityBucketSample {
+    // Audit batch B: the per-session / per-day / time-window reads this model serves.
+    #Index<ActivityBucketSample>([\.date])
     /// Bucket start time in unix seconds — unique, so the same bucket upserts instead of duplicating.
     @Attribute(.unique) var startEpoch: Int
-    var date: Date          // startOfDay for the bucket, for fast per-day queries
+    // The hash modifier makes an upgraded store migrate, which is what creates the new index there.
+    @Attribute(hashModifier: "idx-2026-09") var date: Date          // startOfDay for the bucket, for fast per-day queries
     var timestamp: Date     // bucket start instant
     var steps: Int
     var distanceMeters: Double

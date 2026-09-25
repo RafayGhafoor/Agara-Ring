@@ -145,6 +145,12 @@ final class EventPersistenceSubscriber {
     private var lastBatteryLogAt: Date?
     private let batteryMinInterval: TimeInterval = 30 * 60   // 30 min
 
+    /// True while every live HR sample must be kept: a workout (its stream is the recorded data) or a
+    /// spot HR measurement (its samples are the reading). Set by the app to the coordinator's state.
+    var keepEveryHeartRateSample: @MainActor () -> Bool = { false }
+    /// When the last throttled live HR row was stored — see `LiveHeartRateThrottle`.
+    private var lastLiveHRStoredAt: Date?
+
     init(context: ModelContext) {
         self.context = context
     }
@@ -161,6 +167,8 @@ final class EventPersistenceSubscriber {
 
     func start() {
         guard task == nil else { return }
+        // Keep the audit tables a rolling week (they grew without bound).
+        DebugRepository.pruneAuditTables(context: context)
         task = Task {
             let stream = await PulseEventBus.shared.stream()
             for await event in stream {
@@ -188,9 +196,16 @@ final class EventPersistenceSubscriber {
     }
 
     func persist(_ event: PulseEvent) {
+        noopWrite = false
         applyPersist(event)
+        // Nothing written (an unchanged poll value, a throttled sample, a non-data event): no save and no
+        // data-change signal — the 30 s poll used to wake the widget, Health export and every store.
+        guard !noopWrite else { return }
         scheduleFlush()
     }
+
+    /// Set by `applyPersist` when the event changed nothing in the store (Android's `noopWrite`).
+    private var noopWrite = false
 
     /// Debounced batch flush: reset the idle timer each event; flush immediately if too many writes
     /// have piled up. Coalesces a sync burst into a handful of saves + change signals.
@@ -269,17 +284,22 @@ final class EventPersistenceSubscriber {
             device.peripheralIdentifier = nil
             context.insert(device)
         case let .batteryLevel(percent):
-            let device = MetricsService.fetchDevices(context).first ?? Device()
+            let existing = MetricsService.fetchDevices(context).first
+            let device = existing ?? Device()
+            let sampled = recordBatterySample(percent)
+            if existing != nil, device.batteryPercent == percent {
+                if !sampled { noopWrite = true }
+                break
+            }
             device.batteryPercent = percent
             context.insert(device)
-            recordBatterySample(percent)
         case let .rawPacket(direction, data, decoded):
             // The raw byte trace is a developer diagnostic. DEBUG builds always keep it; release
             // builds keep it only while the user has explicitly enabled capture in Privacy & Data —
             // the toggle exists so a remote tester on TestFlight can hand back protocol bytes from a
             // ring family we've never had in hand (raw packets encode health data, hence opt-in,
             // off by default and clearable).
-            guard RawPacketCapture.isEnabled else { return }
+            guard RawPacketCapture.isEnabled else { noopWrite = true; return }
             context.insert(
                 RawPacketRow(
                     direction: direction,
@@ -301,7 +321,7 @@ final class EventPersistenceSubscriber {
             context.insert(DerivedUpdateRow(kind: kind, entityType: entityType, entityId: entityId, payloadJSON: payloadJSON))
         case let .activityUpdate(timestamp, steps, distanceMeters, calories):
             // Single ratchet source of truth (monotonic max within a day), tagged as live.
-            let row = ActivityService.applyActivityUpdate(
+            let (_, changed) = ActivityService.applyActivityUpdateIfChanged(
                 ActivityDailyUpdate(
                     date: timestamp,
                     steps: steps,
@@ -312,12 +332,10 @@ final class EventPersistenceSubscriber {
                 ),
                 context: context
             )
-            context.insert(DerivedUpdateRow(
-                kind: "activity_update",
-                entityType: "activity_daily",
-                entityId: row.id.uuidString,
-                payloadJSON: #"{"steps":\#(row.steps),"calories":\#(Int(row.calories)),"distance_m":\#(Int(row.distanceMeters))}"#
-            ))
+            // Unchanged totals (the 30 s poll while still): nothing to write, no signal. The per-update
+            // audit row (`DerivedUpdateRow`) is no longer written — nothing reads it back per update, and it
+            // was the table's main source of growth.
+            guard changed else { noopWrite = true; break }
             // Devices that report no calorie counter (send 0): keep today's on-device estimate
             // tracking the live step ratchet. Throttled — cumulative packets can stream every second.
             if calories <= 0 {
@@ -332,6 +350,13 @@ final class EventPersistenceSubscriber {
             // Kept as a no-op so the (still-published) event doesn't fall through to `unknown`.
             break
         case let .heartRateSample(bpm, timestamp):
+            // The live stream arrives about once a second; outside a workout / spot test one row per 5 s
+            // is kept (Android `LiveHeartRateThrottle`, plan release-hardening-storage B3). The screens
+            // read the live value from the coordinator, not from the store.
+            guard LiveHeartRateThrottle.shouldStore(
+                lastStoredAt: lastLiveHRStoredAt, at: timestamp, keepAll: keepEveryHeartRateSample()
+            ) else { noopWrite = true; return }
+            lastLiveHRStoredAt = timestamp
             persistMeasurement(kind: .heartRate, value: Double(bpm), timestamp: timestamp, source: .live, kindLabel: "hr_sample")
         case let .spo2Result(value, timestamp):
             persistMeasurement(kind: .spo2, value: Double(value), timestamp: timestamp, source: .live, kindLabel: "spo2_result")
@@ -387,7 +412,7 @@ final class EventPersistenceSubscriber {
                 accepted: accepted,
                 rejectionReason: rejectionReason
             ))
-            if let session = ActivityRepository.sessions(context: context).first(where: { $0.id == sessionId }) {
+            if let session = ActivityRepository.session(id: sessionId, context: context) {
                 if accepted {
                     session.gpsPointCount += 1
                     session.lastGpsPointAt = timestamp
@@ -409,11 +434,11 @@ final class EventPersistenceSubscriber {
                 DailyCalorieEstimator.flushDirty(context: context)
             }
         case .decodedPacket:
-            break
+            noopWrite = true
         // `.wearState` is a live condition the measurement flow reacts to, not data — nothing to store.
         case .heartRateComplete, .spo2Progress, .spo2Complete, .workoutStarted, .workoutPaused,
              .workoutResumed, .workoutFinished, .coachTrace, .wearState, .chargingState:
-            break
+            noopWrite = true
         }
         // NB: no per-event save here — `scheduleFlush()` (called by `persist`) batches the save.
     }
@@ -425,10 +450,15 @@ final class EventPersistenceSubscriber {
     /// re-request a day, and the epochs it stamps are deterministic, so an exact-timestamp match is a
     /// valid identity. Live samples keep append semantics (two readings a second apart are two events).
     private func persistMeasurement(kind: MeasurementKind, value: Double, timestamp: Date, source: MeasurementSource, kindLabel: String) {
-        if source == .history, isDuplicateHistory(kind: kind, value: value, timestamp: timestamp) { return }
+        if source == .history, let unchanged = isDuplicateHistory(kind: kind, value: value, timestamp: timestamp) {
+            // A re-synced slot with the same value writes nothing (a revised value updates in place).
+            if unchanged { noopWrite = true }
+            return
+        }
         let row = Measurement(kind: kind, value: value, unit: kind.unit, timestamp: timestamp, source: source)
         context.insert(row)
-        context.insert(DerivedUpdateRow(kind: kindLabel, entityType: "measurement", entityId: row.id.uuidString))
+        // No per-measurement `DerivedUpdateRow` any more: one audit row per sample doubled every sync's
+        // inserts and nothing reads them per measurement (audit batch B; the table is also pruned).
         _ = ActivityRecorderService.linkSample(
             kind: kind,
             value: value,
@@ -444,7 +474,8 @@ final class EventPersistenceSubscriber {
     /// Two tiers: an in-process key set keeps the hot sync path off the database entirely, and a single
     /// indexed fetch catches re-syncs across launches. `context.insert` is not visible to `fetch` until
     /// the batched save lands, which is exactly why the in-memory tier is needed.
-    private func isDuplicateHistory(kind: MeasurementKind, value: Double, timestamp: Date) -> Bool {
+    /// nil = new sample; true = already stored with this value; false = already stored, value revised.
+    private func isDuplicateHistory(kind: MeasurementKind, value: Double, timestamp: Date) -> Bool? {
         let key = HistoryKey(kind: kind.rawValue, epoch: Int(timestamp.timeIntervalSince1970))
         if seenHistoryKeys.contains(key) { return true }
         seenHistoryKeys.insert(key)
@@ -455,24 +486,28 @@ final class EventPersistenceSubscriber {
             $0.kindRaw == kindRaw && $0.timestamp == timestamp && $0.sourceRaw == sourceRaw
         })
         descriptor.fetchLimit = 1
-        guard let existing = (try? context.fetch(descriptor))?.first else { return false }
+        guard let existing = (try? context.fetch(descriptor))?.first else { return nil }
         // Same slot, possibly refined value (the ring can revise an averaged block). Update in place;
         // no new audit/link row, because nothing new happened.
+        guard existing.value != value else { return true }
         existing.value = value
-        return true
+        return false
     }
 
     /// Append a battery reading to the drainage history, throttled to on-change or a 30-min floor so
     /// the table stays tiny. Rides the same coalesced flush as every other persist (no extra `save()`).
-    private func recordBatterySample(_ percent: Int) {
-        guard (0...100).contains(percent) else { return }   // guard the Device()-fallback default / garbage
+    /// Returns whether a sample was written.
+    @discardableResult
+    private func recordBatterySample(_ percent: Int) -> Bool {
+        guard (0...100).contains(percent) else { return false }   // guard the Device()-fallback default / garbage
         let now = Date()
         let changed = percent != lastBatteryPercent
         let floorElapsed = lastBatteryLogAt.map { now.timeIntervalSince($0) >= batteryMinInterval } ?? true
-        guard changed || floorElapsed else { return }
+        guard changed || floorElapsed else { return false }
         context.insert(BatterySample(percent: percent, timestamp: now))
         lastBatteryPercent = percent
         lastBatteryLogAt = now
+        return true
     }
 
     /// Names nobody chose: `"SMART_RING"` (the default `Device()` used to insert, and still sitting in
@@ -509,5 +544,17 @@ final class EventPersistenceSubscriber {
     private func persistFirmwareVersion(_ version: String) {
         guard let device = DeviceRepository.current(context: context), device.firmwareVersion != version else { return }
         device.firmwareVersion = version
+    }
+}
+
+/// How often the *live* heart-rate stream is written. The ring streams about one sample a second while
+/// connected; outside a workout (and a spot test) one row per `minGap` keeps the chart's shape at a fifth of
+/// the rows. Same rule and constant as Android's `LiveHeartRateThrottle`.
+enum LiveHeartRateThrottle {
+    static let minGap: TimeInterval = 5
+
+    static func shouldStore(lastStoredAt: Date?, at: Date, keepAll: Bool) -> Bool {
+        guard !keepAll, let lastStoredAt else { return true }
+        return at < lastStoredAt || at.timeIntervalSince(lastStoredAt) >= minGap
     }
 }
