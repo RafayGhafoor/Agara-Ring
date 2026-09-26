@@ -10,28 +10,28 @@ enum ChipTone {
 
     var foreground: Color {
         switch self {
-        case .neutral: return PulseColors.textSecondary
-        case .up: return PulseColors.success
-        case .down: return PulseColors.danger
-        case .warn: return PulseColors.warning
+        case .neutral: return AgaraColors.textSecondary
+        case .up: return AgaraColors.success
+        case .down: return AgaraColors.danger
+        case .warn: return AgaraColors.warning
         }
     }
 
     var background: Color {
         switch self {
-        case .neutral: return PulseColors.textPrimary.opacity(0.10)
-        case .up: return PulseColors.success.opacity(0.15)
-        case .down: return PulseColors.danger.opacity(0.15)
-        case .warn: return PulseColors.warning.opacity(0.15)
+        case .neutral: return AgaraColors.textPrimary.opacity(0.10)
+        case .up: return AgaraColors.success.opacity(0.15)
+        case .down: return AgaraColors.danger.opacity(0.15)
+        case .warn: return AgaraColors.warning.opacity(0.15)
         }
     }
 
     var border: Color {
         switch self {
-        case .neutral: return PulseColors.borderSubtle
-        case .up: return PulseColors.success.opacity(0.30)
-        case .down: return PulseColors.danger.opacity(0.30)
-        case .warn: return PulseColors.warning.opacity(0.30)
+        case .neutral: return AgaraColors.borderSubtle
+        case .up: return AgaraColors.success.opacity(0.30)
+        case .down: return AgaraColors.danger.opacity(0.30)
+        case .warn: return AgaraColors.warning.opacity(0.30)
         }
     }
 }
@@ -50,12 +50,12 @@ struct HeroInsightCardView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(title)
-                .font(PulseFont.title)
-                .foregroundStyle(PulseColors.textPrimary)
+                .font(AgaraFont.title)
+                .foregroundStyle(AgaraColors.textPrimary)
             Text(summary)
-                .font(PulseFont.callout.weight(.regular))
+                .font(AgaraFont.callout.weight(.regular))
                 .lineSpacing(4)
-                .foregroundStyle(PulseColors.textSecondary)
+                .foregroundStyle(AgaraColors.textSecondary)
                 .padding(.top, 8)
             if !chips.isEmpty {
                 FlowChips(chips: chips).padding(.top, 16)
@@ -65,7 +65,7 @@ struct HeroInsightCardView: View {
         .padding(20)
         .background(
             LinearGradient(
-                colors: [PulseColors.accent.opacity(0.18), PulseColors.spo2.opacity(0.10)],
+                colors: [AgaraColors.accent.opacity(0.18), AgaraColors.spo2.opacity(0.10)],
                 startPoint: .topLeading, endPoint: .bottomTrailing
             )
         )
@@ -80,7 +80,7 @@ private struct FlowChips: View {
         HStack(spacing: 6) {
             ForEach(chips) { chip in
                 Text(chip.label)
-                    .font(PulseFont.caption)
+                    .font(AgaraFont.caption)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
                     .foregroundStyle(chip.tone.foreground)
@@ -108,21 +108,21 @@ struct CoachMessageCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 6) {
-                Circle().fill(PulseColors.accent).frame(width: 6, height: 6)
-                    .shadow(color: PulseColors.accent.opacity(0.8), radius: 5)
+                Circle().fill(AgaraColors.accent).frame(width: 6, height: 6)
+                    .shadow(color: AgaraColors.accent.opacity(0.8), radius: 5)
                 Text("COACH")
-                    .font(PulseFont.micro)
+                    .font(AgaraFont.micro)
                     .tracking(1.8)
-                    .foregroundStyle(PulseColors.textMuted)
+                    .foregroundStyle(AgaraColors.textMuted)
             }
             Text(headline)
-                .font(PulseFont.subheadline.weight(.semibold))
-                .foregroundStyle(PulseColors.textPrimary)
+                .font(AgaraFont.subheadline.weight(.semibold))
+                .foregroundStyle(AgaraColors.textPrimary)
                 .padding(.top, 6)
             Text(bodyText)
-                .font(PulseFont.subheadline.weight(.regular))
+                .font(AgaraFont.subheadline.weight(.regular))
                 .lineSpacing(5)
-                .foregroundStyle(PulseColors.textSecondary)
+                .foregroundStyle(AgaraColors.textSecondary)
                 .padding(.top, 6)
             if !chips.isEmpty {
                 // Both questions share one compact row (each wraps to ≤2 lines)
@@ -138,9 +138,9 @@ struct CoachMessageCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
-        .pulseGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(alignment: .leading) {
-            Rectangle().fill(PulseColors.accent).frame(width: 2)
+            Rectangle().fill(AgaraColors.accent).frame(width: 2)
         }
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
@@ -153,15 +153,15 @@ private struct CoachSummaryChip: View {
 
     var body: some View {
         Text(text)
-            .font(PulseFont.caption2.weight(.regular))
+            .font(AgaraFont.caption2.weight(.regular))
             .lineLimit(2)
             .multilineTextAlignment(.leading)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
-            .foregroundStyle(PulseColors.textSecondary)
-            .pulseGlass(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .foregroundStyle(AgaraColors.textSecondary)
+            .agaraGlass(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 
@@ -191,20 +191,20 @@ struct MetricCardButton: View {
                     Circle().fill(color).frame(width: 8, height: 8)
                         .shadow(color: color.opacity(0.7), radius: 5)
                     Text(label.uppercased())
-                        .font(PulseFont.caption2)
+                        .font(AgaraFont.caption2)
                         .tracking(0.6)
-                        .foregroundStyle(PulseColors.textMuted)
+                        .foregroundStyle(AgaraColors.textMuted)
                         .lineLimit(1)
                 }
                 HStack(alignment: .firstTextBaseline, spacing: 5) {
                     Text(value)
-                        .font(PulseFont.greeting)
+                        .font(AgaraFont.greeting)
                         .monospacedDigit()
-                        .foregroundStyle(PulseColors.textPrimary)
+                        .foregroundStyle(AgaraColors.textPrimary)
                         .minimumScaleFactor(0.7)
                         .lineLimit(1)
                     if let unit {
-                        Text(unit).font(PulseFont.caption).foregroundStyle(PulseColors.textMuted)
+                        Text(unit).font(AgaraFont.caption).foregroundStyle(AgaraColors.textMuted)
                     }
                 }
                 if let delta {
@@ -212,13 +212,13 @@ struct MetricCardButton: View {
                     HStack(spacing: 4) {
                         Image(systemName: isUp ? "arrow.up" : "arrow.down")
                         Text("\(isUp ? "+" : "")\(delta.value)").monospacedDigit()
-                        Text(delta.label).foregroundStyle(PulseColors.textMuted)
+                        Text(delta.label).foregroundStyle(AgaraColors.textMuted)
                     }
-                    .font(PulseFont.caption2)
-                    .foregroundStyle(isUp ? PulseColors.success : PulseColors.danger)
+                    .font(AgaraFont.caption2)
+                    .foregroundStyle(isUp ? AgaraColors.success : AgaraColors.danger)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
-                    .background((isUp ? PulseColors.success : PulseColors.danger).opacity(0.15))
+                    .background((isUp ? AgaraColors.success : AgaraColors.danger).opacity(0.15))
                     .clipShape(Capsule())
                 }
                 Spacer(minLength: 0)
@@ -229,7 +229,7 @@ struct MetricCardButton: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .padding(16)
             .frame(height: 150)
-            .pulseGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .agaraGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
             // Non-tappable tiles should look identical to tappable ones — never dimmed.
             .contentShape(Rectangle())
         }
@@ -250,12 +250,12 @@ struct RangeToggleView: View {
                 let active = selection == option.0
                 Button { selection = option.0 } label: {
                     Text(option.1)
-                        .font(PulseFont.micro.weight(.semibold))
+                        .font(AgaraFont.micro.weight(.semibold))
                         .tracking(0.8)
-                        .foregroundStyle(active ? PulseColors.textPrimary : PulseColors.textMuted)
+                        .foregroundStyle(active ? AgaraColors.textPrimary : AgaraColors.textMuted)
                         .frame(minWidth: 28)
                         .padding(.vertical, 3)
-                        .background(active ? PulseColors.card : Color.clear)
+                        .background(active ? AgaraColors.card : Color.clear)
                         .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
@@ -264,7 +264,7 @@ struct RangeToggleView: View {
         .padding(2)
         // Glass track; the active segment stays a solid dark pill so the selection
         // reads clearly against the translucent container (no glass-on-glass).
-        .pulseGlass(Capsule())
+        .agaraGlass(Capsule())
     }
 }
 
@@ -292,14 +292,14 @@ struct ProgressRingView<Center: View>: View {
     let max: Double
     var size: CGFloat = 84
     var stroke: CGFloat = 9
-    var color: Color = PulseColors.steps
+    var color: Color = AgaraColors.steps
     @ViewBuilder var center: () -> Center
 
     private var progress: Double { max == 0 ? 0 : Swift.min(1, Swift.max(0, value / max)) }
 
     var body: some View {
         ZStack {
-            Circle().stroke(PulseColors.elevated, lineWidth: stroke)
+            Circle().stroke(AgaraColors.elevated, lineWidth: stroke)
             Circle()
                 .trim(from: 0, to: progress)
                 .stroke(color, style: StrokeStyle(lineWidth: stroke, lineCap: .round))
@@ -329,14 +329,14 @@ struct WeeklyPillCalendarView: View {
                     ZStack {
                         Capsule().fill(fill(day)).overlay(Capsule().stroke(border(day), lineWidth: 1))
                         Text(day.completed ? "✓" : day.isToday ? "•" : "")
-                            .font(PulseFont.micro)
+                            .font(AgaraFont.micro)
                             .foregroundStyle(textColor(day))
                     }
                     .frame(width: 24, height: 40)
                     Text(day.label)
-                        .font(PulseFont.micro)
+                        .font(AgaraFont.micro)
                         .tracking(0.5)
-                        .foregroundStyle(day.isToday ? PulseColors.textPrimary : PulseColors.textMuted)
+                        .foregroundStyle(day.isToday ? AgaraColors.textPrimary : AgaraColors.textMuted)
                 }
                 .frame(maxWidth: .infinity)
             }
@@ -344,19 +344,19 @@ struct WeeklyPillCalendarView: View {
     }
 
     private func fill(_ day: WeeklyDay) -> Color {
-        if day.completed { return PulseColors.success.opacity(0.20) }
-        if day.isToday { return PulseColors.accent.opacity(0.20) }
-        return PulseColors.cardSoft.opacity(0.4)
+        if day.completed { return AgaraColors.success.opacity(0.20) }
+        if day.isToday { return AgaraColors.accent.opacity(0.20) }
+        return AgaraColors.cardSoft.opacity(0.4)
     }
     private func border(_ day: WeeklyDay) -> Color {
-        if day.completed { return PulseColors.success.opacity(0.4) }
-        if day.isToday { return PulseColors.accent }
-        return PulseColors.borderSubtle
+        if day.completed { return AgaraColors.success.opacity(0.4) }
+        if day.isToday { return AgaraColors.accent }
+        return AgaraColors.borderSubtle
     }
     private func textColor(_ day: WeeklyDay) -> Color {
-        if day.completed { return PulseColors.success }
-        if day.isToday { return PulseColors.textPrimary }
-        return PulseColors.textMuted
+        if day.completed { return AgaraColors.success }
+        if day.isToday { return AgaraColors.textPrimary }
+        return AgaraColors.textMuted
     }
 }
 
@@ -374,18 +374,18 @@ struct SleepHeroCardView: View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 0) {
                 Text(label.uppercased())
-                    .font(PulseFont.caption2)
+                    .font(AgaraFont.caption2)
                     .tracking(1.8)
-                    .foregroundStyle(PulseColors.textMuted)
+                    .foregroundStyle(AgaraColors.textMuted)
                 Text(value)
                     .font(AgaraFont.face(noData ? 24 : 40, .semibold))
                     .monospacedDigit()
-                    .foregroundStyle(PulseColors.textPrimary)
+                    .foregroundStyle(AgaraColors.textPrimary)
                     .padding(.top, 4)
                 if let support {
                     Text(support)
-                        .font(PulseFont.subheadline.weight(.regular).monospacedDigit())
-                        .foregroundStyle(PulseColors.textSecondary)
+                        .font(AgaraFont.subheadline.weight(.regular).monospacedDigit())
+                        .foregroundStyle(AgaraColors.textSecondary)
                         .padding(.top, 8)
                 }
             }
@@ -394,22 +394,22 @@ struct SleepHeroCardView: View {
                 HStack(alignment: .center, spacing: 2) {
                     HelpTip(AgaraHelp.sleepScore)
                     Text(score.map { "\($0)" } ?? "—")
-                        .font(PulseFont.largeTitle)
+                        .font(AgaraFont.largeTitle)
                         .monospacedDigit()
-                        .foregroundStyle(PulseColors.sleep)
+                        .foregroundStyle(AgaraColors.sleep)
                 }
                 if let scoreLabel, score != nil {
                     Text(scoreLabel)
-                        .font(PulseFont.subheadline)
-                        .foregroundStyle(PulseColors.textPrimary)
+                        .font(AgaraFont.subheadline)
+                        .foregroundStyle(AgaraColors.textPrimary)
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .background(
-            PulseColors.card.overlay(
-                RadialGradient(colors: [PulseColors.accent.opacity(0.16), .clear], center: .init(x: 0.82, y: 0), startRadius: 0, endRadius: 220)
+            AgaraColors.card.overlay(
+                RadialGradient(colors: [AgaraColors.accent.opacity(0.16), .clear], center: .init(x: 0.82, y: 0), startRadius: 0, endRadius: 220)
             )
         )
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
@@ -443,22 +443,22 @@ struct SleepStageSummaryCardsView: View {
             HStack(spacing: 8) {
                 Circle().fill(color).frame(width: 8, height: 8).shadow(color: color.opacity(0.7), radius: 5)
                 Text(label.uppercased())
-                    .font(PulseFont.micro)
+                    .font(AgaraFont.micro)
                     .tracking(0.6)
-                    .foregroundStyle(PulseColors.textMuted)
+                    .foregroundStyle(AgaraColors.textMuted)
                     .lineLimit(1)
             }
             Text(value)
-                .font(PulseFont.title2)
+                .font(AgaraFont.title2)
                 .monospacedDigit()
-                .foregroundStyle(PulseColors.textPrimary)
+                .foregroundStyle(AgaraColors.textPrimary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
                 .padding(.top, 12)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        .pulseGlass(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 }
 
@@ -474,15 +474,15 @@ struct DetailCard<Content: View>: View {
             HStack(spacing: 8) {
                 Circle().fill(color).frame(width: 8, height: 8).shadow(color: color.opacity(0.7), radius: 5)
                 Text(title.uppercased())
-                    .font(PulseFont.caption2)
+                    .font(AgaraFont.caption2)
                     .tracking(1.0)
-                    .foregroundStyle(PulseColors.textMuted)
+                    .foregroundStyle(AgaraColors.textMuted)
             }
             content
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .pulseGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 }
 
@@ -495,7 +495,7 @@ struct QuickActionButton: View {
 
     private var text: some View {
         Text(label)
-            .font(PulseFont.subheadline.weight(.semibold))
+            .font(AgaraFont.subheadline.weight(.semibold))
             // Several of these can share one row (the Vitals measure pills), so a longer label like
             // "Measure SpO₂" shrinks to fit rather than wrapping or truncating.
             .lineLimit(1)
@@ -508,17 +508,17 @@ struct QuickActionButton: View {
         if #available(iOS 26, *), !reduceTransparency {
             // Accent variant = tinted prominent glass; neutral = plain glass.
             Button(action: action) {
-                text.foregroundStyle(accent ? PulseColors.onAccent : PulseColors.textPrimary)
+                text.foregroundStyle(accent ? AgaraColors.onAccent : AgaraColors.textPrimary)
             }
             .modifier(QuickActionGlass(accent: accent))
             .clipShape(Capsule())
         } else {
             Button(action: action) {
                 text
-                    .foregroundStyle(accent ? PulseColors.onAccent : PulseColors.textPrimary)
-                    .background(accent ? PulseColors.accent : PulseColors.card)
+                    .foregroundStyle(accent ? AgaraColors.onAccent : AgaraColors.textPrimary)
+                    .background(accent ? AgaraColors.accent : AgaraColors.card)
                     .clipShape(Capsule())
-                    .overlay(Capsule().stroke(accent ? Color.clear : PulseColors.borderSubtle, lineWidth: 1))
+                    .overlay(Capsule().stroke(accent ? Color.clear : AgaraColors.borderSubtle, lineWidth: 1))
             }
             .buttonStyle(.plain)
         }
@@ -532,7 +532,7 @@ private struct QuickActionGlass: ViewModifier {
     func body(content: Content) -> some View {
         // Both variants use translucent glass; accent adds a tint (no flat prominent fill).
         if accent {
-            content.buttonStyle(.glass).tint(PulseColors.accent)
+            content.buttonStyle(.glass).tint(AgaraColors.accent)
         } else {
             content.buttonStyle(.glass)
         }
@@ -550,9 +550,9 @@ struct ActivitySectionCard<Content: View>: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Text(title.uppercased())
-                    .font(PulseFont.caption2)
+                    .font(AgaraFont.caption2)
                     .tracking(1.0)
-                    .foregroundStyle(PulseColors.textMuted)
+                    .foregroundStyle(AgaraColors.textMuted)
                 Spacer()
                 RangeToggleView(selection: $range)
             }
@@ -560,7 +560,7 @@ struct ActivitySectionCard<Content: View>: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .pulseGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 }
 
@@ -649,39 +649,39 @@ struct ActivityWorkoutRow: View {
         Button { onTap?() } label: {
             HStack(spacing: 12) {
                 Image(systemName: ActivityMeta.icon(session.type))
-                    .font(PulseFont.title3.weight(.regular))
-                    .foregroundStyle(PulseColors.accent)
+                    .font(AgaraFont.title3.weight(.regular))
+                    .foregroundStyle(AgaraColors.accent)
                     .frame(width: 44, height: 44)
-                    .background(PulseColors.accentSoft)
+                    .background(AgaraColors.accentSoft)
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 VStack(alignment: .leading, spacing: 3) {
                     HStack {
                         Text(ActivityMeta.label(session.type))
-                            .font(PulseFont.subheadline.weight(.semibold))
-                            .foregroundStyle(PulseColors.textPrimary)
+                            .font(AgaraFont.subheadline.weight(.semibold))
+                            .foregroundStyle(AgaraColors.textPrimary)
                         Spacer()
                         Text(SleepFormat.clockTime(session.startedAt))
-                            .font(PulseFont.caption2.weight(.regular).monospacedDigit())
-                            .foregroundStyle(PulseColors.textMuted)
+                            .font(AgaraFont.caption2.weight(.regular).monospacedDigit())
+                            .foregroundStyle(AgaraColors.textMuted)
                     }
                     HStack(spacing: 12) {
-                        Text(durationLabel).font(PulseFont.caption.weight(.regular).monospacedDigit())
+                        Text(durationLabel).font(AgaraFont.caption.weight(.regular).monospacedDigit())
                         if let distance = session.distanceMeters {
                             let d = UnitsFormatter.distance(meters: distance, units: units)
-                            Text("\(d.value) \(d.unit)").font(PulseFont.caption.weight(.regular).monospacedDigit())
+                            Text("\(d.value) \(d.unit)").font(AgaraFont.caption.weight(.regular).monospacedDigit())
                         }
                         if let hr = session.avgHeartRate {
-                            Text("\(Int(hr)) bpm avg").font(PulseFont.caption.weight(.regular).monospacedDigit())
+                            Text("\(Int(hr)) bpm avg").font(AgaraFont.caption.weight(.regular).monospacedDigit())
                         }
                     }
-                    .foregroundStyle(PulseColors.textMuted)
+                    .foregroundStyle(AgaraColors.textMuted)
                 }
                 if session.useGps {
-                    Image(systemName: "map").font(PulseFont.subheadline.weight(.regular)).foregroundStyle(PulseColors.textMuted)
+                    Image(systemName: "map").font(AgaraFont.subheadline.weight(.regular)).foregroundStyle(AgaraColors.textMuted)
                 }
             }
             .padding(16)
-            .pulseGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .agaraGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(onTap == nil)
@@ -701,7 +701,7 @@ struct ActivityWorkoutRow: View {
 /// A thin, full-width indeterminate progress bar shown under the app header while the ring is
 /// syncing. We only have stage labels (not a percentage), so this is indeterminate: an accent
 /// segment sweeps left→right over a recessed track. Under Reduce Motion it degrades to a steady
-/// pulsing full-width fill (no horizontal travel). Visuals use the existing `PulseColors` tokens.
+/// pulsing full-width fill (no horizontal travel). Visuals use the existing `AgaraColors` tokens.
 ///
 /// Driven by `TimelineView(.animation)` with the position a pure function of wall-clock time —
 /// never a `@State` + `repeatForever` pair. The bar is mounted behind `if isSyncing`, so state-based
@@ -729,16 +729,16 @@ struct SyncProgressBar: View {
                 let segmentWidth = trackWidth * segmentFraction
 
                 ZStack(alignment: .leading) {
-                    Rectangle().fill(PulseColors.elevated)
+                    Rectangle().fill(AgaraColors.elevated)
 
                     if reduceMotion {
                         // No travel — a gentle opacity pulse on a full-width fill (1.0 ↔ 0.55).
                         Rectangle()
-                            .fill(PulseColors.accent)
+                            .fill(AgaraColors.accent)
                             .opacity(1.0 - 0.45 * Self.easedTriangle(t, halfPeriod: pulseHalfPeriod))
                     } else {
                         Capsule()
-                            .fill(PulseColors.accent)
+                            .fill(AgaraColors.accent)
                             .frame(width: segmentWidth)
                             // Sweep from the left edge to the right edge and back.
                             .offset(x: (trackWidth - segmentWidth) * Self.easedTriangle(t, halfPeriod: sweepDuration))

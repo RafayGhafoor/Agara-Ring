@@ -1,13 +1,13 @@
 ---
 title: iOS vs Android
 description: >-
-  A living comparison of where the PulseLoop iOS and Android ports differ in
+  A living comparison of where the Agara Ring iOS and Android ports differ in
   design, features, and capability.
 ---
 
 # iOS vs Android
 
-The iOS and Android ports of PulseLoop are built hand in hand and share the same
+The iOS and Android ports of Agara Ring are built hand in hand and share the same
 reverse-engineered BLE protocol work. They are not identical, though. Each
 platform lands some features first. This page is a **living comparison** of the
 real differences in design and capability, not language or framework details.

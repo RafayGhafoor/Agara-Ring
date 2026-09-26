@@ -104,7 +104,7 @@ struct PairingView: View {
 
     var body: some View {
         content
-            .background(PulseColors.background.ignoresSafeArea())
+            .background(AgaraColors.background.ignoresSafeArea())
             .onChange(of: ble.state) { _, state in
                 if state == .connected, !didFireConnected {
                     didFireConnected = true
@@ -129,10 +129,10 @@ struct PairingView: View {
                 HStack {
                     Button { dismiss() } label: {
                         Image(systemName: "chevron.left")
-                            .font(PulseFont.bodyEmphasis)
-                            .foregroundStyle(PulseColors.textPrimary)
+                            .font(AgaraFont.bodyEmphasis)
+                            .foregroundStyle(AgaraColors.textPrimary)
                             .frame(width: 36, height: 36)
-                            .pulseGlass(Circle(), interactive: true)
+                            .agaraGlass(Circle(), interactive: true)
                             .minTapTarget(visualSize: 36)
                     }
                     .buttonStyle(.plain)
@@ -248,8 +248,8 @@ struct PairingView: View {
         if let error = ble.lastError {
             VStack(spacing: 10) {
                 Text(error)
-                    .font(PulseFont.caption)
-                    .foregroundStyle(PulseColors.danger)
+                    .font(AgaraFont.caption)
+                    .foregroundStyle(AgaraColors.danger)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
             }
@@ -271,8 +271,8 @@ struct PairingView: View {
                             phase: isLooking ? .searching : .idle
                         )
                         Text(model.displayName)
-                            .font(PulseFont.numberL)
-                            .foregroundStyle(PulseColors.textPrimary)
+                            .font(AgaraFont.numberL)
+                            .foregroundStyle(AgaraColors.textPrimary)
                             .lineLimit(1)
                             .minimumScaleFactor(0.85)
                         CapabilityChips(blurb: model.blurb)
@@ -339,12 +339,12 @@ struct PairingView: View {
                     if isLooking { ble.startScanning() }
                 } label: {
                     Text(brand)
-                        .font(PulseFont.subheadline.weight(.semibold))
-                        .foregroundStyle(isSelected ? PulseColors.onAccent : PulseColors.textSecondary)
+                        .font(AgaraFont.subheadline.weight(.semibold))
+                        .foregroundStyle(isSelected ? AgaraColors.onAccent : AgaraColors.textSecondary)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
                         // Selected = accent-tinted interactive glass; others = plain glass.
-                        .pulseGlass(Capsule(), interactive: true, tint: isSelected ? PulseColors.accent : nil)
+                        .agaraGlass(Capsule(), interactive: true, tint: isSelected ? AgaraColors.accent : nil)
                         .animation(.spring(response: 0.25, dampingFraction: 0.82), value: selectedBrand)
                 }
                 .buttonStyle(.plain)
@@ -353,7 +353,7 @@ struct PairingView: View {
             }
         }
         .padding(.horizontal, 2)
-        .pulseGlassContainer(spacing: 8) // morph pills as the selection moves
+        .agaraGlassContainer(spacing: 8) // morph pills as the selection moves
     }
 
     // MARK: - Action area (scan + discovered rings)
@@ -372,8 +372,8 @@ struct PairingView: View {
         VStack(spacing: 10) {
             PrimaryButton(title: "Save name", systemImage: "checkmark", action: saveName)
             Button("Skip", action: finishNaming)
-                .font(PulseFont.subheadline.weight(.semibold))
-                .foregroundStyle(PulseColors.textMuted)
+                .font(AgaraFont.subheadline.weight(.semibold))
+                .foregroundStyle(AgaraColors.textMuted)
                 .frame(height: 44)
         }
     }
@@ -408,8 +408,8 @@ struct PairingView: View {
 
             if let onSkip {
                 Button("Skip for now", action: onSkip)
-                    .font(PulseFont.subheadline.weight(.semibold))
-                    .foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.subheadline.weight(.semibold))
+                    .foregroundStyle(AgaraColors.textMuted)
                     .frame(height: 44)
             }
         }
@@ -428,8 +428,8 @@ struct PairingView: View {
                         Text("Scanning for \(selectedModel.displayName)…") // §4
                     }
                 }
-                .font(PulseFont.caption)
-                .foregroundStyle(PulseColors.textMuted)
+                .font(AgaraFont.caption)
+                .foregroundStyle(AgaraColors.textMuted)
                 .frame(maxWidth: .infinity, alignment: .center) // §4 centered
 
                 VStack(spacing: 8) {
@@ -442,7 +442,7 @@ struct PairingView: View {
                         .buttonStyle(.plain)
                     }
                 }
-                .pulseGlassContainer(spacing: 8) // discovered glass rows blend/morph together
+                .agaraGlassContainer(spacing: 8) // discovered glass rows blend/morph together
 
                 if matchingRings.isEmpty {
                     InlineEmptyState(
@@ -458,7 +458,7 @@ struct PairingView: View {
                 }
         }
         .padding(16) // §4 card wrapper
-        .pulseGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     /// The wrong-pick escape hatch. A user-initiated connect that dies in `.failed` on a two-app card is,
@@ -472,14 +472,14 @@ struct PairingView: View {
         // card, on QRing, is a fully-supported one. Falls back to the model when the scan matched nothing.
         return HStack {
             Image(systemName: ring.isLikelyRing ? "circle.hexagongrid.circle.fill" : "dot.radiowaves.left.and.right")
-                .foregroundStyle(ring.isLikelyRing ? PulseColors.accent : PulseColors.textMuted)
+                .foregroundStyle(ring.isLikelyRing ? AgaraColors.accent : AgaraColors.textMuted)
             VStack(alignment: .leading, spacing: 2) {
-                Text(ring.name).font(PulseFont.subheadline.weight(.medium)).foregroundStyle(PulseColors.textPrimary)
+                Text(ring.name).font(AgaraFont.subheadline.weight(.medium)).foregroundStyle(AgaraColors.textPrimary)
                 if let type = ring.deviceType {
                     HStack(spacing: 6) {
                         Text(WearableModel.model(id: ring.wearableModelID)?.displayName ?? type.displayName)
-                            .font(PulseFont.caption2)
-                            .foregroundStyle(PulseColors.accent)
+                            .font(AgaraFont.caption2)
+                            .foregroundStyle(AgaraColors.accent)
                     }
                 }
             }
@@ -491,11 +491,11 @@ struct PairingView: View {
         .padding(.horizontal, 12)
         .frame(maxWidth: .infinity)
         // Interactive glass row (it's a tappable connect button).
-        .pulseGlass(RoundedRectangle(cornerRadius: 14, style: .continuous), interactive: true)
+        .agaraGlass(RoundedRectangle(cornerRadius: 14, style: .continuous), interactive: true)
         .overlay(alignment: .leading) { // §5 accent left-stripe for likely rings
             if ring.isLikelyRing {
                 Rectangle()
-                    .fill(PulseColors.accent)
+                    .fill(AgaraColors.accent)
                     .frame(width: 2)
             }
         }
@@ -518,12 +518,12 @@ struct PairingView: View {
                 .padding(.vertical, 6)
             HStack(spacing: 8) {
                 Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(PulseColors.success)
+                    .foregroundStyle(AgaraColors.success)
                     .scaleEffect(didFireConnected ? 1.0 : 0.3) // §6 checkmark spring
                     .animation(.spring(response: 0.45, dampingFraction: 0.55), value: didFireConnected) // §6
                 Text("Connected to \(connectedRingName)")
-                    .font(PulseFont.headline)
-                    .foregroundStyle(PulseColors.textPrimary)
+                    .font(AgaraFont.headline)
+                    .foregroundStyle(AgaraColors.textPrimary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
@@ -555,14 +555,14 @@ struct PairingView: View {
         let copy = BluetoothUnavailableCopy(ble.bluetoothAvailability)
         return VStack(spacing: 14) { // §6 spacing bumped to 14
             Image(systemName: copy.symbol)
-                .font(PulseFont.largeTitle.weight(.regular))
-                .foregroundStyle(PulseColors.textMuted)
+                .font(AgaraFont.largeTitle.weight(.regular))
+                .foregroundStyle(AgaraColors.textMuted)
             Text(copy.title)
-                .font(PulseFont.headline)
-                .foregroundStyle(PulseColors.textPrimary)
+                .font(AgaraFont.headline)
+                .foregroundStyle(AgaraColors.textPrimary)
             Text(copy.body)
-                .font(PulseFont.subheadline)
-                .foregroundStyle(PulseColors.textMuted)
+                .font(AgaraFont.subheadline)
+                .foregroundStyle(AgaraColors.textMuted)
                 .multilineTextAlignment(.center)
             if let action = copy.settingsButton, let url = URL(string: UIApplication.openSettingsURLString) {
                 SecondaryButton(title: action, systemImage: "gear") { // §6
@@ -572,7 +572,7 @@ struct PairingView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 32)
-        .pulseGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 }
 

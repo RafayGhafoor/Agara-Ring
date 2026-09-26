@@ -44,14 +44,14 @@ struct NutritionSettingsView: View {
             }
             .padding()
         }
-        .background(PulseColors.background)
+        .background(AgaraColors.background)
         .pageChrome("Nutrition")
         .onChange(of: store.prefs.masterEnabled) { _, _ in
             // Tiles/cards/widgets gate on the master toggle — nudge dependents immediately.
-            PulseDataChange.shared.notify()
+            AgaraDataChange.shared.notify()
         }
         .onChange(of: store.prefs.showOnToday) { _, _ in
-            PulseDataChange.shared.notify()
+            AgaraDataChange.shared.notify()
         }
     }
 
@@ -125,12 +125,12 @@ private struct NutritionGoalsGroup: View {
             FormField(padding: 12) {
                 HStack {
                     Text(helperText)
-                        .font(PulseFont.caption.weight(.regular).monospacedDigit())
-                        .foregroundStyle(drifted ? PulseColors.warning : PulseColors.textMuted)
+                        .font(AgaraFont.caption.weight(.regular).monospacedDigit())
+                        .foregroundStyle(drifted ? AgaraColors.warning : AgaraColors.textMuted)
                     Spacer()
                     Button("Balance macros") { rebalance() }
-                        .font(PulseFont.caption)
-                        .foregroundStyle(PulseColors.accent)
+                        .font(AgaraFont.caption)
+                        .foregroundStyle(AgaraColors.accent)
                         .disabled(kcal == 0 || (!drifted && macrosSet))
                         .opacity(kcal > 0 && (drifted || !macrosSet) ? 1 : 0.4)
                 }
@@ -161,14 +161,14 @@ private struct NutritionGoalsGroup: View {
                             step: Double, format: @escaping (Double) -> String) -> some View {
         Stepper(value: value, in: range, step: step) {
             HStack {
-                Text(label).font(PulseFont.body).foregroundStyle(PulseColors.textPrimary)
+                Text(label).font(AgaraFont.body).foregroundStyle(AgaraColors.textPrimary)
                 Spacer()
                 Text(format(value.wrappedValue))
-                    .font(PulseFont.subheadline.monospacedDigit())
-                    .foregroundStyle(value.wrappedValue == 0 ? PulseColors.textMuted : PulseColors.textSecondary)
+                    .font(AgaraFont.subheadline.monospacedDigit())
+                    .foregroundStyle(value.wrappedValue == 0 ? AgaraColors.textMuted : AgaraColors.textSecondary)
             }
         }
-        .tint(PulseColors.accent)
+        .tint(AgaraColors.accent)
     }
 
     private func load() {
@@ -194,6 +194,6 @@ private struct NutritionGoalsGroup: View {
         goal.intakeFatG = fat > 0 ? Int(fat) : nil
         goal.updatedAt = Date()
         try? modelContext.save()
-        PulseDataChange.shared.notify()
+        AgaraDataChange.shared.notify()
     }
 }

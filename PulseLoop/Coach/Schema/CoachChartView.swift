@@ -14,26 +14,26 @@ struct CoachChartView: View {
 
     private var color: Color {
         switch chart.metric {
-        case .steps: return PulseColors.steps
-        case .hr: return PulseColors.heartRate
-        case .spo2: return PulseColors.spo2
-        case .sleep: return PulseColors.sleep
-        case .activeMinutes: return PulseColors.accent
-        case .calories: return PulseColors.calories
-        case .distance: return PulseColors.distance
+        case .steps: return AgaraColors.steps
+        case .hr: return AgaraColors.heartRate
+        case .spo2: return AgaraColors.spo2
+        case .sleep: return AgaraColors.sleep
+        case .activeMinutes: return AgaraColors.accent
+        case .calories: return AgaraColors.calories
+        case .distance: return AgaraColors.distance
         }
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(chart.title)
-                .font(PulseFont.caption)
-                .foregroundStyle(PulseColors.textSecondary)
+                .font(AgaraFont.caption)
+                .foregroundStyle(AgaraColors.textSecondary)
 
             if chart.data.isEmpty {
                 Text("No data to plot for this range.")
-                    .font(PulseFont.caption.weight(.regular))
-                    .foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.caption.weight(.regular))
+                    .foregroundStyle(AgaraColors.textMuted)
                     .frame(maxWidth: .infinity, minHeight: 60, alignment: .center)
             } else if chart.chartType == .sleepStage {
                 sleepHypnogram
@@ -45,8 +45,8 @@ struct CoachChartView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(chart.annotations) { a in
                         Text("• \(a.label)")
-                            .font(PulseFont.caption2.weight(.regular))
-                            .foregroundStyle(PulseColors.textMuted)
+                            .font(AgaraFont.caption2.weight(.regular))
+                            .foregroundStyle(AgaraColors.textMuted)
                     }
                 }
             }
@@ -56,10 +56,10 @@ struct CoachChartView: View {
         // Solid card fill, not glass: this chart card renders inside the assistant bubble's
         // glass, and glass can't sample glass (renders flat). A card fill + hairline keeps it
         // reading as a distinct raised surface.
-        .background(PulseColors.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(AgaraColors.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(PulseColors.textPrimary.opacity(0.12), lineWidth: 0.5)
+                .strokeBorder(AgaraColors.textPrimary.opacity(0.12), lineWidth: 0.5)
         )
     }
 
@@ -117,7 +117,7 @@ struct CoachChartView: View {
             .chartYScale(domain: domain)
             .chartXAxis {
                 AxisMarks(values: .automatic(desiredCount: min(6, chart.data.count))) { _ in
-                    AxisValueLabel().font(PulseFont.nano.weight(.regular)).foregroundStyle(PulseColors.textMuted)
+                    AxisValueLabel().font(AgaraFont.nano.weight(.regular)).foregroundStyle(AgaraColors.textMuted)
                 }
             }
             .chartYAxis { axisMarks }
@@ -129,8 +129,8 @@ struct CoachChartView: View {
 
     private var axisMarks: some AxisContent {
         AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { _ in
-            AxisGridLine().foregroundStyle(PulseColors.borderSubtle)
-            AxisValueLabel().font(PulseFont.nano.weight(.regular)).foregroundStyle(PulseColors.textMuted)
+            AxisGridLine().foregroundStyle(AgaraColors.borderSubtle)
+            AxisValueLabel().font(AgaraFont.nano.weight(.regular)).foregroundStyle(AgaraColors.textMuted)
         }
     }
 
@@ -184,7 +184,7 @@ struct CoachChartView: View {
         return Group {
             if blocks.isEmpty || total == 0 {
                 Text("No sleep stages to plot.")
-                    .font(PulseFont.caption.weight(.regular)).foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.caption.weight(.regular)).foregroundStyle(AgaraColors.textMuted)
                     .frame(maxWidth: .infinity, minHeight: 60, alignment: .center)
             } else {
                 SleepHypnogramView(blocks: blocks, totalMin: total, startTs: nil, height: height + 30)

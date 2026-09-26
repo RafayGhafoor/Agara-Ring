@@ -1,4 +1,7 @@
-# PulseLoop
+# Agara Ring
+
+iOS app for the Agara Ring, forked from [PulseLoop](https://github.com/saksham2001/PulseLoopiOS) by Saksham Bhutani.
+The Xcode project, targets and source folders still carry the upstream `PulseLoop` name until the project rename.
 
 <!-- ===================== BADGES ===================== -->
 <p align="center">
@@ -16,7 +19,7 @@
 
 <p align="center">
   <a href="docs/images/thumbnail.png">
-    <img src="docs/images/thumbnail.png" alt="PulseLoop">
+    <img src="docs/images/thumbnail.png" alt="Agara Ring">
   </a>
 </p>
 
@@ -43,7 +46,7 @@ into a real, conversational health tracker. It currently supports the generic Ch
 Jring and the Colmi / Yawell ring family (R02/R0x/R1x/H59), behind a device-agnostic driver layer so
 adding more wearables is straightforward.
 
-PulseLoop talks to the ring directly over Bluetooth LE (no vendor cloud, no
+Agara Ring talks to the ring directly over Bluetooth LE (no vendor cloud, no
 account) and layers an **optional** AI Coach on top of your own data. Instead of
 static charts, you get a coach that can read your metrics, run its own
 analysis, draw charts, remember context about you, and answer questions about
@@ -135,7 +138,7 @@ New here? Good places to start:
 > under the same name, change prices, and your unit may behave differently from mine. Buy at
 > your own risk and treat any data the ring produces as approximate.
 
-PulseLoop is built around a device-agnostic driver layer, so each supported ring
+Agara Ring is built around a device-agnostic driver layer, so each supported ring
 declares exactly what it can do and the app shows only those features.
 
 | Ring | BLE Family | Advertised name | Price |
@@ -147,7 +150,7 @@ declares exactly what it can do and the app shows only those features.
 | TK5 ring — 🧪 **limited support** | `be940` (Yucheng YCBT) | `TK5 …` (e.g. `TK5 24AA`) | ❓ |
 
 > ⚠️ **A Colmi ring ships with *either* the QRing or the SmartHealth app** — two completely different
-> BLE protocols — and its Bluetooth name doesn't reliably say which. So PulseLoop asks you when you
+> BLE protocols — and its Bluetooth name doesn't reliably say which. So Agara Ring asks you when you
 > pair. Pick the wrong one and it simply won't connect; the app then offers a one-tap "try the other
 > app" retry. Both are supported. See the
 > [Colmi page](https://saksham2001.github.io/PulseLoopiOS/hardware/colmi/#smarthealth-app-colmi-rings).

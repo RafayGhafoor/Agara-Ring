@@ -39,22 +39,22 @@ struct FirmwareRow: View {
                 if hasRelease {
                     Button { showsRelease = true } label: {
                         HStack(spacing: 4) {
-                            Text(summary).foregroundStyle(PulseColors.accent)
-                            Image(systemName: "chevron.right").font(PulseFont.caption).foregroundStyle(PulseColors.textMuted)
+                            Text(summary).foregroundStyle(AgaraColors.accent)
+                            Image(systemName: "chevron.right").font(AgaraFont.caption).foregroundStyle(AgaraColors.textMuted)
                         }
                     }
                     .buttonStyle(.plain)
                     .accessibilityHint("Shows the release notes")
                 } else {
-                    Text(summary).foregroundStyle(PulseColors.textMuted)
+                    Text(summary).foregroundStyle(AgaraColors.textMuted)
                 }
                 if canCheck, !hasRelease {
                     Button("Check") {
                         guard let identity else { return }
                         Task { await checker.check(identity) }
                     }
-                    .font(PulseFont.body.weight(.semibold))
-                    .foregroundStyle(PulseColors.accent)
+                    .font(AgaraFont.body.weight(.semibold))
+                    .foregroundStyle(AgaraColors.accent)
                     .buttonStyle(.plain)
                     .frame(minHeight: 44)
                     .accessibilityLabel("Check for firmware update")
@@ -91,29 +91,29 @@ struct FirmwareReleaseSheet: View {
                 VStack(alignment: .leading, spacing: 16) {
                     if let release = checker.latestRelease {
                         SettingsGroup(header: "Firmware \(release.version)") {
-                            FormValueRow(title: "Installed") { Text(installed).foregroundStyle(PulseColors.textMuted) }
+                            FormValueRow(title: "Installed") { Text(installed).foregroundStyle(AgaraColors.textMuted) }
                             FormValueRow(title: "Size") {
-                                Text(Self.sizeFormatter.string(fromByteCount: release.size)).foregroundStyle(PulseColors.textMuted)
+                                Text(Self.sizeFormatter.string(fromByteCount: release.size)).foregroundStyle(AgaraColors.textMuted)
                             }
                         }
                         SettingsGroup(header: "What's new") {
                             FormField {
                                 Text(release.notes.isEmpty ? "No release notes." : release.notes)
-                                    .font(PulseFont.body)
-                                    .foregroundStyle(PulseColors.textPrimary)
+                                    .font(AgaraFont.body)
+                                    .foregroundStyle(AgaraColors.textPrimary)
                                     .textSelection(.enabled)
                             }
                         }
                         if features.isOn(.firmwareDownload) { downloadSection }
                     } else {
                         Text("Your ring's firmware is up to date.")
-                            .font(PulseFont.body)
-                            .foregroundStyle(PulseColors.textMuted)
+                            .font(AgaraFont.body)
+                            .foregroundStyle(AgaraColors.textMuted)
                     }
                 }
                 .padding(20)
             }
-            .background(PulseColors.background.ignoresSafeArea())
+            .background(AgaraColors.background.ignoresSafeArea())
             .navigationTitle("Firmware update")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -131,7 +131,7 @@ struct FirmwareReleaseSheet: View {
         case .downloading:
             HStack(spacing: 10) {
                 ProgressView()
-                Text("Downloading…").foregroundStyle(PulseColors.textMuted)
+                Text("Downloading…").foregroundStyle(AgaraColors.textMuted)
             }
         case let .ready(release):
             VStack(alignment: .leading, spacing: 12) {
@@ -139,8 +139,8 @@ struct FirmwareReleaseSheet: View {
                     "Ready to install · on the ring's charger, battery ≥ \(AgaraConfig.Ring.firmwareMinBatteryPercent) %",
                     systemImage: "checkmark.seal.fill"
                 )
-                .font(PulseFont.body)
-                .foregroundStyle(PulseColors.success)
+                .font(AgaraFont.body)
+                .foregroundStyle(AgaraColors.success)
                 if installer.enabled {
                     FirmwareInstallSection(version: release.version) {
                         // Close the sheet first: the full-screen progress is presented from the app root.
@@ -154,7 +154,7 @@ struct FirmwareReleaseSheet: View {
             }
         case let .error(message):
             VStack(alignment: .leading, spacing: 10) {
-                Text(message).font(PulseFont.subheadline).foregroundStyle(PulseColors.textMuted)
+                Text(message).font(AgaraFont.subheadline).foregroundStyle(AgaraColors.textMuted)
                 SecondaryButton(title: "Download", systemImage: "arrow.down.circle") { Task { await checker.download() } }
             }
         default:

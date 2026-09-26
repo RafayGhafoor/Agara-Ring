@@ -65,7 +65,7 @@ struct LogPastActivityView: View {
             .padding(16)
             .padding(.bottom, 40)
         }
-        .background(PulseColors.background.ignoresSafeArea())
+        .background(AgaraColors.background.ignoresSafeArea())
         .pageChrome("Log Past Activity")
     }
 
@@ -91,11 +91,11 @@ private struct LogPastActivityHeader: View, Equatable {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("What did you do?")
-                .font(PulseFont.title2.weight(.bold))
-                .foregroundStyle(PulseColors.textPrimary)
+                .font(AgaraFont.title2.weight(.bold))
+                .foregroundStyle(AgaraColors.textPrimary)
             Text("Choose an activity, when it started, and how long it lasted.")
-                .font(PulseFont.subheadline.weight(.regular))
-                .foregroundStyle(PulseColors.textMuted)
+                .font(AgaraFont.subheadline.weight(.regular))
+                .foregroundStyle(AgaraColors.textMuted)
         }
     }
 }
@@ -107,9 +107,9 @@ private struct FormSectionLabel: View, Equatable {
 
     var body: some View {
         Text(text.uppercased())
-            .font(PulseFont.caption2.weight(.semibold))
+            .font(AgaraFont.caption2.weight(.semibold))
             .tracking(1.2)
-            .foregroundStyle(PulseColors.textMuted)
+            .foregroundStyle(AgaraColors.textMuted)
     }
 }
 
@@ -156,30 +156,30 @@ private struct ActivityTypeButton: View, Equatable {
         Button { onSelect(kind.type) } label: {
             HStack(spacing: 10) {
                 Image(systemName: kind.symbol)
-                    .font(PulseFont.title3.weight(.regular))
-                    .foregroundStyle(isSelected ? PulseColors.onAccent : PulseColors.textSecondary)
+                    .font(AgaraFont.title3.weight(.regular))
+                    .foregroundStyle(isSelected ? AgaraColors.onAccent : AgaraColors.textSecondary)
                     .frame(width: 38, height: 38)
-                    .background(isSelected ? PulseColors.onAccent.opacity(0.22) : PulseColors.cardSoft, in: Circle())
+                    .background(isSelected ? AgaraColors.onAccent.opacity(0.22) : AgaraColors.cardSoft, in: Circle())
                 Text(kind.label)
-                    .font(PulseFont.callout.weight(.semibold))
-                    .foregroundStyle(isSelected ? PulseColors.onAccent : PulseColors.textPrimary)
+                    .font(AgaraFont.callout.weight(.semibold))
+                    .foregroundStyle(isSelected ? AgaraColors.onAccent : AgaraColors.textPrimary)
                 Spacer(minLength: 0)
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 16))
-                        .foregroundStyle(PulseColors.accent)
+                        .foregroundStyle(AgaraColors.accent)
                         .accessibilityHidden(true)
                 }
             }
             .padding(12)
             .frame(maxWidth: .infinity)
-            .contentShape(RoundedRectangle(cornerRadius: PulseRadius.compact, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: AgaraShape.radiusCompact, style: .continuous))
             // Selected = dim accent-tinted glass; others = plain glass.
-            .pulseGlass(RoundedRectangle(cornerRadius: PulseRadius.compact, style: .continuous),
-                        interactive: true, tint: isSelected ? PulseColors.accentSoft : nil)
+            .agaraGlass(RoundedRectangle(cornerRadius: AgaraShape.radiusCompact, style: .continuous),
+                        interactive: true, tint: isSelected ? AgaraColors.accentSoft : nil)
             .overlay(
-                RoundedRectangle(cornerRadius: PulseRadius.compact, style: .continuous)
-                    .strokeBorder(isSelected ? PulseColors.accent.opacity(0.9) : Color.clear, lineWidth: 1.5)
+                RoundedRectangle(cornerRadius: AgaraShape.radiusCompact, style: .continuous)
+                    .strokeBorder(isSelected ? AgaraColors.accent.opacity(0.9) : Color.clear, lineWidth: 1.5)
             )
         }
         .buttonStyle(.plain)
@@ -205,26 +205,26 @@ private struct PastActivityTimeCard: View {
                     displayedComponents: [.date, .hourAndMinute]
                 )
                 .labelsHidden()
-                .tint(PulseColors.accent)
+                .tint(AgaraColors.accent)
             }
-            Divider().overlay(PulseColors.borderSubtle).padding(.leading, 52)
+            Divider().overlay(AgaraColors.borderSubtle).padding(.leading, 52)
             row(title: "Ends", systemImage: "clock") {
                 Text(endedAt.formatted(date: .abbreviated, time: .shortened))
-                    .font(PulseFont.subheadline)
-                    .foregroundStyle(isValid ? PulseColors.textSecondary : PulseColors.warning)
+                    .font(AgaraFont.subheadline)
+                    .foregroundStyle(isValid ? AgaraColors.textSecondary : AgaraColors.warning)
             }
         }
-        .pulseGlass(RoundedRectangle(cornerRadius: PulseRadius.card, style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous))
     }
 
     private func row<Content: View>(title: String, systemImage: String, @ViewBuilder content: () -> Content) -> some View {
         HStack(spacing: 12) {
             Image(systemName: systemImage)
-                .foregroundStyle(PulseColors.accent)
+                .foregroundStyle(AgaraColors.accent)
                 .frame(width: 24)
             Text(title)
-                .font(PulseFont.subheadline)
-                .foregroundStyle(PulseColors.textPrimary)
+                .font(AgaraFont.subheadline)
+                .foregroundStyle(AgaraColors.textPrimary)
                 .fixedSize()   // never wrap "Started" when the date/time chips are wide
             Spacer(minLength: 8)
             content()
@@ -253,13 +253,13 @@ private struct PastActivityDurationCard: View, Equatable {
                 Spacer()
                 VStack(spacing: 2) {
                     Text(durationText)
-                        .font(PulseFont.title)
+                        .font(AgaraFont.title)
                         .monospacedDigit()
-                        .foregroundStyle(PulseColors.textPrimary)
+                        .foregroundStyle(AgaraColors.textPrimary)
                     Text("DURATION")
-                        .font(PulseFont.micro)
+                        .font(AgaraFont.micro)
                         .tracking(1.1)
-                        .foregroundStyle(PulseColors.textMuted)
+                        .foregroundStyle(AgaraColors.textMuted)
                 }
                 Spacer()
                 durationButton(systemImage: "plus") { onChange(minutes + 5) }
@@ -271,13 +271,13 @@ private struct PastActivityDurationCard: View, Equatable {
                 ForEach(Self.quickDurations, id: \.self) { value in
                     let chipSelected = minutes == value
                     Button("\(value)m") { onChange(value) }
-                        .font(PulseFont.caption.weight(.semibold))
-                        .foregroundStyle(chipSelected ? PulseColors.accent : PulseColors.textSecondary)
+                        .font(AgaraFont.caption.weight(.semibold))
+                        .foregroundStyle(chipSelected ? AgaraColors.accent : AgaraColors.textSecondary)
                         .frame(maxWidth: .infinity)
                         .frame(height: 34)
-                        .background(chipSelected ? PulseColors.accentSoft : PulseColors.cardSoft, in: Capsule())
+                        .background(chipSelected ? AgaraColors.accentSoft : AgaraColors.cardSoft, in: Capsule())
                         .overlay(
-                            Capsule().strokeBorder(chipSelected ? PulseColors.accent.opacity(0.9) : Color.clear, lineWidth: 1)
+                            Capsule().strokeBorder(chipSelected ? AgaraColors.accent.opacity(0.9) : Color.clear, lineWidth: 1)
                         )
                         .buttonStyle(.plain)
                         .accessibilityLabel("\(value) minutes")
@@ -287,18 +287,18 @@ private struct PastActivityDurationCard: View, Equatable {
             .sensoryFeedback(.selection, trigger: minutes)
         }
         .padding(16)
-        .pulseGlass(RoundedRectangle(cornerRadius: PulseRadius.card, style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous))
     }
 
     private func durationButton(systemImage: String, disabled: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .foregroundStyle(disabled ? PulseColors.textMuted : PulseColors.textPrimary)
+                .foregroundStyle(disabled ? AgaraColors.textMuted : AgaraColors.textPrimary)
                 .frame(width: 44, height: 44)
                 .contentShape(Rectangle())   // whole 44pt circle taps, not just the thin glyph
         }
         .buttonStyle(.plain)
-        .background(PulseColors.cardSoft, in: Circle())
+        .background(AgaraColors.cardSoft, in: Circle())
         .disabled(disabled)
     }
 
@@ -319,13 +319,13 @@ private struct FormMessages: View, Equatable {
         Group {
             if !isValid {
                 Label("The workout must finish before now.", systemImage: "exclamationmark.circle.fill")
-                    .foregroundStyle(PulseColors.warning)
+                    .foregroundStyle(AgaraColors.warning)
             }
             if let saveError {
                 Label(saveError, systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(PulseColors.danger)
+                    .foregroundStyle(AgaraColors.danger)
             }
         }
-        .font(PulseFont.footnote)
+        .font(AgaraFont.footnote)
     }
 }

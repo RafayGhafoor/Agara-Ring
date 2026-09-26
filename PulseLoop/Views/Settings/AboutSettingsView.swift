@@ -41,12 +41,12 @@ struct AboutSettingsView: View {
                         .buttonStyle(VersionRowButtonStyle())
                         .overlay {
                             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                .fill(PulseColors.accent.opacity(tapProgress * 0.22))
+                                .fill(AgaraColors.accent.opacity(tapProgress * 0.22))
                                 .allowsHitTesting(false)
                         }
                         .overlay {
                             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                .strokeBorder(PulseColors.accent.opacity(tapProgress * 0.9), lineWidth: 1.5)
+                                .strokeBorder(AgaraColors.accent.opacity(tapProgress * 0.9), lineWidth: 1.5)
                                 .allowsHitTesting(false)
                         }
                         .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: versionTapCount)
@@ -76,16 +76,16 @@ struct AboutSettingsView: View {
             }
             .padding()
         }
-        .background(PulseColors.background)
+        .background(AgaraColors.background)
         .pageChrome("About")
         .overlay(alignment: .bottom) {
             if let toast {
                 Text(toast)
-                    .font(PulseFont.footnote)
-                    .foregroundStyle(PulseColors.textPrimary)
+                    .font(AgaraFont.footnote)
+                    .foregroundStyle(AgaraColors.textPrimary)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
-                    .pulseGlass(Capsule())
+                    .agaraGlass(Capsule())
                     .padding(.bottom, 28)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
@@ -135,11 +135,11 @@ struct AboutSettingsView: View {
                     // community link. It is attribution, not a feature, so it reads as a footnote —
                     // no icon tile, smaller type, muted tint.
                     Image(systemName: "arrow.up.right")
-                        .font(PulseFont.caption2.weight(.semibold))
-                        .foregroundStyle(PulseColors.textMuted)
-                    Text(title).font(PulseFont.footnote.weight(.regular)).foregroundStyle(PulseColors.textSecondary)
+                        .font(AgaraFont.caption2.weight(.semibold))
+                        .foregroundStyle(AgaraColors.textMuted)
+                    Text(title).font(AgaraFont.footnote.weight(.regular)).foregroundStyle(AgaraColors.textSecondary)
                     Spacer(minLength: 8)
-                    Text(subtitle).font(PulseFont.caption2.weight(.regular)).foregroundStyle(PulseColors.textMuted)
+                    Text(subtitle).font(AgaraFont.caption2.weight(.regular)).foregroundStyle(AgaraColors.textMuted)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }

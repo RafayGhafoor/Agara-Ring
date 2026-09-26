@@ -17,7 +17,7 @@ struct SleepView: View {
     @State private var dayNavEdge: Edge = .trailing
     /// Observed so the tab re-fetches when a background sync writes new sleep data (matches
     /// Today/Vitals). Without it, `sleepRange` is a plain call the body never re-runs on sync.
-    @State private var dataChange = PulseDataChange.shared
+    @State private var dataChange = AgaraDataChange.shared
     /// True while a press-and-hold scrub is active on a hypnogram. Pauses this screen's scroll
     /// views (outer vertical + session carousel) so the scrub drag doesn't pan them.
     @State private var hypnogramScrubbing = false
@@ -79,9 +79,9 @@ struct SleepView: View {
         }
         // Applies to every scrollable below (outer + carousel), so an active scrub owns the drag.
         .scrollDisabled(hypnogramScrubbing)
-        .background(PulseColors.background)
+        .background(AgaraColors.background)
         .refreshable { await coordinator.pullToRefresh() }
-        .pulseScrollEdges()
+        .agaraScrollEdges()
         .onChange(of: range) { _, newRange in
             // Returning to Day from an aggregate range always lands on today, not a stale offset.
             if newRange == .day { resetToToday() }
@@ -182,8 +182,8 @@ struct SleepView: View {
                 ForEach(Array(sessions.enumerated()), id: \.element.session.id) { idx, s in
                     VStack(spacing: 16) {
                         Text("\(idx + 1) of \(sessions.count) · \(SleepFormat.clockTime(s.session.startAt))–\(SleepFormat.clockTime(s.session.endAt))")
-                            .font(PulseFont.caption)
-                            .foregroundStyle(PulseColors.textSecondary)
+                            .font(AgaraFont.caption)
+                            .foregroundStyle(AgaraColors.textSecondary)
                             .textCase(.uppercase)
                             .kerning(0.5)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -221,16 +221,16 @@ struct SleepView: View {
             }
             guard next != selectedSleepPage else { return }
             selectedSleepPage = next
-            withAnimation(reduceMotion ? nil : PulseMotion.spring) { scrolledSleepPage = next }
+            withAnimation(reduceMotion ? nil : AgaraMotion.spring) { scrolledSleepPage = next }
         }
 
         // Page indicator dots.
         HStack(spacing: 8) {
             ForEach(sessions.indices, id: \.self) { i in
                 Circle()
-                    .fill(i == selectedSleepPage ? PulseColors.accent : PulseColors.textSecondary.opacity(0.3))
+                    .fill(i == selectedSleepPage ? AgaraColors.accent : AgaraColors.textSecondary.opacity(0.3))
                     .frame(width: 7, height: 7)
-                    .animation(reduceMotion ? nil : PulseMotion.spring, value: selectedSleepPage)
+                    .animation(reduceMotion ? nil : AgaraMotion.spring, value: selectedSleepPage)
             }
         }
         .frame(maxWidth: .infinity)
@@ -261,18 +261,18 @@ struct SleepView: View {
                 VStack(spacing: 1) {
                     HStack(spacing: 4) {
                         Text(labels.primary)
-                            .font(PulseFont.headline)
-                            .foregroundStyle(PulseColors.textPrimary)
+                            .font(AgaraFont.headline)
+                            .foregroundStyle(AgaraColors.textPrimary)
                             .contentTransition(.opacity)
                         Image(systemName: "chevron.down")
                             .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(PulseColors.textMuted)
+                            .foregroundStyle(AgaraColors.textMuted)
                     }
                     // Always render the subtitle line (a space when empty) so the hero card never
                     // shifts vertically as you cross the Today/Yesterday/weekday label boundaries.
                     Text(labels.secondary.isEmpty ? " " : labels.secondary)
-                        .font(PulseFont.caption)
-                        .foregroundStyle(PulseColors.textSecondary)
+                        .font(AgaraFont.caption)
+                        .foregroundStyle(AgaraColors.textSecondary)
                         .textCase(.uppercase)
                         .kerning(0.5)
                         .contentTransition(.opacity)
@@ -280,7 +280,7 @@ struct SleepView: View {
                 .frame(minHeight: 44)
                 .fixedSize(horizontal: false, vertical: true)
                 .contentShape(Rectangle())
-                .animation(reduceMotion ? nil : PulseMotion.spring, value: dayOffset)
+                .animation(reduceMotion ? nil : AgaraMotion.spring, value: dayOffset)
             }
             .buttonStyle(.plain)
             .accessibilityElement(children: .ignore)
@@ -300,17 +300,17 @@ struct SleepView: View {
                                disabledHint: String? = nil, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: system)
-                .font(PulseFont.headline.weight(.semibold))
-                .foregroundStyle(enabled ? PulseColors.textPrimary : PulseColors.textMuted)
+                .font(AgaraFont.headline.weight(.semibold))
+                .foregroundStyle(enabled ? AgaraColors.textPrimary : AgaraColors.textMuted)
                 .frame(width: 44, height: 44)
                 .background {
                     if enabled {
-                        Circle().fill(Color.clear).frame(width: 36, height: 36).pulseGlass(Circle(), interactive: true)
+                        Circle().fill(Color.clear).frame(width: 36, height: 36).agaraGlass(Circle(), interactive: true)
                     }
                 }
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.pulseTap)
+        .buttonStyle(.agaraTap)
         .disabled(!enabled)
         .accessibilityLabel(label)
         .accessibilityHint(enabled ? "" : (disabledHint ?? ""))
@@ -371,7 +371,7 @@ struct SleepView: View {
         let clamped = min(maxDayOffset, max(0, target))
         guard clamped != dayOffset else { return }
         dayNavEdge = older ? .leading : .trailing
-        withAnimation(reduceMotion ? nil : PulseMotion.spring) { dayOffset = clamped }
+        withAnimation(reduceMotion ? nil : AgaraMotion.spring) { dayOffset = clamped }
         selectedSleepPage = 0
         scrolledSleepPage = nil
     }
@@ -381,7 +381,7 @@ struct SleepView: View {
         let offset = calendar.dateComponents([.day], from: calendar.startOfDay(for: date), to: today).day ?? 0
         let clamped = min(maxDayOffset, max(0, offset))
         dayNavEdge = clamped > dayOffset ? .leading : .trailing   // further back = enters from leading
-        withAnimation(reduceMotion ? nil : PulseMotion.spring) { dayOffset = clamped }
+        withAnimation(reduceMotion ? nil : AgaraMotion.spring) { dayOffset = clamped }
         selectedSleepPage = 0
         scrolledSleepPage = nil
         showDayPicker = false
@@ -501,8 +501,8 @@ private struct VisualizationCard<Content: View>: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(eyebrow.uppercased()).font(PulseFont.caption2).tracking(1.8).foregroundStyle(PulseColors.textMuted)
-                    Text(title).font(PulseFont.bodyEmphasis).foregroundStyle(PulseColors.textPrimary)
+                    Text(eyebrow.uppercased()).font(AgaraFont.caption2).tracking(1.8).foregroundStyle(AgaraColors.textMuted)
+                    Text(title).font(AgaraFont.bodyEmphasis).foregroundStyle(AgaraColors.textPrimary)
                 }
                 Spacer()
                 if legend {
@@ -519,13 +519,13 @@ private struct VisualizationCard<Content: View>: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .pulseGlass(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
     private func legendItem(_ label: String, _ color: Color) -> some View {
         HStack(spacing: 5) {
             Circle().fill(color).frame(width: 6, height: 6)
-            Text(label).font(PulseFont.nano.weight(.regular)).foregroundStyle(PulseColors.textSecondary)
+            Text(label).font(AgaraFont.nano.weight(.regular)).foregroundStyle(AgaraColors.textSecondary)
         }
     }
 }

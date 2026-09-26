@@ -3,7 +3,7 @@ import Foundation
 // Bridges between the storage layer (SwiftData models, MetricKey/MetricSample from
 // DerivedSummaries.swift) and the pure vitals value types. These helpers used to live in
 // ChartSample.swift / VitalsZoneModel.swift; they were moved here so those files carry zero storage
-// dependencies and can be compiled into the PulseLoopWidgets extension. App target only.
+// dependencies and can be compiled into the widget extension. App target only.
 
 extension ChartSampleBuilder {
     /// Map stored samples to chart samples, tagging each with a single resolved quality. Samples are

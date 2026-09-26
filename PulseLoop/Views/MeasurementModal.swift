@@ -149,8 +149,8 @@ struct MeasurementSheet: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(PulseColors.background.ignoresSafeArea())
-        .pulseGlassContainer()
+        .background(AgaraColors.background.ignoresSafeArea())
+        .agaraGlassContainer()
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(.isModal)
         .accessibilityLabel("Measuring \(name)")
@@ -174,10 +174,10 @@ struct MeasurementSheet: View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(stage.eyebrow(isCombinedSweep: kind == .vitals))
-                    .font(PulseFont.micro).tracking(1.8)
+                    .font(AgaraFont.micro).tracking(1.8)
                     .foregroundStyle(stage.eyebrowColor(tint: color))
                     .contentTransition(.opacity)
-                Text(name).font(PulseFont.title3).foregroundStyle(PulseColors.textPrimary)
+                Text(name).font(AgaraFont.title3).foregroundStyle(AgaraColors.textPrimary)
             }
             Spacer()
             controlButton
@@ -199,12 +199,12 @@ struct MeasurementSheet: View {
                 EmptyView()
             }
         }
-        .font(PulseFont.footnote)
-        .foregroundStyle(PulseColors.textPrimary)
+        .font(AgaraFont.footnote)
+        .foregroundStyle(AgaraColors.textPrimary)
         .padding(.horizontal, 14)
         .frame(minWidth: 44, minHeight: 44)
         .contentShape(Capsule())
-        .pulseGlass(Capsule(), interactive: true)
+        .agaraGlass(Capsule(), interactive: true)
     }
 
     // MARK: - Measuring content (ring + copy), vertically centred
@@ -228,8 +228,8 @@ struct MeasurementSheet: View {
 
                 if kind.isEstimate {
                     Text(AgaraCopy.estimateDisclaimer)
-                        .font(PulseFont.caption)
-                        .foregroundStyle(PulseColors.textMuted)
+                        .font(AgaraFont.caption)
+                        .foregroundStyle(AgaraColors.textMuted)
                         .multilineTextAlignment(.center)
                         .frame(maxWidth: 280)
                         .padding(.top, 10)
@@ -240,11 +240,11 @@ struct MeasurementSheet: View {
 
             if stage == .result {
                 Text("Saved")
-                    .font(PulseFont.subheadline.weight(.semibold))
-                    .foregroundStyle(PulseColors.success)
+                    .font(AgaraFont.subheadline.weight(.semibold))
+                    .foregroundStyle(AgaraColors.success)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .pulseMaterialize(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .agaraMaterialize(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     .padding(.horizontal, 24)
                     .padding(.bottom, 28)
                     .accessibilityHidden(true)
@@ -287,8 +287,8 @@ struct MeasurementSheet: View {
 
     private var copyLine: some View {
         Text(copyText)
-            .font(PulseFont.subheadline.weight(.regular))
-            .foregroundStyle(PulseColors.textSecondary)
+            .font(AgaraFont.subheadline.weight(.regular))
+            .foregroundStyle(AgaraColors.textSecondary)
             .multilineTextAlignment(.center)
             .frame(maxWidth: 280)
             .contentTransition(.opacity)
@@ -314,31 +314,31 @@ struct MeasurementSheet: View {
     private var errorState: some View {
         VStack(spacing: 16) {
             Image(systemName: "exclamationmark")
-                .font(PulseFont.title.weight(.bold))
-                .foregroundStyle(PulseColors.danger)
+                .font(AgaraFont.title.weight(.bold))
+                .foregroundStyle(AgaraColors.danger)
                 .frame(width: 80, height: 80)
-                .background(PulseColors.danger.opacity(0.10), in: Circle())
-                .overlay(Circle().stroke(PulseColors.danger.opacity(0.3), lineWidth: 1))
+                .background(AgaraColors.danger.opacity(0.10), in: Circle())
+                .overlay(Circle().stroke(AgaraColors.danger.opacity(0.3), lineWidth: 1))
                 .accessibilityHidden(true)
 
             Text(errorMessage)
-                .font(PulseFont.subheadline.weight(.regular))
-                .foregroundStyle(PulseColors.textSecondary)
+                .font(AgaraFont.subheadline.weight(.regular))
+                .foregroundStyle(AgaraColors.textSecondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 280)
 
             HStack(spacing: 12) {
                 Button("Try again") { retry() }
-                    .pulseGlassButton(prominent: true)
+                    .agaraGlassButton(prominent: true)
                     .accessibilityFocused($errorFocus)
 
                 Button("Close") { dismiss() }
-                    .font(PulseFont.subheadline.weight(.semibold))
-                    .foregroundStyle(PulseColors.textPrimary)
+                    .font(AgaraFont.subheadline.weight(.semibold))
+                    .foregroundStyle(AgaraColors.textPrimary)
                     .padding(.horizontal, 20)
                     .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Capsule())
-                    .pulseGlass(Capsule(), interactive: true)
+                    .agaraGlass(Capsule(), interactive: true)
             }
             .padding(.top, 4)
         }
@@ -409,12 +409,12 @@ struct MeasurementSheet: View {
 
     private func enterLocking() {
         guard stage == .searching else { return }
-        withAnimation(reduceMotion ? .none : PulseMotion.bouncy) { stage = .locking }
+        withAnimation(reduceMotion ? .none : AgaraMotion.bouncy) { stage = .locking }
     }
 
     private func enterResult() {
         withAnimation(.easeInOut(duration: 0.25)) { stage = .result }
-        withAnimation(.easeInOut(duration: 0.3)) { ringColor = PulseColors.success }
+        withAnimation(.easeInOut(duration: 0.3)) { ringColor = AgaraColors.success }
         #if canImport(UIKit)
         notify.notificationOccurred(.success)
         #endif

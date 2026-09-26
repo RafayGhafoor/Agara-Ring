@@ -2,7 +2,7 @@ import SwiftUI
 
 // Concentric activity rings, extracted from Components.swift so the widget extension can compile
 // them without pulling in the rest of the design system (which reaches into UnitsFormatter and
-// other app-only services). Shared between the app and PulseLoopWidgets targets.
+// other app-only services). Shared between the app and widget extension targets.
 
 // MARK: - Concentric activity rings (Daily activity summary)
 
@@ -36,7 +36,7 @@ struct ActivityRingsView: View {
                 let inset = CGFloat(index) * (stroke + spacing)
                 let ringSize = size - inset * 2
                 ZStack {
-                    Circle().stroke(PulseColors.elevated, lineWidth: stroke)
+                    Circle().stroke(AgaraColors.elevated, lineWidth: stroke)
                     Circle()
                         .trim(from: 0, to: ring.progress)
                         .stroke(ring.color, style: StrokeStyle(lineWidth: stroke, lineCap: .round))
@@ -59,7 +59,7 @@ extension Text {
     func activityValueStyle(size: CGFloat) -> some View {
         self.font(AgaraFont.face(size, .semibold))
             .monospacedDigit()
-            .foregroundStyle(PulseColors.textPrimary)
+            .foregroundStyle(AgaraColors.textPrimary)
             .lineLimit(1)
             .minimumScaleFactor(0.35)
             .allowsTightening(true)

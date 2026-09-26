@@ -34,16 +34,16 @@ extension View {
                         AxisGridLine().foregroundStyle(.clear)
                         AxisTick().foregroundStyle(.clear)
                         AxisValueLabel(format: VitalsAxisFormat.dateFormat(for: range))
-                            .font(PulseFont.micro.weight(.regular))
-                            .foregroundStyle(PulseColors.textMuted)
+                            .font(AgaraFont.micro.weight(.regular))
+                            .foregroundStyle(AgaraColors.textMuted)
                     }
                 } else {
                     AxisMarks(values: .automatic(desiredCount: 4)) { _ in
                         AxisGridLine().foregroundStyle(.clear)
                         AxisTick().foregroundStyle(.clear)
                         AxisValueLabel(format: VitalsAxisFormat.dateFormat(for: range))
-                            .font(PulseFont.micro.weight(.regular))
-                            .foregroundStyle(PulseColors.textMuted)
+                            .font(AgaraFont.micro.weight(.regular))
+                            .foregroundStyle(AgaraColors.textMuted)
                     }
                 }
             }
@@ -53,19 +53,19 @@ extension View {
                 if let yTicks {
                     // A fixed axis's round ticks (ChartAxes), so the gridlines don't move between readings.
                     AxisMarks(position: .trailing, values: yTicks) { _ in
-                        AxisGridLine().foregroundStyle(PulseColors.borderSubtle)
+                        AxisGridLine().foregroundStyle(AgaraColors.borderSubtle)
                         AxisTick().foregroundStyle(.clear)
                         AxisValueLabel()
-                            .font(PulseFont.micro.weight(.regular))
-                            .foregroundStyle(PulseColors.textMuted)
+                            .font(AgaraFont.micro.weight(.regular))
+                            .foregroundStyle(AgaraColors.textMuted)
                     }
                 } else {
                     AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) { _ in
-                        AxisGridLine().foregroundStyle(PulseColors.borderSubtle)
+                        AxisGridLine().foregroundStyle(AgaraColors.borderSubtle)
                         AxisTick().foregroundStyle(.clear)
                         AxisValueLabel()
-                            .font(PulseFont.micro.weight(.regular))
-                            .foregroundStyle(PulseColors.textMuted)
+                            .font(AgaraFont.micro.weight(.regular))
+                            .foregroundStyle(AgaraColors.textMuted)
                     }
                 }
             }
@@ -141,7 +141,7 @@ struct ZoneLineChart: View {
             ForEach(dashedRules, id: \.self) { rule in
                 RuleMark(y: .value("Rule", rule))
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                    .foregroundStyle(PulseColors.textMuted.opacity(0.5))
+                    .foregroundStyle(AgaraColors.textMuted.opacity(0.5))
             }
             if showPoints || !drawsLine {
                 ForEach(samples) { sample in

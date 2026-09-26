@@ -190,7 +190,7 @@ struct HRSampleWindow {
     }
 }
 
-/// High-level orchestration of ring command flows. Subscribes to `PulseEventBus` to track the
+/// High-level orchestration of ring command flows. Subscribes to `AgaraEventBus` to track the
 /// latest measurement values and completion signals, and exposes app-facing actions
 /// (`syncNow`, `measureHR`, `measureSpO2`, `querySleep`, `setGoal`). It only *orchestrates*
 /// command writes — persistence is handled by `EventPersistenceSubscriber`.
@@ -377,7 +377,7 @@ final class RingSyncCoordinator {
     private var clockChangeTask: Task<Void, Never>?
     private var periodicSyncTask: Task<Void, Never>?
 
-    /// SmartHealth re-reads its ring's stored history every 30 minutes while connected; PulseLoop matches
+    /// SmartHealth re-reads its ring's stored history every 30 minutes while connected; Agara Ring matches
     /// that cadence. The ring has no cursor — it always dumps everything it holds for a type — so a
     /// tighter interval would just re-transfer the same records for nothing.
     private let periodicSyncInterval: TimeInterval = 30 * 60
@@ -393,7 +393,7 @@ final class RingSyncCoordinator {
     func start() {
         guard streamTask == nil else { return }
         streamTask = Task { [weak self] in
-            let stream = await PulseEventBus.shared.stream()
+            let stream = await AgaraEventBus.shared.stream()
             for await event in stream {
                 guard let self else { continue }
                 self.handle(event)
@@ -859,7 +859,7 @@ final class RingSyncCoordinator {
         lastSyncAt = now
     }
 
-    private func handle(_ event: PulseEvent) {
+    private func handle(_ event: AgaraEvent) {
         switch event {
         case let .heartRateSample(bpm, _):
             latestHRValue = bpm
@@ -902,7 +902,7 @@ final class RingSyncCoordinator {
         case let .syncProgress(stage):
             updateSync(stage: stage)
         case let .decodedPacket(decoded):
-            // `.measurementRejected` has no `PulseEvent` of its own — it is a verdict on a command, not
+            // `.measurementRejected` has no `AgaraEvent` of its own — it is a verdict on a command, not
             // data — so the raw-packet feed (which carries every decoded frame) is where a measurement
             // hears the ring say no.
             guard case let .measurementRejected(mode, reason) = decoded else { break }
@@ -1013,7 +1013,7 @@ private extension RingSyncCoordinator {
 
     /// Mirror a live spot-measurement value for the UI (`latest*Value`). Split out of `handle(_:)`
     /// purely to keep that switch's complexity down — these cases share one shape: store and done.
-    func mirrorLiveValue(_ event: PulseEvent) {
+    func mirrorLiveValue(_ event: AgaraEvent) {
         switch event {
         case let .spo2Result(value, _):
             latestSpO2Value = value

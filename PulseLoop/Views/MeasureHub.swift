@@ -69,17 +69,17 @@ struct MeasureHubSheet: View {
         VStack(alignment: .leading, spacing: 18) {
             HStack {
                 Text("Measure")
-                    .font(PulseFont.title3)
-                    .foregroundStyle(PulseColors.textPrimary)
+                    .font(AgaraFont.title3)
+                    .foregroundStyle(AgaraColors.textPrimary)
                     .accessibilityAddTraits(.isHeader)
                 Spacer()
                 Button("Close") { dismiss() }
-                    .font(PulseFont.footnote)
-                    .foregroundStyle(PulseColors.textPrimary)
+                    .font(AgaraFont.footnote)
+                    .foregroundStyle(AgaraColors.textPrimary)
                     .padding(.horizontal, 14)
                     .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Capsule())
-                    .pulseGlass(Capsule(), interactive: true)
+                    .agaraGlass(Capsule(), interactive: true)
             }
 
             if isCharging {
@@ -96,7 +96,7 @@ struct MeasureHubSheet: View {
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(PulseColors.background.ignoresSafeArea())
+        .background(AgaraColors.background.ignoresSafeArea())
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
     }
@@ -107,17 +107,17 @@ struct ChargingBanner: View {
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "bolt.fill")
-                .foregroundStyle(PulseColors.success)
+                .foregroundStyle(AgaraColors.success)
                 .accessibilityHidden(true)
             Text(MeasurementRefusal.chargingMessage)
-                .font(PulseFont.footnote)
-                .foregroundStyle(PulseColors.textPrimary)
+                .font(AgaraFont.footnote)
+                .foregroundStyle(AgaraColors.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        .background(PulseColors.success.opacity(0.12),
-                    in: RoundedRectangle(cornerRadius: PulseRadius.compact, style: .continuous))
+        .background(AgaraColors.success.opacity(0.12),
+                    in: RoundedRectangle(cornerRadius: AgaraShape.radiusCompact, style: .continuous))
         .accessibilityElement(children: .combine)
     }
 }
@@ -131,24 +131,24 @@ private struct MeasureTile: View {
         Button(action: action) {
             VStack(spacing: 8) {
                 Image(systemName: kind.symbolName)
-                    .font(PulseFont.title3)
+                    .font(AgaraFont.title3)
                     .foregroundStyle(kind.tint)
                     .frame(width: 44, height: 44)
                     .background(kind.tint.opacity(0.14), in: Circle())
                 Text(kind.title)
-                    .font(PulseFont.footnote.weight(.semibold))
-                    .foregroundStyle(PulseColors.textPrimary)
+                    .font(AgaraFont.footnote.weight(.semibold))
+                    .foregroundStyle(AgaraColors.textPrimary)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
                     .minimumScaleFactor(0.8)
                 Text(kind.durationText)
-                    .font(PulseFont.caption)
-                    .foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.caption)
+                    .foregroundStyle(AgaraColors.textMuted)
             }
             .frame(maxWidth: .infinity, minHeight: 118)
             .padding(.vertical, 6)
-            .contentShape(RoundedRectangle(cornerRadius: PulseRadius.card, style: .continuous))
-            .pulseGlass(RoundedRectangle(cornerRadius: PulseRadius.card, style: .continuous), interactive: enabled)
+            .contentShape(RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous))
+            .agaraGlass(RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous), interactive: enabled)
         }
         .buttonStyle(.plain)
         .disabled(!enabled)

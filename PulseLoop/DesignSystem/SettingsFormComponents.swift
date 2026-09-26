@@ -15,7 +15,7 @@ struct SettingsCard<Content: View>: View {
     var body: some View {
         content
             .padding(padding)
-            .pulseGlass(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .agaraGlass(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
     }
 }
 
@@ -27,13 +27,13 @@ struct SettingsToggleRow: View {
     var body: some View {
         Toggle(isOn: $isOn) {
             Text(title)
-                .font(PulseFont.subheadline)
-                .foregroundStyle(PulseColors.textPrimary)
+                .font(AgaraFont.subheadline)
+                .foregroundStyle(AgaraColors.textPrimary)
         }
-        .tint(PulseColors.accent)
+        .tint(AgaraColors.accent)
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .pulseGlass(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }
 
@@ -59,11 +59,11 @@ struct SettingsMenuRow<MenuContent: View>: View {
                         .lineLimit(1)
                         .truncationMode(.tail)
                     Image(systemName: "chevron.up.chevron.down")
-                        .font(PulseFont.caption2)
+                        .font(AgaraFont.caption2)
                         .imageScale(.small)
                 }
-                .font(PulseFont.subheadline)
-                .foregroundStyle(PulseColors.accent)
+                .font(AgaraFont.subheadline)
+                .foregroundStyle(AgaraColors.accent)
             }
         }
     }
@@ -88,9 +88,9 @@ struct SettingsGroup<Content: View>: View {
         VStack(alignment: .leading, spacing: 7) {
             if let header {
                 Text(header.uppercased())
-                    .font(PulseFont.caption.weight(.semibold))
+                    .font(AgaraFont.caption.weight(.semibold))
                     .tracking(0.8)
-                    .foregroundStyle(PulseColors.textMuted)
+                    .foregroundStyle(AgaraColors.textMuted)
                     .padding(.leading, 16)
                     .accessibilityAddTraits(.isHeader)
             }
@@ -99,12 +99,12 @@ struct SettingsGroup<Content: View>: View {
             _VariadicView.Tree(GroupedRowLayout()) { content }
                 // Glass as a BACKGROUND layer so interactive rows (Menu/Picker) stay in
                 // the foreground, outside the iOS 26 glassEffect. See SettingsLabeledRow.
-                .background { Color.clear.pulseGlass(RoundedRectangle(cornerRadius: 18, style: .continuous)) }
+                .background { Color.clear.agaraGlass(RoundedRectangle(cornerRadius: 18, style: .continuous)) }
                 .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             if let footer {
                 Text(footer)
-                    .font(PulseFont.caption.weight(.regular))
-                    .foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.caption.weight(.regular))
+                    .foregroundStyle(AgaraColors.textMuted)
                     .padding(.horizontal, 16)
             }
         }
@@ -119,7 +119,7 @@ private struct GroupedRowLayout: _VariadicView.MultiViewRoot {
                 child
                 if child.id != last {
                     Divider()
-                        .overlay(PulseColors.borderSubtle)
+                        .overlay(AgaraColors.borderSubtle)
                         .padding(.leading, 16)
                 }
             }
@@ -134,9 +134,9 @@ struct FormToggleRow: View {
 
     var body: some View {
         Toggle(isOn: $isOn) {
-            Text(title).font(PulseFont.body).foregroundStyle(PulseColors.textPrimary)
+            Text(title).font(AgaraFont.body).foregroundStyle(AgaraColors.textPrimary)
         }
-        .tint(PulseColors.accent)
+        .tint(AgaraColors.accent)
         .padding(.horizontal, 16)
         .frame(minHeight: 50)
     }
@@ -149,7 +149,7 @@ struct FormValueRow<Trailing: View>: View {
 
     var body: some View {
         HStack {
-            Text(title).font(PulseFont.body).foregroundStyle(PulseColors.textPrimary)
+            Text(title).font(AgaraFont.body).foregroundStyle(AgaraColors.textPrimary)
             Spacer()
             trailing
         }
@@ -174,11 +174,11 @@ struct FormMenuRow<MenuContent: View>: View {
                 HStack(spacing: 4) {
                     Text(value).lineLimit(1).truncationMode(.tail)
                     Image(systemName: "chevron.up.chevron.down")
-                        .font(PulseFont.caption2)
+                        .font(AgaraFont.caption2)
                         .imageScale(.small)
                 }
-                .font(PulseFont.body)
-                .foregroundStyle(PulseColors.accent)
+                .font(AgaraFont.body)
+                .foregroundStyle(AgaraColors.accent)
             }
         }
     }
@@ -206,8 +206,8 @@ struct SettingsLabeledRow<Trailing: View>: View {
     var body: some View {
         HStack {
             Text(title)
-                .font(PulseFont.subheadline)
-                .foregroundStyle(PulseColors.textPrimary)
+                .font(AgaraFont.subheadline)
+                .foregroundStyle(AgaraColors.textPrimary)
             Spacer()
             trailing
         }
@@ -217,6 +217,6 @@ struct SettingsLabeledRow<Trailing: View>: View {
         // Menu/Picker placed *inside* an iOS 26 `glassEffect` can vanish when its
         // popover opens or the selection changes. Keeping the glass behind the
         // foreground controls avoids that while looking identical.
-        .background { Color.clear.pulseGlass(RoundedRectangle(cornerRadius: 16, style: .continuous)) }
+        .background { Color.clear.agaraGlass(RoundedRectangle(cornerRadius: 16, style: .continuous)) }
     }
 }

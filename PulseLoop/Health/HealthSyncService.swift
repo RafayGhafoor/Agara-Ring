@@ -3,7 +3,7 @@ import HealthKit
 import SwiftData
 import os
 
-/// Exports everything the ring captures into Apple Health, one direction only (PulseLoop → Health):
+/// Exports everything the ring captures into Apple Health, one direction only (Agara Ring → Health):
 ///   • Vitals — heart rate, blood oxygen (SpO₂), HRV, skin temperature
 ///   • Daily activity — steps, active energy, walking/running distance
 ///   • Sleep — per-stage segments (deep / core / REM / awake)
@@ -23,7 +23,7 @@ final class HealthSyncService {
     static let shared = HealthSyncService()
 
     let store = HKHealthStore()
-    let log = Logger(subsystem: "com.pulseloop", category: "HealthSync")
+    let log = Logger(subsystem: "com.agara.ring", category: "HealthSync")
 
     /// True while an export run is in flight (drives the Settings button state).
     private(set) var isSyncing = false

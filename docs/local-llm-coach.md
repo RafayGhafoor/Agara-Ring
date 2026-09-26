@@ -1,17 +1,17 @@
 ---
 title: Local / self-hosted AI Coach
-description: Connect PulseLoop to Ollama, LM Studio, llama.cpp, vLLM, SGLang, or another OpenAI-compatible server.
+description: Connect Agara Ring to Ollama, LM Studio, llama.cpp, vLLM, SGLang, or another OpenAI-compatible server.
 ---
 
 # Use a local model with AI Coach
 
-PulseLoop can run AI Coach conversations through an OpenAI-compatible server
+Agara Ring can run AI Coach conversations through an OpenAI-compatible server
 you control. The server can run on a Mac, PC, NAS, or another computer on your
 network, and most setups do not need an API key.
 
 !!! important "Use the server's network address"
     If the model runs on another computer, do **not** enter `localhost` or
-    `127.0.0.1` in PulseLoop. On your iPhone, those addresses mean the iPhone
+    `127.0.0.1` in Agara Ring. On your iPhone, those addresses mean the iPhone
     itself. Use the computer's LAN address instead, such as
     `http://192.168.1.50:11434`.
 
@@ -20,12 +20,12 @@ network, and most setups do not need an API key.
 1. Start one of the [supported servers](#supported-servers), load a chat model,
    and make the server reachable from your local network. Keep the iPhone and
    server on the same network for the first setup.
-2. In PulseLoop, open **Settings → AI Coach** and turn on **Enable AI Coach**.
+2. In Agara Ring, open **Settings → AI Coach** and turn on **Enable AI Coach**.
 3. Set **Provider** to **Local / self-hosted**.
 4. Enter the server's base address, for example
    `http://192.168.1.50:11434`. You do not need to add `/v1`. Add an API key
    only if your server requires one.
-5. Tap **Detect server & configure**. PulseLoop checks the connection, lists
+5. Tap **Detect server & configure**. Agara Ring checks the connection, lists
    available models, and tests tool calling and structured output. Choose a
    model if the server offers more than one.
 6. Open the Coach and try a question such as **“How was my sleep last night?”**
@@ -33,12 +33,12 @@ network, and most setups do not need an API key.
 
 !!! tip "Model size and context"
     Tool-capable instruct models work best. A context window of at least 8K is
-    a good starting point; very small contexts can truncate PulseLoop's health
+    a good starting point; very small contexts can truncate Agara Ring's health
     context and tool definitions.
 
 ## Supported servers
 
-PulseLoop uses the OpenAI-compatible Chat Completions API. These engines are
+Agara Ring uses the OpenAI-compatible Chat Completions API. These engines are
 supported directly:
 
 | Engine | Typical address from the iPhone | API key | Setup notes |
@@ -50,7 +50,7 @@ supported directly:
 | [SGLang](https://docs.sglang.io/basic_usage/openai_api_completions.html) | `http://<server-ip>:30000` | Optional | Tool and structured-output support depends on the model and server configuration. |
 | Other OpenAI-compatible servers | Your server's base address | Varies | The server must provide `GET /v1/models` and `POST /v1/chat/completions`. |
 
-The port can be different if you changed the server configuration. PulseLoop
+The port can be different if you changed the server configuration. Agara Ring
 also accepts a full `/v1` or `/v1/chat/completions` URL and normalizes it to the
 base address.
 
@@ -58,7 +58,7 @@ base address.
 
 - **Detect server & configure:** Run this first and again after changing the
   server, model, or launch options.
-- **Tool calling:** Keep this on for questions that need detailed PulseLoop
+- **Tool calling:** Keep this on for questions that need detailed Agara Ring
   data. It also powers goals, workout logging, meal logging, and other actions
   when **AI actions** is enabled. Turn it off if the server or model does not
   support tools reliably.
@@ -71,7 +71,7 @@ base address.
 - **API key:** Leave it blank unless authentication is enabled on your server.
   Saved keys are stored in the iOS Keychain.
 
-Local servers can use PulseLoop's health-data and action tools. Image input also
+Local servers can use Agara Ring's health-data and action tools. Image input also
 works when the selected model supports images. Provider-hosted web search is not
 available in local mode.
 
@@ -79,7 +79,7 @@ available in local mode.
 
 | Problem | What to check |
 |---|---|
-| **Server not reachable** | Use the server computer's LAN IP, not `localhost`. Confirm both devices are on the same network and allow PulseLoop's iOS Local Network permission. |
+| **Server not reachable** | Use the server computer's LAN IP, not `localhost`. Confirm both devices are on the same network and allow Agara Ring's iOS Local Network permission. |
 | **Connection refused** | Make sure the server listens on `0.0.0.0` or its LAN interface, and allow its port through the computer's firewall. |
 | **No models found** | Load a model, then open `<base-address>/v1/models` from another device on the same network. It should return JSON. |
 | **Coach answers but cannot read or change data** | Enable **Tool calling**, use a tool-capable model, and check the engine-specific launch options in the table. Enable **AI actions** for writes. |
@@ -92,7 +92,7 @@ available in local mode.
 The local provider sends your question and the health context needed to answer
 it to the server you configure. Use a server and network you trust.
 
-PulseLoop accepts plain `http://` addresses for local/private destinations and
+Agara Ring accepts plain `http://` addresses for local/private destinations and
 requires `https://` for public hosts. Redirects are not followed, and an optional
 API key is stored in the iOS Keychain. Do not expose an unauthenticated local
 model server directly to the public internet.

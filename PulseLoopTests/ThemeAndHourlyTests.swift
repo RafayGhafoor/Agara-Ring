@@ -12,7 +12,7 @@ final class ThemeAndHourlyTests: XCTestCase {
         XCTAssertEqual(Set(AgaraTheme.all.map(\.name)).count, AgaraTheme.all.count)
     }
 
-    func testSelectingAThemeIsWhatPulseColorsReads() {
+    func testSelectingAThemeIsWhatAgaraColorsReads() {
         ThemeStore.select("light")
         XCTAssertEqual(ThemeStore.current.name, "light")
         ThemeStore.select("no-such-theme")

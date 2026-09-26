@@ -1,9 +1,9 @@
 ---
 title: Sideloading the IPA
-description: Install the pre-built PulseLoop IPA on your iPhone without Xcode. Sign it yourself via Sideloadly, AltStore/SideStore, Feather/ESign, TrollStore, or a paid Developer account.
+description: Install the pre-built Agara Ring IPA on your iPhone without Xcode. Sign it yourself via Sideloadly, AltStore/SideStore, Feather/ESign, TrollStore, or a paid Developer account.
 ---
 
-# Sideloading PulseLoop on iOS
+# Sideloading Agara Ring on iOS
 
 Every published [release](https://github.com/saksham2001/PulseLoopiOS/releases)
 ships a pre-built, **unsigned** IPA:
@@ -14,7 +14,7 @@ PulseLoop-<tag>.ipa      e.g. PulseLoop-v1.0.0.ipa
 
 Nothing is signed in CI, so there are no Apple certificates or secrets in the
 repo. You sign the IPA yourself with your own Apple ID using one of the tools
-below. This lets you run PulseLoop on a real iPhone without building it in Xcode.
+below. This lets you run Agara Ring on a real iPhone without building it in Xcode.
 
 !!! info "Prefer a hands-off install?"
     The **[TestFlight beta](ios.md#testflight-beta)** needs no signing, no
@@ -23,7 +23,7 @@ below. This lets you run PulseLoop on a real iPhone without building it in Xcode
 
 ## :material-alert: Read this first: the App Group caveat
 
-PulseLoop's only special entitlement is an **App Group**
+Agara Ring's only special entitlement is an **App Group**
 (`group.xyz.sakshambhutani.pulseloop2`). It's the shared container that the
 Home Screen widgets and the Live Activity / Dynamic Island read from.
 
@@ -67,7 +67,7 @@ gracefully and everything else runs normally.
 !!! note "Free Apple ID limits (apply to Sideloadly, AltStore, SideStore)"
     - **7-day expiry**: the app stops opening after a week until you re-sign.
     - **Max 3 sideloaded apps** at once per Apple ID.
-    - **No App Groups**, so no PulseLoop widgets / Live Activity (see above).
+    - **No App Groups**, so no Agara Ring widgets / Live Activity (see above).
     - Use a **secondary/burner Apple ID**, not your main one, to sign.
 
 ---
@@ -86,7 +86,7 @@ Free desktop tool for macOS and Windows. Signs and installs in one pass.
    prompted.
 6. On the phone: **Settings → General → VPN & Device Management** → trust your
    Apple ID's developer profile.
-7. Launch PulseLoop.
+7. Launch Agara Ring.
 
 !!! warning "Re-sign every 7 days"
     With a free Apple ID the app expires after 7 days. Re-run the same Sideloadly
@@ -206,7 +206,7 @@ apps in SideStore.
 6. Disconnect the computer. You won't need it again unless you update SideStore
    or replace the pairing file.
 
-**Install PulseLoop:**
+**Install Agara Ring:**
 
 7. Download `PulseLoop-<tag>.ipa` on the device.
 8. With LocalDevVPN **connected**, SideStore → **My Apps → +** → pick the IPA.
@@ -217,7 +217,7 @@ Apps** before it hits zero, or automate it with a Shortcuts automation that
 *connects LocalDevVPN → waits a few seconds → refreshes SideStore apps →
 disconnects LocalDevVPN*, scheduled a few nights a week.
 
-!!! note "If it lapses, don't delete PulseLoop"
+!!! note "If it lapses, don't delete Agara Ring"
     An expired app stops opening but is **not** revoked, so your data is intact.
     Reconnect and refresh in SideStore (re-run iloader only if SideStore itself
     lapsed). No need to redo the whole setup. Pairing files can expire after an
@@ -231,15 +231,15 @@ is one app that virtualizes and runs *other* apps inside it, so dozens of apps
 cost just **one** of your three slots, and the inner apps don't need individual
 signing or refreshing (you only refresh LiveContainer in SideStore).
 
-!!! warning "PulseLoop's widgets are not expected to work inside LiveContainer"
+!!! warning "Agara Ring's widgets are not expected to work inside LiveContainer"
     LiveContainer runs apps in a shared virtualized sandbox and generally can't
-    host app extensions, so PulseLoop's Home Screen widgets and the Live Activity
+    host app extensions, so Agara Ring's Home Screen widgets and the Live Activity
     / Dynamic Island are **not expected to work** inside it (we haven't tested
     this specific case). The core app (ring sync, vitals, sleep, coach, workouts,
-    GPS) should run fine. If you want the widgets, install PulseLoop **directly**
+    GPS) should run fine. If you want the widgets, install Agara Ring **directly**
     via SideStore (using a normal app slot) rather than inside LiveContainer, and
     remember you still need a **paid** cert for the App Group. LiveContainer is
-    best when you're bundling many *other* modded apps and just want PulseLoop's
+    best when you're bundling many *other* modded apps and just want Agara Ring's
     core app along for the ride.
 
 To use it: install `LiveContainer.ipa` through SideStore, complete its
@@ -319,7 +319,7 @@ To sign the pre-built IPA instead, use Sideloadly / Feather / ESign with your
 
 ??? question "Ring receives no data"
     Set the ring up once in the **Jring** app, unpair it there, then connect it
-    in PulseLoop. See the [iOS guide](ios.md).
+    in Agara Ring. See the [iOS guide](ios.md).
 
 ## :material-scale-balance: A note on sideloading
 

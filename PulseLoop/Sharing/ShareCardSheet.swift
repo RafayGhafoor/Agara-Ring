@@ -21,8 +21,8 @@ struct ShareCardSheet: View {
     var body: some View {
         VStack(spacing: 18) {
             Text("Share workout")
-                .font(PulseFont.title3.weight(.bold))
-                .foregroundStyle(PulseColors.textPrimary)
+                .font(AgaraFont.title3.weight(.bold))
+                .foregroundStyle(AgaraColors.textPrimary)
                 .padding(.top, 8)
 
             preview
@@ -35,7 +35,7 @@ struct ShareCardSheet: View {
         .padding(20)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
-        .presentationBackground(PulseColors.background)
+        .presentationBackground(AgaraColors.background)
         .onAppear(perform: buildModel)
         .onChange(of: format) { _, _ in renderShareImage() }
     }
@@ -99,14 +99,14 @@ struct ShareCardSheet: View {
         let active = format == value
         return Button { format = value } label: {
             Text(title)
-                .font(PulseFont.footnote)
-                .foregroundStyle(active ? PulseColors.textPrimary : PulseColors.textSecondary)
+                .font(AgaraFont.footnote)
+                .foregroundStyle(active ? AgaraColors.textPrimary : AgaraColors.textSecondary)
                 .padding(.horizontal, 16).padding(.vertical, 9)
                 // Solid pills, not glass — mirrors the effort pills in the workout summary
                 // (glass can't sample glass; these sit over the sheet's own surface).
                 .background {
                     if active {
-                        Capsule().fill(PulseColors.accent.opacity(0.18))
+                        Capsule().fill(AgaraColors.accent.opacity(0.18))
                     } else {
                         Capsule().fill(
                             LinearGradient(
@@ -117,7 +117,7 @@ struct ShareCardSheet: View {
                     }
                 }
                 .overlay(
-                    Capsule().stroke(active ? PulseColors.accent : PulseColors.borderSubtle, lineWidth: 1)
+                    Capsule().stroke(active ? AgaraColors.accent : AgaraColors.borderSubtle, lineWidth: 1)
                 )
         }
         .buttonStyle(.plain)
@@ -128,7 +128,7 @@ struct ShareCardSheet: View {
     private var shareLabel: some View {
         Label("Share card", systemImage: "square.and.arrow.up")
             .labelStyle(.titleAndIcon)
-            .font(PulseFont.bodyEmphasis)
+            .font(AgaraFont.bodyEmphasis)
             .frame(maxWidth: .infinity)
             .frame(height: 56)
     }
@@ -145,23 +145,23 @@ struct ShareCardSheet: View {
                     image: shareImage.previewImage
                 )
             ) {
-                shareLabel.foregroundStyle(PulseColors.textPrimary)
+                shareLabel.foregroundStyle(AgaraColors.textPrimary)
             }
             if #available(iOS 26, *), !reduceTransparency {
                 link
                     .buttonStyle(.glass)
-                    .tint(PulseColors.accent)
+                    .tint(AgaraColors.accent)
                     .clipShape(Capsule())
             } else {
                 link
-                    .background(PulseColors.accent)
+                    .background(AgaraColors.accent)
                     .clipShape(Capsule())
             }
         } else {
             // Render failed (or is still pending) — keep the affordance visible but inert.
             shareLabel
                 .foregroundStyle(.white.opacity(0.5))
-                .background(PulseColors.accent.opacity(0.4))
+                .background(AgaraColors.accent.opacity(0.4))
                 .clipShape(Capsule())
         }
     }

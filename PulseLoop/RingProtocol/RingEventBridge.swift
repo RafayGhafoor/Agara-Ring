@@ -1,6 +1,6 @@
 import Foundation
 
-/// Pure mapping from a decoded ring packet to the typed `PulseEvent`s that should be
+/// Pure mapping from a decoded ring packet to the typed `AgaraEvent`s that should be
 /// published on the bus. The raw packet itself is published separately by `RingBLEClient`
 /// (always, even for `.unknown`), so this bridge only produces the *typed* fan-out used by
 /// the persistence subscriber and the sync coordinator.
@@ -62,7 +62,7 @@ enum RingEventBridge {
     ///   because the ring's clock carries no year (anything outside its retention cannot be trusted);
     ///   cloud rows carry real epochs from our own server, so re-importing a two-month account must
     ///   not be silently trimmed to the last 8 days. Value-range gates always apply.
-    static func events(for decoded: RingDecodedEvent, now: Date = Date(), trustTimestamps: Bool = false) -> [PulseEvent] {
+    static func events(for decoded: RingDecodedEvent, now: Date = Date(), trustTimestamps: Bool = false) -> [AgaraEvent] {
         switch decoded {
         case let .activityUpdate(timestamp, steps, distanceMeters, calories):
             // A live cumulative update ratchets the daily row via `max`, so a single misframed packet
@@ -167,7 +167,7 @@ enum RingEventBridge {
         timestamp: Date,
         now: Date,
         trustTimestamps: Bool
-    ) -> [PulseEvent] {
+    ) -> [AgaraEvent] {
         guard isPlausible(kind: kind, value: value) else { return [] }
         guard trustTimestamps || isWithinHistoryWindow(timestamp, now: now) else { return [] }
         return [.historyMeasurement(kind: kind, value: value, timestamp: timestamp)]
@@ -202,7 +202,7 @@ enum RingEventBridge {
         }
     }
 
-    private static func extraMetricEvents(for decoded: RingDecodedEvent) -> [PulseEvent] {
+    private static func extraMetricEvents(for decoded: RingDecodedEvent) -> [AgaraEvent] {
         switch decoded {
         case let .bloodPressureSample(systolic, diastolic, timestamp):
             guard systolicRange.contains(systolic), diastolicRange.contains(diastolic) else { return [] }

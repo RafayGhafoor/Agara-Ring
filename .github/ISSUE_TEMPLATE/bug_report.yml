@@ -64,7 +64,7 @@ body:
   - type: input
     id: app-version
     attributes:
-      label: PulseLoop version / commit
+      label: Agara Ring version / commit
       description: Settings → About, or the git commit you built from.
       placeholder: "e.g. main @ a1b2c3d"
     validations:

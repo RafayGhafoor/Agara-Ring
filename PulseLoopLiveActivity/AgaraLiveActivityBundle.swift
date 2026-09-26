@@ -1,6 +1,6 @@
 //
-//  PulseLoopLiveActivityBundle.swift
-//  PulseLoopLiveActivity
+//  AgaraLiveActivityBundle.swift
+//  Agara Ring
 //
 //  Created by Saksham Bhutani on 6/1/26.
 //
@@ -9,7 +9,7 @@ import WidgetKit
 import SwiftUI
 
 @main
-struct PulseLoopLiveActivityBundle: WidgetBundle {
+struct AgaraLiveActivityBundle: WidgetBundle {
     /// The Live Activity renders with Manrope; its fonts ship in this target's asset catalog.
     init() {
         AgaraFontRegistry.registerBundledFonts()

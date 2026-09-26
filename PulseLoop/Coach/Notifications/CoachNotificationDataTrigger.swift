@@ -2,7 +2,7 @@ import Foundation
 import UIKit
 
 /// Fires the coach check-in the moment fresh data actually lands, instead of only at the scheduled
-/// wake. Subscribes to `PulseEventBus` and, when a full history sync completes, runs the due slot —
+/// wake. Subscribes to `AgaraEventBus` and, when a full history sync completes, runs the due slot —
 /// so a slot the BGTask skipped as `.skippedStaleData` (ring out of range, sync didn't finish in
 /// budget) is delivered right after the pending connect re-links the ring and the background sync
 /// finishes, while the numbers are minutes old.
@@ -29,14 +29,14 @@ final class CoachNotificationDataTrigger {
     func start() {
         guard streamTask == nil else { return }
         streamTask = Task { [weak self] in
-            let stream = await PulseEventBus.shared.stream()
+            let stream = await AgaraEventBus.shared.stream()
             for await event in stream {
                 self?.handle(event)
             }
         }
     }
 
-    private func handle(_ event: PulseEvent) {
+    private func handle(_ event: AgaraEvent) {
         guard case let .syncProgress(stage) = event, stage == "done" else { return }
         debounce?.cancel()
         debounce = Task { [weak self] in

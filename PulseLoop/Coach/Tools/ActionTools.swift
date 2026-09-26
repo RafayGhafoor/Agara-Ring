@@ -53,7 +53,7 @@ enum ActionTools {
             }
             goal.updatedAt = Date()
             try? ctx.modelContext.save()
-            PulseDataChange.shared.notify()
+            AgaraDataChange.shared.notify()
             return .object(["ok": true, "goal_type": args.goalType, "target": args.target])
         }
     }
@@ -368,6 +368,6 @@ enum ActionTools {
         try? context.save()
         // `applyEdit` already notified; only notify again when it didn't run or we changed
         // something after it (the distance override), so a plain edit doesn't double-bump.
-        if !didEdit || updates.distanceKm != nil { PulseDataChange.shared.notify() }
+        if !didEdit || updates.distanceKm != nil { AgaraDataChange.shared.notify() }
     }
 }

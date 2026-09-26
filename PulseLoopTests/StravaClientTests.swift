@@ -141,7 +141,7 @@ final class StravaClientTests: XCTestCase {
             tcx: tcxBytes,
             fileName: "pl-ext-1.tcx",
             name: "Morning Run",
-            description: "PulseLoop workout",
+            description: "Agara workout",
             trainer: true,
             externalId: "pl-ext-1",
             accessToken: "at-1"

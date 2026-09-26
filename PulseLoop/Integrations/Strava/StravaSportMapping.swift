@@ -1,6 +1,6 @@
 import Foundation
 
-/// Maps PulseLoop activity types to Strava's TCX `Sport` attribute and API `sport_type` values.
+/// Maps Agara Ring activity types to Strava's TCX `Sport` attribute and API `sport_type` values.
 enum StravaSportMapping {
     /// The TCX v2 schema only allows "Running" | "Biking" | "Other" for the Activity Sport attribute.
     static func tcxSport(for type: String) -> String {

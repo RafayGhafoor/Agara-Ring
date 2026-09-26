@@ -17,7 +17,7 @@ struct VitalsView: View {
     /// swaps the hub for the ring.
     @State private var sheet: VitalsSheet?
     @State private var features = AgaraFeatureStore.shared
-    @State private var dataChange = PulseDataChange.shared
+    @State private var dataChange = AgaraDataChange.shared
     /// Owns the prepared vitals state. Created lazily in `.task` (never in `body`) so a `body`
     /// re-render never triggers DB work — it just reads the already-prepared store.
     @State private var store: VitalsStore?
@@ -43,7 +43,7 @@ struct VitalsView: View {
 
     var body: some View {
         guard let activeStore = store else {
-            return AnyView(PulseColors.background.ignoresSafeArea().task { ensureStore() })
+            return AnyView(AgaraColors.background.ignoresSafeArea().task { ensureStore() })
         }
 
         return AnyView(ScrollView {
@@ -53,10 +53,10 @@ struct VitalsView: View {
             }
             .padding(.horizontal, 16)
             // Extra clearance while editing so the last card stays draggable above the Done bar.
-            .padding(.bottom, editing ? PulseLayout.scrollBottomInsetEditing : PulseLayout.scrollBottomInset)
+            .padding(.bottom, editing ? AgaraLayout.scrollBottomInsetEditing : AgaraLayout.scrollBottomInset)
         }
         // Tap-outside-to-exit: a catcher layered above the opaque background colour — `.background`
-        // stacks back-to-front, so adding it after `PulseColors.background` would bury it.
+        // stacks back-to-front, so adding it after `AgaraColors.background` would bury it.
         .background {
             if editing {
                 Color.clear
@@ -65,9 +65,9 @@ struct VitalsView: View {
                     .accessibilityHidden(true)
             }
         }
-        .background(PulseColors.background)
+        .background(AgaraColors.background)
         .refreshable { await coordinator.pullToRefresh() }
-        .pulseScrollEdges()
+        .agaraScrollEdges()
         // A sync can rebuild the store mid-edit — fold the new card set into the on-screen order, and
         // never while a drag is in flight.
         .onChange(of: activeStore.revision) { _, _ in
@@ -118,22 +118,22 @@ struct VitalsView: View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Vitals")
-                    .font(PulseFont.title2.weight(.semibold))
-                    .foregroundStyle(PulseColors.textPrimary)
+                    .font(AgaraFont.title2.weight(.semibold))
+                    .foregroundStyle(AgaraColors.textPrimary)
                     .accessibilityAddTraits(.isHeader)
                 Text("Today's readings from your ring")
-                    .font(PulseFont.footnote)
-                    .foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.footnote)
+                    .foregroundStyle(AgaraColors.textMuted)
             }
             Spacer(minLength: 8)
             if !kinds.isEmpty {
                 Button { sheet = .hub } label: {
                     Label("Measure", systemImage: "waveform.path.ecg")
-                        .font(PulseFont.subheadline.weight(.semibold))
-                        .foregroundStyle(PulseColors.onAccent)
+                        .font(AgaraFont.subheadline.weight(.semibold))
+                        .foregroundStyle(AgaraColors.onAccent)
                         .padding(.horizontal, 16)
                         .frame(minHeight: 40)
-                        .background(PulseColors.accent, in: Capsule())
+                        .background(AgaraColors.accent, in: Capsule())
                 }
                 .buttonStyle(.plain)
                 .accessibilityHint("Choose a measurement to take with your ring.")
@@ -266,7 +266,7 @@ struct VitalsView: View {
         } else {
             VitalEmptyState(metric: .totalCholesterol)
                 .padding(.vertical, 20)
-                .pulseGlass(RoundedRectangle(cornerRadius: PulseRadius.card, style: .continuous))
+                .agaraGlass(RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous))
         }
     }
 
@@ -311,7 +311,7 @@ struct VitalsView: View {
         if let model = card(store, metric) {
             let baseline = metric == .hrv ? store.hrvBaseline : nil
             VitalChartCard(model: model, profile: physiology, baseline: baseline, showPoints: showPoints) { open(metric) }
-                .pulseZoomSource(AppRoute.metricDetail(metric), in: zoomNS)
+                .agaraZoomSource(AppRoute.metricDetail(metric), in: zoomNS)
         }
     }
 
@@ -326,7 +326,7 @@ struct VitalsView: View {
                 diastolicZones: VitalsThresholdEngine.diastolicReferenceZones(),
                 onTap: { open(.bloodPressure) }
             )
-            .pulseZoomSource(AppRoute.metricDetail(.bloodPressure), in: zoomNS)
+            .agaraZoomSource(AppRoute.metricDetail(.bloodPressure), in: zoomNS)
         }
     }
 

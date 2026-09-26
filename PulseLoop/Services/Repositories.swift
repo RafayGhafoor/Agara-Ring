@@ -423,7 +423,7 @@ enum NutritionRepository {
     static func insert(_ entry: MealEntry, context: ModelContext) {
         context.insert(entry)
         try? context.save()
-        PulseDataChange.shared.notify()
+        AgaraDataChange.shared.notify()
     }
 
     /// Save after in-place edits to `entry` (the caller mutated the row already).
@@ -431,7 +431,7 @@ enum NutritionRepository {
     static func update(_ entry: MealEntry, context: ModelContext) {
         entry.updatedAt = Date()
         try? context.save()
-        PulseDataChange.shared.notify()
+        AgaraDataChange.shared.notify()
     }
 
     @MainActor
@@ -444,7 +444,7 @@ enum NutritionRepository {
         if AppleHealthPrefsStore.shared.prefs.masterEnabled && AppleHealthPrefsStore.shared.prefs.syncNutrition {
             HealthSyncService.shared.deleteExportedMeal(entryId: id)
         }
-        PulseDataChange.shared.notify()
+        AgaraDataChange.shared.notify()
     }
 
     // MARK: Open Food Facts product cache

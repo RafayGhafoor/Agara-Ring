@@ -14,8 +14,8 @@ struct NutritionSummaryCard: View {
     private var goal: Int? { goals.intakeCalories }
     private var remaining: Double? { goal.map { Double($0) - totals.calories } }
     private var ringColor: Color {
-        goal.map { NutritionFormat.progressColor(consumed: totals.calories, goal: Double($0), base: PulseColors.calories) }
-            ?? PulseColors.calories
+        goal.map { NutritionFormat.progressColor(consumed: totals.calories, goal: Double($0), base: AgaraColors.calories) }
+            ?? AgaraColors.calories
     }
 
     var body: some View {
@@ -24,9 +24,9 @@ struct NutritionSummaryCard: View {
                 HStack(alignment: .center, spacing: 12) {
                     VStack(alignment: .leading, spacing: 18) {
                         metric(label: "Eaten", value: NutritionFormat.kcal(totals.calories),
-                               unit: "kcal", color: PulseColors.calories)
+                               unit: "kcal", color: AgaraColors.calories)
                         metric(label: "Burned", value: burned.map { NutritionFormat.kcal($0) } ?? "—",
-                               unit: burned == nil ? nil : "kcal", color: PulseColors.textMuted)
+                               unit: burned == nil ? nil : "kcal", color: AgaraColors.textMuted)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -40,20 +40,20 @@ struct NutritionSummaryCard: View {
                         VStack(spacing: 0) {
                             if let remaining {
                                 Text(NutritionFormat.kcal(max(0, remaining)))
-                                    .font(PulseFont.title3)
+                                    .font(AgaraFont.title3)
                                     .monospacedDigit()
-                                    .foregroundStyle(PulseColors.textPrimary)
+                                    .foregroundStyle(AgaraColors.textPrimary)
                                 Text(remaining >= 0 ? "LEFT" : "OVER")
-                                    .font(PulseFont.micro.weight(.semibold))
+                                    .font(AgaraFont.micro.weight(.semibold))
                                     .tracking(1.0)
-                                    .foregroundStyle(remaining >= 0 ? PulseColors.textMuted : ringColor)
+                                    .foregroundStyle(remaining >= 0 ? AgaraColors.textMuted : ringColor)
                             } else {
                                 Text("SET")
-                                    .font(PulseFont.micro.weight(.semibold)).tracking(1.0)
-                                    .foregroundStyle(PulseColors.textMuted)
+                                    .font(AgaraFont.micro.weight(.semibold)).tracking(1.0)
+                                    .foregroundStyle(AgaraColors.textMuted)
                                 Text("GOAL")
-                                    .font(PulseFont.micro.weight(.semibold)).tracking(1.0)
-                                    .foregroundStyle(PulseColors.textMuted)
+                                    .font(AgaraFont.micro.weight(.semibold)).tracking(1.0)
+                                    .foregroundStyle(AgaraColors.textMuted)
                             }
                         }
                     }
@@ -63,7 +63,7 @@ struct NutritionSummaryCard: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(16)
-            .pulseGlass(RoundedRectangle(cornerRadius: PulseRadius.card, style: .continuous))
+            .agaraGlass(RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous))
         }
         .buttonStyle(.plain)
     }
@@ -71,7 +71,7 @@ struct NutritionSummaryCard: View {
     private func metric(label: String, value: String, unit: String?, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(label.uppercased())
-                .font(PulseFont.callout.weight(.bold)).tracking(0.6)
+                .font(AgaraFont.callout.weight(.bold)).tracking(0.6)
                 .foregroundStyle(color)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
@@ -79,7 +79,7 @@ struct NutritionSummaryCard: View {
                 Text(value)
                     .activityValueStyle(size: 32)
                 if let unit {
-                    Text(unit).font(PulseFont.subheadline).foregroundStyle(PulseColors.textMuted)
+                    Text(unit).font(AgaraFont.subheadline).foregroundStyle(AgaraColors.textMuted)
                 }
             }
         }

@@ -17,7 +17,7 @@ struct MetricDetailView: View {
     @State private var primary: [MetricSample] = []
     @State private var secondary: [MetricSample] = []   // diastolic, for BP
     /// Observed so the detail chart/tiles re-fetch when a background sync lands while this is open.
-    @State private var dataChange = PulseDataChange.shared
+    @State private var dataChange = AgaraDataChange.shared
 
     private var profile: UserPhysiologyProfile { UserPhysiologyProfile(profiles.first) }
     private var units: UnitsPreference { profiles.first?.units ?? .metric }
@@ -81,9 +81,9 @@ struct MetricDetailView: View {
             .padding(16)
             .padding(.bottom, 40)
             // Stacked glass cards share one container so their glass renders/blends consistently.
-            .pulseGlassContainer(spacing: 18)
+            .agaraGlassContainer(spacing: 18)
         }
-        .background(PulseColors.background)
+        .background(AgaraColors.background)
         // Shared glass chrome: centered title + glass back button, no system nav
         // bar (so the zoom transition doesn't reflow the content).
         .pageChrome(metric.title)
@@ -130,14 +130,14 @@ struct MetricDetailView: View {
         VStack(alignment: .leading, spacing: 8) {
             if !unitLabel.isEmpty {
                 Text(unitLabel)
-                    .font(PulseFont.caption.weight(.semibold))
-                    .foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.caption.weight(.semibold))
+                    .foregroundStyle(AgaraColors.textMuted)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             // A line needs two points; a bar or a dot is readable on its own.
             if chart.count < (ChartAxes.style(for: metric) == .line || xDomain == nil ? 2 : 1) {
                 Text("Not enough data for this period.")
-                    .font(PulseFont.footnote.weight(.regular)).foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.footnote.weight(.regular)).foregroundStyle(AgaraColors.textMuted)
                     .frame(maxWidth: .infinity, minHeight: 120, alignment: .center)
             } else if metric == .bloodPressure {
                 bloodPressureChart
@@ -165,7 +165,7 @@ struct MetricDetailView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .pulseGlass(RoundedRectangle(cornerRadius: PulseRadius.card, style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous))
     }
 
     /// The BP chart's bucket: an hour on a day, 3 h over a week, a day over a month.
@@ -187,11 +187,11 @@ struct MetricDetailView: View {
                 let (time, sys, dia) = (bar.time, bar.high, bar.low)
                 RuleMark(x: .value("Time", time), yStart: .value("Diastolic", dia), yEnd: .value("Systolic", sys))
                     .lineStyle(StrokeStyle(lineWidth: 6, lineCap: .round))
-                    .foregroundStyle(PulseColors.bloodPressure.opacity(0.28))
+                    .foregroundStyle(AgaraColors.bloodPressure.opacity(0.28))
                 PointMark(x: .value("Time", time), y: .value("Systolic", sys))
-                    .symbolSize(28).foregroundStyle(PulseColors.bloodPressure)
+                    .symbolSize(28).foregroundStyle(AgaraColors.bloodPressure)
                 PointMark(x: .value("Time", time), y: .value("Diastolic", dia))
-                    .symbolSize(28).foregroundStyle(PulseColors.bloodPressure.opacity(0.55))
+                    .symbolSize(28).foregroundStyle(AgaraColors.bloodPressure.opacity(0.55))
             }
         }
         .chartYScale(domain: axis.domain)
@@ -232,19 +232,19 @@ struct MetricDetailView: View {
         .padding(.vertical, 14)
         .padding(.horizontal, 10)
         .frame(maxWidth: .infinity)
-        .pulseGlass(RoundedRectangle(cornerRadius: PulseRadius.card, style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous))
     }
 
     private func stat(_ title: String, _ value: String, longest: Int) -> some View {
         VStack(spacing: 8) {
             Text(title.uppercased())
-                .font(PulseFont.caption2).tracking(0.6)
-                .foregroundStyle(PulseColors.textMuted)
+                .font(AgaraFont.caption2).tracking(0.6)
+                .foregroundStyle(AgaraColors.textMuted)
                 .lineLimit(1)
             // Step down for long values (a BP pair like 127/80), row-wide so neighbours match.
             Text(value)
-                .font(longest <= 4 ? PulseFont.numberXL : PulseFont.numberL).monospacedDigit()
-                .foregroundStyle(PulseColors.textPrimary)
+                .font(longest <= 4 ? AgaraFont.numberXL : AgaraFont.numberL).monospacedDigit()
+                .foregroundStyle(AgaraColors.textPrimary)
                 .minimumScaleFactor(0.5)
                 .lineLimit(1)
         }
@@ -252,7 +252,7 @@ struct MetricDetailView: View {
     }
 
     private var statDivider: some View {
-        Rectangle().fill(PulseColors.borderSubtle).frame(width: 1, height: 34)
+        Rectangle().fill(AgaraColors.borderSubtle).frame(width: 1, height: 34)
     }
 
     // MARK: - Legend
@@ -261,47 +261,47 @@ struct MetricDetailView: View {
         let zones = VitalsThresholdEngine.zones(for: metric, profile: profile, baseline: baselineForChart)
         return VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("REFERENCE ZONES").font(PulseFont.caption2.weight(.semibold)).tracking(1.0).foregroundStyle(PulseColors.textMuted)
+                Text("REFERENCE ZONES").font(AgaraFont.caption2.weight(.semibold)).tracking(1.0).foregroundStyle(AgaraColors.textMuted)
                 Spacer()
                 // HR zones are user-configurable (Standard / Auto / Custom) — deep-link to the editor.
                 if metric == .heartRate {
                     Button("Edit") { path.append(AppRoute.settingsHeartRateZones) }
-                        .font(PulseFont.caption.weight(.semibold))
-                        .foregroundStyle(PulseColors.accent)
+                        .font(AgaraFont.caption.weight(.semibold))
+                        .foregroundStyle(AgaraColors.accent)
                 }
             }
             ForEach(zones) { zone in
                 HStack(spacing: 10) {
                     Circle().fill(zone.color).frame(width: 8, height: 8)
-                    Text(zone.label).font(PulseFont.footnote).foregroundStyle(PulseColors.textPrimary)
+                    Text(zone.label).font(AgaraFont.footnote).foregroundStyle(AgaraColors.textPrimary)
                     Spacer()
-                    Text(rangeText(zone)).font(PulseFont.caption.weight(.regular)).monospacedDigit().foregroundStyle(PulseColors.textMuted)
+                    Text(rangeText(zone)).font(AgaraFont.caption.weight(.regular)).monospacedDigit().foregroundStyle(AgaraColors.textMuted)
                 }
             }
         }
         .padding(16)
-        .pulseGlass(RoundedRectangle(cornerRadius: PulseRadius.card, style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous))
     }
 
     private var explainer: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("WHAT THIS MEANS").font(PulseFont.caption2.weight(.semibold)).tracking(1.0).foregroundStyle(PulseColors.textMuted)
-            Text(explainerText).font(PulseFont.footnote.weight(.regular)).foregroundStyle(PulseColors.textSecondary)
+            Text("WHAT THIS MEANS").font(AgaraFont.caption2.weight(.semibold)).tracking(1.0).foregroundStyle(AgaraColors.textMuted)
+            Text(explainerText).font(AgaraFont.footnote.weight(.regular)).foregroundStyle(AgaraColors.textSecondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .pulseGlass(RoundedRectangle(cornerRadius: PulseRadius.card, style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous))
     }
 
     private var disclaimer: some View {
         HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "exclamationmark.triangle").foregroundStyle(PulseColors.warning)
-            Text(disclaimerText).font(PulseFont.caption.weight(.regular)).foregroundStyle(PulseColors.textSecondary)
+            Image(systemName: "exclamationmark.triangle").foregroundStyle(AgaraColors.warning)
+            Text(disclaimerText).font(AgaraFont.caption.weight(.regular)).foregroundStyle(AgaraColors.textSecondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(PulseColors.warning.opacity(0.1), in: RoundedRectangle(cornerRadius: PulseRadius.card, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: PulseRadius.card, style: .continuous).stroke(PulseColors.warning.opacity(0.3), lineWidth: 1))
+        .background(AgaraColors.warning.opacity(0.1), in: RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous).stroke(AgaraColors.warning.opacity(0.3), lineWidth: 1))
     }
 
     // MARK: - Data

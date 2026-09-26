@@ -1,7 +1,7 @@
 import Foundation
 import HealthKit
 
-/// Pure, unit-testable translations between PulseLoop's domain model and HealthKit types.
+/// Pure, unit-testable translations between Agara Ring's domain model and HealthKit types.
 ///
 /// Kept free of any `HKHealthStore` I/O so the mapping tables, plausibility guards, and the
 /// deterministic sync-identifier builders can be exercised in isolation. `HealthSyncService`
@@ -60,7 +60,7 @@ enum HealthKitTypeMappings {
 
     // MARK: - Workouts
 
-    /// Maps a PulseLoop activity type onto the closest `HKWorkoutActivityType`.
+    /// Maps an Agara Ring activity type onto the closest `HKWorkoutActivityType`.
     static func workoutActivityType(for type: String) -> HKWorkoutActivityType {
         switch ActivityMeta.meta(type).type {
         case "walk":   return .walking

@@ -28,14 +28,14 @@ enum ShareCardRenderer {
         return ShareCardImage(pngData: data, filename: filename(activityLabel: model.activityLabel, date: date))
     }
 
-    /// "pulseloop-{slug}-{yyyy-MM-dd}.png" — slug from the activity label, share date.
+    /// "agara-{slug}-{yyyy-MM-dd}.png" — slug from the activity label, share date.
     static func filename(activityLabel: String, date: Date = Date()) -> String {
         let slug = activityLabel.lowercased()
             .replacingOccurrences(of: "[^a-z0-9]+", with: "-", options: .regularExpression)
             .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
-        return "pulseloop-\(slug.isEmpty ? "workout" : slug)-\(formatter.string(from: date)).png"
+        return "agara-\(slug.isEmpty ? "workout" : slug)-\(formatter.string(from: date)).png"
     }
 
     #if DEBUG

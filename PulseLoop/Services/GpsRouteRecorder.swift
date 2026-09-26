@@ -3,7 +3,7 @@ import Observation
 @preconcurrency import CoreLocation
 
 /// Captures a GPS route during an outdoor workout and publishes accepted fixes as
-/// `PulseEvent.gpsPoint`, which `EventPersistenceSubscriber` persists as `ActivityGpsPoint` rows.
+/// `AgaraEvent.gpsPoint`, which `EventPersistenceSubscriber` persists as `ActivityGpsPoint` rows.
 /// Distance is derived later from those rows by `ActivityService.gpsDistance`.
 ///
 /// CoreLocation only delivers real fixes on a physical device; in the Simulator it stays idle
@@ -95,7 +95,7 @@ final class GpsRouteRecorder: NSObject, CLLocationManagerDelegate {
                     pointCount += 1
                 }
                 Task {
-                    await PulseEventBus.shared.publish(.gpsPoint(
+                    await AgaraEventBus.shared.publish(.gpsPoint(
                         sessionId: sessionId,
                         latitude: lat,
                         longitude: lon,

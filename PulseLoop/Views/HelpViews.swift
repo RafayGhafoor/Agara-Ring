@@ -18,7 +18,7 @@ struct HelpTip: View {
         Button { shown = true } label: {
             Image(systemName: "info.circle")
                 .font(.system(size: size, weight: .regular))
-                .foregroundStyle(PulseColors.textMuted)
+                .foregroundStyle(AgaraColors.textMuted)
                 .frame(minWidth: 24, minHeight: 24)   // the glyph is small; the target is not
                 .contentShape(Rectangle())
         }
@@ -38,13 +38,13 @@ struct HelpBubbleText: View {
 
     var body: some View {
         Text(text)
-            .font(PulseFont.footnote)
-            .foregroundStyle(PulseColors.textPrimary)
+            .font(AgaraFont.footnote)
+            .foregroundStyle(AgaraColors.textPrimary)
             .multilineTextAlignment(.leading)
             .fixedSize(horizontal: false, vertical: true)
             .frame(width: 260, alignment: .leading)
             .padding(14)
-            .presentationBackground(PulseColors.elevated)
+            .presentationBackground(AgaraColors.elevated)
     }
 }
 

@@ -1,6 +1,6 @@
 //
-//  PulseLoopApp.swift
-//  PulseLoop
+//  AgaraApp.swift
+//  Agara Ring
 //
 //  Created by Saksham Bhutani on 5/31/26.
 //
@@ -10,7 +10,7 @@ import SwiftData
 import UserNotifications
 
 @main
-struct PulseLoopApp: App {
+struct AgaraApp: App {
     @Environment(\.scenePhase) private var scenePhase
     let container: ModelContainer
     @State private var bleClient: RingBLEClient
@@ -204,7 +204,7 @@ struct PulseLoopApp: App {
         WindowGroup {
             RootAppView()
                 // The default for every Text without its own font — Manrope, never SF Pro.
-                .font(PulseFont.body)
+                .font(AgaraFont.body)
                 .environment(bleClient)
                 .environment(coordinator)
                 .environment(gpsRecorder)

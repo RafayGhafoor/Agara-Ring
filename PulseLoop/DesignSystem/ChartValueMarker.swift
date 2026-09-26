@@ -40,7 +40,7 @@ struct ChartValueMarker<X: Plottable>: ViewModifier {
                             let sample = samples[index]
                             if let point = plotPoint(for: sample, proxy: proxy) {
                                 Circle()
-                                    .fill(PulseColors.textPrimary)
+                                    .fill(AgaraColors.textPrimary)
                                     .frame(width: 9, height: 9)
                                     .overlay(Circle().stroke(.white, lineWidth: 1.5))
                                     .position(point)
@@ -87,11 +87,11 @@ private struct TooltipLabel<X: Plottable>: View {
     var body: some View {
         VStack(spacing: 2) {
             Text(yLabel(sample.y))
-                .font(PulseFont.subheadline.weight(.semibold))
-                .foregroundStyle(PulseColors.textPrimary)
+                .font(AgaraFont.subheadline.weight(.semibold))
+                .foregroundStyle(AgaraColors.textPrimary)
             Text(xLabel(sample.x))
-                .font(PulseFont.caption2)
-                .foregroundStyle(PulseColors.textSecondary)
+                .font(AgaraFont.caption2)
+                .foregroundStyle(AgaraColors.textSecondary)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 5)

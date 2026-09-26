@@ -44,7 +44,7 @@ struct OnboardingFlowView: View {
             .transition(.opacity.combined(with: .move(edge: .trailing)))
         }
         .animation(.snappy(duration: 0.3), value: step)
-        .background(PulseColors.background.ignoresSafeArea())
+        .background(AgaraColors.background.ignoresSafeArea())
         .navigationBarBackButtonHidden()
     }
 
@@ -98,7 +98,7 @@ private struct OnboardingTopBar: View {
                     if canGoBack {
                         Button(action: onBack) {
                             Image(systemName: "chevron.left")
-                                .font(PulseFont.callout.weight(.semibold))
+                                .font(AgaraFont.callout.weight(.semibold))
                                 .frame(width: 44, height: 44)
                         }
                         .accessibilityLabel("Back")
@@ -106,24 +106,24 @@ private struct OnboardingTopBar: View {
                 }
                 Spacer()
                 Text("Step \(step.index + 1) of \(OnboardingStep.allCases.count)")
-                    .font(PulseFont.caption.weight(.semibold))
-                    .foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.caption.weight(.semibold))
+                    .foregroundStyle(AgaraColors.textMuted)
                     .monospacedDigit()
                 Spacer()
                 topBarSlot {
                     if showsSkip {
                         Button("Skip", action: onSkip)
-                            .font(PulseFont.subheadline.weight(.semibold))
+                            .font(AgaraFont.subheadline.weight(.semibold))
                             .frame(minWidth: 44, minHeight: 44)
                     }
                 }
             }
-            .foregroundStyle(PulseColors.textSecondary)
+            .foregroundStyle(AgaraColors.textSecondary)
 
             HStack(spacing: 7) {
                 ForEach(OnboardingStep.allCases) { item in
                     Capsule()
-                        .fill(item.index <= step.index ? PulseColors.accent : PulseColors.cardSoft)
+                        .fill(item.index <= step.index ? AgaraColors.accent : AgaraColors.cardSoft)
                         .frame(height: 4)
                 }
             }
@@ -161,12 +161,12 @@ struct OnboardingWelcomeView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private let features = [
-        OnboardingItem(icon: "dollarsign.circle.fill", title: "No subscription", detail: "Own your ring data", tint: PulseColors.success),
-        OnboardingItem(icon: "lock.shield.fill", title: "Privacy first", detail: "Stays local unless you sync", tint: PulseColors.info),
-        OnboardingItem(icon: "sparkles", title: "AI coach", detail: "Learns your baseline", tint: PulseColors.accent),
-        OnboardingItem(icon: "waveform.path.ecg", title: "Your vitals", detail: "HR, SpO₂, HRV, stress", tint: PulseColors.heartRate),
-        OnboardingItem(icon: "moon.stars.fill", title: "Sleep tracking", detail: "Stages & trends", tint: PulseColors.sleep),
-        OnboardingItem(icon: "figure.run", title: "Workouts", detail: "Live activity tracking", tint: PulseColors.steps),
+        OnboardingItem(icon: "dollarsign.circle.fill", title: "No subscription", detail: "Own your ring data", tint: AgaraColors.success),
+        OnboardingItem(icon: "lock.shield.fill", title: "Privacy first", detail: "Stays local unless you sync", tint: AgaraColors.info),
+        OnboardingItem(icon: "sparkles", title: "AI coach", detail: "Learns your baseline", tint: AgaraColors.accent),
+        OnboardingItem(icon: "waveform.path.ecg", title: "Your vitals", detail: "HR, SpO₂, HRV, stress", tint: AgaraColors.heartRate),
+        OnboardingItem(icon: "moon.stars.fill", title: "Sleep tracking", detail: "Stages & trends", tint: AgaraColors.sleep),
+        OnboardingItem(icon: "figure.run", title: "Workouts", detail: "Live activity tracking", tint: AgaraColors.steps),
     ]
 
     private let columns = [
@@ -221,18 +221,18 @@ struct OnboardingWelcomeView: View {
                         VStack(spacing: 8) {
                             tileIcon(feature, s: 1)
                             Text(feature.title)
-                                .font(PulseFont.headline)
-                                .foregroundStyle(PulseColors.textPrimary)
+                                .font(AgaraFont.headline)
+                                .foregroundStyle(AgaraColors.textPrimary)
                                 .multilineTextAlignment(.center)
                             Text(feature.detail)
-                                .font(PulseFont.footnote.weight(.regular))
-                                .foregroundStyle(PulseColors.textMuted)
+                                .font(AgaraFont.footnote.weight(.regular))
+                                .foregroundStyle(AgaraColors.textMuted)
                                 .multilineTextAlignment(.center)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
                         .padding(.horizontal, 13)
-                        .pulseGlass(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .agaraGlass(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     }
                 }
             }
@@ -251,7 +251,7 @@ struct OnboardingWelcomeView: View {
             .scaledToFit()
             .frame(width: size, height: size)
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .shadow(color: PulseColors.accent.opacity(0.22), radius: 16)
+            .shadow(color: AgaraColors.accent.opacity(0.22), radius: 16)
             .accessibilityHidden(true)
     }
 
@@ -267,14 +267,14 @@ struct OnboardingWelcomeView: View {
         VStack(spacing: 6) {
             tileIcon(feature, s: s)
             Text(feature.title)
-                .font(PulseFont.subheadline.weight(.semibold))
-                .foregroundStyle(PulseColors.textPrimary)
+                .font(AgaraFont.subheadline.weight(.semibold))
+                .foregroundStyle(AgaraColors.textPrimary)
                 .multilineTextAlignment(.center)
                 .lineLimit(1)
                 .minimumScaleFactor(0.85)
             Text(feature.detail)
-                .font(PulseFont.caption)
-                .foregroundStyle(PulseColors.textMuted)
+                .font(AgaraFont.caption)
+                .foregroundStyle(AgaraColors.textMuted)
                 .multilineTextAlignment(.center)
                 .lineLimit(1)
                 .minimumScaleFactor(0.9)
@@ -282,15 +282,15 @@ struct OnboardingWelcomeView: View {
         .frame(maxWidth: .infinity)
         .frame(height: (92 * s).rounded(), alignment: .center)
         .padding(.horizontal, 13)
-        .pulseGlass(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private var footer: some View {
         VStack(spacing: 10) {
             PrimaryButton(title: "Get started", systemImage: "arrow.right", action: getStarted)
             Button("Explore without ring", action: exploreWithoutRing)
-                .font(PulseFont.subheadline.weight(.semibold))
-                .foregroundStyle(PulseColors.textSecondary)
+                .font(AgaraFont.subheadline.weight(.semibold))
+                .foregroundStyle(AgaraColors.textSecondary)
                 .frame(height: 44)
         }
     }
@@ -418,15 +418,15 @@ struct OnboardingBaselineView: View {
     private let milestones = [
         OnboardingItem(
             icon: "1", title: "Today",
-            detail: "Activity and live vitals, right away", tint: PulseColors.info
+            detail: "Activity and live vitals, right away", tint: AgaraColors.info
         ),
         OnboardingItem(
             icon: "moon.fill", title: "First sync",
-            detail: "Sleep stages and nightly trends", tint: PulseColors.sleep
+            detail: "Sleep stages and nightly trends", tint: AgaraColors.sleep
         ),
         OnboardingItem(
             icon: "chart.line.uptrend.xyaxis", title: "Days 3–7",
-            detail: "Your personalized baseline unlocks", tint: PulseColors.success
+            detail: "Your personalized baseline unlocks", tint: AgaraColors.success
         ),
     ]
 
@@ -447,7 +447,7 @@ struct OnboardingBaselineView: View {
             if reduceMotion {
                 appeared = true
             } else {
-                withAnimation(PulseMotion.bouncy) { appeared = true }
+                withAnimation(AgaraMotion.bouncy) { appeared = true }
             }
         }
     }
@@ -463,14 +463,14 @@ struct OnboardingBaselineView: View {
 
                 VStack(spacing: 6) {
                     Text("You're all set")
-                        .font(PulseFont.largeTitle)
-                        .foregroundStyle(PulseColors.textPrimary)
+                        .font(AgaraFont.largeTitle)
+                        .foregroundStyle(AgaraColors.textPrimary)
                         .multilineTextAlignment(.center)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                     Text("Wear your ring today. Your baseline builds from here.")
-                        .font(PulseFont.callout)
-                        .foregroundStyle(PulseColors.textSecondary)
+                        .font(AgaraFont.callout)
+                        .foregroundStyle(AgaraColors.textSecondary)
                         .multilineTextAlignment(.center)
                         .lineLimit(1)
                         .minimumScaleFactor(0.85)
@@ -493,12 +493,12 @@ struct OnboardingBaselineView: View {
                 eyebrow
                 VStack(spacing: 6) {
                     Text("You're all set")
-                        .font(PulseFont.largeTitle)
-                        .foregroundStyle(PulseColors.textPrimary)
+                        .font(AgaraFont.largeTitle)
+                        .foregroundStyle(AgaraColors.textPrimary)
                         .multilineTextAlignment(.center)
                     Text("Wear your ring today. Your baseline builds from here.")
-                        .font(PulseFont.callout)
-                        .foregroundStyle(PulseColors.textSecondary)
+                        .font(AgaraFont.callout)
+                        .foregroundStyle(AgaraColors.textSecondary)
                         .multilineTextAlignment(.center)
                 }
                 timeline(s: 1)
@@ -518,41 +518,41 @@ struct OnboardingBaselineView: View {
         ZStack {
             // Outer concentric ring.
             Circle()
-                .stroke(PulseColors.accent.opacity(0.12), lineWidth: 2)
+                .stroke(AgaraColors.accent.opacity(0.12), lineWidth: 2)
                 .frame(width: (140 * s).rounded(), height: (140 * s).rounded())
                 .scaleEffect(appeared ? 1.0 : 0.7)
                 .opacity(appeared ? 1.0 : 0.0)
             // Inner concentric ring (staggered).
             Circle()
-                .stroke(PulseColors.accent.opacity(0.25), lineWidth: 2)
+                .stroke(AgaraColors.accent.opacity(0.25), lineWidth: 2)
                 .frame(width: (104 * s).rounded(), height: (104 * s).rounded())
                 .scaleEffect(appeared ? 1.0 : 0.7)
                 .opacity(appeared ? 1.0 : 0.0)
-                .animation(reduceMotion ? nil : PulseMotion.bouncy.delay(0.06), value: appeared)
+                .animation(reduceMotion ? nil : AgaraMotion.bouncy.delay(0.06), value: appeared)
 
             Image(systemName: "checkmark.seal.fill")
                 .font(.system(size: (72 * s).rounded()))
-                .foregroundStyle(PulseColors.accent)
+                .foregroundStyle(AgaraColors.accent)
                 .padding((14 * s).rounded())
-                .pulseGlass(Circle())
+                .agaraGlass(Circle())
                 .scaleEffect(appeared ? 1.0 : 0.3)
                 .animation(reduceMotion ? nil : .spring(response: 0.5, dampingFraction: 0.6), value: appeared)
         }
-        .pulseGlassContainer()
+        .agaraGlassContainer()
         .accessibilityHidden(true)
     }
 
     private var eyebrow: some View {
         HStack(spacing: 6) {
             Image(systemName: "checkmark.seal.fill")
-                .font(PulseFont.caption)
+                .font(AgaraFont.caption)
             Text("Setup complete")
-                .font(PulseFont.caption.weight(.semibold))
+                .font(AgaraFont.caption.weight(.semibold))
         }
-        .foregroundStyle(PulseColors.accent)
+        .foregroundStyle(AgaraColors.accent)
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .pulseGlass(Capsule(), tint: PulseColors.accent.opacity(0.16))
+        .agaraGlass(Capsule(), tint: AgaraColors.accent.opacity(0.16))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Setup complete")
     }
@@ -569,13 +569,13 @@ struct OnboardingBaselineView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             LinearGradient(
-                colors: [PulseColors.accent.opacity(0.14), PulseColors.card],
+                colors: [AgaraColors.accent.opacity(0.14), AgaraColors.card],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             ),
             in: RoundedRectangle(cornerRadius: (22 * s).rounded(), style: .continuous)
         )
-        .pulseGlass(RoundedRectangle(cornerRadius: (22 * s).rounded(), style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: (22 * s).rounded(), style: .continuous))
     }
 
     private func milestoneRow(
@@ -590,14 +590,14 @@ struct OnboardingBaselineView: View {
             VStack(spacing: 0) {
                 Group {
                     if milestone.icon == "1" {
-                        Text("1").font(PulseFont.footnote.weight(.bold))
+                        Text("1").font(AgaraFont.footnote.weight(.bold))
                     } else {
-                        Image(systemName: milestone.icon).font(PulseFont.footnote.weight(.semibold))
+                        Image(systemName: milestone.icon).font(AgaraFont.footnote.weight(.semibold))
                     }
                 }
                 .foregroundStyle(milestone.tint)
                 .frame(width: node, height: node)
-                .pulseGlass(Circle(), tint: milestone.tint.opacity(0.18))
+                .agaraGlass(Circle(), tint: milestone.tint.opacity(0.18))
 
                 if !isLast {
                     Rectangle()
@@ -610,11 +610,11 @@ struct OnboardingBaselineView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(milestone.title)
-                    .font(PulseFont.subheadline.weight(.semibold))
-                    .foregroundStyle(PulseColors.textPrimary)
+                    .font(AgaraFont.subheadline.weight(.semibold))
+                    .foregroundStyle(AgaraColors.textPrimary)
                 Text(milestone.detail)
-                    .font(PulseFont.footnote.weight(.regular))
-                    .foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.footnote.weight(.regular))
+                    .foregroundStyle(AgaraColors.textMuted)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.top, (node - 26) / 2) // vertically center title against the node
@@ -623,7 +623,7 @@ struct OnboardingBaselineView: View {
         .fixedSize(horizontal: false, vertical: true)
         .opacity(appeared ? 1.0 : 0.0)
         .offset(y: appeared ? 0 : 8)
-        .animation(reduceMotion ? nil : PulseMotion.materialize.delay(0.12 * Double(index)), value: appeared)
+        .animation(reduceMotion ? nil : AgaraMotion.materialize.delay(0.12 * Double(index)), value: appeared)
         .accessibilityElement(children: .combine)
     }
 }

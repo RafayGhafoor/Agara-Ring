@@ -1,6 +1,6 @@
 //
-//  PulseLoopLiveActivityControl.swift
-//  PulseLoopLiveActivity
+//  AgaraLiveActivityControl.swift
+//  Agara Ring
 //
 //  Created by Saksham Bhutani on 6/1/26.
 //
@@ -9,10 +9,11 @@ import AppIntents
 import SwiftUI
 import WidgetKit
 
-struct PulseLoopLiveActivityControl: ControlWidget {
+struct AgaraLiveActivityControl: ControlWidget {
     var body: some ControlWidgetConfiguration {
         StaticControlConfiguration(
-            kind: "xyz.sakshambhutani.pulseloop2.PulseLoopLiveActivity",
+            // Xcode template, never registered in the bundle, so no installed control references this kind.
+            kind: "com.agara.ring.AgaraLiveActivity",
             provider: Provider()
         ) { value in
             ControlWidgetToggle(
@@ -28,7 +29,7 @@ struct PulseLoopLiveActivityControl: ControlWidget {
     }
 }
 
-extension PulseLoopLiveActivityControl {
+extension AgaraLiveActivityControl {
     struct Provider: ControlValueProvider {
         var previewValue: Bool {
             false

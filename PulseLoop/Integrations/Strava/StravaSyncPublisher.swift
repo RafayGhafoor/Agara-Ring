@@ -1,10 +1,10 @@
 import SwiftUI
 import SwiftData
 
-/// Drives automatic Strava uploads off the same coalesced `PulseDataChange` signal the widget and
+/// Drives automatic Strava uploads off the same coalesced `AgaraDataChange` signal the widget and
 /// Health publishers ride. When ring data lands (or a scene-phase edge fires), it debounces briefly
 /// and then asks `StravaUploadService` to push every newly-finished workout past the watermark.
-/// Retained for the app's lifetime by `PulseLoopApp` (like `HealthSyncPublisher`).
+/// Retained for the app's lifetime by `AgaraApp` (like `HealthSyncPublisher`).
 ///
 /// Refresh discipline mirrors the Health publisher: a history sync bumps the token once per batch,
 /// but several batches can land in quick succession, so the publish is debounced. Scene-phase edges
@@ -42,7 +42,7 @@ final class StravaSyncPublisher {
     /// one burst of persistence batches produces one upload pass.
     private func observeDataChange() {
         withObservationTracking {
-            _ = PulseDataChange.shared.token
+            _ = AgaraDataChange.shared.token
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self else { return }

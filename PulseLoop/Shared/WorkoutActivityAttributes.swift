@@ -1,6 +1,6 @@
 //
 //  WorkoutActivityAttributes.swift
-//  PulseLoop
+//  Agara Ring
 //
 //  Shared types for the workout Live Activity. Must compile in BOTH the app
 //  target (PulseLoop) and the widget extension target
@@ -86,7 +86,7 @@ extension WorkoutActivityAttributes.ContentState {
 /// `nonisolated` so the App Intents' nonisolated `perform()` can call it under Swift 6
 /// (this target defaults to MainActor isolation).
 nonisolated enum WorkoutAppGroup {
-    static let suite = "group.xyz.sakshambhutani.pulseloop2"
+    static let suite = "group.xyz.sakshambhutani.pulseloop2" // install-bound: App Group id (entitlements + provisioning)
     static let commandKey = "pendingWorkoutCommand"          // "pause" | "resume" | "finish"
     static let commandSessionKey = "pendingWorkoutCommandSession"
     static let commandTimeKey = "pendingWorkoutCommandTime"  // Date for de-dupe

@@ -94,16 +94,16 @@ struct ShareCardModel {
     /// Per-type accent, reusing existing palette tokens (no new hex values).
     static func accent(for type: String) -> Color {
         switch ActivityMeta.meta(type).type {
-        case "run": return PulseColors.heartRate
-        case "walk": return PulseColors.success
-        case "cycle": return PulseColors.distance
-        case "hike": return PulseColors.warning
-        case "gym": return PulseColors.accent
-        case "yoga": return PulseColors.temperature
-        case "dance": return PulseColors.fatigue
-        case "squash": return PulseColors.calories
-        case "sport": return PulseColors.info
-        default: return PulseColors.accent
+        case "run": return AgaraColors.heartRate
+        case "walk": return AgaraColors.success
+        case "cycle": return AgaraColors.distance
+        case "hike": return AgaraColors.warning
+        case "gym": return AgaraColors.accent
+        case "yoga": return AgaraColors.temperature
+        case "dance": return AgaraColors.fatigue
+        case "squash": return AgaraColors.calories
+        case "sport": return AgaraColors.info
+        default: return AgaraColors.accent
         }
     }
 

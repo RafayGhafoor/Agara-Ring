@@ -60,7 +60,7 @@ struct AnimatedRingArt: View {
                 .scaleEffect(frame.scale)
                 .overlay {
                     Circle()
-                        .strokeBorder(PulseColors.success, lineWidth: 3)
+                        .strokeBorder(AgaraColors.success, lineWidth: 3)
                         .scaleEffect(frame.ringScale)
                         .opacity(frame.flash)
                 }
@@ -82,7 +82,7 @@ struct AnimatedRingArt: View {
         }
         .overlay {
             if reduceMotion && phase == .paired {
-                Circle().strokeBorder(PulseColors.success, lineWidth: 2)
+                Circle().strokeBorder(AgaraColors.success, lineWidth: 2)
             }
         }
         .frame(width: size, height: size)
@@ -131,7 +131,7 @@ struct AnimatedRingArt: View {
         ZStack {
             // Breathing accent glow behind the platter.
             Circle()
-                .fill(PulseColors.accent)
+                .fill(AgaraColors.accent)
                 .frame(width: size * 1.02, height: size * 1.02)
                 .blur(radius: size * 0.16)
                 .opacity(glow)
@@ -146,7 +146,7 @@ struct AnimatedRingArt: View {
                                     stops: [
                                         .init(color: Color.white.opacity(0), location: 0),
                                         .init(color: Color.white.opacity(0), location: 0.72),
-                                        .init(color: PulseColors.accent.opacity(0.55), location: 0.9),
+                                        .init(color: AgaraColors.accent.opacity(0.55), location: 0.9),
                                         .init(color: Color.white.opacity(0.95), location: 0.98),
                                         .init(color: Color.white.opacity(0), location: 1),
                                     ],

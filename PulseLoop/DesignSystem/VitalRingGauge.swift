@@ -90,7 +90,7 @@ struct VitalRingGauge: View {
         ZStack {
             // Track (the full 270° arc), rounded so both sweep ends read as rounded under the zones.
             RingSegment(startFraction: 0, endFraction: 1, inset: strokeInset)
-                .stroke(PulseColors.elevated, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                .stroke(AgaraColors.elevated, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
 
             // Muted zone arcs — every zone is butt-capped at its exact boundaries so interior joins are
             // clean straight edges (orange meets red with no rounding between them).
@@ -119,10 +119,10 @@ struct VitalRingGauge: View {
                 Text(centerValue)
                     .font(AgaraFont.face(size * 0.30, .semibold).monospacedDigit())
                     .monospacedDigit()
-                    .foregroundStyle(PulseColors.textPrimary)
+                    .foregroundStyle(AgaraColors.textPrimary)
                     .contentTransition(.numericText())
                 if let centerUnit {
-                    Text(centerUnit).font(AgaraFont.face(size * 0.08, .medium)).foregroundStyle(PulseColors.textMuted)
+                    Text(centerUnit).font(AgaraFont.face(size * 0.08, .medium)).foregroundStyle(AgaraColors.textMuted)
                 }
                 if let centerStatus {
                     Text(centerStatus.uppercased())
@@ -130,7 +130,7 @@ struct VitalRingGauge: View {
                         .foregroundStyle(valueColor)
                 }
                 if let subtitle {
-                    Text(subtitle).font(AgaraFont.face(size * 0.065)).foregroundStyle(PulseColors.textMuted)
+                    Text(subtitle).font(AgaraFont.face(size * 0.065)).foregroundStyle(AgaraColors.textMuted)
                 }
             }
         }
@@ -163,7 +163,7 @@ struct VitalRingGauge: View {
         let angle = GaugeGeometry.angle(for: fraction(value))
         let r = size / 2 - strokeInset
         return Circle()
-            .fill(PulseColors.textPrimary)
+            .fill(AgaraColors.textPrimary)
             .frame(width: lineWidth * 0.55, height: lineWidth * 0.55)
             .offset(x: r * cos(angle.radians), y: r * sin(angle.radians))
     }

@@ -38,22 +38,22 @@ enum RingDecodedEvent: Sendable {
     /// The device's own capability bitmap, already mapped onto `WearableCapability` (the protocol's `02 01`; see
     /// `the support-function reply`). Consumed by `RingBLEClient` to refine the active capability set — the
     /// coordinator's baseline is what the *family* can do, this is what *this unit* claims. Produces no
-    /// `PulseEvent`: capabilities reach persistence via the re-published `.deviceIdentified`, not here.
+    /// `AgaraEvent`: capabilities reach persistence via the re-published `.deviceIdentified`, not here.
     case supportFunctions(Set<WearableCapability>)
-    /// The chipset/OTA family (the protocol's `02 1b`). **Diagnostic only** — PulseLoop does no firmware updates,
+    /// The chipset/OTA family (the protocol's `02 1b`). **Diagnostic only** — Agara Ring does no firmware updates,
     /// so nothing branches on it; it is decoded because it is the one frame that says whether the ring's
     /// OTA path is JieLi RCSP (3/4/5), which is what would gate the AE00 auth we deliberately don't
-    /// implement. Produces no `PulseEvent`.
+    /// implement. Produces no `AgaraEvent`.
     case chipScheme(value: Int)
     /// The ring reports it went on/off the finger (the protocol's `06 13`). Debug-feed only for now — it produces
-    /// no `PulseEvent`, because nothing in the app gates on wear state yet. It is decoded so the packet
+    /// no `AgaraEvent`, because nothing in the app gates on wear state yet. It is decoded so the packet
     /// feed can show *why* a measurement returned nothing (the ring was off).
     case wearingStatus(worn: Bool, timestamp: Date)
     /// The ring **refused** to start the spot measurement we asked for (the protocol's `03 2f` answered with a
     /// non-zero status). `mode` is the measurement mode we started — the reply itself carries only a
     /// status byte, so the mode comes from the start `the driver` remembers sending.
     ///
-    /// Produces no `PulseEvent`: it is a verdict on a command, not data. `RingSyncCoordinator` reads it
+    /// Produces no `AgaraEvent`: it is a verdict on a command, not data. `RingSyncCoordinator` reads it
     /// off the raw-packet feed and aborts the matching in-flight measurement, which is the whole point —
     /// the owner's an earlier ring refuses HRV (mode `0x0a` → status `0x01`), and without this the app polls a ring
     /// that already said no for the full 45-second window before reporting a generic failure.
@@ -65,7 +65,7 @@ enum RingDecodedEvent: Sendable {
     /// `insertBleMessage(<query>.b(day, index + 1))` in `e1/{f,d,g,l}.java`). `cmd` identifies the
     /// vital, `day` is 0 = today.
     ///
-    /// Produces no `PulseEvent` — the samples themselves arrive as separate `.historyMeasurement`
+    /// Produces no `AgaraEvent` — the samples themselves arrive as separate `.historyMeasurement`
     /// events; this only advances the cursor.
     case timingHistoryFrame(cmd: Int, day: Int, frameIndex: Int)
     case timeSyncAck(timestamp: Date)

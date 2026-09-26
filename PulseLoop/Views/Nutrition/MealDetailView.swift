@@ -11,7 +11,7 @@ struct MealDetailView: View {
     let mealId: UUID
     @Binding var path: NavigationPath
 
-    @State private var dataChange = PulseDataChange.shared
+    @State private var dataChange = AgaraDataChange.shared
     @State private var entry: MealEntry?
     @State private var editSheet = false
     @State private var deleteConfirm = false
@@ -30,7 +30,7 @@ struct MealDetailView: View {
                             .resizable().scaledToFill()
                             .frame(maxWidth: .infinity)
                             .frame(height: 220)
-                            .clipShape(RoundedRectangle(cornerRadius: PulseRadius.card, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous))
                     }
                     titleBlock(entry)
                     kcalMacroCard(entry)
@@ -39,10 +39,10 @@ struct MealDetailView: View {
                     }
                     factsCard(entry)
                     if let notes = entry.notes, !notes.isEmpty {
-                        DetailCard(title: "Notes", color: PulseColors.textMuted) {
+                        DetailCard(title: "Notes", color: AgaraColors.textMuted) {
                             Text(notes)
-                                .font(PulseFont.body)
-                                .foregroundStyle(PulseColors.textSecondary)
+                                .font(AgaraFont.body)
+                                .foregroundStyle(AgaraColors.textSecondary)
                                 .padding(.top, 12)
                         }
                     }
@@ -55,7 +55,7 @@ struct MealDetailView: View {
                     .padding(.top, 60)
             }
         }
-        .background(PulseColors.background)
+        .background(AgaraColors.background)
         .pageChrome(entry?.name ?? "Meal") {
             if entry != nil {
                 Menu {
@@ -63,16 +63,16 @@ struct MealDetailView: View {
                     Button(role: .destructive) { deleteConfirm = true } label: { Label("Delete", systemImage: "trash") }
                 } label: {
                     Image(systemName: "ellipsis")
-                        .font(PulseFont.bodyEmphasis)
-                        .foregroundStyle(PulseColors.textPrimary)
+                        .font(AgaraFont.bodyEmphasis)
+                        .foregroundStyle(AgaraColors.textPrimary)
                         .frame(width: 36, height: 36)
-                        .pulseGlass(Circle(), interactive: true)
+                        .agaraGlass(Circle(), interactive: true)
                         .minTapTarget(visualSize: 36)
                 }
                 .accessibilityLabel("Meal actions")
             }
         }
-        .pulseScrollEdges()
+        .agaraScrollEdges()
         .task(id: dataChange.token) { reload() }
         .sheet(isPresented: $editSheet) {
             if let entry {
@@ -99,17 +99,17 @@ struct MealDetailView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 Text(entry.mealType.label.uppercased())
-                    .font(PulseFont.micro.weight(.semibold))
+                    .font(AgaraFont.micro.weight(.semibold))
                     .tracking(0.8)
-                    .foregroundStyle(PulseColors.calories)
+                    .foregroundStyle(AgaraColors.calories)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(PulseColors.calories.opacity(0.14), in: Capsule())
+                    .background(AgaraColors.calories.opacity(0.14), in: Capsule())
                 ProvenanceBadge(source: entry.source, userEdited: entry.userEdited)
             }
             Text(Self.timeFormatter.string(from: entry.timestamp))
-                .font(PulseFont.caption.weight(.regular))
-                .foregroundStyle(PulseColors.textMuted)
+                .font(AgaraFont.caption.weight(.regular))
+                .foregroundStyle(AgaraColors.textMuted)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -121,20 +121,20 @@ struct MealDetailView: View {
             Text(NutritionFormat.kcal(entry.calories))
                 .activityValueStyle(size: 40)
             Text("kcal")
-                .font(PulseFont.subheadline)
-                .foregroundStyle(PulseColors.textMuted)
+                .font(AgaraFont.subheadline)
+                .foregroundStyle(AgaraColors.textMuted)
             Spacer()
             Text("ENERGY")
-                .font(PulseFont.micro.weight(.semibold))
+                .font(AgaraFont.micro.weight(.semibold))
                 .tracking(1.0)
-                .foregroundStyle(PulseColors.calories)
+                .foregroundStyle(AgaraColors.calories)
         }
         .padding(16)
-        .pulseGlass(RoundedRectangle(cornerRadius: PulseRadius.card, style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous))
     }
 
     private func servingCard(_ entry: MealEntry) -> some View {
-        DetailCard(title: "Serving", color: PulseColors.calories) {
+        DetailCard(title: "Serving", color: AgaraColors.calories) {
             VStack(alignment: .leading, spacing: 6) {
                 if let serving = entry.servingDescription {
                     factRow("Serving size", serving)
@@ -150,7 +150,7 @@ struct MealDetailView: View {
     }
 
     private func factsCard(_ entry: MealEntry) -> some View {
-        DetailCard(title: "Nutrition Facts", color: PulseColors.calories) {
+        DetailCard(title: "Nutrition Facts", color: AgaraColors.calories) {
             VStack(spacing: 0) {
                 // No Calories row — the hero strip above owns energy.
                 factDividedRow("Protein", "\(NutritionFormat.grams(entry.proteinG)) g", first: true)
@@ -172,28 +172,28 @@ struct MealDetailView: View {
 
     private func factRow(_ label: String, _ value: String) -> some View {
         HStack {
-            Text(label).font(PulseFont.body).foregroundStyle(PulseColors.textSecondary)
+            Text(label).font(AgaraFont.body).foregroundStyle(AgaraColors.textSecondary)
             Spacer()
             Text(value)
-                .font(PulseFont.body.monospacedDigit())
-                .foregroundStyle(PulseColors.textPrimary)
+                .font(AgaraFont.body.monospacedDigit())
+                .foregroundStyle(AgaraColors.textPrimary)
         }
     }
 
     private func factDividedRow(_ label: String, _ value: String, first: Bool = false, indented: Bool = false) -> some View {
         VStack(spacing: 0) {
             if !first {
-                Divider().overlay(PulseColors.borderSubtle)
+                Divider().overlay(AgaraColors.borderSubtle)
             }
             HStack {
                 Text(label)
-                    .font(indented ? PulseFont.subheadline.weight(.regular) : PulseFont.body)
-                    .foregroundStyle(indented ? PulseColors.textMuted : PulseColors.textSecondary)
+                    .font(indented ? AgaraFont.subheadline.weight(.regular) : AgaraFont.body)
+                    .foregroundStyle(indented ? AgaraColors.textMuted : AgaraColors.textSecondary)
                     .padding(.leading, indented ? 16 : 0)
                 Spacer()
                 Text(value)
-                    .font(PulseFont.body.monospacedDigit())
-                    .foregroundStyle(PulseColors.textPrimary)
+                    .font(AgaraFont.body.monospacedDigit())
+                    .foregroundStyle(AgaraColors.textPrimary)
             }
             .padding(.vertical, 10)
         }
@@ -210,8 +210,8 @@ struct MealDetailView: View {
             text = "Entered manually"
         }
         return Text(text)
-            .font(PulseFont.caption.weight(.regular))
-            .foregroundStyle(PulseColors.textMuted)
+            .font(AgaraFont.caption.weight(.regular))
+            .foregroundStyle(AgaraColors.textMuted)
             .frame(maxWidth: .infinity, alignment: .center)
     }
 }

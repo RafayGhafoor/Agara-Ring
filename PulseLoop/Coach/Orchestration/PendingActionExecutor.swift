@@ -28,14 +28,14 @@ enum PendingActionExecutor {
             context.delete(session)
             try? context.save()
             HealthSyncService.shared.deleteExportedWorkout(sessionId: id)
-            PulseDataChange.shared.notify()
+            AgaraDataChange.shared.notify()
             return "Deleted the \(typeLabel) session."
 
         case .updateActivitySession:
             apply(action.updates, to: session, context: context)
             session.updatedAt = Date()
             try? context.save()
-            PulseDataChange.shared.notify()
+            AgaraDataChange.shared.notify()
             return "Updated the \(typeLabel) session."
 
         case .deleteMealEntry, .updateMealEntry:

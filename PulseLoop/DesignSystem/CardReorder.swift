@@ -216,10 +216,10 @@ private struct ReorderDragChip: View {
             Image(systemName: symbol).font(.system(size: 15, weight: .semibold))
             Text(name).font(AgaraFont.face(14, .semibold)).lineLimit(1)
         }
-        .foregroundStyle(PulseColors.textPrimary)
+        .foregroundStyle(AgaraColors.textPrimary)
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .pulseGlass(Capsule())
+        .agaraGlass(Capsule())
         .shadow(color: .black.opacity(0.25), radius: 12, x: 0, y: 6)
     }
 }
@@ -247,7 +247,7 @@ struct HiddenMetricsTray<Item: Hashable>: View {
                 Text("HIDDEN")
                     .font(AgaraFont.face(12, .semibold))
                     .kerning(0.6)
-                    .foregroundStyle(PulseColors.textSecondary)
+                    .foregroundStyle(AgaraColors.textSecondary)
                     .padding(.leading, 4)
 
                 VStack(spacing: 8) {
@@ -282,24 +282,24 @@ private struct HiddenRow: View {
             HStack(spacing: 12) {
                 Image(systemName: symbol)
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(PulseColors.textSecondary)
+                    .foregroundStyle(AgaraColors.textSecondary)
                     .frame(width: 22)
                 Text(name)
                     .font(AgaraFont.face(15, .medium))
-                    .foregroundStyle(PulseColors.textPrimary)
+                    .foregroundStyle(AgaraColors.textPrimary)
                 Spacer(minLength: 8)
                 // A solid disc, not another glass surface: glass inside glass muddies both.
                 ZStack {
-                    Circle().fill(PulseColors.card)
+                    Circle().fill(AgaraColors.card)
                     Image(systemName: "plus")
                         .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(PulseColors.accent)
+                        .foregroundStyle(AgaraColors.accent)
                 }
                 .frame(width: 24, height: 24)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
-            .pulseGlass(RoundedRectangle(cornerRadius: 14, style: .continuous), interactive: true)
+            .agaraGlass(RoundedRectangle(cornerRadius: 14, style: .continuous), interactive: true)
             // As in `RemoveBadge`: the glass surface is a `.background`, so the row needs its own
             // shape or only the label glyphs and the "+" disc would answer a tap.
             .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -330,11 +330,11 @@ private struct RemoveBadge: View {
         Button(action: action) {
             Image(systemName: "minus")
                 .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(PulseColors.textPrimary)
+                .foregroundStyle(AgaraColors.textPrimary)
                 .frame(width: Self.size, height: Self.size)
-                .pulseGlass(Circle(), interactive: true)
+                .agaraGlass(Circle(), interactive: true)
                 .shadow(color: .black.opacity(0.18), radius: 3, x: 0, y: 1)
-                // `pulseGlass` draws through `.background`, which adds no hit region, so without an
+                // `agaraGlass` draws through `.background`, which adds no hit region, so without an
                 // explicit shape the button's target collapses to the minus glyph's strokes. Widen it
                 // past the disc too — 24pt is a small thing to hit while every card is wiggling.
                 .frame(width: Self.hitSize, height: Self.hitSize)
@@ -363,15 +363,15 @@ struct ReorderDoneBar: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
             }
-            // `.pulseTap` brings its own `contentShape` and consumes the touch, so "Done" gets a real
+            // `.agaraTap` brings its own `contentShape` and consumes the touch, so "Done" gets a real
             // hit area instead of only its glyphs.
-            .buttonStyle(.pulseTap)
+            .buttonStyle(.agaraTap)
         }
-        .foregroundStyle(PulseColors.textPrimary)
+        .foregroundStyle(AgaraColors.textPrimary)
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .pulseGlass(Capsule(), interactive: true)
-        // `pulseGlass` paints its surface with `.background`, which draws but adds no hit region — so
+        .agaraGlass(Capsule(), interactive: true)
+        // `agaraGlass` paints its surface with `.background`, which draws but adds no hit region — so
         // without this, every touch outside the "Done" glyphs fell straight through to the card
         // beneath. `BottomNavBar` carries a `contentShape` for exactly this reason. Tapping the label
         // does nothing on purpose: exiting on a stray label tap would fire during fumbled drags.

@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-/// Subscribes to `PulseEventBus` and triggers coach-summary regeneration on new
+/// Subscribes to `AgaraEventBus` and triggers coach-summary regeneration on new
 /// data, debounced so streaming packets coalesce into one refresh. The service
 /// self-gates (signature + rate limit), so this just nudges it on relevant
 /// events. Lives for the app lifetime, like `EventPersistenceSubscriber`.
@@ -23,14 +23,14 @@ final class CoachSummaryCoordinator {
     func start() {
         guard streamTask == nil else { return }
         streamTask = Task { [weak self] in
-            let stream = await PulseEventBus.shared.stream()
+            let stream = await AgaraEventBus.shared.stream()
             for await event in stream {
                 self?.handle(event)
             }
         }
     }
 
-    private func handle(_ event: PulseEvent) {
+    private func handle(_ event: AgaraEvent) {
         switch event {
         case .activityUpdate, .heartRateSample, .spo2Result, .historyMeasurement:
             pendingToday = true

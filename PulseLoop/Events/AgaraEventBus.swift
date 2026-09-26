@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-enum PulseEvent: Sendable {
+enum AgaraEvent: Sendable {
     case deviceStateChanged(state: RingConnectionState, address: String?)
     /// Emitted on connect once the active wearable's type + capabilities are known, so persistence
     /// can stamp the `Device` and the UI can capability-gate its surfaces.
@@ -79,18 +79,18 @@ enum PulseEvent: Sendable {
     case coachTrace(String)
 }
 
-actor PulseEventBus {
-    static let shared = PulseEventBus()
+actor AgaraEventBus {
+    static let shared = AgaraEventBus()
     
-    private var continuations: [UUID: AsyncStream<PulseEvent>.Continuation] = [:]
+    private var continuations: [UUID: AsyncStream<AgaraEvent>.Continuation] = [:]
     
-    func publish(_ event: PulseEvent) {
+    func publish(_ event: AgaraEvent) {
         for continuation in continuations.values {
             continuation.yield(event)
         }
     }
     
-    func stream() -> AsyncStream<PulseEvent> {
+    func stream() -> AsyncStream<AgaraEvent> {
         let id = UUID()
         return AsyncStream { continuation in
             continuations[id] = continuation
@@ -170,7 +170,7 @@ final class EventPersistenceSubscriber {
         // Keep the audit tables a rolling week (they grew without bound).
         DebugRepository.pruneAuditTables(context: context)
         task = Task {
-            let stream = await PulseEventBus.shared.stream()
+            let stream = await AgaraEventBus.shared.stream()
             for await event in stream {
                 await MainActor.run {
                     self.persist(event)
@@ -195,7 +195,7 @@ final class EventPersistenceSubscriber {
         flushNow()
     }
 
-    func persist(_ event: PulseEvent) {
+    func persist(_ event: AgaraEvent) {
         noopWrite = false
         applyPersist(event)
         // Nothing written (an unchanged poll value, a throttled sample, a non-data event): no save and no
@@ -232,12 +232,12 @@ final class EventPersistenceSubscriber {
         pendingWrites = 0
         try? context.save()
         // One coalesced signal per batch; stores recompute once instead of per event.
-        PulseDataChange.shared.notify()
+        AgaraDataChange.shared.notify()
     }
 
     // This is an exhaustive event router; each enum case is independent rather than branching logic.
     // swiftlint:disable:next cyclomatic_complexity
-    private func applyPersist(_ event: PulseEvent) {
+    private func applyPersist(_ event: AgaraEvent) {
         switch event {
         case let .deviceStateChanged(state, address):
             let device = MetricsService.fetchDevices(context).first ?? Device()

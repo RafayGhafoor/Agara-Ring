@@ -182,8 +182,8 @@ final class HealthSyncTests: XCTestCase {
 
     func testDeviceFactoryReturnsNilWhenNothingIsKnown() {
         XCTAssertNil(HealthKitTypeMappings.device(name: nil, model: nil, firmwareVersion: nil))
-        let device = HealthKitTypeMappings.device(name: "PulseLoop Ring", model: "R02", firmwareVersion: "1.2.3")
-        XCTAssertEqual(device?.name, "PulseLoop Ring")
+        let device = HealthKitTypeMappings.device(name: "Agara Ring", model: "R02", firmwareVersion: "1.2.3")
+        XCTAssertEqual(device?.name, "Agara Ring")
         XCTAssertEqual(device?.model, "R02")
         XCTAssertEqual(device?.firmwareVersion, "1.2.3")
     }

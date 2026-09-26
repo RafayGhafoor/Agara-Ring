@@ -1,6 +1,6 @@
 //
-//  PulseLoopLiveActivityLiveActivity.swift
-//  PulseLoopLiveActivity
+//  WorkoutLiveActivityWidget.swift
+//  Agara Ring
 //
 
 import ActivityKit

@@ -1091,7 +1091,7 @@ enum ActivityService {
         }
         DailyCalorieEstimator.recompute(around: session, context: context)
         try? context.save()
-        PulseDataChange.shared.notify()
+        AgaraDataChange.shared.notify()
         return true
     }
 
@@ -1257,7 +1257,7 @@ enum ActivityRecorderService {
         context.insert(ActivityEvent(sessionId: session.id, kind: "gps_stopped"))
         context.insert(ActivityEvent(sessionId: session.id, kind: "finished"))
         try? context.save()
-        PulseDataChange.shared.notify()
+        AgaraDataChange.shared.notify()
     }
     
     static func cancel(_ session: ActivitySession, context: ModelContext) {
@@ -1294,7 +1294,7 @@ enum ActivityRecorderService {
         }
         try? context.save()
         HealthSyncService.shared.deleteExportedWorkout(sessionId: id)
-        PulseDataChange.shared.notify()
+        AgaraDataChange.shared.notify()
     }
 
     static func recoverStaleSession(context: ModelContext) -> [ActivitySession] {

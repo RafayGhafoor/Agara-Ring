@@ -1,11 +1,11 @@
 ---
 title: Contributors
-description: The people building PulseLoop on iOS and Android.
+description: The people building Agara Ring on iOS and Android.
 ---
 
 # Contributors
 
-PulseLoop is built by a community across **iOS** and **Android**. This page is
+Agara Ring is built by a community across **iOS** and **Android**. This page is
 generated automatically from both repositories.
 
 <!-- CONTRIBUTORS:START -->

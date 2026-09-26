@@ -12,19 +12,19 @@ struct WorkoutStat: View {
     var body: some View {
         VStack(spacing: 6) {
             Text(value)
-                .font(PulseFont.title3)
+                .font(AgaraFont.title3)
                 .monospacedDigit()
-                .foregroundStyle(PulseColors.textPrimary)
+                .foregroundStyle(AgaraColors.textPrimary)
                 .minimumScaleFactor(0.7)
                 .lineLimit(1)
             Text(label.uppercased())
-                .font(PulseFont.micro)
+                .font(AgaraFont.micro)
                 .tracking(0.6)
-                .foregroundStyle(PulseColors.textMuted)
+                .foregroundStyle(AgaraColors.textMuted)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
-        .pulseGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 }
 
@@ -36,21 +36,21 @@ private struct LiveStatTile: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(value)
-                .font(PulseFont.title)
+                .font(AgaraFont.title)
                 .monospacedDigit()
-                .foregroundStyle(muted ? PulseColors.textMuted : PulseColors.textPrimary)
+                .foregroundStyle(muted ? AgaraColors.textMuted : AgaraColors.textPrimary)
                 .minimumScaleFactor(0.6)
                 .lineLimit(1)
             Text(label.uppercased())
-                .font(PulseFont.caption2)
+                .font(AgaraFont.caption2)
                 .tracking(1.0)
-                .foregroundStyle(PulseColors.textMuted)
+                .foregroundStyle(AgaraColors.textMuted)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         // Stretch to fill the grid cell so all tiles in a row are the same height.
         .frame(maxWidth: .infinity, minHeight: 92, maxHeight: .infinity, alignment: .topLeading)
-        .pulseGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 }
 
@@ -79,25 +79,25 @@ struct StaleSessionRecoveryCard: View {
     let sessions: [ActivitySession]
 
     var body: some View {
-        PulseCard {
+        AgaraCard {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(PulseColors.warning)
+                        .foregroundStyle(AgaraColors.warning)
                     Text("Unfinished workout")
-                        .font(PulseFont.headline)
+                        .font(AgaraFont.headline)
                 }
                 Text("A workout was left running from an earlier session. Finish it to keep its time and distance, or discard it.")
-                    .font(PulseFont.caption)
-                    .foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.caption)
+                    .foregroundStyle(AgaraColors.textMuted)
                 ForEach(sessions) { session in
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(ActivityMeta.label(session.type))
-                                .font(PulseFont.subheadline.weight(.medium))
+                                .font(AgaraFont.subheadline.weight(.medium))
                             Text(session.startedAt, style: .relative)
-                                .font(PulseFont.caption2)
-                                .foregroundStyle(PulseColors.textMuted)
+                                .font(AgaraFont.caption2)
+                                .foregroundStyle(AgaraColors.textMuted)
                         }
                         Spacer()
                         // Route through the manager (not ActivityRecorderService directly) so the
@@ -105,13 +105,13 @@ struct StaleSessionRecoveryCard: View {
                         Button("Finish") {
                             liveWorkout.finish(session)
                         }
-                        .font(PulseFont.caption.weight(.semibold))
-                        .foregroundStyle(PulseColors.success)
+                        .font(AgaraFont.caption.weight(.semibold))
+                        .foregroundStyle(AgaraColors.success)
                         Button("Discard") {
                             liveWorkout.cancel(session)
                         }
-                        .font(PulseFont.caption.weight(.semibold))
-                        .foregroundStyle(PulseColors.danger)
+                        .font(AgaraFont.caption.weight(.semibold))
+                        .foregroundStyle(AgaraColors.danger)
                     }
                     .padding(.vertical, 4)
                 }
@@ -126,28 +126,28 @@ struct WorkoutRow: View {
     @Query private var profiles: [UserProfile]
     private var units: UnitsPreference { profiles.first?.units ?? .metric }
     var body: some View {
-        PulseCard {
+        AgaraCard {
             HStack {
                 Image(systemName: ActivityMeta.icon(session.type))
-                    .font(PulseFont.title2)
-                    .foregroundStyle(PulseColors.steps)
+                    .font(AgaraFont.title2)
+                    .foregroundStyle(AgaraColors.steps)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(ActivityMeta.label(session.type))
-                        .font(PulseFont.headline)
+                        .font(AgaraFont.headline)
                     Text(session.startedAt, style: .date)
-                        .font(PulseFont.caption)
-                        .foregroundStyle(PulseColors.textMuted)
+                        .font(AgaraFont.caption)
+                        .foregroundStyle(AgaraColors.textMuted)
                 }
                 Spacer()
                 VStack(alignment: .trailing) {
                     Text(session.status.rawValue.capitalized)
-                        .font(PulseFont.caption)
-                        .foregroundStyle(PulseColors.textSecondary)
+                        .font(AgaraFont.caption)
+                        .foregroundStyle(AgaraColors.textSecondary)
                     if let distance = session.distanceMeters {
                         let d = UnitsFormatter.distance(meters: distance, units: units)
                         Text("\(d.value) \(d.unit)")
-                            .font(PulseFont.caption.monospacedDigit())
-                            .foregroundStyle(PulseColors.textMuted)
+                            .font(AgaraFont.caption.monospacedDigit())
+                            .foregroundStyle(AgaraColors.textMuted)
                     }
                 }
             }
@@ -181,12 +181,12 @@ struct ActivityDetailView: View {
                     }
                     if let effort = session.perceivedEffort, !effort.isEmpty {
                         HStack {
-                            Text("Effort").foregroundStyle(PulseColors.textMuted)
+                            Text("Effort").foregroundStyle(AgaraColors.textMuted)
                             Text(effort.replacingOccurrences(of: "_", with: " ").capitalized)
-                                .foregroundStyle(PulseColors.textPrimary)
+                                .foregroundStyle(AgaraColors.textPrimary)
                             Spacer()
                         }
-                        .font(PulseFont.subheadline.weight(.regular))
+                        .font(AgaraFont.subheadline.weight(.regular))
                         .padding(.horizontal, 4)
                     }
 
@@ -196,12 +196,12 @@ struct ActivityDetailView: View {
                         confirmingDelete = true
                     } label: {
                         Label("Delete workout", systemImage: "trash")
-                            .font(PulseFont.callout)
-                            .foregroundStyle(PulseColors.danger)
+                            .font(AgaraFont.callout)
+                            .foregroundStyle(AgaraColors.danger)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
-                            .background(PulseColors.danger.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(PulseColors.danger.opacity(0.4), lineWidth: 1))
+                            .background(AgaraColors.danger.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(AgaraColors.danger.opacity(0.4), lineWidth: 1))
                     }
                     .buttonStyle(.plain)
                     .padding(.top, 8)
@@ -209,25 +209,25 @@ struct ActivityDetailView: View {
                 .padding(16)
                 .padding(.bottom, 32)
             }
-            .background(PulseColors.background)
+            .background(AgaraColors.background)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { presentingShare = true } label: {
                         Image(systemName: "square.and.arrow.up")
                     }
-                    .tint(PulseColors.accent)
+                    .tint(AgaraColors.accent)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { editing = true } label: {
                         Image(systemName: "pencil")
                     }
-                    .tint(PulseColors.accent)
+                    .tint(AgaraColors.accent)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(role: .destructive) { confirmingDelete = true } label: {
                         Image(systemName: "trash")
                     }
-                    .tint(PulseColors.danger)
+                    .tint(AgaraColors.danger)
                 }
             }
             .sheet(isPresented: $editing) {
@@ -303,8 +303,8 @@ private struct EditWorkoutSheet: View {
     var body: some View {
         VStack(spacing: 14) {
             Text("Edit workout")
-                .font(PulseFont.title3.weight(.bold))
-                .foregroundStyle(PulseColors.textPrimary)
+                .font(AgaraFont.title3.weight(.bold))
+                .foregroundStyle(AgaraColors.textPrimary)
                 .padding(.top, 8)
 
             fieldRow("Activity") {
@@ -314,30 +314,30 @@ private struct EditWorkoutSheet: View {
                     }
                 }
                 .pickerStyle(.menu)
-                .tint(PulseColors.accent)
+                .tint(AgaraColors.accent)
             }
 
             fieldRow("Starts") {
                 DatePicker("", selection: $startedAt, in: ...Date(), displayedComponents: [.date, .hourAndMinute])
                     .labelsHidden()
-                    .tint(PulseColors.accent)
+                    .tint(AgaraColors.accent)
             }
 
             fieldRow("Ends") {
                 DatePicker("", selection: $endedAt, in: ...Date(), displayedComponents: [.date, .hourAndMinute])
                     .labelsHidden()
-                    .tint(PulseColors.accent)
+                    .tint(AgaraColors.accent)
             }
 
             if let validationMessage {
                 Text(validationMessage)
-                    .font(PulseFont.caption.weight(.regular))
-                    .foregroundStyle(PulseColors.warning)
+                    .font(AgaraFont.caption.weight(.regular))
+                    .foregroundStyle(AgaraColors.warning)
                     .multilineTextAlignment(.center)
             } else {
                 Text("Distance, calories, and heart-rate stats are recalculated. Ring data recorded in the new window is pulled in automatically.")
-                    .font(PulseFont.caption.weight(.regular))
-                    .foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.caption.weight(.regular))
+                    .foregroundStyle(AgaraColors.textMuted)
                     .multilineTextAlignment(.center)
             }
 
@@ -350,40 +350,40 @@ private struct EditWorkoutSheet: View {
                 }
             } label: {
                 Label("Save changes", systemImage: "checkmark")
-                    .font(PulseFont.bodyEmphasis)
+                    .font(AgaraFont.bodyEmphasis)
                     .frame(maxWidth: .infinity)
                     .frame(height: 56)
-                    .foregroundStyle(PulseColors.textPrimary)
-                    .background(validationMessage == nil ? PulseColors.accent : PulseColors.accent.opacity(0.4))
+                    .foregroundStyle(AgaraColors.textPrimary)
+                    .background(validationMessage == nil ? AgaraColors.accent : AgaraColors.accent.opacity(0.4))
                     .clipShape(Capsule())
             }
             .disabled(validationMessage != nil)
 
             Button { dismiss() } label: {
                 Text("Cancel")
-                    .font(PulseFont.callout.weight(.semibold))
+                    .font(AgaraFont.callout.weight(.semibold))
                     .frame(maxWidth: .infinity)
                     .frame(height: 52)
-                    .foregroundStyle(PulseColors.textPrimary)
-                    .pulseGlass(Capsule(), interactive: true)
+                    .foregroundStyle(AgaraColors.textPrimary)
+                    .agaraGlass(Capsule(), interactive: true)
             }
         }
         .padding(20)
         .presentationDetents([.height(470)])
         .presentationDragIndicator(.visible)
-        .presentationBackground(PulseColors.card)
+        .presentationBackground(AgaraColors.card)
     }
 
     private func fieldRow<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         HStack {
             Text(title)
-                .font(PulseFont.subheadline)
-                .foregroundStyle(PulseColors.textPrimary)
+                .font(AgaraFont.subheadline)
+                .foregroundStyle(AgaraColors.textPrimary)
             Spacer()
             content()
         }
         .padding(.horizontal, 16).padding(.vertical, 8)
-        .pulseGlass(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }
 
@@ -412,9 +412,9 @@ struct RecordSelectView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Choose activity")
-                    .font(PulseFont.footnote.weight(.semibold))
+                    .font(AgaraFont.footnote.weight(.semibold))
                     .textCase(.uppercase)
-                    .foregroundStyle(PulseColors.textSecondary)
+                    .foregroundStyle(AgaraColors.textSecondary)
 
                 LazyVGrid(columns: gridColumns, spacing: 12) {
                     ForEach(ActivityMeta.allKinds) { kind in
@@ -422,33 +422,33 @@ struct RecordSelectView: View {
                         Button { selected = kind.type } label: {
                             VStack(alignment: .leading, spacing: 6) {
                                 Image(systemName: kind.symbol)
-                                    .font(PulseFont.title2.weight(.regular))
-                                    .foregroundStyle(isSelected ? PulseColors.onAccent : PulseColors.textSecondary)
+                                    .font(AgaraFont.title2.weight(.regular))
+                                    .foregroundStyle(isSelected ? AgaraColors.onAccent : AgaraColors.textSecondary)
                                     .frame(width: 46, height: 46)
-                                    .background(isSelected ? PulseColors.onAccent.opacity(0.22) : PulseColors.cardSoft, in: Circle())
+                                    .background(isSelected ? AgaraColors.onAccent.opacity(0.22) : AgaraColors.cardSoft, in: Circle())
                                 Text(kind.label)
-                                    .font(PulseFont.bodyEmphasis)
-                                    .foregroundStyle(isSelected ? PulseColors.onAccent : PulseColors.textPrimary)
+                                    .font(AgaraFont.bodyEmphasis)
+                                    .foregroundStyle(isSelected ? AgaraColors.onAccent : AgaraColors.textPrimary)
                                 Text(kind.helper)
-                                    .font(PulseFont.caption.weight(.regular))
-                                    .foregroundStyle(isSelected ? PulseColors.onAccent.opacity(0.85) : PulseColors.textMuted)
+                                    .font(AgaraFont.caption.weight(.regular))
+                                    .foregroundStyle(isSelected ? AgaraColors.onAccent.opacity(0.85) : AgaraColors.textMuted)
                                     .lineLimit(2)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(16)
-                            .contentShape(RoundedRectangle(cornerRadius: PulseRadius.card, style: .continuous))
-                            .pulseGlass(RoundedRectangle(cornerRadius: PulseRadius.card, style: .continuous),
-                                        interactive: true, tint: isSelected ? PulseColors.accentSoft : nil)
+                            .contentShape(RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous))
+                            .agaraGlass(RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous),
+                                        interactive: true, tint: isSelected ? AgaraColors.accentSoft : nil)
                             .overlay(
-                                RoundedRectangle(cornerRadius: PulseRadius.card, style: .continuous)
-                                    .strokeBorder(isSelected ? PulseColors.accent.opacity(0.9) : Color.clear, lineWidth: 1.5)
+                                RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous)
+                                    .strokeBorder(isSelected ? AgaraColors.accent.opacity(0.9) : Color.clear, lineWidth: 1.5)
                             )
                             .overlay(alignment: .topTrailing) {
                                 if isSelected {
                                     Image(systemName: "checkmark.circle.fill")
                                         .font(.system(size: 18))
-                                        .foregroundStyle(PulseColors.accent)
+                                        .foregroundStyle(AgaraColors.accent)
                                         .padding(10)
                                         .accessibilityHidden(true)
                                 }
@@ -465,15 +465,15 @@ struct RecordSelectView: View {
 
                 Toggle(isOn: $useGps) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Use GPS route").font(PulseFont.callout).foregroundStyle(PulseColors.textPrimary)
+                        Text("Use GPS route").font(AgaraFont.callout).foregroundStyle(AgaraColors.textPrimary)
                         Text(gpsCapable ? "Track your route on a map" : "Not available for this activity")
-                            .font(PulseFont.caption.weight(.regular)).foregroundStyle(PulseColors.textMuted)
+                            .font(AgaraFont.caption.weight(.regular)).foregroundStyle(AgaraColors.textMuted)
                     }
                 }
-                .tint(PulseColors.accent)
+                .tint(AgaraColors.accent)
                 .disabled(!gpsCapable)
                 .padding(16)
-                .pulseGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .agaraGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
 
                 PrimaryButton(title: "Start", systemImage: "play.fill") {
                     let willUseGps = useGps && gpsCapable
@@ -484,7 +484,7 @@ struct RecordSelectView: View {
             }
             .padding(16)
         }
-        .background(PulseColors.background.ignoresSafeArea())
+        .background(AgaraColors.background.ignoresSafeArea())
         .navigationTitle("Record")
         .navigationBarTitleDisplayMode(.inline)
         // Seed the GPS toggle from the user's Activity-Tracking default (still per-workout overridable).
@@ -527,11 +527,11 @@ struct RecordLiveView: View {
                     VStack(spacing: 8) {
                         HStack(spacing: 10) {
                             Image(systemName: ActivityMeta.icon(session.type))
-                                .font(PulseFont.title2)
-                                .foregroundStyle(PulseColors.accent)
+                                .font(AgaraFont.title2)
+                                .foregroundStyle(AgaraColors.accent)
                             Text(ActivityMeta.label(session.type))
-                                .font(PulseFont.title.weight(.bold))
-                                .foregroundStyle(PulseColors.textPrimary)
+                                .font(AgaraFont.title.weight(.bold))
+                                .foregroundStyle(AgaraColors.textPrimary)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.6)
                             RecordingStatusPill(paused: paused)
@@ -577,17 +577,17 @@ struct RecordLiveView: View {
                         )
                     } else if paused {
                         Text("PAUSED")
-                            .font(PulseFont.footnote.weight(.semibold)).tracking(2)
-                            .foregroundStyle(PulseColors.textPrimary)
+                            .font(AgaraFont.footnote.weight(.semibold)).tracking(2)
+                            .foregroundStyle(AgaraColors.textPrimary)
                             .padding(.horizontal, 18).padding(.vertical, 10)
-                            .pulseGlass(Capsule())
+                            .agaraGlass(Capsule())
                             .frame(maxWidth: .infinity)
                     }
                 }
                 .padding(16)
                 .padding(.bottom, 12)
             }
-            .background(PulseColors.background)
+            .background(AgaraColors.background)
             .safeAreaInset(edge: .bottom) {
                 HStack(spacing: 12) {
                     SecondaryButton(title: paused ? "Resume" : "Pause", systemImage: paused ? "play.fill" : "pause.fill") {
@@ -602,7 +602,7 @@ struct RecordLiveView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button { confirmDiscard = true } label: { Image(systemName: "xmark") }
-                        .tint(PulseColors.textSecondary)
+                        .tint(AgaraColors.textSecondary)
                         .accessibilityLabel("Discard workout")
                 }
             }
@@ -718,10 +718,10 @@ private struct ElapsedTimeText: View {
     private func clock(now: Date, muted: Bool) -> some View {
         VStack(spacing: 6) {
             Text(ActivityMeta.duration(max(0, Int(now.timeIntervalSince(startedAt) - totalPauseSeconds))))
-                .font(PulseFont.numberHero)
+                .font(AgaraFont.numberHero)
                 .monospacedDigit()
-                .foregroundStyle(muted ? PulseColors.textMuted : PulseColors.textPrimary)
-            Text("DURATION").font(PulseFont.caption2).tracking(1.4).foregroundStyle(PulseColors.textMuted)
+                .foregroundStyle(muted ? AgaraColors.textMuted : AgaraColors.textPrimary)
+            Text("DURATION").font(AgaraFont.caption2).tracking(1.4).foregroundStyle(AgaraColors.textMuted)
         }
         .padding(.vertical, 8)
     }
@@ -769,7 +769,7 @@ private struct LiveHRTile: View {
                 label: "Heart rate",
                 subtitle: subtitle(now: timeline.date),
                 pulsing: coordinator.hrState == .measuring,
-                tint: PulseColors.heartRate,
+                tint: AgaraColors.heartRate,
                 muted: hr == nil
             )
         }
@@ -808,7 +808,7 @@ private struct LiveSpO2Tile: View {
                 label: "SpO₂",
                 subtitle: subtitle(now: timeline.date),
                 pulsing: coordinator.spo2State == .measuring,
-                tint: PulseColors.spo2,
+                tint: AgaraColors.spo2,
                 muted: spo2 == nil
             )
         }
@@ -890,19 +890,19 @@ private struct LiveRouteMapSection: View {
                 .opacity(paused ? 0.55 : 1)
                 if paused {
                     Text("PAUSED")
-                        .font(PulseFont.footnote.weight(.semibold)).tracking(2)
-                        .foregroundStyle(PulseColors.textPrimary)
+                        .font(AgaraFont.footnote.weight(.semibold)).tracking(2)
+                        .foregroundStyle(AgaraColors.textPrimary)
                         .padding(.horizontal, 18).padding(.vertical, 10)
-                        .pulseGlass(Capsule())
+                        .agaraGlass(Capsule())
                 }
             }
 
             if permissionDenied {
                 Text("Location access is denied — enable it in Settings to record your route.")
-                    .font(PulseFont.caption).foregroundStyle(PulseColors.warning).multilineTextAlignment(.center)
+                    .font(AgaraFont.caption).foregroundStyle(AgaraColors.warning).multilineTextAlignment(.center)
             } else if !hasAlwaysAuthorization {
                 Text("Route will pause when the screen locks — allow “Always” location in Settings for full background tracking.")
-                    .font(PulseFont.caption).foregroundStyle(PulseColors.warning).multilineTextAlignment(.center)
+                    .font(AgaraFont.caption).foregroundStyle(AgaraColors.warning).multilineTextAlignment(.center)
             }
         }
     }
@@ -912,13 +912,13 @@ private struct LiveRouteMapSection: View {
 struct RecordingStatusPill: View {
     let paused: Bool
 
-    private var color: Color { paused ? PulseColors.warning : PulseColors.danger }
+    private var color: Color { paused ? AgaraColors.warning : AgaraColors.danger }
 
     var body: some View {
         HStack(spacing: 5) {
             Circle().fill(color).frame(width: 7, height: 7)
             Text(paused ? "PAUSED" : "REC")
-                .font(PulseFont.caption2.weight(.semibold)).tracking(1.0)
+                .font(AgaraFont.caption2.weight(.semibold)).tracking(1.0)
                 .foregroundStyle(color)
         }
         .padding(.horizontal, 9).padding(.vertical, 5)
@@ -942,33 +942,33 @@ private struct WorkoutEndSheet: View {
     var body: some View {
         VStack(spacing: 16) {
             Text(title)
-                .font(PulseFont.title3.weight(.bold))
-                .foregroundStyle(PulseColors.textPrimary)
+                .font(AgaraFont.title3.weight(.bold))
+                .foregroundStyle(AgaraColors.textPrimary)
                 .padding(.top, 8)
 
             HStack(spacing: 0) {
                 ForEach(stats.indices, id: \.self) { i in
                     if i > 0 {
-                        Rectangle().fill(PulseColors.borderSubtle).frame(width: 1, height: 34)
+                        Rectangle().fill(AgaraColors.borderSubtle).frame(width: 1, height: 34)
                     }
                     VStack(spacing: 4) {
                         Text(stats[i].value)
-                            .font(PulseFont.numberM)
+                            .font(AgaraFont.numberM)
                             .monospacedDigit()
-                            .foregroundStyle(PulseColors.textPrimary)
+                            .foregroundStyle(AgaraColors.textPrimary)
                         Text(stats[i].label.uppercased())
-                            .font(PulseFont.micro).tracking(1.0)
-                            .foregroundStyle(PulseColors.textMuted)
+                            .font(AgaraFont.micro).tracking(1.0)
+                            .foregroundStyle(AgaraColors.textMuted)
                     }
                     .frame(maxWidth: .infinity)
                 }
             }
             .padding(.vertical, 14)
-            .pulseGlass(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .agaraGlass(RoundedRectangle(cornerRadius: 16, style: .continuous))
 
             Text(message)
-                .font(PulseFont.footnote.weight(.regular))
-                .foregroundStyle(PulseColors.textMuted)
+                .font(AgaraFont.footnote.weight(.regular))
+                .foregroundStyle(AgaraColors.textMuted)
                 .multilineTextAlignment(.center)
 
             Button {
@@ -976,26 +976,26 @@ private struct WorkoutEndSheet: View {
                 onConfirm()
             } label: {
                 Label(confirmTitle, systemImage: confirmIcon)
-                    .font(PulseFont.bodyEmphasis)
+                    .font(AgaraFont.bodyEmphasis)
                     .frame(maxWidth: .infinity)
                     .frame(height: 56)
-                    .foregroundStyle(PulseColors.textPrimary)
-                    .pulseGlass(Capsule(), interactive: true, tint: destructive ? PulseColors.danger : PulseColors.accent)
+                    .foregroundStyle(AgaraColors.textPrimary)
+                    .agaraGlass(Capsule(), interactive: true, tint: destructive ? AgaraColors.danger : AgaraColors.accent)
             }
 
             Button { dismiss() } label: {
                 Text(cancelTitle)
-                    .font(PulseFont.callout.weight(.semibold))
+                    .font(AgaraFont.callout.weight(.semibold))
                     .frame(maxWidth: .infinity)
                     .frame(height: 52)
-                    .foregroundStyle(PulseColors.textPrimary)
-                    .pulseGlass(Capsule(), interactive: true)
+                    .foregroundStyle(AgaraColors.textPrimary)
+                    .agaraGlass(Capsule(), interactive: true)
             }
         }
         .padding(20)
         .presentationDetents([.height(360)])
         .presentationDragIndicator(.visible)
-        .presentationBackground(PulseColors.card)
+        .presentationBackground(AgaraColors.card)
     }
 }
 

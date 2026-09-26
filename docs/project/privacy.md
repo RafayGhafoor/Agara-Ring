@@ -1,11 +1,11 @@
 ---
 title: Privacy
-description: PulseLoop is local-first by design — what leaves your device and what never does.
+description: Agara Ring is local-first by design — what leaves your device and what never does.
 ---
 
 # Privacy
 
-PulseLoop is built **local-first**, which is the whole point.
+Agara Ring is built **local-first**, which is the whole point.
 
 - **No vendor cloud, no account.** The app talks to the ring directly over
   Bluetooth LE.
@@ -26,7 +26,7 @@ PulseLoop is built **local-first**, which is the whole point.
   `EncryptedSharedPreferences`.
 
 !!! warning "Not a medical device"
-    PulseLoop is not a medical device and is not a substitute for professional
+    Agara Ring is not a medical device and is not a substitute for professional
     medical advice. Treat all readings as approximate. Always consult a clinician
     for health concerns.
 

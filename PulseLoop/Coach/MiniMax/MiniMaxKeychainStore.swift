@@ -8,6 +8,7 @@ struct MiniMaxKeychainStore: APIKeyStore {
     private let service: String
     private let account: String
 
+    // Install-bound: Keychain service/account keep the pre-rename names so stored secrets stay readable.
     init(service: String = "com.pulseloop.coach.minimax", account: String = "minimax_api_key") {
         self.service = service
         self.account = account

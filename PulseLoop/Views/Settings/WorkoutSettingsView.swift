@@ -31,7 +31,7 @@ struct WorkoutSettingsView: View {
                                 ForEach(hrIntervals, id: \.self) { Text(intervalLabel($0)).tag($0) }
                             }
                             .pickerStyle(.menu)
-                            .tint(PulseColors.accent)
+                            .tint(AgaraColors.accent)
                         }
                     }
 
@@ -48,7 +48,7 @@ struct WorkoutSettingsView: View {
                                 ForEach(spo2Intervals, id: \.self) { Text(intervalLabel($0)).tag($0) }
                             }
                             .pickerStyle(.menu)
-                            .tint(PulseColors.accent)
+                            .tint(AgaraColors.accent)
                         }
                     }
                 }
@@ -80,8 +80,8 @@ struct WorkoutSettingsView: View {
                             .pickerStyle(.segmented)
 
                             Text(store.settings.gpsAccuracy.blurb)
-                                .font(PulseFont.caption)
-                                .foregroundStyle(PulseColors.textMuted)
+                                .font(AgaraFont.caption)
+                                .foregroundStyle(AgaraColors.textMuted)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -89,7 +89,7 @@ struct WorkoutSettingsView: View {
             }
             .padding()
         }
-        .background(PulseColors.background)
+        .background(AgaraColors.background)
         .pageChrome("Activity Tracking")
     }
 

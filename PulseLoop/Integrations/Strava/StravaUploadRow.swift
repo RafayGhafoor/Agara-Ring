@@ -30,8 +30,8 @@ struct StravaUploadRow: View {
                     uploadButton
                     if let message = StravaUploadService.shared.lastErrorBySession[session.id] {
                         Text(message)
-                            .font(PulseFont.caption.weight(.regular))
-                            .foregroundStyle(PulseColors.danger)
+                            .font(AgaraFont.caption.weight(.regular))
+                            .foregroundStyle(AgaraColors.danger)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, 4)
                     }
@@ -47,7 +47,7 @@ struct StravaUploadRow: View {
             Task { await StravaUploadService.shared.upload(session: session, context: modelContext) }
         } label: {
             Label("Push to Strava", systemImage: "arrow.up.circle.fill")
-                .font(PulseFont.callout)
+                .font(AgaraFont.callout)
                 .foregroundStyle(Self.stravaOrange)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
@@ -63,7 +63,7 @@ struct StravaUploadRow: View {
                 .controlSize(.small)
                 .tint(Self.stravaOrange)
             Text("Uploading to Strava…")
-                .font(PulseFont.callout)
+                .font(AgaraFont.callout)
                 .foregroundStyle(Self.stravaOrange)
         }
         .frame(maxWidth: .infinity)
@@ -79,19 +79,19 @@ struct StravaUploadRow: View {
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(PulseColors.success)
+                    .foregroundStyle(AgaraColors.success)
                 Text("On Strava")
-                    .font(PulseFont.callout)
-                    .foregroundStyle(PulseColors.textPrimary)
+                    .font(AgaraFont.callout)
+                    .foregroundStyle(AgaraColors.textPrimary)
                 Spacer()
                 Image(systemName: "chevron.right")
-                    .font(PulseFont.caption)
-                    .foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.caption)
+                    .foregroundStyle(AgaraColors.textMuted)
             }
             .padding(.vertical, 14)
             .padding(.horizontal, 16)
-            .background(PulseColors.success.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(PulseColors.success.opacity(0.3), lineWidth: 1))
+            .background(AgaraColors.success.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(AgaraColors.success.opacity(0.3), lineWidth: 1))
         }
         .buttonStyle(.plain)
     }

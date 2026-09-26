@@ -7,7 +7,7 @@ import SwiftUI
 // persistent") and ring-estimated metrics (BP, glucose, fatigue) are always flagged `isEstimated`.
 //
 // Design rule: colors resolve in exactly one place (`VitalColorToken.color`), which maps to
-// `PulseColors`. Views, charts, gauges, and legends all go through tokens — no hex anywhere else.
+// `AgaraColors`. Views, charts, gauges, and legends all go through tokens — no hex anywhere else.
 
 // MARK: - Metric identity
 
@@ -124,7 +124,7 @@ enum ZoneSeverity: Int, Comparable {
 
 // MARK: - Color tokens
 
-/// Explicit vitals color token. The single `color` switch maps to `PulseColors` — never duplicate
+/// Explicit vitals color token. The single `color` switch maps to `AgaraColors` — never duplicate
 /// hex elsewhere. Each `MetricZone` picks its token from this palette so the chart line, reference
 /// band, gauge arc, stat dot, and status label are always the same color for the same zone.
 /// `metricAccent` resolves to the metric's brand color (heart pink, HRV purple…) — used where a
@@ -144,37 +144,37 @@ enum VitalColorToken: Equatable {
 
     var color: Color {
         switch self {
-        case .blue: return PulseColors.zoneBlue
-        case .mint: return PulseColors.zoneMint
-        case .cyan: return PulseColors.zoneCyan
-        case .amber: return PulseColors.zoneAmber
-        case .softAmber: return PulseColors.zoneSoftAmber
-        case .orange: return PulseColors.zoneOrange
-        case .red: return PulseColors.zoneRed
-        case .brightRed: return PulseColors.zoneCritical
-        case .deepRed: return PulseColors.zoneDeepRed
-        case .neutral: return PulseColors.textMuted
+        case .blue: return AgaraColors.zoneBlue
+        case .mint: return AgaraColors.zoneMint
+        case .cyan: return AgaraColors.zoneCyan
+        case .amber: return AgaraColors.zoneAmber
+        case .softAmber: return AgaraColors.zoneSoftAmber
+        case .orange: return AgaraColors.zoneOrange
+        case .red: return AgaraColors.zoneRed
+        case .brightRed: return AgaraColors.zoneCritical
+        case .deepRed: return AgaraColors.zoneDeepRed
+        case .neutral: return AgaraColors.textMuted
         case .metricAccent(let metric): return metric.accentColor
         }
     }
 }
 
 extension MetricKind {
-    /// The brand accent color for this metric, drawn from `PulseColors`.
+    /// The brand accent color for this metric, drawn from `AgaraColors`.
     var accentColor: Color {
         switch self {
-        case .heartRate: return PulseColors.heartRate
-        case .spo2: return PulseColors.spo2
-        case .hrv: return PulseColors.hrv
-        case .bloodPressure: return PulseColors.bloodPressure
-        case .stress: return PulseColors.stress
-        case .fatigue: return PulseColors.fatigue
-        case .glucose: return PulseColors.bloodSugar
-        case .temperature: return PulseColors.temperature
-        case .respiration: return PulseColors.respiration
-        case .met: return PulseColors.met
-        case .cardiacLoad: return PulseColors.cardiacLoad
-        case .totalCholesterol, .triglycerides, .hdl, .ldl, .uricAcid: return PulseColors.bloodComponents
+        case .heartRate: return AgaraColors.heartRate
+        case .spo2: return AgaraColors.spo2
+        case .hrv: return AgaraColors.hrv
+        case .bloodPressure: return AgaraColors.bloodPressure
+        case .stress: return AgaraColors.stress
+        case .fatigue: return AgaraColors.fatigue
+        case .glucose: return AgaraColors.bloodSugar
+        case .temperature: return AgaraColors.temperature
+        case .respiration: return AgaraColors.respiration
+        case .met: return AgaraColors.met
+        case .cardiacLoad: return AgaraColors.cardiacLoad
+        case .totalCholesterol, .triglycerides, .hdl, .ldl, .uricAcid: return AgaraColors.bloodComponents
         }
     }
 }

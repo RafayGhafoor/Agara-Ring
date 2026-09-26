@@ -1,5 +1,5 @@
 <!--
-Thanks for contributing to PulseLoop! 🫀
+Thanks for contributing to Agara Ring! 🫀
 Please fill this out so your PR can be reviewed quickly. Delete sections that
 don't apply. PRs need (1) all CI checks green and (2) one approving review
 before they can be merged.
@@ -27,7 +27,7 @@ before they can be merged.
 ## How was this tested?
 
 <!--
-PulseLoop's BLE + Live Activity features need a REAL device — the simulator
+Agara Ring's BLE + Live Activity features need a REAL device — the simulator
 can't reach the ring. Tell us what you actually ran:
 -->
 
@@ -40,7 +40,7 @@ can't reach the ring. Tell us what you actually ran:
 ## Privacy & data
 
 <!--
-PulseLoop is privacy-first: health data stays on device, and the only thing that
+Agara Ring is privacy-first: health data stays on device, and the only thing that
 leaves is a coach question the user chooses to send. Confirm this PR keeps that promise.
 -->
 

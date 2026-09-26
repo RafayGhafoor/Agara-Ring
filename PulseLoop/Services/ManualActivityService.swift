@@ -50,7 +50,7 @@ enum ManualActivityService {
         context.insert(session)
         _ = ActivityService.finishSummary(for: session, endedAt: endedAt, context: context)
         try context.save()
-        PulseDataChange.shared.notify()
+        AgaraDataChange.shared.notify()
         return session
     }
 }

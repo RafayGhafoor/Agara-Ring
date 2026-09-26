@@ -4,7 +4,7 @@ import Foundation
 @MainActor
 enum RingNotificationDelivery {
     static func receive(_ data: Data, decode: () -> [RingDecodedEvent],
-                        publish: (PulseEvent) -> Void, deliver: (RingDecodedEvent) -> Void) {
+                        publish: (AgaraEvent) -> Void, deliver: (RingDecodedEvent) -> Void) {
         // Only when capture is on: otherwise nobody stores it, and every notification still cost a bus
         // hop through every collector (audit batch B).
         if RawPacketCapture.isEnabled {
@@ -14,7 +14,7 @@ enum RingNotificationDelivery {
         for event in decode() { deliver(event) }
     }
 
-    static func events(for decoded: RingDecodedEvent) -> [PulseEvent] {
+    static func events(for decoded: RingDecodedEvent) -> [AgaraEvent] {
         [.decodedPacket(decoded)] + RingEventBridge.events(for: decoded)
     }
 }

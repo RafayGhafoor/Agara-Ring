@@ -169,7 +169,7 @@ final class DataArchiveTests: XCTestCase {
             XCTFail("expected unsupportedVersion")
         } catch let DataArchiveError.unsupportedVersion(found, supported) {
             XCTAssertEqual(found, 999)
-            XCTAssertEqual(supported, PulseArchive.currentFormatVersion)
+            XCTAssertEqual(supported, AgaraArchive.currentFormatVersion)
         }
         XCTAssertEqual(count(PulseLoop.Measurement.self, context), before, "a rejected file must not touch existing data")
     }

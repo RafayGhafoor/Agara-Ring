@@ -2,10 +2,10 @@ import SwiftUI
 import SwiftData
 import HealthKit
 
-/// Drives incremental Apple Health exports off the same coalesced `PulseDataChange` signal the widget
+/// Drives incremental Apple Health exports off the same coalesced `AgaraDataChange` signal the widget
 /// publisher rides. When ring data lands (or a scene-phase edge fires), it debounces briefly and then
 /// asks `HealthSyncService` to export everything newer than each category's watermark. Retained for the
-/// app's lifetime by `PulseLoopApp` (like `WidgetSnapshotPublisher`).
+/// app's lifetime by `AgaraApp` (like `WidgetSnapshotPublisher`).
 ///
 /// Refresh discipline mirrors the widget publisher: a history sync bumps the token once per batch, but
 /// several batches can land in quick succession, so the publish is debounced. Scene-phase edges are also
@@ -42,7 +42,7 @@ final class HealthSyncPublisher {
     /// burst of persistence batches produces one export run.
     private func observeDataChange() {
         withObservationTracking {
-            _ = PulseDataChange.shared.token
+            _ = AgaraDataChange.shared.token
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self else { return }

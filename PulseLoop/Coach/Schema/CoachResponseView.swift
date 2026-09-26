@@ -11,15 +11,15 @@ struct CoachResponseView: View {
         VStack(alignment: .leading, spacing: 10) {
             if !response.title.isEmpty {
                 Text(coachMarkdown: response.title)
-                    .font(PulseFont.subheadline.weight(.semibold))
-                    .foregroundStyle(PulseColors.textPrimary)
+                    .font(AgaraFont.subheadline.weight(.semibold))
+                    .foregroundStyle(AgaraColors.textPrimary)
             }
 
             if !response.summary.isEmpty {
                 Text(coachMarkdown: response.summary)
-                    .font(PulseFont.subheadline.weight(.regular))
+                    .font(AgaraFont.subheadline.weight(.regular))
                     .lineSpacing(4)
-                    .foregroundStyle(PulseColors.textPrimary)
+                    .foregroundStyle(AgaraColors.textPrimary)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -30,11 +30,11 @@ struct CoachResponseView: View {
             }
 
             if let safety = response.safetyNote, !safety.isEmpty {
-                noteRow(icon: "exclamationmark.triangle.fill", text: safety, tone: PulseColors.warning)
+                noteRow(icon: "exclamationmark.triangle.fill", text: safety, tone: AgaraColors.warning)
             }
 
             if let dq = response.dataQualityNote, !dq.isEmpty {
-                noteRow(icon: "info.circle", text: dq, tone: PulseColors.textMuted)
+                noteRow(icon: "info.circle", text: dq, tone: AgaraColors.textMuted)
             }
 
             sourcesSection
@@ -48,10 +48,10 @@ struct CoachResponseView: View {
             VStack(alignment: .leading, spacing: 5) {
                 ForEach(response.bullets, id: \.self) { bullet in
                     HStack(alignment: .top, spacing: 6) {
-                        Text("•").foregroundStyle(PulseColors.accent)
-                        Text(coachMarkdown: bullet).foregroundStyle(PulseColors.textSecondary)
+                        Text("•").foregroundStyle(AgaraColors.accent)
+                        Text(coachMarkdown: bullet).foregroundStyle(AgaraColors.textSecondary)
                     }
-                    .font(PulseFont.footnote.weight(.regular))
+                    .font(AgaraFont.footnote.weight(.regular))
                 }
             }
         }
@@ -62,8 +62,8 @@ struct CoachResponseView: View {
         if !response.sources.isEmpty {
             VStack(alignment: .leading, spacing: 3) {
                 Text("SOURCES")
-                    .font(PulseFont.nano).tracking(1.2)
-                    .foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.nano).tracking(1.2)
+                    .foregroundStyle(AgaraColors.textMuted)
                 ForEach(response.sources) { source in
                     sourceLink(source)
                 }
@@ -77,14 +77,14 @@ struct CoachResponseView: View {
         if let url = URL(string: source.url) {
             Link(destination: url) {
                 Text("\(source.title) — \(source.publisher)")
-                    .font(PulseFont.caption2.weight(.regular))
-                    .foregroundStyle(PulseColors.info)
+                    .font(AgaraFont.caption2.weight(.regular))
+                    .foregroundStyle(AgaraColors.info)
                     .underline()
             }
         } else {
             Text("\(source.title) — \(source.publisher)")
-                .font(PulseFont.caption2.weight(.regular))
-                .foregroundStyle(PulseColors.textMuted)
+                .font(AgaraFont.caption2.weight(.regular))
+                .foregroundStyle(AgaraColors.textMuted)
         }
     }
 
@@ -108,8 +108,8 @@ struct CoachResponseView: View {
 
     private func noteRow(icon: String, text: String, tone: Color) -> some View {
         HStack(alignment: .top, spacing: 6) {
-            Image(systemName: icon).font(PulseFont.caption2.weight(.regular)).foregroundStyle(tone)
-            Text(coachMarkdown: text).font(PulseFont.caption.weight(.regular)).foregroundStyle(tone)
+            Image(systemName: icon).font(AgaraFont.caption2.weight(.regular)).foregroundStyle(tone)
+            Text(coachMarkdown: text).font(AgaraFont.caption.weight(.regular)).foregroundStyle(tone)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -127,15 +127,15 @@ struct CoachFollowUpChipLabel: View {
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             Text(text)
-                .font(PulseFont.footnote.weight(.regular))
-                .foregroundStyle(PulseColors.textSecondary)
+                .font(AgaraFont.footnote.weight(.regular))
+                .foregroundStyle(AgaraColors.textSecondary)
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 4)
             Image(systemName: "arrow.up.right")
-                .font(PulseFont.micro.weight(.semibold))
-                .foregroundStyle(PulseColors.textMuted)
+                .font(AgaraFont.micro.weight(.semibold))
+                .foregroundStyle(AgaraColors.textMuted)
                 .padding(.top, 2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -143,10 +143,10 @@ struct CoachFollowUpChipLabel: View {
         // Solid tile, not glass: this chip renders inside the assistant bubble's glass,
         // and glass can't sample glass (renders flat). A soft card fill + hairline keeps
         // the chip visible as a tappable affordance.
-        .background(PulseColors.cardSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(AgaraColors.cardSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(PulseColors.textPrimary.opacity(0.12), lineWidth: 0.5)
+                .strokeBorder(AgaraColors.textPrimary.opacity(0.12), lineWidth: 0.5)
         )
     }
 }

@@ -20,7 +20,7 @@ import SwiftData
 ///
 /// Enable with either the scheme argument `-virtualRing 9909` (or any port) or the environment
 /// variable `PULSELOOP_VIRTUAL_RING=9909`. When it is configured, CoreBluetooth is not started at all
-/// (see `PulseLoopApp`), so a remembered physical ring can never be dragged into the session.
+/// (see `AgaraApp`), so a remembered physical ring can never be dragged into the session.
 /// E2E tooling: plain-text trace lines appended to `Documents/e2e.log` and stderr. The unified log redacts
 /// `NSLog` interpolations as `<private>`, and a Mac "Designed for iPad" run has no UI-test runner to read the
 /// screen, so this file is how a scripted run proves what happened (`tools/e2e_ios.sh --mac`).

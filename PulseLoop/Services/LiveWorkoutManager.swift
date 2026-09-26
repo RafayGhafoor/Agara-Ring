@@ -5,7 +5,7 @@ import SwiftData
 /// deterministic sensor polling, and the Live Activity so the views stay mostly UI. Injected via
 /// `.environment(...)` like `RingSyncCoordinator` / `GpsRouteRecorder`.
 ///
-/// Also owns `LiveWorkoutStats` — the O(1) rolling stats fed straight from `PulseEventBus`
+/// Also owns `LiveWorkoutStats` — the O(1) rolling stats fed straight from `AgaraEventBus`
 /// (GPS fixes, HR/SpO₂ samples) that the live screen and Live Activity read, so nothing on the
 /// per-second render path ever fetches or re-walks the whole route.
 @MainActor
@@ -63,7 +63,7 @@ final class LiveWorkoutManager {
     private func startEventSubscription() {
         guard eventTask == nil else { return }
         eventTask = Task { [weak self] in
-            let stream = await PulseEventBus.shared.stream()
+            let stream = await AgaraEventBus.shared.stream()
             for await event in stream {
                 guard let self else { return }
                 self.handleEvent(event)
@@ -71,7 +71,7 @@ final class LiveWorkoutManager {
         }
     }
 
-    private func handleEvent(_ event: PulseEvent) {
+    private func handleEvent(_ event: AgaraEvent) {
         guard let stats else { return }   // nothing recording — ignore (all-day syncs etc.)
         switch event {
         case let .gpsPoint(sessionId, latitude, longitude, _, horizontalAccuracy, _, _, accepted, _, timestamp):

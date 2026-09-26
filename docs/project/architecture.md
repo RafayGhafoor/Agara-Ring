@@ -5,7 +5,7 @@ description: How data flows from the ring into local storage and out to the AI c
 
 # Architecture
 
-PulseLoop is built **local-first**: data flows up from the ring into local
+Agara Ring is built **local-first**: data flows up from the ring into local
 storage on your phone, the coach reads sideways through tools, and the only thing
 that ever leaves the device is a coach question you explicitly choose to ask.
 

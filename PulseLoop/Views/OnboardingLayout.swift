@@ -50,23 +50,23 @@ struct FittedOnboardingHeader: View {
         self.s = s
     }
 
-    private var titleFont: Font { s >= 0.92 ? PulseFont.numberXL : PulseFont.numberL }
+    private var titleFont: Font { s >= 0.92 ? AgaraFont.numberXL : AgaraFont.numberL }
     private var subtitleFont: Font {
-        s >= 0.92 ? PulseFont.callout.weight(.regular) : PulseFont.subheadline.weight(.regular)
+        s >= 0.92 ? AgaraFont.callout.weight(.regular) : AgaraFont.subheadline.weight(.regular)
     }
 
     var body: some View {
         VStack(spacing: 8) {
             Text(title)
                 .font(titleFont)
-                .foregroundStyle(PulseColors.textPrimary)
+                .foregroundStyle(AgaraColors.textPrimary)
                 .multilineTextAlignment(.center)
                 .lineLimit(1)
                 .minimumScaleFactor(0.85)
             if let subtitle {
                 Text(subtitle)
                     .font(subtitleFont)
-                    .foregroundStyle(PulseColors.textSecondary)
+                    .foregroundStyle(AgaraColors.textSecondary)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
                     .minimumScaleFactor(0.85)
@@ -91,13 +91,13 @@ struct CompactOnboardingHeader: View {
     var body: some View {
         VStack(spacing: 8) {
             Text(title)
-                .font(PulseFont.numberXL)
-                .foregroundStyle(PulseColors.textPrimary)
+                .font(AgaraFont.numberXL)
+                .foregroundStyle(AgaraColors.textPrimary)
                 .multilineTextAlignment(.center)
             if let subtitle {
                 Text(subtitle)
-                    .font(PulseFont.callout.weight(.regular))
-                    .foregroundStyle(PulseColors.textSecondary)
+                    .font(AgaraFont.callout.weight(.regular))
+                    .foregroundStyle(AgaraColors.textSecondary)
                     .multilineTextAlignment(.center)
                     .lineSpacing(3)
             }

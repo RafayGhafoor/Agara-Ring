@@ -212,7 +212,7 @@ final class FirmwareUpdateChecker {
     func start() {
         guard streamTask == nil else { return }
         streamTask = Task { [weak self] in
-            let stream = await PulseEventBus.shared.stream()
+            let stream = await AgaraEventBus.shared.stream()
             for await event in stream {
                 guard case let .firmwareIdentity(deviceNumber, version, testVersion) = event else { continue }
                 await self?.checkIfDue(FirmwareIdentity(deviceNumber: deviceNumber, version: version, testVersion: testVersion))

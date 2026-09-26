@@ -82,7 +82,7 @@ enum AgaraFontRegistry {
 // xcodebuild until Xcode next saves the project (the folder is a synchronized group, and its
 // membership is recorded at save time). Android has no such constraint.
 
-/// Every colour role, resolved for one theme. `PulseColors` reads the current theme's instance, so
+/// Every colour role, resolved for one theme. `AgaraColors` reads the current theme's instance, so
 /// screens never hold a hex. Add a theme in docs/config/palette.yaml, not here.
 /// Regenerate with `python3 tools/gen_shared.py` (add `--check` in CI).
 struct AgaraTheme: Identifiable {

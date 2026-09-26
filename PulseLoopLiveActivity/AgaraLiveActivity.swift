@@ -1,6 +1,6 @@
 //
-//  PulseLoopLiveActivity.swift
-//  PulseLoopLiveActivity
+//  AgaraLiveActivity.swift
+//  Agara Ring
 //
 //  Created by Saksham Bhutani on 6/1/26.
 //
@@ -43,7 +43,7 @@ struct SimpleEntry: TimelineEntry {
     let emoji: String
 }
 
-struct PulseLoopLiveActivityEntryView : View {
+struct AgaraLiveActivityEntryView : View {
     var entry: Provider.Entry
 
     var body: some View {
@@ -57,16 +57,17 @@ struct PulseLoopLiveActivityEntryView : View {
     }
 }
 
-struct PulseLoopLiveActivity: Widget {
-    let kind: String = "PulseLoopLiveActivity"
+struct AgaraLiveActivity: Widget {
+    // Xcode template, not registered in AgaraLiveActivityBundle, so no installed widget references this kind.
+    let kind: String = "AgaraLiveActivity"
 
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: Provider()) { entry in
             if #available(iOS 17.0, *) {
-                PulseLoopLiveActivityEntryView(entry: entry)
+                AgaraLiveActivityEntryView(entry: entry)
                     .containerBackground(.fill.tertiary, for: .widget)
             } else {
-                PulseLoopLiveActivityEntryView(entry: entry)
+                AgaraLiveActivityEntryView(entry: entry)
                     .padding()
                     .background()
             }
@@ -77,7 +78,7 @@ struct PulseLoopLiveActivity: Widget {
 }
 
 #Preview(as: .systemSmall) {
-    PulseLoopLiveActivity()
+    AgaraLiveActivity()
 } timeline: {
     SimpleEntry(date: .now, emoji: "😀")
     SimpleEntry(date: .now, emoji: "🤩")

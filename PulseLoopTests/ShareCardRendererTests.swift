@@ -10,7 +10,7 @@ final class ShareCardRendererTests: XCTestCase {
         ShareCardModel(
             activityLabel: "RUN",
             symbol: "figure.run",
-            accent: PulseColors.heartRate,
+            accent: AgaraColors.heartRate,
             dateHeadline: "SAT · JUL 26 · 7:32 AM",
             dateFooter: "July 26, 2026",
             heroStat: ShareCardStat(label: "DISTANCE", value: "5.02", unit: "KM"),
@@ -23,8 +23,8 @@ final class ShareCardRendererTests: XCTestCase {
             ],
             routeCoordinates: [],
             zoneSegments: [
-                ShareZoneSegment(color: PulseColors.zoneBlue, fraction: 0.4),
-                ShareZoneSegment(color: PulseColors.zoneMint, fraction: 0.6)
+                ShareZoneSegment(color: AgaraColors.zoneBlue, fraction: 0.4),
+                ShareZoneSegment(color: AgaraColors.zoneMint, fraction: 0.6)
             ],
             hrCaption: "AVG 152 · MAX 171 BPM",
             hasRoute: false
@@ -53,7 +53,7 @@ final class ShareCardRendererTests: XCTestCase {
         )
         XCTAssertNotNil(image)
         XCTAssertFalse(image!.pngData.isEmpty)
-        XCTAssertTrue(image!.filename.hasPrefix("pulseloop-run-"))
+        XCTAssertTrue(image!.filename.hasPrefix("agara-run-"))
         XCTAssertTrue(image!.filename.hasSuffix(".png"))
     }
 }

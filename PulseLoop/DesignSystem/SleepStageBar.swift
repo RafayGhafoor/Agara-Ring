@@ -3,7 +3,7 @@ import SwiftUI
 // The proportional sleep-stage bar, extracted from TodayTiles.swift so the widget extension can
 // render the Sleep tile without pulling in `SleepStageDistribution` (which needs the SwiftData-backed
 // `SleepSummary`). Segments are plain value inputs; the app derives them from a sleep summary, the
-// widget decodes them from the shared snapshot. Shared between the app and PulseLoopWidgets targets.
+// widget decodes them from the shared snapshot. Shared between the app and widget extension targets.
 
 /// One colored segment of the sleep-stage bar, with a short label ("DEEP"/"LIGHT"/"REM"/"AWAKE").
 struct SleepStageSegment: Identifiable {
@@ -52,7 +52,7 @@ struct SleepStageBar: View {
                 HStack(spacing: spacing) {
                     ForEach(Array(segments.enumerated()), id: \.element.id) { index, segment in
                         Text(showsLabel(segment) ? segment.label : "")
-                            .font(PulseFont.nano)
+                            .font(AgaraFont.nano)
                             .foregroundStyle(segment.color)
                             .lineLimit(1)
                             .minimumScaleFactor(0.75)

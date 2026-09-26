@@ -1,5 +1,5 @@
 ---
-title: PulseLoop
+title: Agara Ring
 description: >-
   An LLM-native, local-first health app that turns a cheap Bluetooth smart ring
   into a real, conversational health tracker — on iOS and Android.
@@ -10,11 +10,11 @@ hide:
 
 <div class="pl-hero" markdown>
 
-# PulseLoop
+# Agara Ring
 
 <p class="pl-tagline">
 <b>Your health data, owned by you.</b>
-PulseLoop turns affordable wearables into a private, local-first health tracker with an optional AI coach —
+Agara Ring turns affordable wearables into a private, local-first health tracker with an optional AI coach —
 no subscription, no vendor cloud, no account.
 Available on <b>iOS</b> and <b>Android</b>.
 </p>
@@ -72,7 +72,7 @@ Available on <b>iOS</b> and <b>Android</b>.
 
 ## The two ports
 
-PulseLoop ships as two apps that are developed together and share the same
+Agara Ring ships as two apps that are developed together and share the same
 reverse-engineered BLE protocol work, so a fix or a newly decoded sensor on one
 platform usually lands on the other.
 
@@ -120,6 +120,6 @@ up-to-date breakdown of where the two ports differ.
 ---
 
 !!! warning "Not a medical device"
-    PulseLoop is not a medical device and is not a substitute for professional
+    Agara Ring is not a medical device and is not a substitute for professional
     medical advice. Treat all readings as approximate, and always consult a
     clinician for health concerns.

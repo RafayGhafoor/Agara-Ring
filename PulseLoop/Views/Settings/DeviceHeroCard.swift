@@ -56,16 +56,16 @@ struct DeviceHeroStatus: Equatable {
         let statusTint: Color
         switch state {
         case .connected:
-            statusLine = "Connected"; statusTint = PulseColors.success
+            statusLine = "Connected"; statusTint = AgaraColors.success
         case .connecting, .reconnecting:
-            statusLine = "Connecting…"; statusTint = PulseColors.warning
+            statusLine = "Connecting…"; statusTint = AgaraColors.warning
         case .scanning:
-            statusLine = "Searching…"; statusTint = PulseColors.warning
+            statusLine = "Searching…"; statusTint = AgaraColors.warning
         case .failed:
-            statusLine = "Connection failed"; statusTint = PulseColors.danger
+            statusLine = "Connection failed"; statusTint = AgaraColors.danger
         case .idle, .disconnected:
             statusLine = knownName == nil ? "No ring paired" : "Disconnected"
-            statusTint = PulseColors.textSecondary
+            statusTint = AgaraColors.textSecondary
         }
 
         let batteryText = batteryPercent.map { "\(max(0, min(100, $0)))%" }
@@ -93,7 +93,7 @@ struct DeviceHeroStatus: Equatable {
 
         return DeviceHeroStatus(
             title: title, statusLine: charging ? chargingLine : statusLine,
-            statusTint: charging ? PulseColors.success : statusTint,
+            statusTint: charging ? AgaraColors.success : statusTint,
             batteryText: batteryText, syncText: syncText, action: action, isCharging: charging
         )
     }
@@ -108,7 +108,7 @@ struct DeviceHeroCard: View {
     @Environment(RingSyncCoordinator.self) private var coordinator
     @Binding var path: NavigationPath
     /// Re-read the stored device after a persist (a rename lands here without any BLE state change).
-    @State private var dataChange = PulseDataChange.shared
+    @State private var dataChange = AgaraDataChange.shared
 
     var body: some View {
         // One SwiftData read for the stored device, reused for name, battery, and art.
@@ -137,7 +137,7 @@ struct DeviceHeroCard: View {
                 // at the top-right with the chevron below it, lined up with nothing.
                 HStack(alignment: .center, spacing: 16) {
                     RingArtView(
-                        tint: PulseColors.info,
+                        tint: AgaraColors.info,
                         size: 72,
                         imageName: wearableModel?.imageName
                     )
@@ -145,21 +145,21 @@ struct DeviceHeroCard: View {
 
                     VStack(alignment: .leading, spacing: 5) {
                         Text(status.title)
-                            .font(PulseFont.title3)
-                            .foregroundStyle(PulseColors.textPrimary)
+                            .font(AgaraFont.title3)
+                            .foregroundStyle(AgaraColors.textPrimary)
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
 
                         Text(status.statusLine)
-                            .font(PulseFont.footnote.weight(.regular))
+                            .font(AgaraFont.footnote.weight(.regular))
                             .foregroundStyle(status.statusTint)
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
 
                         if let syncText = status.syncText {
                             Text(syncText)
-                                .font(PulseFont.caption.weight(.regular))
-                                .foregroundStyle(PulseColors.textSecondary)
+                                .font(AgaraFont.caption.weight(.regular))
+                                .foregroundStyle(AgaraColors.textSecondary)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.8)
                         }
@@ -178,7 +178,7 @@ struct DeviceHeroCard: View {
                                 Image(systemName: "battery.\(Int((Double(min(battery, 100)) / 25).rounded()) * 25)percent")
                                 Text(batteryText)
                             }
-                                .font(PulseFont.caption.weight(.semibold))
+                                .font(AgaraFont.caption.weight(.semibold))
                                 .foregroundStyle(tint)
                                 .padding(.horizontal, 9)
                                 .padding(.vertical, 6)
@@ -188,8 +188,8 @@ struct DeviceHeroCard: View {
                         }
 
                         Image(systemName: "chevron.right")
-                            .font(PulseFont.footnote.weight(.semibold))
-                            .foregroundStyle(PulseColors.textMuted)
+                            .font(AgaraFont.footnote.weight(.semibold))
+                            .foregroundStyle(AgaraColors.textMuted)
                             .frame(width: 20, height: 20)
                     }
                     .fixedSize(horizontal: true, vertical: true)
@@ -204,12 +204,12 @@ struct DeviceHeroCard: View {
             if status.action != .disconnect {
                 Button(action: { performAction(status.action) }) {
                     Text(status.actionTitle)
-                        .font(PulseFont.footnote.weight(.semibold))
-                        .foregroundStyle(status.actionEnabled ? PulseColors.textPrimary : PulseColors.textMuted)
+                        .font(AgaraFont.footnote.weight(.semibold))
+                        .foregroundStyle(status.actionEnabled ? AgaraColors.textPrimary : AgaraColors.textMuted)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
                         // Plain liquid glass (no accent tint); interactive when enabled.
-                        .pulseGlass(Capsule(), interactive: status.actionEnabled)
+                        .agaraGlass(Capsule(), interactive: status.actionEnabled)
                 }
                 .buttonStyle(.plain)
                 .disabled(!status.actionEnabled)
@@ -224,8 +224,8 @@ struct DeviceHeroCard: View {
         // Liquid glass hero card. The container lets the card glass and the inner
         // Connect-pill glass coexist as one managed group (glass can't sample glass,
         // so a bare nested glass would render flat).
-        .pulseGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .pulseGlassContainer(spacing: 24)
+        .agaraGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .agaraGlassContainer(spacing: 24)
     }
 
     private func cardAccessibilityLabel(_ status: DeviceHeroStatus) -> String {

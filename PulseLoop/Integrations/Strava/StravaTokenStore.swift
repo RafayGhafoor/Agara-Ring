@@ -25,6 +25,7 @@ nonisolated struct StravaKeychainTokenStore: StravaTokenStoring {
     private let service: String
     private let account: String
 
+    // Install-bound: Keychain service/account keep the pre-rename names so stored secrets stay readable.
     init(service: String = "com.pulseloop.strava", account: String = "oauth_tokens") {
         self.service = service
         self.account = account

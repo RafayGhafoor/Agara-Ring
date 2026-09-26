@@ -30,7 +30,7 @@ final class InfoPlistBrandingTests: XCTestCase {
         return result
     }
 
-    func testNoUserVisibleStringSaysPulseLoop() throws {
+    func testNoUserVisibleStringSaysTheUpstreamName() throws {
         let all = try plists()
         XCTAssertGreaterThanOrEqual(all.count, 3, "expected the app and both extensions")
         for (bundle, plist) in all {

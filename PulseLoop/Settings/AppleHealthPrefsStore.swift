@@ -120,8 +120,8 @@ final class AppleHealthPrefsStore {
 
     static let shared = AppleHealthPrefsStore()
 
-    private static let prefsKey = "pulseloop.applehealth.prefs.v1"
-    private static let stateKey = "pulseloop.applehealth.state.v1"
+    private static let prefsKey = "pulseloop.applehealth.prefs.v1" // install-bound: pre-rename name kept so existing installs keep it
+    private static let stateKey = "pulseloop.applehealth.state.v1" // install-bound: pre-rename name kept so existing installs keep it
     private let defaults: UserDefaults
 
     /// User-facing export preferences. Master toggle defaults **off** (privacy-first).

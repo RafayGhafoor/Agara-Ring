@@ -1,11 +1,11 @@
 ---
 title: Getting Started — Android
-description: Install and build PulseLoop for Android, and what the Android port adds.
+description: Install and build Agara Ring for Android, and what the Android port adds.
 ---
 
 # Getting Started on Android
 
-PulseLoop has a sister project for Android:
+Agara Ring has a sister project for Android:
 **[foureight84/PulseLoopAndroid](https://github.com/foureight84/PulseLoopAndroid)**.
 
 The two ports are developed hand in hand and share the same BLE protocol work, so
@@ -15,7 +15,7 @@ persistence, and adds several platform-specific niceties on top of the shared
 feature set.
 
 !!! info "Pick a ring first"
-    PulseLoop talks to a real Bluetooth ring. Check the
+    Agara Ring talks to a real Bluetooth ring. Check the
     [supported hardware](../hardware/index.md) before you start — both
     ports connect to the same rings.
 

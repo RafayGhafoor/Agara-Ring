@@ -13,50 +13,50 @@ struct CoachActionCardView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 6) {
                 Image(systemName: "exclamationmark.circle.fill")
-                    .font(PulseFont.caption.weight(.regular))
-                    .foregroundStyle(isDestructive ? PulseColors.danger : PulseColors.warning)
+                    .font(AgaraFont.caption.weight(.regular))
+                    .foregroundStyle(isDestructive ? AgaraColors.danger : AgaraColors.warning)
                 Text("Confirm action")
-                    .font(PulseFont.micro.weight(.semibold)).tracking(1.0)
-                    .foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.micro.weight(.semibold)).tracking(1.0)
+                    .foregroundStyle(AgaraColors.textMuted)
             }
             Text(action.summary)
-                .font(PulseFont.footnote.weight(.regular))
-                .foregroundStyle(PulseColors.textPrimary)
+                .font(AgaraFont.footnote.weight(.regular))
+                .foregroundStyle(AgaraColors.textPrimary)
 
             HStack(spacing: 8) {
                 Button(action: onCancel) {
                     Text("Cancel")
-                        .font(PulseFont.footnote.weight(.semibold))
+                        .font(AgaraFont.footnote.weight(.semibold))
                         .frame(maxWidth: .infinity).padding(.vertical, 9)
-                        .foregroundStyle(PulseColors.textPrimary)
+                        .foregroundStyle(AgaraColors.textPrimary)
                         // Solid tile, not glass: this button sits inside the card's own glass,
                         // and glass can't sample glass (renders flat). A subtle white sheen +
                         // hairline mirrors the Settings icon tile.
                         .background(
                             LinearGradient(
-                                colors: [PulseColors.textPrimary.opacity(0.16), PulseColors.textPrimary.opacity(0.07)],
+                                colors: [AgaraColors.textPrimary.opacity(0.16), AgaraColors.textPrimary.opacity(0.07)],
                                 startPoint: .top, endPoint: .bottom
                             ),
                             in: Capsule()
                         )
-                        .overlay(Capsule().strokeBorder(PulseColors.textPrimary.opacity(0.12), lineWidth: 0.5))
+                        .overlay(Capsule().strokeBorder(AgaraColors.textPrimary.opacity(0.12), lineWidth: 0.5))
                 }
                 .buttonStyle(.plain)
                 Button(action: onConfirm) {
                     Text(action.confirmLabel)
-                        .font(PulseFont.footnote.weight(.semibold))
+                        .font(AgaraFont.footnote.weight(.semibold))
                         .frame(maxWidth: .infinity).padding(.vertical, 9)
-                        .foregroundStyle(PulseColors.textPrimary)
+                        .foregroundStyle(AgaraColors.textPrimary)
                         // Solid accent/danger fill (not tinted glass): keeps the destructive
                         // affordance visible while avoiding glass-inside-glass flattening.
-                        .background(isDestructive ? PulseColors.danger : PulseColors.accent, in: Capsule())
+                        .background(isDestructive ? AgaraColors.danger : AgaraColors.accent, in: Capsule())
                 }
                 .buttonStyle(.plain)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        .pulseGlass(RoundedRectangle(cornerRadius: 16, style: .continuous),
-                    tint: isDestructive ? PulseColors.danger : PulseColors.warning)
+        .agaraGlass(RoundedRectangle(cornerRadius: 16, style: .continuous),
+                    tint: isDestructive ? AgaraColors.danger : AgaraColors.warning)
     }
 }

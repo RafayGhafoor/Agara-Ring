@@ -19,7 +19,7 @@ import SwiftData
 /// "latest wins". Idempotent: re-applying the same records is a no-op.
 @MainActor
 enum SleepRecordRepair {
-    static let log = Logger(subsystem: "com.pulseloop", category: "sleep-repair")
+    static let log = Logger(subsystem: "com.agara.ring", category: "sleep-repair")
 
     /// One sleep record recovered from the trace.
     struct Record: Equatable {

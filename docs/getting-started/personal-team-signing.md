@@ -1,6 +1,6 @@
 ---
 title: Fixing Xcode Personal Team Signing
-description: Resolve WeatherKit provisioning-profile and mixed-team signing errors when building PulseLoop from source.
+description: Resolve WeatherKit provisioning-profile and mixed-team signing errors when building Agara Ring from source.
 ---
 
 # Fixing Xcode Personal Team Signing
@@ -88,7 +88,7 @@ should select their own team in Xcode.
 
     | Target | Example bundle identifier |
     | --- | --- |
-    | PulseLoop | `com.yourname.pulseloop` |
+    | PulseLoop (app target) | `com.yourname.pulseloop` |
     | Live Activity extension | `com.yourname.pulseloop.LiveActivity` |
     | Widgets extension | `com.yourname.pulseloop.Widgets` |
     | Tests | `com.yourname.pulseloopTests` |

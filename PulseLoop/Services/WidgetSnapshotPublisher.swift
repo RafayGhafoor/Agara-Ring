@@ -5,10 +5,10 @@ import WidgetKit
 /// Publishes the home-screen-widget snapshot: projects the same prepared tile state the Today page
 /// renders (`MetricsService.buildTodaySummary` + `VitalsCardFactory` cards) into the Codable
 /// `WidgetSnapshot`, writes it atomically into the app-group container, and reloads the widget
-/// timelines. Retained for the app's lifetime by `PulseLoopApp` (like `DiagnosticsSubscriber`).
+/// timelines. Retained for the app's lifetime by `AgaraApp` (like `DiagnosticsSubscriber`).
 ///
 /// Refresh discipline: data only changes when the app syncs with the ring, so publishing rides the
-/// coalesced `PulseDataChange` signal (debounced — a history sync bumps it once per batch, but several
+/// coalesced `AgaraDataChange` signal (debounced — a history sync bumps it once per batch, but several
 /// batches can land in quick succession) plus the scene-phase edges (catches goal/unit/visibility
 /// edits made in Settings, which don't bump the sync token). Timeline reloads while the app is in the
 /// foreground don't count against the WidgetKit refresh budget; reloads from background BLE syncs do,
@@ -49,7 +49,7 @@ final class WidgetSnapshotPublisher {
     /// one burst of persistence batches produces one snapshot.
     private func observeDataChange() {
         withObservationTracking {
-            _ = PulseDataChange.shared.token
+            _ = AgaraDataChange.shared.token
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self else { return }
@@ -72,7 +72,7 @@ final class WidgetSnapshotPublisher {
     }
 
     func publish(reason: Reason) {
-        guard let url = PulseWidgetStore.fileURL else { return }
+        guard let url = AgaraWidgetStore.fileURL else { return }
         if reason == .scenePhase { debounceTask?.cancel() }   // this build covers a pending trailing one
         lastBuildAt = Date()
         var snapshot = buildSnapshot()
@@ -103,12 +103,12 @@ final class WidgetSnapshotPublisher {
     private func reloadTimelines(reason: Reason) {
         let foreground = UIApplication.shared.applicationState != .background
         if reason == .dataChange && !foreground {
-            let defaults = UserDefaults(suiteName: PulseWidgetStore.suite)
-            if let last = defaults?.object(forKey: PulseWidgetStore.lastBackgroundReloadKey) as? Date,
+            let defaults = UserDefaults(suiteName: AgaraWidgetStore.suite)
+            if let last = defaults?.object(forKey: AgaraWidgetStore.lastBackgroundReloadKey) as? Date,
                Date().timeIntervalSince(last) < Self.backgroundReloadMinInterval {
                 return
             }
-            defaults?.set(Date(), forKey: PulseWidgetStore.lastBackgroundReloadKey)
+            defaults?.set(Date(), forKey: AgaraWidgetStore.lastBackgroundReloadKey)
         }
         WidgetCenter.shared.reloadAllTimelines()
     }
@@ -177,7 +177,7 @@ final class WidgetSnapshotPublisher {
         if let goal, totals.calories > Double(goal) {
             ringHex = totals.calories <= Double(goal) * 1.15 ? "#FFB86B" : "#FF4D6D"   // warning / danger
         } else {
-            ringHex = "#FF8A4C"                                                        // PulseColors.calories
+            ringHex = "#FF8A4C"                                                        // AgaraColors.calories
         }
 
         func macroRow(_ letter: String, _ hex: String, _ value: Double, _ macroGoal: Int?) -> WidgetNutritionPayload.MacroRow {
@@ -291,7 +291,7 @@ final class WidgetSnapshotPublisher {
     }
 
     /// Resolve a SwiftUI `Color` to a hex string (8-digit when translucent) the widget rebuilds via
-    /// the shared `Color(hex:)`. All crossing colors originate from `PulseColors` hex values (sRGB),
+    /// the shared `Color(hex:)`. All crossing colors originate from `AgaraColors` hex values (sRGB),
     /// so the round trip is lossless.
     private static func hexString(_ color: Color) -> String {
         let ui = UIColor(color)

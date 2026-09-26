@@ -43,7 +43,7 @@ struct RootAppView: View {
                     }
                 }
             }
-            .background(PulseColors.background.ignoresSafeArea())
+            .background(AgaraColors.background.ignoresSafeArea())
             .environment(\.zoomNamespace, zoomNS)
             // Demo data is opt-in: load it from Settings → "Reseed demo data", or via the
             // `-seedDemo YES` launch arg (test tooling only). Normal launches start empty.
@@ -69,7 +69,7 @@ struct RootAppView: View {
                         DailyCalorieEstimator.recompute(day: day, context: modelContext)
                     }
                     try? modelContext.save()
-                    PulseDataChange.shared.notify()
+                    AgaraDataChange.shared.notify()
                 }
                 // Test tooling: fake a connected Strava account. Must run before anything touches
                 // StravaAuthService.shared (it reads the token store at init).
@@ -80,7 +80,7 @@ struct RootAppView: View {
                 // Test tooling: headless full-archive export/import against
                 // Documents/pulseloop-export.json, so the simulator smoke test can drive the
                 // feature without the share sheet / file picker.
-                let archiveLog = Logger(subsystem: "xyz.sakshambhutani.pulseloop2", category: "DataArchive")
+                let archiveLog = Logger(subsystem: "com.agara.ring", category: "DataArchive")
                 if UserDefaults.standard.bool(forKey: "exportDataToDocuments"),
                    let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
                     let url = docs.appendingPathComponent("pulseloop-export.json")
@@ -107,7 +107,7 @@ struct RootAppView: View {
                 // Test tooling: flip the (off-by-default) nutrition feature on via launch arg.
                 if DebugLaunch.bool("enableNutrition") {
                     NutritionPrefsStore.shared.prefs.masterEnabled = true
-                    PulseDataChange.shared.notify()
+                    AgaraDataChange.shared.notify()
                 }
                 if DebugLaunch.bool("openNutrition") {
                     path.append(AppRoute.nutrition)
@@ -147,7 +147,7 @@ struct RootAppView: View {
                 }
             }
             .onOpenURL { url in
-                guard url.scheme == "pulseloop", url.host == "workout",
+                guard url.scheme == "pulseloop", url.host == "workout", // install-bound URL scheme
                       let id = UUID(uuidString: url.lastPathComponent) else { return }
                 liveWorkout.requestOpen(sessionID: id)
                 routeDeepLinkIfNeeded()
@@ -158,7 +158,7 @@ struct RootAppView: View {
                     ActivityDetailView(sessionId: id)
                 case let .metricDetail(metric):
                     MetricDetailView(metric: metric, path: $path)
-                        .pulseZoomDestination(route, in: zoomNS)
+                        .agaraZoomDestination(route, in: zoomNS)
                 case .activityTrends:
                     ActivityTrendsView(path: $path)
                 case .recordSelect:
@@ -234,7 +234,7 @@ struct RootAppView: View {
         .id(themeStore.theme.name)
         // Ring firmware install progress, over everything while an install runs (debug + `firmwareInstall`).
         .firmwareInstallCover()
-        .tint(PulseColors.accent)
+        .tint(AgaraColors.accent)
         // System mode: no override, so the OS setting flows down (and into `systemScheme`). Otherwise the
         // chosen theme's side drives the status bar and system controls.
         .preferredColorScheme(colorSchemeOverride)
@@ -334,13 +334,13 @@ struct MainTabView: View {
             Group {
                 if coordinator.isSyncing {
                     SyncProgressBar()
-                        .pulseMaterialize()
+                        .agaraMaterialize()
                 }
             }
-            .pulseGlassContainer(spacing: 8)
+            .agaraGlassContainer(spacing: 8)
             if let error = coordinator.syncError {
                 HStack {
-                    Text(error).font(PulseFont.caption)
+                    Text(error).font(AgaraFont.caption)
                     Spacer()
                     Button("Retry") { coordinator.runStartupSequence() }
                 }
@@ -378,15 +378,15 @@ struct MainTabView: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: coordinator.isSyncing)
-        .animation(PulseMotion.materialize, value: coachEnabled)   // FAB materializes in/out
-        .animation(PulseMotion.materialize, value: reorder.isEditing)
+        .animation(AgaraMotion.materialize, value: coachEnabled)   // FAB materializes in/out
+        .animation(AgaraMotion.materialize, value: reorder.isEditing)
         // Floating Coach chat bubble, bottom-right, hovering above the tab bar. It steps aside while
         // reordering: the cards are disabled then anyway, and the Done bar wants the full width.
         .overlay(alignment: .bottomTrailing) {
             if coachEnabled && !reorder.isEditing {
                 CoachFAB { CoachNavigation.shared.openRoot() }
                     .padding(.trailing, 18)
-                    .padding(.bottom, PulseLayout.floatingBottomInset)
+                    .padding(.bottom, AgaraLayout.floatingBottomInset)
                     .transition(.scale(scale: 0.6).combined(with: .opacity))
             }
         }
@@ -396,7 +396,7 @@ struct MainTabView: View {
             if reorder.isEditing {
                 ReorderDoneBar { reorder.end() }
                     .padding(.horizontal, 16)
-                    .padding(.bottom, PulseLayout.floatingBottomInset)
+                    .padding(.bottom, AgaraLayout.floatingBottomInset)
             }
         }
         // Leaving the tab abandons its edit mode; the tab's own observer persists the order.
@@ -417,7 +417,7 @@ struct MainTabView: View {
                 // a sheet presented on the iPad/Mac idiom can lose the WindowGroup's environment objects).
                 .environment(coordinator)
         }
-        .background(PulseColors.background.ignoresSafeArea())
+        .background(AgaraColors.background.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
     }
 }
@@ -506,16 +506,16 @@ struct AppHeader: View {
                 if let firstName {
                     // Two lines: greeting on top, name below — avoids truncating a long name.
                     Text("\(greeting.lead),")
-                        .font(PulseFont.footnote)
-                        .foregroundStyle(PulseColors.textMuted)
+                        .font(AgaraFont.footnote)
+                        .foregroundStyle(AgaraColors.textMuted)
                     Text("\(firstName)\(greeting.suffix)")
-                        .font(PulseFont.title2.weight(.semibold))
-                        .foregroundStyle(PulseColors.textPrimary)
+                        .font(AgaraFont.title2.weight(.semibold))
+                        .foregroundStyle(AgaraColors.textPrimary)
                         .lineLimit(1)
                 } else {
                     Text("\(greeting.lead)\(greeting.suffix)")
-                        .font(PulseFont.title3)
-                        .foregroundStyle(PulseColors.textPrimary)
+                        .font(AgaraFont.title3)
+                        .foregroundStyle(AgaraColors.textPrimary)
                         .lineLimit(1)
                 }
             }
@@ -534,7 +534,7 @@ struct AppHeader: View {
         .padding(.horizontal, 20)
         .padding(.top, 8)
         .padding(.bottom, 10)
-        .background(PulseColors.background)
+        .background(AgaraColors.background)
         }
     }
 
@@ -572,7 +572,7 @@ struct RingStatusChip: View {
             HStack(spacing: 6) {
                 if status != .connected {
                     Text(status.label)
-                        .font(PulseFont.caption.weight(.semibold))
+                        .font(AgaraFont.caption.weight(.semibold))
                         .foregroundStyle(status.color)
                         .lineLimit(1)
                         .fixedSize()
@@ -655,9 +655,9 @@ enum RingChipStatus: Equatable {
 
     var color: Color {
         switch self {
-        case .connected: return PulseColors.success
-        case .connecting: return PulseColors.accent
-        case .failed, .disconnected: return PulseColors.danger
+        case .connected: return AgaraColors.success
+        case .connecting: return AgaraColors.accent
+        case .failed, .disconnected: return AgaraColors.danger
         }
     }
 }
@@ -692,20 +692,20 @@ struct RingBatteryGlyph: View {
                 TimelineView(.animation) { context in
                     let level = Double(percent ?? 0) / 100
                     glyph(fill: Self.chargingFill(level: level, time: context.date.timeIntervalSinceReferenceDate),
-                          tier: PulseColors.success)
+                          tier: AgaraColors.success)
                 }
             } else if charging {
-                glyph(fill: 1, tier: PulseColors.success)
+                glyph(fill: 1, tier: AgaraColors.success)
             } else {
                 glyph(fill: percent.map { Double($0) / 100 }, tier: percent.map { BatteryTier(percent: $0).color })
             }
             if charging {
                 Image(systemName: "bolt.fill")
                     .font(.system(size: size * 0.2, weight: .bold))
-                    .foregroundStyle(PulseColors.onAccent)
+                    .foregroundStyle(AgaraColors.onAccent)
                     .frame(width: size * 0.3, height: size * 0.3)
-                    .background(PulseColors.success, in: Circle())
-                    .overlay(Circle().stroke(PulseColors.background, lineWidth: 1.5))
+                    .background(AgaraColors.success, in: Circle())
+                    .overlay(Circle().stroke(AgaraColors.background, lineWidth: 1.5))
                     .accessibilityHidden(true)
             }
         }
@@ -715,7 +715,7 @@ struct RingBatteryGlyph: View {
 
     /// The glyph itself; `fill` nil = unknown level (track only).
     private func glyph(fill: Double?, tier: Color?) -> some View {
-        let tierColor = tier ?? PulseColors.textMuted
+        let tierColor = tier ?? AgaraColors.textMuted
         let showsDot = !charging
         return Canvas { context, canvasSize in
             let w = canvasSize.width
@@ -724,8 +724,8 @@ struct RingBatteryGlyph: View {
             let arcRect = CGRect(x: (w - diameter) / 2 + arcStroke / 2, y: (w - diameter) / 2 + arcStroke / 2,
                                  width: diameter - arcStroke, height: diameter - arcStroke)
             let disc = CGRect(x: (w - diameter) / 2, y: (w - diameter) / 2, width: diameter, height: diameter)
-            context.fill(Path(ellipseIn: disc), with: .color(PulseColors.card))
-            context.stroke(Path(ellipseIn: arcRect), with: .color(PulseColors.borderStrong), lineWidth: arcStroke)
+            context.fill(Path(ellipseIn: disc), with: .color(AgaraColors.card))
+            context.stroke(Path(ellipseIn: arcRect), with: .color(AgaraColors.borderStrong), lineWidth: arcStroke)
             if let fill {
                 var arc = Path()
                 arc.addArc(center: CGPoint(x: arcRect.midX, y: arcRect.midY), radius: arcRect.width / 2,
@@ -735,7 +735,7 @@ struct RingBatteryGlyph: View {
                                style: StrokeStyle(lineWidth: arcStroke, lineCap: .round))
             }
             // The ring: a band with a small gem on top.
-            let ink = PulseColors.textPrimary.opacity(live ? 1 : 0.6)
+            let ink = AgaraColors.textPrimary.opacity(live ? 1 : 0.6)
             let band = w * 0.15
             let bandStroke = w * 0.065
             let c = CGPoint(x: w / 2, y: w / 2 + w * 0.03)
@@ -754,7 +754,7 @@ struct RingBatteryGlyph: View {
                 let r = w * 0.12
                 let dc = CGPoint(x: w - r - 0.5, y: w - r - 0.5)
                 context.fill(Path(ellipseIn: CGRect(x: dc.x - r - 1.5, y: dc.y - r - 1.5, width: (r + 1.5) * 2, height: (r + 1.5) * 2)),
-                             with: .color(PulseColors.background))
+                             with: .color(AgaraColors.background))
                 context.fill(Path(ellipseIn: CGRect(x: dc.x - r, y: dc.y - r, width: r * 2, height: r * 2)),
                              with: .color(dotColor.opacity(dotOpacity)))
             }
@@ -774,9 +774,9 @@ enum BatteryTier: Equatable {
 
     var color: Color {
         switch self {
-        case .low: return PulseColors.danger
-        case .mid: return PulseColors.warning
-        case .ok: return PulseColors.success
+        case .low: return AgaraColors.danger
+        case .mid: return AgaraColors.warning
+        case .ok: return AgaraColors.success
         }
     }
 }
@@ -800,8 +800,8 @@ struct CoachFAB: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: "bubble.left.and.text.bubble.right.fill")
-                .font(PulseFont.title2)
-                .foregroundStyle(PulseColors.accent)
+                .font(AgaraFont.title2)
+                .foregroundStyle(AgaraColors.accent)
                 .frame(width: 56, height: 56)
                 .modifier(CoachFABGlass())
                 // Consume every touch inside the circle so taps never fall through
@@ -835,7 +835,7 @@ private struct CoachFABGlass: ViewModifier {
         } else {
             content
                 .background(.ultraThinMaterial, in: Circle())
-                .overlay(Circle().stroke(PulseColors.borderSubtle, lineWidth: 1))
+                .overlay(Circle().stroke(AgaraColors.borderSubtle, lineWidth: 1))
         }
     }
 }
@@ -860,34 +860,34 @@ struct BottomNavBar: View {
                 } label: {
                     VStack(spacing: 4) {
                         Image(systemName: tab.symbol)
-                            .font(PulseFont.headline)
+                            .font(AgaraFont.headline)
                             .frame(width: 38, height: 28)
                             .background {
                                 // The active lozenge slides between tabs instead of
                                 // hard-cutting — matchedGeometryEffect works on every OS.
                                 if isSelected {
                                     Capsule()
-                                        .fill(PulseColors.accentSoft)
+                                        .fill(AgaraColors.accentSoft)
                                         .matchedGeometryEffect(id: "tabLozenge", in: tabSelection)
                                 }
                             }
                         Text(tab.rawValue)
-                            .font(PulseFont.micro)
+                            .font(AgaraFont.micro)
                     }
-                    .foregroundStyle(isSelected ? PulseColors.textPrimary : PulseColors.textMuted)
+                    .foregroundStyle(isSelected ? AgaraColors.textPrimary : AgaraColors.textMuted)
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.plain)
             }
         }
         // Slide the selection lozenge smoothly whenever the tab changes.
-        .animation(PulseMotion.spring, value: selected)
+        .animation(AgaraMotion.spring, value: selected)
         .padding(.horizontal, 8)
         .padding(.vertical, 8)
         // Single interactive glass surface — real Liquid Glass (touch illumination)
         // on iOS 26+, Material fallback below.
-        .pulseGlass(Capsule(), interactive: true)
-        .overlay(Capsule().stroke(PulseColors.borderSubtle, lineWidth: 1))
+        .agaraGlass(Capsule(), interactive: true)
+        .overlay(Capsule().stroke(AgaraColors.borderSubtle, lineWidth: 1))
         // Consume every touch inside the capsule so taps never fall through to the
         // scrolling content beneath the floating bar.
         .contentShape(Capsule())
@@ -902,12 +902,12 @@ struct OnboardingHeader: View {
     var body: some View {
         VStack(spacing: 10) {
             Text(title)
-                .font(PulseFont.numberHero)
-                .foregroundStyle(PulseColors.textPrimary)
+                .font(AgaraFont.numberHero)
+                .foregroundStyle(AgaraColors.textPrimary)
                 .multilineTextAlignment(.center)
             Text(subtitle)
-                .font(PulseFont.callout.weight(.regular))
-                .foregroundStyle(PulseColors.textSecondary)
+                .font(AgaraFont.callout.weight(.regular))
+                .foregroundStyle(AgaraColors.textSecondary)
                 .multilineTextAlignment(.center)
                 .lineSpacing(4)
         }
@@ -922,14 +922,14 @@ struct SectionHeader: View {
     var body: some View {
         HStack {
             Text(title)
-                .font(PulseFont.footnote.weight(.semibold))
-                .foregroundStyle(PulseColors.textSecondary)
+                .font(AgaraFont.footnote.weight(.semibold))
+                .foregroundStyle(AgaraColors.textSecondary)
                 .textCase(.uppercase)
             Spacer()
             if let action {
                 Text(action)
-                    .font(PulseFont.caption)
-                    .foregroundStyle(PulseColors.accent)
+                    .font(AgaraFont.caption)
+                    .foregroundStyle(AgaraColors.accent)
             }
         }
     }
@@ -945,13 +945,13 @@ struct StatusCopy: View {
     }
 
     var body: some View {
-        PulseCard {
+        AgaraCard {
             VStack(alignment: .leading, spacing: 8) {
                 Text(title)
-                    .font(PulseFont.headline)
+                    .font(AgaraFont.headline)
                 Text(text)
-                    .font(PulseFont.subheadline.weight(.regular))
-                    .foregroundStyle(PulseColors.textSecondary)
+                    .font(AgaraFont.subheadline.weight(.regular))
+                    .foregroundStyle(AgaraColors.textSecondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -970,13 +970,13 @@ struct EmptyStateView: View {
     var body: some View {
         VStack(spacing: 12) {
             Image(systemName: "tray")
-                .font(PulseFont.largeTitle)
-                .foregroundStyle(PulseColors.textMuted)
+                .font(AgaraFont.largeTitle)
+                .foregroundStyle(AgaraColors.textMuted)
             Text(title)
-                .font(PulseFont.headline)
+                .font(AgaraFont.headline)
             Text(message)
-                .font(PulseFont.subheadline)
-                .foregroundStyle(PulseColors.textMuted)
+                .font(AgaraFont.subheadline)
+                .foregroundStyle(AgaraColors.textMuted)
                 .multilineTextAlignment(.center)
         }
         .padding()
@@ -990,8 +990,8 @@ struct InlineEmptyState: View {
     let message: String
     var body: some View {
         VStack(spacing: 4) {
-            Text(title).font(PulseFont.subheadline).foregroundStyle(PulseColors.textPrimary)
-            Text(message).font(PulseFont.caption.weight(.regular)).foregroundStyle(PulseColors.textMuted).multilineTextAlignment(.center)
+            Text(title).font(AgaraFont.subheadline).foregroundStyle(AgaraColors.textPrimary)
+            Text(message).font(AgaraFont.caption.weight(.regular)).foregroundStyle(AgaraColors.textMuted).multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 24)

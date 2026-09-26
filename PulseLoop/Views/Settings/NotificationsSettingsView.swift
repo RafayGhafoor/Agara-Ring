@@ -37,7 +37,7 @@ struct NotificationsSettingsView: View {
             }
             .padding()
         }
-        .background(PulseColors.background)
+        .background(AgaraColors.background)
         .pageChrome("Coach Check-Ins")
         .onAppear {
             batteryAlertsEnabled = UserDefaults.standard.object(forKey: BatteryAlertMonitor.enabledKey) as? Bool ?? true
@@ -72,7 +72,7 @@ struct NotificationsSettingsView: View {
         if store.settings.notificationsEnabled {
             QuickActionButton(label: "Send a test check-in now") { sendTestCheckin() }
             if let testStatus {
-                Text(testStatus).font(PulseFont.caption).foregroundStyle(PulseColors.textMuted)
+                Text(testStatus).font(AgaraFont.caption).foregroundStyle(AgaraColors.textMuted)
                     .padding(.horizontal, 4)
             }
 
@@ -92,7 +92,7 @@ struct NotificationsSettingsView: View {
         }
         if notifPermissionDenied {
             Text(AgaraCopy.notificationsDisabled)
-                .font(PulseFont.caption).foregroundStyle(PulseColors.danger)
+                .font(AgaraFont.caption).foregroundStyle(AgaraColors.danger)
                 .padding(.horizontal, 4)
         }
     }
@@ -104,7 +104,7 @@ struct NotificationsSettingsView: View {
             ForEach(0..<24, id: \.self) { h in Text(String(format: "%02d:00", h)).tag(h) }
         }
         .pickerStyle(.menu)
-        .tint(PulseColors.accent)
+        .tint(AgaraColors.accent)
     }
 
     private func hourBinding(_ keyPath: WritableKeyPath<CoachSettings, Int>) -> Binding<Int> {

@@ -67,8 +67,8 @@ struct FirmwareInstallSection: View {
             VStack(alignment: .leading, spacing: 8) {
                 ForEach(Array(gates.enumerated()), id: \.offset) { _, gate in
                     Text("• \(gate.text(minBattery: controller.minBattery))")
-                        .font(PulseFont.footnote)
-                        .foregroundStyle(PulseColors.textSecondary)
+                        .font(AgaraFont.footnote)
+                        .foregroundStyle(AgaraColors.textSecondary)
                 }
                 PrimaryButton(title: "Install on ring", systemImage: "arrow.up.circle") { confirming = true }
                     .disabled(!gates.isEmpty)
@@ -93,27 +93,27 @@ struct FirmwareInstallScreen: View {
     var body: some View {
         let state = controller.state
         ZStack {
-            PulseColors.background.ignoresSafeArea()
+            AgaraColors.background.ignoresSafeArea()
             VStack(spacing: 16) {
                 Text("Firmware update")
-                    .font(PulseFont.caption)
-                    .foregroundStyle(PulseColors.textSecondary)
+                    .font(AgaraFont.caption)
+                    .foregroundStyle(AgaraColors.textSecondary)
                 Text(FirmwareInstallText.headline(state))
-                    .font(PulseFont.title2)
+                    .font(AgaraFont.title2)
                     .multilineTextAlignment(.center)
                     .foregroundStyle(headlineColor(state))
                     .accessibilityIdentifier("firmwareInstallHeadline")
                 if state.busy {
                     if let fraction = FirmwareInstallText.fraction(state) {
                         ProgressView(value: fraction)
-                            .tint(PulseColors.accent)
+                            .tint(AgaraColors.accent)
                     } else {
-                        ProgressView().tint(PulseColors.accent)
+                        ProgressView().tint(AgaraColors.accent)
                     }
                 }
                 Text(FirmwareInstallText.detail(state))
-                    .font(PulseFont.body)
-                    .foregroundStyle(PulseColors.textSecondary)
+                    .font(AgaraFont.body)
+                    .foregroundStyle(AgaraColors.textSecondary)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer().frame(height: 8)
@@ -129,9 +129,9 @@ struct FirmwareInstallScreen: View {
 
     private func headlineColor(_ state: InstallState) -> Color {
         switch state {
-        case .succeeded: return PulseColors.success
-        case .failed: return PulseColors.danger
-        default: return PulseColors.textPrimary
+        case .succeeded: return AgaraColors.success
+        case .failed: return AgaraColors.danger
+        default: return AgaraColors.textPrimary
         }
     }
 

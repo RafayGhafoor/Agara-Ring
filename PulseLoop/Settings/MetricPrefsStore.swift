@@ -104,7 +104,7 @@ final class MetricPrefsStore {
 
     static let shared = MetricPrefsStore()
 
-    private static let storageKey = "pulseloop.metricprefs.v1"
+    private static let storageKey = "pulseloop.metricprefs.v1" // install-bound: pre-rename name kept so existing installs keep it
     private let defaults: UserDefaults
 
     var settings: MetricPrefs {

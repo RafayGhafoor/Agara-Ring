@@ -66,7 +66,7 @@ struct PhysiologySettingsView: View {
             .padding()
         }
         .scrollDismissesKeyboard(.interactively)
-        .background(PulseColors.background)
+        .background(AgaraColors.background)
         .pageChrome("Physiology")
         .onAppear(perform: loadIfNeeded)
     }
@@ -78,7 +78,7 @@ struct PhysiologySettingsView: View {
             TextField("0", text: text)
                 .keyboardType(.numberPad)
                 .multilineTextAlignment(.trailing)
-                .foregroundStyle(PulseColors.textPrimary)
+                .foregroundStyle(AgaraColors.textPrimary)
                 .frame(maxWidth: 90)
         }
     }

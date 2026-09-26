@@ -14,7 +14,7 @@ struct TodayView: View {
     /// Whether the Today tab is on screen (adjacent tabs stay alive under the `.page` TabView).
     let isActive: Bool
     @State private var coachStore = CoachSettingsStore.shared
-    @State private var dataChange = PulseDataChange.shared
+    @State private var dataChange = AgaraDataChange.shared
     /// Owns the prepared dashboard state. Created lazily in `.task` (never in `body`) so a `body`
     /// re-render never triggers DB work — it just reads the already-prepared store.
     @State private var store: TodayStore?
@@ -60,7 +60,7 @@ struct TodayView: View {
     var body: some View {
         guard let activeStore = store else {
             // One pre-`.task` frame before the store is built: themed background, zero DB work.
-            return AnyView(PulseColors.background.ignoresSafeArea().task { ensureStore() })
+            return AnyView(AgaraColors.background.ignoresSafeArea().task { ensureStore() })
         }
         let summary = activeStore.summary
         let hero = activeStore.hero
@@ -80,7 +80,7 @@ struct TodayView: View {
                             chips: coachSummary.chips
                         )
                     }
-                    .buttonStyle(.pulseTap)
+                    .buttonStyle(.agaraTap)
                 } else if coachEnabled {
                     // Coach on but no summary generated yet: offer the chat entry point.
                     Button { CoachNavigation.shared.openRoot() } label: {
@@ -92,7 +92,7 @@ struct TodayView: View {
                             chips: []
                         )
                     }
-                    .buttonStyle(.pulseTap)
+                    .buttonStyle(.agaraTap)
                 } else {
                     HeroInsightCardView(title: hero.title, summary: hero.summary, chips: hero.chips)
                 }
@@ -113,11 +113,11 @@ struct TodayView: View {
             }
             .padding(.horizontal, 16)
             // Extra clearance while editing so the last tile stays draggable above the Done bar.
-            .padding(.bottom, editing ? PulseLayout.scrollBottomInsetEditing : PulseLayout.scrollBottomInset)
+            .padding(.bottom, editing ? AgaraLayout.scrollBottomInsetEditing : AgaraLayout.scrollBottomInset)
         }
         // Tap-outside-to-exit: a catcher behind the cards, live only while editing. It must be layered
         // *above* the opaque background colour — `.background` stacks back-to-front, so a catcher added
-        // after `PulseColors.background` would sit behind it and never see a touch.
+        // after `AgaraColors.background` would sit behind it and never see a touch.
         .background {
             if editing {
                 Color.clear
@@ -126,9 +126,9 @@ struct TodayView: View {
                     .accessibilityHidden(true)
             }
         }
-        .background(PulseColors.background)
+        .background(AgaraColors.background)
         .refreshable { await coordinator.pullToRefresh() }
-        .pulseScrollEdges()
+        .agaraScrollEdges()
         // A sync can rebuild the store mid-edit. Fold the new card set into the order on screen rather
         // than re-deriving it, and never while a drag is in flight — that would yank the card away.
         .onChange(of: activeStore.revision) { _, _ in
@@ -303,7 +303,7 @@ struct TodayView: View {
             TodayChartTile(model: model, profile: physiology, baseline: baseline, showPoints: showPoints) {
                 path.append(AppRoute.metricDetail(metric))
             }
-            .pulseZoomSource(AppRoute.metricDetail(metric), in: zoomNS)
+            .agaraZoomSource(AppRoute.metricDetail(metric), in: zoomNS)
         }
     }
 
@@ -311,7 +311,7 @@ struct TodayView: View {
     private func gaugeTile(_ store: TodayStore, _ metric: MetricKind) -> some View {
         if let model = store.cards[metric] {
             TodayGaugeTile(model: model) { path.append(AppRoute.metricDetail(metric)) }
-                .pulseZoomSource(AppRoute.metricDetail(metric), in: zoomNS)
+                .agaraZoomSource(AppRoute.metricDetail(metric), in: zoomNS)
         }
     }
 
@@ -326,7 +326,7 @@ struct TodayView: View {
                 diastolicZones: VitalsThresholdEngine.diastolicReferenceZones(),
                 onTap: { path.append(AppRoute.metricDetail(.bloodPressure)) }
             )
-            .pulseZoomSource(AppRoute.metricDetail(.bloodPressure), in: zoomNS)
+            .agaraZoomSource(AppRoute.metricDetail(.bloodPressure), in: zoomNS)
         }
     }
 }

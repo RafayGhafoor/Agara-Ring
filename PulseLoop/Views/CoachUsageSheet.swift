@@ -78,7 +78,7 @@ struct CoachUsageSheet: View {
                 .padding(16)
             }
             .scrollContentBackground(.hidden)
-            .background(PulseColors.background)
+            .background(AgaraColors.background)
             .navigationTitle("Usage & cost")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -105,21 +105,21 @@ struct CoachUsageSheet: View {
             )
         }
         .padding(.horizontal, 16).padding(.vertical, 4)
-        .pulseGlass(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     // Inline notice, not a surface: keeps its flat tint so it doesn't stack glass
     // on top of the glass cards it sits between.
     private var costNote: some View {
         HStack(alignment: .top, spacing: 6) {
-            Image(systemName: "info.circle").font(PulseFont.caption2.weight(.regular)).foregroundStyle(PulseColors.textMuted)
+            Image(systemName: "info.circle").font(AgaraFont.caption2.weight(.regular)).foregroundStyle(AgaraColors.textMuted)
             Text("Cost estimates aren't available for on-device or custom models.")
-                .font(PulseFont.caption.weight(.regular)).foregroundStyle(PulseColors.textMuted)
+                .font(AgaraFont.caption.weight(.regular)).foregroundStyle(AgaraColors.textMuted)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
-        .background(PulseColors.textMuted.opacity(0.10), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(AgaraColors.textMuted.opacity(0.10), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     private var breakdownCard: some View {
@@ -133,13 +133,13 @@ struct CoachUsageSheet: View {
                 .padding(.top, 8)
             } label: {
                 Text("Per-message breakdown")
-                    .font(PulseFont.footnote)
-                    .foregroundStyle(PulseColors.textPrimary)
+                    .font(AgaraFont.footnote)
+                    .foregroundStyle(AgaraColors.textPrimary)
             }
-            .tint(PulseColors.textSecondary)
+            .tint(AgaraColors.textSecondary)
         }
         .padding(16)
-        .pulseGlass(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private func messageBreakdownRow(_ message: CoachMessage) -> some View {
@@ -148,17 +148,17 @@ struct CoachUsageSheet: View {
         let cost = message.costUSD.map { String(format: "$%.4f", $0) } ?? "—"
         return VStack(alignment: .leading, spacing: 2) {
             Text(preview.isEmpty ? "(no text)" : String(preview))
-                .font(PulseFont.caption.weight(.regular))
-                .foregroundStyle(PulseColors.textPrimary)
+                .font(AgaraFont.caption.weight(.regular))
+                .foregroundStyle(AgaraColors.textPrimary)
                 .lineLimit(1)
             HStack {
                 Text(tokens)
-                    .font(PulseFont.caption2.weight(.regular).monospacedDigit())
-                    .foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.caption2.weight(.regular).monospacedDigit())
+                    .foregroundStyle(AgaraColors.textMuted)
                 Spacer()
                 Text(cost)
-                    .font(PulseFont.caption2.weight(.regular).monospacedDigit())
-                    .foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.caption2.weight(.regular).monospacedDigit())
+                    .foregroundStyle(AgaraColors.textMuted)
             }
         }
     }
@@ -166,18 +166,18 @@ struct CoachUsageSheet: View {
     private func usageRow(label: String, value: String, mono: Bool = false) -> some View {
         HStack {
             Text(label)
-                .font(PulseFont.subheadline.weight(.regular))
-                .foregroundStyle(PulseColors.textSecondary)
+                .font(AgaraFont.subheadline.weight(.regular))
+                .foregroundStyle(AgaraColors.textSecondary)
             Spacer(minLength: 12)
             Text(value)
-                .font(mono ? PulseFont.subheadline.weight(.regular).monospacedDigit() : PulseFont.subheadline.weight(.regular))
-                .foregroundStyle(PulseColors.textPrimary)
+                .font(mono ? AgaraFont.subheadline.weight(.regular).monospacedDigit() : AgaraFont.subheadline.weight(.regular))
+                .foregroundStyle(AgaraColors.textPrimary)
                 .multilineTextAlignment(.trailing)
         }
         .padding(.vertical, 12)
     }
 
     private var divider: some View {
-        Rectangle().fill(PulseColors.borderSubtle).frame(height: 1)
+        Rectangle().fill(AgaraColors.borderSubtle).frame(height: 1)
     }
 }

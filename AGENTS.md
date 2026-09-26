@@ -22,3 +22,9 @@
    runs on another device, the debug socket transport when it runs on the same machine.
 8. **No secrets, ever** — no credentials, tokens, account data or signing material in code, docs, logs
    or commits. Redact in diagnostics.
+9. **Code names are `Agara*`** (`AgaraColors`, `AgaraFont`, `AgaraShape`, `AgaraEventBus`, `AgaraDataChange`, …).
+   Install-bound names keep the upstream `pulseloop`/`PulseLoop` spelling on purpose — UserDefaults keys
+   (`pulseloop.*`), Keychain services (`com.pulseloop.*`), BG task ids, the App Group, the `pulseloop://`
+   URL scheme (Strava redirect), the CoreBluetooth restore id, widget `kind` strings — each marked with a
+   comment. The Xcode project, targets, module (`@testable import PulseLoop`) and source folders are renamed
+   separately. Never rename an install-bound name without a migration.

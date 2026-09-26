@@ -1,5 +1,5 @@
 /* ===========================================================================
-   PulseLoop brand polish for MkDocs Material.
+   Agara Ring brand polish for MkDocs Material.
    Palette pulled from icon-source.svg + the app's DesignSystem:
      violet  #7C5CFF / #863bff / #7e14ff
      lavender #EDE6FF / #D2CDFF / #8B7CFF
@@ -80,7 +80,7 @@
 /* ===========================================================================
    Home page "choose your platform" grid cards (attr_list + md_in_html).
    Usage in markdown:  wrap cards in <div class="grid cards"> ... </div>
-   Material already ships .grid.cards; this just adds PulseLoop flavor.
+   Material already ships .grid.cards; this just adds Agara Ring flavor.
    =========================================================================== */
 .md-typeset .grid.cards > :is(ul, ol) > li,
 .md-typeset .grid.cards > .card {

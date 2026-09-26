@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-/// Subscribes to `PulseEventBus` and records high-level connection / sync / battery / error events
+/// Subscribes to `AgaraEventBus` and records high-level connection / sync / battery / error events
 /// into the structured `WearableLog` store. Mirrors the wiring of `EventPersistenceSubscriber`
 /// (init with a `ModelContext`, `start()` spawns a task consuming the bus stream).
 ///
@@ -20,7 +20,7 @@ final class DiagnosticsSubscriber {
     func start() {
         guard task == nil else { return }
         task = Task {
-            let stream = await PulseEventBus.shared.stream()
+            let stream = await AgaraEventBus.shared.stream()
             for await event in stream {
                 await MainActor.run { self.record(event) }
             }
@@ -32,7 +32,7 @@ final class DiagnosticsSubscriber {
         task = nil
     }
 
-    private func record(_ event: PulseEvent) {
+    private func record(_ event: AgaraEvent) {
         switch event {
         case let .deviceStateChanged(state, _):
             log(.connection, .info, "Connection state: \(state.rawValue)")

@@ -15,11 +15,11 @@ struct CapabilityChips: View {
         let row = HStack(spacing: 6) {
             ForEach(chips, id: \.self) { chip in
                 Text(chip)
-                    .font(PulseFont.caption2)
+                    .font(AgaraFont.caption2)
                     .foregroundStyle(ChipTone.neutral.foreground)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .pulseGlass(Capsule())
+                    .agaraGlass(Capsule())
             }
         }
         return ViewThatFits(in: .horizontal) {
@@ -51,7 +51,7 @@ struct SignalStrengthDots: View {
         HStack(spacing: 3) {
             ForEach(0..<filledCount, id: \.self) { _ in
                 Circle()
-                    .fill(PulseColors.textPrimary)
+                    .fill(AgaraColors.textPrimary)
                     .frame(width: 6, height: 6)
             }
         }
@@ -84,12 +84,12 @@ struct GlassScrollIndicator: View {
                 Color.clear
                     .frame(maxWidth: .infinity)
                     .frame(height: trackHeight)
-                    .pulseGlass(Capsule())
+                    .agaraGlass(Capsule())
                     .opacity(0.5)
                 // Accent glass thumb.
                 Color.clear
                     .frame(width: thumbW, height: trackHeight)
-                    .pulseGlass(Capsule(), interactive: true, tint: PulseColors.accent)
+                    .agaraGlass(Capsule(), interactive: true, tint: AgaraColors.accent)
                     .offset(x: x)
                     .animation(slide, value: index)
             }

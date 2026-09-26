@@ -61,7 +61,7 @@ struct MeasurementRingView: View {
                     .allowsHitTesting(false)
 
                 Circle()
-                    .stroke(PulseColors.card, lineWidth: trackWidth)
+                    .stroke(AgaraColors.card, lineWidth: trackWidth)
                     .frame(width: 200, height: 200)
                     .allowsHitTesting(false)
 
@@ -97,7 +97,7 @@ struct MeasurementRingView: View {
             .stroke(strokeColor, style: StrokeStyle(lineWidth: trackWidth, lineCap: .round))
             // When the stage flips, the trim target becomes 1.0 and this runs the fill smoothly up from
             // wherever the countdown had reached.
-            .animation(reduceMotion ? .linear(duration: 0.6) : PulseMotion.bouncy, value: stage)
+            .animation(reduceMotion ? .linear(duration: 0.6) : AgaraMotion.bouncy, value: stage)
             .frame(width: 200, height: 200)
             .rotationEffect(.degrees(-90 + (indeterminate ? elapsed * 140 : 0)))
             .allowsHitTesting(false)
@@ -116,8 +116,8 @@ struct MeasurementRingView: View {
 
     private var strokeColor: Color {
         switch stage {
-        case .error: return PulseColors.danger
-        case .result: return tinted(PulseColors.success)
+        case .error: return AgaraColors.danger
+        case .result: return tinted(AgaraColors.success)
         default: return tint
         }
     }
@@ -156,7 +156,7 @@ struct MeasurementRingView: View {
 
     private var glyph: some View {
         Image(systemName: symbolName)
-            .font(PulseFont.numberL)
+            .font(AgaraFont.numberL)
             .foregroundStyle(tint)
     }
 
@@ -172,27 +172,27 @@ struct MeasurementRingView: View {
         VStack(spacing: 4) {
             if let caption {
                 Text(caption)
-                    .font(PulseFont.footnote.monospacedDigit())
-                    .foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.footnote.monospacedDigit())
+                    .foregroundStyle(AgaraColors.textMuted)
                     .contentTransition(reduceMotion ? .identity : .numericText())
             }
             Group {
                 if let size {
                     Text(text).font(AgaraFont.face(size, .semibold).monospacedDigit())
                 } else {
-                    Text(text).font(PulseFont.numberHero)
+                    Text(text).font(AgaraFont.numberHero)
                 }
             }
             .monospacedDigit()
-            .foregroundStyle(PulseColors.textPrimary)
+            .foregroundStyle(AgaraColors.textPrimary)
             .contentTransition(reduceMotion ? .identity : .numericText())
             .lineLimit(1)
             .minimumScaleFactor(0.5)
             .scaleEffect(bounce ? resultBounce : 1)
 
             Text(unit)
-                .font(PulseFont.caption.weight(.regular)).tracking(1.4)
-                .foregroundStyle(PulseColors.textMuted)
+                .font(AgaraFont.caption.weight(.regular)).tracking(1.4)
+                .foregroundStyle(AgaraColors.textMuted)
         }
         // Bound the reading to the inner circle so `minimumScaleFactor` has something to shrink against
         // rather than overflowing the ring.

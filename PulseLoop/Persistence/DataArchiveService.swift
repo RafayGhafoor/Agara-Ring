@@ -25,7 +25,7 @@ nonisolated enum DataArchiveError: LocalizedError, Sendable {
 }
 
 /// Full-app export/import: everything in SwiftData plus the settings blobs and coach attachments,
-/// as one gzip-compressed JSON file in Android's archive layout (see `PulseArchive`). Import reads gzip
+/// as one gzip-compressed JSON file in Android's archive layout (see `AgaraArchive`). Import reads gzip
 /// (detected by its `1f 8b` magic, not the name) or the plain `.json` earlier builds wrote. Privacy-first — nothing leaves the device unless
 /// the user shares the file themselves. Keychain API keys are deliberately excluded.
 ///
@@ -37,6 +37,7 @@ enum DataArchiveService {
     /// UserDefaults blobs included in the archive. Deliberately excluded: Apple Health watermarks
     /// (device-local — reset after import instead), Keychain API keys (secrets), remembered-ring
     /// BLE identity and widget snapshots (device-local/derived).
+    // Install-bound: UserDefaults keys and archive keys (old exports must import), so the `pulseloop.` prefix stays.
     static let settingsKeys: [String] = [
         "pulseloop.metricprefs.v1",
         "pulseloop.workoutprefs.v1",
@@ -123,7 +124,7 @@ enum DataArchiveService {
         includeRawPackets: Bool
     ) async throws {
         let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
-        let head = "{\"formatVersion\":\(PulseArchive.currentFormatVersion),\"exportedAt\":"
+        let head = "{\"formatVersion\":\(AgaraArchive.currentFormatVersion),\"exportedAt\":"
             + "\(ArchiveCoding.millis(Date())),\"appVersion\":" + jsonString(appVersion)
         try sink.write(Data(head.utf8))
 
@@ -280,15 +281,15 @@ enum DataArchiveService {
         guard let probe = try? JSONDecoder().decode(ArchiveVersionProbe.self, from: data) else {
             throw DataArchiveError.invalidFile(details: "missing formatVersion")
         }
-        guard probe.formatVersion <= PulseArchive.currentFormatVersion else {
-            throw DataArchiveError.unsupportedVersion(found: probe.formatVersion, supported: PulseArchive.currentFormatVersion)
+        guard probe.formatVersion <= AgaraArchive.currentFormatVersion else {
+            throw DataArchiveError.unsupportedVersion(found: probe.formatVersion, supported: AgaraArchive.currentFormatVersion)
         }
 
         // 2. Full decode off-main. Nothing has been mutated yet, so any failure here is safe.
-        let archive: PulseArchive
+        let archive: AgaraArchive
         do {
             archive = try await Task.detached(priority: .userInitiated) {
-                try ArchiveCoding.makeDecoder().decode(PulseArchive.self, from: data)
+                try ArchiveCoding.makeDecoder().decode(AgaraArchive.self, from: data)
             }.value
         } catch {
             throw DataArchiveError.invalidFile(details: String(describing: error))
@@ -385,7 +386,7 @@ enum DataArchiveService {
         }
     }
 
-    private static func insertAll(_ archive: PulseArchive, context: ModelContext) {
+    private static func insertAll(_ archive: AgaraArchive, context: ModelContext) {
         insert(archive.devices, context)
         insert(archive.activityDailies, context)
         insert(archive.measurements, context)
@@ -422,7 +423,7 @@ enum DataArchiveService {
 
     // MARK: - Validation
 
-    private static func validate(_ archive: PulseArchive) throws {
+    private static func validate(_ archive: AgaraArchive) throws {
         try requireUnique(archive.devices.map(\.id), entity: "device")
         try requireUnique(archive.activityDailies.map(\.id), entity: "daily activity")
         try requireUnique(archive.measurements.map(\.id), entity: "measurement")

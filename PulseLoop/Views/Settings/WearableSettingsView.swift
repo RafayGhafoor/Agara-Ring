@@ -52,12 +52,12 @@ struct WearableSettingsView: View {
         FormValueRow(title: "Name") {
             HStack(spacing: 10) {
                 Text(ringName)
-                    .foregroundStyle(PulseColors.textMuted)
+                    .foregroundStyle(AgaraColors.textMuted)
                     .lineLimit(1)
                     .truncationMode(.tail)
                 Button("Rename") { showsRename = true }
-                    .font(PulseFont.body.weight(.semibold))
-                    .foregroundStyle(PulseColors.accent)
+                    .font(AgaraFont.body.weight(.semibold))
+                    .foregroundStyle(AgaraColors.accent)
                     .buttonStyle(.plain)
                     .frame(minHeight: 44)
                     .accessibilityLabel("Rename ring")
@@ -91,14 +91,14 @@ struct WearableSettingsView: View {
                 if ble.state == .connected {
                     SettingsGroup(header: "Connected ring") {
                         nameRow
-                        FormValueRow(title: "Device") { Text(wearableDisplayName).foregroundStyle(PulseColors.textMuted) }
+                        FormValueRow(title: "Device") { Text(wearableDisplayName).foregroundStyle(AgaraColors.textMuted) }
                         FormValueRow(title: "Battery") {
                             if charging {
                                 HStack(spacing: 6) {
                                     RingBatteryGlyph(percent: batteryPercent, dotColor: nil, size: 22, charging: true)
                                         .accessibilityHidden(true)
                                     Text(ChargeEstimator.statusLine(percent: batteryPercent, estimate: ble.chargeEstimate))
-                                        .foregroundStyle(PulseColors.success)
+                                        .foregroundStyle(AgaraColors.success)
                                         .lineLimit(1)
                                         .minimumScaleFactor(0.75)
                                     if case .fullIn? = ble.chargeEstimate {
@@ -107,15 +107,15 @@ struct WearableSettingsView: View {
                                 }
                                 .accessibilityElement(children: .combine)
                             } else {
-                                Text(batteryPercent.map { "\($0)%" } ?? "--").foregroundStyle(PulseColors.textMuted)
+                                Text(batteryPercent.map { "\($0)%" } ?? "--").foregroundStyle(AgaraColors.textMuted)
                             }
                         }
                         if features.isOn(.firmwareCheck), let firmware = devices.first?.firmwareVersion, !firmware.isEmpty {
                             FirmwareRow(installed: firmware, identity: firmwareIdentity, checker: firmwareChecker)
                         } else if features.isOn(.capabilityProbe), let firmware = devices.first?.firmwareVersion, !firmware.isEmpty {
-                            FormValueRow(title: "Firmware") { Text(firmware).foregroundStyle(PulseColors.textMuted) }
+                            FormValueRow(title: "Firmware") { Text(firmware).foregroundStyle(AgaraColors.textMuted) }
                         }
-                        FormValueRow(title: "Last synced") { Text(lastSyncedLabel).foregroundStyle(PulseColors.textMuted) }
+                        FormValueRow(title: "Last synced") { Text(lastSyncedLabel).foregroundStyle(AgaraColors.textMuted) }
                     }
                     if features.isOn(.autoMeasureSettings), let schedule = devices.first?.autoMeasureSchedule, !schedule.isEmpty {
                         SettingsGroup(
@@ -124,7 +124,7 @@ struct WearableSettingsView: View {
                         ) {
                             ForEach(schedule) { entry in
                                 FormValueRow(title: entry.title) {
-                                    Text(entry.summary).foregroundStyle(PulseColors.textMuted)
+                                    Text(entry.summary).foregroundStyle(AgaraColors.textMuted)
                                 }
                             }
                         }
@@ -159,7 +159,7 @@ struct WearableSettingsView: View {
                 } else {
                     SettingsGroup(header: "No ring connected") {
                         if ble.hasLastKnownRing && devices.first != nil { nameRow }
-                        FormValueRow(title: "Status") { Text(ble.state.rawValue.capitalized).foregroundStyle(PulseColors.textMuted) }
+                        FormValueRow(title: "Status") { Text(ble.state.rawValue.capitalized).foregroundStyle(AgaraColors.textMuted) }
                     }
                     PrimaryButton(title: "Add a ring", systemImage: "plus.circle") {
                         path.append(AppRoute.pairing)
@@ -172,7 +172,7 @@ struct WearableSettingsView: View {
             }
             .padding()
         }
-        .background(PulseColors.background)
+        .background(AgaraColors.background)
         .pageChrome("Wearable")
         // Same copy as Android's confirmation (audit batch A #24).
         .alert("Forget this ring?", isPresented: $confirmsForget) {
@@ -196,7 +196,7 @@ struct WearableSettingsView: View {
 /// window changes or new data is persisted — so it adds no ongoing cost.
 private struct BatteryHistorySection: View {
     @Environment(\.modelContext) private var modelContext
-    @State private var dataChange = PulseDataChange.shared
+    @State private var dataChange = AgaraDataChange.shared
     @State private var range: MetricRange = .twentyFourHours
     @State private var samples: [ChartSample] = []
 
@@ -232,7 +232,7 @@ private struct BatteryHistorySection: View {
                 } else {
                     Text("Not enough data yet — battery history builds up as your ring reports its level.")
                         .font(AgaraFont.face(13))
-                        .foregroundStyle(PulseColors.textMuted)
+                        .foregroundStyle(AgaraColors.textMuted)
                         .frame(maxWidth: .infinity, minHeight: 120, alignment: .center)
                         .multilineTextAlignment(.center)
                 }

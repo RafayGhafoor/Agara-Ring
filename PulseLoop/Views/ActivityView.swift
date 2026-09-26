@@ -14,7 +14,7 @@ struct ActivityView: View {
 
     @State private var goalsOpen = false
     @State private var historyOpen = false
-    @State private var dataChange = PulseDataChange.shared
+    @State private var dataChange = AgaraDataChange.shared
     // Cached off the render path (via reload() on token/data change) so an @Query invalidation
     // doesn't re-run buildTodaySummary and re-create the glass tiles every body eval — that
     // re-render flashed all the tiles white on iOS 26. Mirrors Today/Vitals.
@@ -66,23 +66,23 @@ struct ActivityView: View {
                     HStack(spacing: 12) {
                     Button { path.append(AppRoute.recordSelect) } label: {
                         Text("+ Record Activity")
-                            .font(PulseFont.headline)
+                            .font(AgaraFont.headline)
                             .frame(maxWidth: .infinity)
                             .frame(height: 60)
-                            .foregroundStyle(PulseColors.textPrimary)
+                            .foregroundStyle(AgaraColors.textPrimary)
                             // Plain translucent Liquid Glass (no accent tint, so it reads as glass
                             // rather than a solid fill) — matches the Connect button.
-                            .pulseGlass(Capsule(), interactive: true)
+                            .agaraGlass(Capsule(), interactive: true)
                     }
                     .buttonStyle(.plain)
 
                     Button { historyOpen = true } label: {
                         Image(systemName: "calendar")
-                            .font(PulseFont.title3.weight(.regular))
-                            .foregroundStyle(PulseColors.textSecondary)
+                            .font(AgaraFont.title3.weight(.regular))
+                            .foregroundStyle(AgaraColors.textSecondary)
                             .frame(width: 60, height: 60)
                             // Glass circle, matching the pushed-page back button.
-                            .pulseGlass(Circle(), interactive: true)
+                            .agaraGlass(Circle(), interactive: true)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Workout history")
@@ -90,47 +90,47 @@ struct ActivityView: View {
                     .help("Workout history")
                 }
                 // Record pill + calendar circle share one container so their glass renders/blends together.
-                .pulseGlassContainer(spacing: 12)
+                .agaraGlassContainer(spacing: 12)
 
                 Button { path.append(AppRoute.logPastActivity) } label: {
                     HStack(spacing: 12) {
                         Image(systemName: "clock.arrow.circlepath")
-                            .font(PulseFont.title3)
-                            .foregroundStyle(PulseColors.accent)
+                            .font(AgaraFont.title3)
+                            .foregroundStyle(AgaraColors.accent)
                             .frame(width: 40, height: 40)
-                            .background(PulseColors.accentSoft, in: Circle())
+                            .background(AgaraColors.accentSoft, in: Circle())
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Log Past Activity")
-                                .font(PulseFont.bodyEmphasis)
-                                .foregroundStyle(PulseColors.textPrimary)
+                                .font(AgaraFont.bodyEmphasis)
+                                .foregroundStyle(AgaraColors.textPrimary)
                             Text("Add a workout you forgot to record")
-                                .font(PulseFont.caption.weight(.regular))
-                                .foregroundStyle(PulseColors.textMuted)
+                                .font(AgaraFont.caption.weight(.regular))
+                                .foregroundStyle(AgaraColors.textMuted)
                         }
                         Spacer()
                         Image(systemName: "chevron.right")
-                            .font(PulseFont.footnote.weight(.semibold))
-                            .foregroundStyle(PulseColors.textMuted)
+                            .font(AgaraFont.footnote.weight(.semibold))
+                            .foregroundStyle(AgaraColors.textMuted)
                     }
                     .padding(.horizontal, 16)
                     .frame(maxWidth: .infinity)
                     .frame(height: 68)
-                    .pulseGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .agaraGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
                 }
                 .buttonStyle(.plain)
 
                 // Today's workouts
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("TODAY").font(PulseFont.caption2).tracking(1.4)
-                        .foregroundStyle(PulseColors.textMuted)
+                    Text("TODAY").font(AgaraFont.caption2).tracking(1.4)
+                        .foregroundStyle(AgaraColors.textMuted)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     if todayWorkouts.isEmpty {
                         VStack(spacing: 4) {
-                            Text("No workouts recorded today").font(PulseFont.subheadline).foregroundStyle(PulseColors.textPrimary)
-                            Text("Start one manually when your ring misses an activity.").font(PulseFont.caption.weight(.regular)).foregroundStyle(PulseColors.textMuted)
+                            Text("No workouts recorded today").font(AgaraFont.subheadline).foregroundStyle(AgaraColors.textPrimary)
+                            Text("Start one manually when your ring misses an activity.").font(AgaraFont.caption.weight(.regular)).foregroundStyle(AgaraColors.textMuted)
                         }
                         .frame(maxWidth: .infinity).padding(.vertical, 20)
-                        .pulseGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .agaraGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
                     } else {
                         ForEach(todayWorkouts) { session in
                             ActivityWorkoutRow(session: session, units: units) { path.append(AppRoute.activityDetail(session.id)) }
@@ -142,24 +142,24 @@ struct ActivityView: View {
                 Button { goalsOpen = true } label: {
                     VStack(alignment: .leading, spacing: 16) {
                         HStack(spacing: 16) {
-                            ProgressRingView(value: Double(summary.activeMinutes ?? 0), max: Double(activeGoal), color: PulseColors.steps) {
+                            ProgressRingView(value: Double(summary.activeMinutes ?? 0), max: Double(activeGoal), color: AgaraColors.steps) {
                                 VStack(spacing: 0) {
-                                    Text("\(summary.activeMinutes ?? 0)").font(PulseFont.title3).monospacedDigit().foregroundStyle(PulseColors.textPrimary)
-                                    Text("MIN").font(PulseFont.micro).tracking(1.0).foregroundStyle(PulseColors.textMuted)
+                                    Text("\(summary.activeMinutes ?? 0)").font(AgaraFont.title3).monospacedDigit().foregroundStyle(AgaraColors.textPrimary)
+                                    Text("MIN").font(AgaraFont.micro).tracking(1.0).foregroundStyle(AgaraColors.textMuted)
                                 }
                             }
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("WEEKLY GOAL").font(PulseFont.caption2).tracking(1.4).foregroundStyle(PulseColors.textMuted)
-                                Text("\(activeDayCount) of 7 active days").font(PulseFont.body).foregroundStyle(PulseColors.textPrimary)
+                                Text("WEEKLY GOAL").font(AgaraFont.caption2).tracking(1.4).foregroundStyle(AgaraColors.textMuted)
+                                Text("\(activeDayCount) of 7 active days").font(AgaraFont.body).foregroundStyle(AgaraColors.textPrimary)
                             }
                             Spacer(minLength: 0)
                         }
                         WeeklyPillCalendarView(days: days)
-                        Text("TAP TO EDIT GOALS").font(PulseFont.micro).tracking(1.0).foregroundStyle(PulseColors.textMuted)
+                        Text("TAP TO EDIT GOALS").font(AgaraFont.micro).tracking(1.0).foregroundStyle(AgaraColors.textMuted)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(16)
-                    .pulseGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .agaraGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
                 }
                 .buttonStyle(.plain)
 
@@ -171,9 +171,9 @@ struct ActivityView: View {
             // NB: no glass container around the whole content stack — it made adjacent workout
             // cards blend/bleed into each other. Small button clusters keep their own containers.
         }
-        .background(PulseColors.background)
+        .background(AgaraColors.background)
         .refreshable { await coordinator.pullToRefresh() }
-        .pulseScrollEdges()
+        .agaraScrollEdges()
         .task(id: dataChange.token) { reload() }
         .onChange(of: sessions.count) { _, _ in reload() }
         .sheet(isPresented: $goalsOpen) { GoalEditorSheet() }
@@ -242,24 +242,24 @@ struct DailyActivitySummaryCard: View {
                 HStack(alignment: .center, spacing: 12) {
                     VStack(alignment: .leading, spacing: 18) {
                         HStack(alignment: .top, spacing: 12) {
-                            metric(label: "Steps", value: summary.steps.map { $0.formatted() } ?? "—", unit: nil, color: PulseColors.steps)
-                            metric(label: "Distance", value: distanceValue ?? "—", unit: distanceValue == nil ? nil : distanceUnit, color: PulseColors.distance)
+                            metric(label: "Steps", value: summary.steps.map { $0.formatted() } ?? "—", unit: nil, color: AgaraColors.steps)
+                            metric(label: "Distance", value: distanceValue ?? "—", unit: distanceValue == nil ? nil : distanceUnit, color: AgaraColors.distance)
                         }
-                        metric(label: "Calories", value: effectiveCalories.map { Int($0).formatted() } ?? "—", unit: effectiveCalories == nil ? nil : "cal", color: PulseColors.calories)
+                        metric(label: "Calories", value: effectiveCalories.map { Int($0).formatted() } ?? "—", unit: effectiveCalories == nil ? nil : "cal", color: AgaraColors.calories)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                     ActivityRingsView(rings: [
-                        ActivityRing(value: summary.steps.map(Double.init), goal: Double(summary.goals.stepsDaily), color: PulseColors.steps),
-                        ActivityRing(value: distanceDisplay, goal: distanceGoalDisplay, color: PulseColors.distance),
-                        ActivityRing(value: effectiveActiveCalories, goal: Double(summary.goals.caloriesDaily), color: PulseColors.calories)
+                        ActivityRing(value: summary.steps.map(Double.init), goal: Double(summary.goals.stepsDaily), color: AgaraColors.steps),
+                        ActivityRing(value: distanceDisplay, goal: distanceGoalDisplay, color: AgaraColors.distance),
+                        ActivityRing(value: effectiveActiveCalories, goal: Double(summary.goals.caloriesDaily), color: AgaraColors.calories)
                     ], size: 112, stroke: 11, spacing: 5)
                     .frame(width: 112, height: 112)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(16)
-            .pulseGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .agaraGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
         .buttonStyle(.plain)
     }
@@ -267,7 +267,7 @@ struct DailyActivitySummaryCard: View {
     private func metric(label: String, value: String, unit: String?, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(label.uppercased())
-                .font(PulseFont.callout.weight(.bold)).tracking(0.6)
+                .font(AgaraFont.callout.weight(.bold)).tracking(0.6)
                 .foregroundStyle(color)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
@@ -275,7 +275,7 @@ struct DailyActivitySummaryCard: View {
                 Text(value)
                     .activityValueStyle(size: 32)
                 if let unit {
-                    Text(unit).font(PulseFont.subheadline).foregroundStyle(PulseColors.textMuted)
+                    Text(unit).font(AgaraFont.subheadline).foregroundStyle(AgaraColors.textMuted)
                 }
             }
         }
@@ -403,7 +403,7 @@ struct WorkoutHistorySheet: View {
                         ForEach(Array(groups.enumerated()), id: \.element.day) { index, group in
                             Text(header(for: group.day))
                                 .font(AgaraFont.face(11, .medium)).tracking(1.4)
-                                .foregroundStyle(PulseColors.textMuted)
+                                .foregroundStyle(AgaraColors.textMuted)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.top, index == 0 ? 0 : 8)
                             ForEach(group.sessions) { session in
@@ -414,7 +414,7 @@ struct WorkoutHistorySheet: View {
                 }
                 .padding()
             }
-            .background(PulseColors.background)
+            .background(AgaraColors.background)
             .navigationTitle("Workout history")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } } }
@@ -457,14 +457,14 @@ struct StepsByHourCard: View {
         VStack(alignment: .leading, spacing: 0) {
             Button { expanded.toggle() } label: {
                 HStack {
-                    Text("STEPS BY HOUR").font(PulseFont.caption2).tracking(1.4).foregroundStyle(PulseColors.textMuted)
+                    Text("STEPS BY HOUR").font(AgaraFont.caption2).tracking(1.4).foregroundStyle(AgaraColors.textMuted)
                     Spacer()
                     if let hours {
                         Text(hours.count == 1 ? "1 active hour" : "\(hours.count) active hours")
-                            .font(PulseFont.caption.weight(.regular)).foregroundStyle(PulseColors.textMuted)
+                            .font(AgaraFont.caption.weight(.regular)).foregroundStyle(AgaraColors.textMuted)
                     }
                     Image(systemName: expanded ? "chevron.up" : "chevron.down")
-                        .font(PulseFont.footnote.weight(.semibold)).foregroundStyle(PulseColors.textMuted)
+                        .font(AgaraFont.footnote.weight(.semibold)).foregroundStyle(AgaraColors.textMuted)
                 }
                 .padding(16)
                 .contentShape(Rectangle())
@@ -474,7 +474,7 @@ struct StepsByHourCard: View {
             if expanded, let hours {
                 if hours.isEmpty {
                     Text("No steps recorded today yet.")
-                        .font(PulseFont.footnote.weight(.regular)).foregroundStyle(PulseColors.textMuted)
+                        .font(AgaraFont.footnote.weight(.regular)).foregroundStyle(AgaraColors.textMuted)
                         .padding([.horizontal, .bottom], 16)
                 } else {
                     let peak = max(hours.map(\.steps).max() ?? 1, 1)
@@ -482,19 +482,19 @@ struct StepsByHourCard: View {
                         ForEach(hours) { hour in
                             VStack(spacing: 4) {
                                 HStack {
-                                    Text(Self.hourLabel(hour.start)).font(PulseFont.footnote.weight(.regular)).foregroundStyle(PulseColors.textSecondary)
+                                    Text(Self.hourLabel(hour.start)).font(AgaraFont.footnote.weight(.regular)).foregroundStyle(AgaraColors.textSecondary)
                                     Spacer()
-                                    Text("\(hour.steps.formatted()) steps").font(PulseFont.footnote.weight(.semibold)).foregroundStyle(PulseColors.textPrimary)
+                                    Text("\(hour.steps.formatted()) steps").font(AgaraFont.footnote.weight(.semibold)).foregroundStyle(AgaraColors.textPrimary)
                                     if hour.distanceMeters > 0 {
                                         let d = UnitsFormatter.distance(meters: hour.distanceMeters, units: units)
-                                        Text("· \(d.value) \(d.unit)").font(PulseFont.caption2).foregroundStyle(PulseColors.textMuted)
+                                        Text("· \(d.value) \(d.unit)").font(AgaraFont.caption2).foregroundStyle(AgaraColors.textMuted)
                                     }
                                 }
                                 // A bar relative to the day's busiest hour, so the list reads at a glance.
                                 GeometryReader { geo in
                                     ZStack(alignment: .leading) {
-                                        Capsule().fill(PulseColors.cardSoft)
-                                        Capsule().fill(PulseColors.steps).frame(width: geo.size.width * CGFloat(hour.steps) / CGFloat(peak))
+                                        Capsule().fill(AgaraColors.cardSoft)
+                                        Capsule().fill(AgaraColors.steps).frame(width: geo.size.width * CGFloat(hour.steps) / CGFloat(peak))
                                     }
                                 }
                                 .frame(height: 4)
@@ -506,7 +506,7 @@ struct StepsByHourCard: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .pulseGlass(RoundedRectangle(cornerRadius: PulseRadius.card, style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous))
         .task(id: reloadToken) { reload() }
     }
 

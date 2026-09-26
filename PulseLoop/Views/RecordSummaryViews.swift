@@ -19,11 +19,11 @@ struct HRZone: Identifiable {
 func hrZoneDurations(samples: [MetricSample], age: Int?) -> [HRZone] {
     let hrMax = Double(age.map { 220 - $0 } ?? 190)
     let palette: [(String, Color)] = [
-        ("Zone 1 · Easy", PulseColors.spo2),
-        ("Zone 2 · Fat burn", PulseColors.success),
-        ("Zone 3 · Aerobic", PulseColors.warning),
-        ("Zone 4 · Threshold", PulseColors.calories),
-        ("Zone 5 · Max", PulseColors.heartRate)
+        ("Zone 1 · Easy", AgaraColors.spo2),
+        ("Zone 2 · Fat burn", AgaraColors.success),
+        ("Zone 3 · Aerobic", AgaraColors.warning),
+        ("Zone 4 · Threshold", AgaraColors.calories),
+        ("Zone 5 · Max", AgaraColors.heartRate)
     ]
     var seconds = [Double](repeating: 0, count: 5)
     let sorted = samples.sorted { $0.timestamp < $1.timestamp }
@@ -82,8 +82,8 @@ struct RecordSummaryView: View {
                         HStack(spacing: 6) {
                             ProgressView().controlSize(.mini)
                             Text("Updating from ring…")
-                                .font(PulseFont.caption.weight(.regular))
-                                .foregroundStyle(PulseColors.textMuted)
+                                .font(AgaraFont.caption.weight(.regular))
+                                .foregroundStyle(AgaraColors.textMuted)
                         }
                         .frame(maxWidth: .infinity)
                     }
@@ -101,7 +101,7 @@ struct RecordSummaryView: View {
                 .padding(16)
                 .padding(.bottom, 12)
             }
-            .background(PulseColors.background)
+            .background(AgaraColors.background)
             .navigationBarBackButtonHidden(true)
             .safeAreaInset(edge: .bottom) {
                 HStack(spacing: 12) {
@@ -134,14 +134,14 @@ struct RecordSummaryView: View {
 
     private var effortCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("How did this feel?").font(PulseFont.callout).foregroundStyle(PulseColors.textPrimary)
+            Text("How did this feel?").font(AgaraFont.callout).foregroundStyle(AgaraColors.textPrimary)
             HStack(spacing: 8) {
                 ForEach(efforts, id: \.0) { value, label in
                     let active = effort == value
                     Button { effort = value } label: {
                         Text(label)
-                            .font(PulseFont.footnote)
-                            .foregroundStyle(active ? PulseColors.textPrimary : PulseColors.textSecondary)
+                            .font(AgaraFont.footnote)
+                            .foregroundStyle(active ? AgaraColors.textPrimary : AgaraColors.textSecondary)
                             .padding(.horizontal, 12).padding(.vertical, 8)
                             // Solid tile, not glass: these pills sit inside the effort card's
                             // own glass, and glass can't sample glass (renders flat). Selected
@@ -149,16 +149,16 @@ struct RecordSummaryView: View {
                             // sheen + hairline.
                             .background {
                                 if active {
-                                    Capsule().fill(PulseColors.accent)
+                                    Capsule().fill(AgaraColors.accent)
                                 } else {
                                     Capsule()
                                         .fill(
                                             LinearGradient(
-                                                colors: [PulseColors.textPrimary.opacity(0.16), PulseColors.textPrimary.opacity(0.07)],
+                                                colors: [AgaraColors.textPrimary.opacity(0.16), AgaraColors.textPrimary.opacity(0.07)],
                                                 startPoint: .top, endPoint: .bottom
                                             )
                                         )
-                                        .overlay(Capsule().strokeBorder(PulseColors.textPrimary.opacity(0.12), lineWidth: 0.5))
+                                        .overlay(Capsule().strokeBorder(AgaraColors.textPrimary.opacity(0.12), lineWidth: 0.5))
                                 }
                             }
                     }
@@ -167,20 +167,20 @@ struct RecordSummaryView: View {
             }
             TextField("Add a note…", text: $note, axis: .vertical)
                 .lineLimit(2...4)
-                .font(PulseFont.subheadline.weight(.regular))
+                .font(AgaraFont.subheadline.weight(.regular))
                 .padding(12)
                 // Solid field background, not glass: this input sits inside the effort card's
                 // glass (glass can't sample glass → flat). A soft fill + hairline gives it a
                 // visible input affordance.
-                .background(PulseColors.cardSoft, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .background(AgaraColors.cardSoft, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .strokeBorder(PulseColors.textPrimary.opacity(0.12), lineWidth: 0.5)
+                        .strokeBorder(AgaraColors.textPrimary.opacity(0.12), lineWidth: 0.5)
                 )
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .pulseGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     private func done(_ session: ActivitySession) {
@@ -203,7 +203,7 @@ struct LiveSensorTile: View {
     let label: String
     let subtitle: String
     var pulsing: Bool = false
-    var tint: Color = PulseColors.accent
+    var tint: Color = AgaraColors.accent
     var muted: Bool = false
     @State private var pulse = false
 
@@ -213,21 +213,21 @@ struct LiveSensorTile: View {
                 if pulsing {
                     Circle().fill(tint).frame(width: 7, height: 7).opacity(pulse ? 0.3 : 1)
                 }
-                Text(label.uppercased()).font(PulseFont.caption2).tracking(1.0).foregroundStyle(PulseColors.textMuted)
+                Text(label.uppercased()).font(AgaraFont.caption2).tracking(1.0).foregroundStyle(AgaraColors.textMuted)
             }
             HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text(value).font(PulseFont.title).monospacedDigit()
-                    .foregroundStyle(muted ? PulseColors.textMuted : PulseColors.textPrimary)
+                Text(value).font(AgaraFont.title).monospacedDigit()
+                    .foregroundStyle(muted ? AgaraColors.textMuted : AgaraColors.textPrimary)
                     .minimumScaleFactor(0.6).lineLimit(1)
-                if let unit { Text(unit).font(PulseFont.footnote).foregroundStyle(PulseColors.textMuted) }
+                if let unit { Text(unit).font(AgaraFont.footnote).foregroundStyle(AgaraColors.textMuted) }
             }
-            Text(subtitle).font(PulseFont.caption2.weight(.regular)).foregroundStyle(PulseColors.textMuted).lineLimit(1)
+            Text(subtitle).font(AgaraFont.caption2.weight(.regular)).foregroundStyle(AgaraColors.textMuted).lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         // Stretch to fill the grid cell so all tiles in a row are the same height.
         .frame(maxWidth: .infinity, minHeight: 92, maxHeight: .infinity, alignment: .topLeading)
-        .pulseGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .onAppear { startPulse(pulsing) }
         .onChange(of: pulsing) { _, now in startPulse(now) }
     }
@@ -252,8 +252,8 @@ struct WorkoutStatusStrip: View {
                 StatusPill(icon: "location.fill", text: "GPS \(gpsLabel.0)", tint: gpsLabel.1)
             }
             StatusPill(icon: "dot.radiowaves.left.and.right", text: ringLabel.0, tint: ringLabel.1)
-            StatusPill(icon: "heart.fill", text: hrPillText, tint: PulseColors.textMuted)
-            StatusPill(icon: "drop.fill", text: spo2PillText, tint: PulseColors.textMuted)
+            StatusPill(icon: "heart.fill", text: hrPillText, tint: AgaraColors.textMuted)
+            StatusPill(icon: "drop.fill", text: spo2PillText, tint: AgaraColors.textMuted)
         }
     }
 
@@ -288,19 +288,19 @@ struct WorkoutStatusStrip: View {
     }
 
     private var gpsLabel: (String, Color) {
-        guard let a = gpsAccuracy else { return ("Lost", PulseColors.danger) }
-        return a <= 10 ? ("Good", PulseColors.success) : ("Weak", PulseColors.warning)
+        guard let a = gpsAccuracy else { return ("Lost", AgaraColors.danger) }
+        return a <= 10 ? ("Good", AgaraColors.success) : ("Weak", AgaraColors.warning)
     }
 
     /// Ring pill: green when linked, amber while (re)connecting, red when dropped — so the user sees
     /// the workout is handling a disconnect rather than silently stalling.
     private var ringLabel: (String, Color) {
         switch ringState {
-        case .connected:                  return ("Ring on", PulseColors.success)
-        case .reconnecting, .connecting:  return ("Reconnecting…", PulseColors.warning)
-        case .disconnected, .failed:      return ("Ring lost", PulseColors.danger)
-        case .scanning:                   return ("Searching…", PulseColors.warning)
-        case .idle:                       return ("Ring off", PulseColors.textMuted)
+        case .connected:                  return ("Ring on", AgaraColors.success)
+        case .reconnecting, .connecting:  return ("Reconnecting…", AgaraColors.warning)
+        case .disconnected, .failed:      return ("Ring lost", AgaraColors.danger)
+        case .scanning:                   return ("Searching…", AgaraColors.warning)
+        case .idle:                       return ("Ring off", AgaraColors.textMuted)
         }
     }
 }
@@ -311,12 +311,12 @@ struct StatusPill: View {
     let tint: Color
     var body: some View {
         HStack(spacing: 4) {
-            Image(systemName: icon).font(PulseFont.nano.weight(.regular))
-            Text(text).font(PulseFont.micro)
+            Image(systemName: icon).font(AgaraFont.nano.weight(.regular))
+            Text(text).font(AgaraFont.micro)
         }
         .foregroundStyle(tint)
         .padding(.horizontal, 8).padding(.vertical, 4)
-        .pulseGlass(Capsule())
+        .agaraGlass(Capsule())
     }
 }
 
@@ -361,18 +361,18 @@ struct RecordingQualityCard: View {
     var body: some View {
         let rows = qualityRows()
         VStack(alignment: .leading, spacing: 12) {
-            Text("RECORDING QUALITY").font(PulseFont.caption2).tracking(1.0).foregroundStyle(PulseColors.textMuted)
+            Text("RECORDING QUALITY").font(AgaraFont.caption2).tracking(1.0).foregroundStyle(AgaraColors.textMuted)
             ForEach(rows.indices, id: \.self) { i in
                 HStack {
-                    Text(rows[i].0).font(PulseFont.footnote.weight(.regular)).foregroundStyle(PulseColors.textSecondary)
+                    Text(rows[i].0).font(AgaraFont.footnote.weight(.regular)).foregroundStyle(AgaraColors.textSecondary)
                     Spacer()
-                    Text(rows[i].1).font(PulseFont.footnote.monospacedDigit()).foregroundStyle(rows[i].2)
+                    Text(rows[i].1).font(AgaraFont.footnote.monospacedDigit()).foregroundStyle(rows[i].2)
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .pulseGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     private func qualityRows() -> [(String, String, Color)] {
@@ -389,21 +389,21 @@ struct RecordingQualityCard: View {
         let pollFailures = session.hrPollFailureCount + session.spo2PollFailureCount
 
         var rows: [(String, String, Color)] = [
-            ("HR capture", streamed ? "Live stream" : "Spot readings", PulseColors.textPrimary)
+            ("HR capture", streamed ? "Live stream" : "Spot readings", AgaraColors.textPrimary)
         ]
         if session.useGps {
             let accepted = session.gpsPointCount
             let total = accepted + session.rejectedGpsPointCount
             let coverage = total > 0 ? Int(Double(accepted) / Double(total) * 100) : 0
-            rows.append(("GPS coverage", total > 0 ? "\(coverage)%" : "—", coverage >= 80 ? PulseColors.success : PulseColors.warning))
-            rows.append(("Dropped GPS points", "\(session.rejectedGpsPointCount)", session.rejectedGpsPointCount == 0 ? PulseColors.textPrimary : PulseColors.warning))
-            rows.append(("Distance source", session.distanceMeters != nil ? "GPS route" : "—", PulseColors.textPrimary))
+            rows.append(("GPS coverage", total > 0 ? "\(coverage)%" : "—", coverage >= 80 ? AgaraColors.success : AgaraColors.warning))
+            rows.append(("Dropped GPS points", "\(session.rejectedGpsPointCount)", session.rejectedGpsPointCount == 0 ? AgaraColors.textPrimary : AgaraColors.warning))
+            rows.append(("Distance source", session.distanceMeters != nil ? "GPS route" : "—", AgaraColors.textPrimary))
         } else {
-            rows.append(("Distance source", "Not tracked", PulseColors.textMuted))
+            rows.append(("Distance source", "Not tracked", AgaraColors.textMuted))
         }
-        rows.append(("HR samples", "\(hrCount) / \(expectedHR)", hrCount >= expectedHR ? PulseColors.success : PulseColors.warning))
-        rows.append(("SpO₂ samples", "\(spo2Count) / \(expectedSpO2)", spo2Count >= expectedSpO2 ? PulseColors.success : PulseColors.warning))
-        rows.append(("Sensor read failures", "\(pollFailures)", pollFailures == 0 ? PulseColors.textPrimary : PulseColors.warning))
+        rows.append(("HR samples", "\(hrCount) / \(expectedHR)", hrCount >= expectedHR ? AgaraColors.success : AgaraColors.warning))
+        rows.append(("SpO₂ samples", "\(spo2Count) / \(expectedSpO2)", spo2Count >= expectedSpO2 ? AgaraColors.success : AgaraColors.warning))
+        rows.append(("Sensor read failures", "\(pollFailures)", pollFailures == 0 ? AgaraColors.textPrimary : AgaraColors.warning))
         return rows
     }
 }

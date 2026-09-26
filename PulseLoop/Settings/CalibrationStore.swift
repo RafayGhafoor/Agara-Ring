@@ -63,7 +63,7 @@ final class CalibrationStore {
 
     static let shared = CalibrationStore()
 
-    private static let storageKey = "pulseloop.calibration.v1"
+    private static let storageKey = "pulseloop.calibration.v1" // install-bound: pre-rename name kept so existing installs keep it
     private let defaults: UserDefaults
 
     var settings: Calibration {

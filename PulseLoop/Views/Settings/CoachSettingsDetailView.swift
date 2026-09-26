@@ -10,7 +10,7 @@ struct CoachSettingsDetailView: View {
             }
             .padding()
         }
-        .background(PulseColors.background)
+        .background(AgaraColors.background)
         .pageChrome("AI Coach")
     }
 }

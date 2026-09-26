@@ -21,7 +21,7 @@ struct ProfileSettingsView: View {
             .padding()
         }
         .scrollDismissesKeyboard(.interactively)
-        .background(PulseColors.background)
+        .background(AgaraColors.background)
         .pageChrome("Profile")
         .onAppear(perform: loadIfNeeded)
         // Autosave: every field edit persists immediately — no explicit Save step. Health-imported
@@ -50,8 +50,8 @@ struct ProfileSettingsView: View {
             }
             if let importStatus {
                 Text(importStatus)
-                    .font(PulseFont.caption)
-                    .foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.caption)
+                    .foregroundStyle(AgaraColors.textMuted)
                     .padding(.horizontal, 4)
             }
         }

@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - Share card view
 
 /// The exportable workout card, laid out on a 360-wide canvas and rendered offscreen by
-/// `ShareCardRenderer`. Every surface is an explicit fill — no `pulseGlass`/materials, because
+/// `ShareCardRenderer`. Every surface is an explicit fill — no `agaraGlass`/materials, because
 /// `ImageRenderer` has nothing behind the view to sample, so blurs would come out flat/black.
 struct ShareCardView: View {
     let model: ShareCardModel
@@ -25,7 +25,7 @@ struct ShareCardView: View {
 
     private var background: some View {
         ZStack {
-            PulseColors.background
+            AgaraColors.background
             // Aurora wash from the top-left corner, tinted by the activity accent.
             LinearGradient(
                 stops: [
@@ -149,7 +149,7 @@ struct ShareCardView: View {
                 Text(model.dateHeadline)
                     .font(AgaraFont.face(10, .medium))
                     .tracking(1.5)
-                    .foregroundStyle(PulseColors.textMuted)
+                    .foregroundStyle(AgaraColors.textMuted)
             }
             Spacer(minLength: 0)
         }
@@ -195,17 +195,17 @@ struct ShareCardView: View {
             Text(model.heroStat.label)
                 .font(AgaraFont.face(11, .semibold))
                 .tracking(2.2)
-                .foregroundStyle(PulseColors.textSecondary)
+                .foregroundStyle(AgaraColors.textSecondary)
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(model.heroStat.value)
-                    .font(PulseFont.number(valueSize, .bold).monospacedDigit())
-                    .foregroundStyle(model.heroStat.value == "—" ? PulseColors.textMuted : PulseColors.textPrimary)
+                    .font(AgaraFont.number(valueSize, .bold).monospacedDigit())
+                    .foregroundStyle(model.heroStat.value == "—" ? AgaraColors.textMuted : AgaraColors.textPrimary)
                     .minimumScaleFactor(0.6)
                     .lineLimit(1)
                 if let unit = model.heroStat.unit {
                     Text(unit)
-                        .font(PulseFont.numberL)
-                        .foregroundStyle(PulseColors.textSecondary)
+                        .font(AgaraFont.numberL)
+                        .foregroundStyle(AgaraColors.textSecondary)
                 }
             }
         }
@@ -219,7 +219,7 @@ struct ShareCardView: View {
             ForEach(Array(row.enumerated()), id: \.offset) { index, stat in
                 if index > 0 {
                     Rectangle()
-                        .fill(PulseColors.borderSubtle)
+                        .fill(AgaraColors.borderSubtle)
                         .frame(width: 1, height: 28)
                 }
                 statColumn(stat)
@@ -231,22 +231,22 @@ struct ShareCardView: View {
         VStack(spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(stat.value)
-                    .font(PulseFont.number(22).monospacedDigit())
-                    .foregroundStyle(stat.value == "—" ? PulseColors.textMuted : PulseColors.textPrimary)
+                    .font(AgaraFont.number(22).monospacedDigit())
+                    .foregroundStyle(stat.value == "—" ? AgaraColors.textMuted : AgaraColors.textPrimary)
                     .minimumScaleFactor(0.7)
                     .lineLimit(1)
                 // Small trailing unit ("/KM", "BPM") so pace/speed stay unambiguous on a card
                 // seen out of app context.
                 if let unit = stat.unit {
                     Text(unit)
-                        .font(PulseFont.number(11, .medium))
-                        .foregroundStyle(PulseColors.textMuted)
+                        .font(AgaraFont.number(11, .medium))
+                        .foregroundStyle(AgaraColors.textMuted)
                 }
             }
             Text(stat.label.uppercased())
                 .font(AgaraFont.face(9, .semibold))
                 .tracking(1.6)
-                .foregroundStyle(PulseColors.textMuted)
+                .foregroundStyle(AgaraColors.textMuted)
         }
         .frame(maxWidth: .infinity)
     }
@@ -259,12 +259,12 @@ struct ShareCardView: View {
                 Text("EFFORT")
                     .font(AgaraFont.face(9, .semibold))
                     .tracking(1.6)
-                    .foregroundStyle(PulseColors.textMuted)
+                    .foregroundStyle(AgaraColors.textMuted)
                 Spacer()
                 if let caption = model.hrCaption {
                     Text(caption)
                         .font(AgaraFont.face(9, .medium).monospacedDigit())
-                        .foregroundStyle(PulseColors.textSecondary)
+                        .foregroundStyle(AgaraColors.textSecondary)
                 }
             }
             GeometryReader { geo in
@@ -298,11 +298,11 @@ struct ShareCardView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
             Text(AgaraCopy.shareCardBrand)
                 .font(AgaraFont.face(13, .semibold))
-                .foregroundStyle(PulseColors.textPrimary)
+                .foregroundStyle(AgaraColors.textPrimary)
             Spacer()
             Text(model.dateFooter)
                 .font(AgaraFont.face(10, .medium))
-                .foregroundStyle(PulseColors.textMuted)
+                .foregroundStyle(AgaraColors.textMuted)
         }
     }
 }

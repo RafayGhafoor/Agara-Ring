@@ -11,7 +11,7 @@ struct ProfileEditorView: View {
                     TextField("Optional", text: $draft.name)
                         .textInputAutocapitalization(.words)
                         .multilineTextAlignment(.trailing)
-                        .foregroundStyle(PulseColors.textPrimary)
+                        .foregroundStyle(AgaraColors.textPrimary)
                 }
             }
 
@@ -49,8 +49,8 @@ struct ProfileEditorView: View {
                 FormField {
                     VStack(alignment: .leading, spacing: 10) {
                         Text("Measurement units")
-                            .font(PulseFont.subheadline)
-                            .foregroundStyle(PulseColors.textPrimary)
+                            .font(AgaraFont.subheadline)
+                            .foregroundStyle(AgaraColors.textPrimary)
                         Picker("Measurement units", selection: $draft.units) {
                             ForEach(UnitsPreference.allCases, id: \.self) { units in
                                 Text(units.label).tag(units)
@@ -83,15 +83,15 @@ struct ProfileEditorView: View {
         } label: {
             HStack(spacing: 12) {
                 Text(title)
-                    .font(PulseFont.body)
-                    .foregroundStyle(PulseColors.textPrimary)
+                    .font(AgaraFont.body)
+                    .foregroundStyle(AgaraColors.textPrimary)
                 Spacer()
                 Text(value ?? "Not set")
-                    .font(PulseFont.subheadline.weight(.regular))
-                    .foregroundStyle(value == nil ? PulseColors.textMuted : PulseColors.textSecondary)
+                    .font(AgaraFont.subheadline.weight(.regular))
+                    .foregroundStyle(value == nil ? AgaraColors.textMuted : AgaraColors.textSecondary)
                 Image(systemName: "chevron.right")
-                    .font(PulseFont.caption2.weight(.semibold))
-                    .foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.caption2.weight(.semibold))
+                    .foregroundStyle(AgaraColors.textMuted)
             }
             .padding(.horizontal, 16)
             .frame(minHeight: 50)
@@ -170,31 +170,31 @@ private struct DecimalValueSheet: View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Enter your weight in \(unit)")
-                    .font(PulseFont.subheadline)
-                    .foregroundStyle(PulseColors.textPrimary)
+                    .font(AgaraFont.subheadline)
+                    .foregroundStyle(AgaraColors.textPrimary)
 
                 SettingsCard(cornerRadius: 14, padding: 14) {
                     TextField(LocalizedDecimalInput.format(70.5), text: $text)
                         .keyboardType(.decimalPad)
                         .focused($fieldFocused)
-                        .font(PulseFont.numberL)
+                        .font(AgaraFont.numberL)
                 }
                 .accessibilityLabel("Weight in \(unit)")
 
                 Text("You can use either a comma or a period as the decimal separator.")
-                    .font(PulseFont.caption)
-                    .foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.caption)
+                    .foregroundStyle(AgaraColors.textMuted)
 
                 if !text.isEmpty && parsedValue == nil {
                     Text("Enter a weight between \(Int(validRange.lowerBound)) and \(Int(validRange.upperBound)) \(unit).")
-                        .font(PulseFont.caption)
-                        .foregroundStyle(PulseColors.danger)
+                        .font(AgaraFont.caption)
+                        .foregroundStyle(AgaraColors.danger)
                 }
 
                 Spacer(minLength: 0)
             }
             .padding(20)
-            .background(PulseColors.background)
+            .background(AgaraColors.background)
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

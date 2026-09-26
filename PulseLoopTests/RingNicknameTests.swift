@@ -11,7 +11,7 @@ final class RingNicknameTests: XCTestCase {
     private let ringA = "11111111-AAAA-4000-8000-000000000001"
     private let ringB = "22222222-BBBB-4000-8000-000000000002"
 
-    private func identified(_ advertisedName: String?, ring: String? = nil) -> PulseEvent {
+    private func identified(_ advertisedName: String?, ring: String? = nil) -> AgaraEvent {
         .deviceIdentified(deviceType: .veepoo, wearableModelID: "tk20", advertisedName: advertisedName,
                           capabilities: [], peripheralIdentifier: ring)
     }

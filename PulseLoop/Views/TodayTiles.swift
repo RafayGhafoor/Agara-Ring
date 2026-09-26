@@ -38,7 +38,7 @@ struct TodayTile<Content: View>: View {
                             eyebrow
                             if let unit {
                                 Spacer(minLength: 4)
-                                Text(unit).font(PulseFont.caption2).foregroundStyle(PulseColors.textMuted)
+                                Text(unit).font(AgaraFont.caption2).foregroundStyle(AgaraColors.textMuted)
                                     .lineLimit(1).fixedSize()
                             }
                         }
@@ -50,7 +50,7 @@ struct TodayTile<Content: View>: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .padding(16)
             .frame(height: TodayTileMetrics.height)
-            .pulseGlass(RoundedRectangle(cornerRadius: TodayTileMetrics.corner, style: .continuous))
+            .agaraGlass(RoundedRectangle(cornerRadius: TodayTileMetrics.corner, style: .continuous))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -59,9 +59,9 @@ struct TodayTile<Content: View>: View {
 
     private var eyebrow: some View {
         Text(label.uppercased())
-            .font(PulseFont.caption2)
+            .font(AgaraFont.caption2)
             .tracking(0.6)
-            .foregroundStyle(PulseColors.textMuted)
+            .foregroundStyle(AgaraColors.textMuted)
             .lineLimit(1)
     }
 }
@@ -93,21 +93,21 @@ struct ActivityTileView: View {
     private var values: [(label: String, text: String, color: Color)] {
         let distUnit = units == .imperial ? "MI" : "KM"
         let rows: [(String, String?, Color)] = [
-            ("STEPS", summary.steps.map { $0.formatted() }, PulseColors.steps),
-            (distUnit, summary.distanceMeters.map { UnitsFormatter.distance(meters: $0, units: units).value }, PulseColors.distance),
-            ("CAL", effectiveCalories.map { Int($0).formatted() }, PulseColors.calories),
+            ("STEPS", summary.steps.map { $0.formatted() }, AgaraColors.steps),
+            (distUnit, summary.distanceMeters.map { UnitsFormatter.distance(meters: $0, units: units).value }, AgaraColors.distance),
+            ("CAL", effectiveCalories.map { Int($0).formatted() }, AgaraColors.calories),
         ]
         return rows.compactMap { label, text, color in text.map { (label, $0, color) } }
     }
 
     var body: some View {
-        TodayTile(label: "Activity", color: PulseColors.steps, onTap: onTap) {
+        TodayTile(label: "Activity", color: AgaraColors.steps, onTap: onTap) {
             Spacer(minLength: 0)
             HStack(spacing: 10) {
                 ActivityRingsView(rings: [
-                    ActivityRing(value: summary.steps.map(Double.init), goal: Double(summary.goals.stepsDaily), color: PulseColors.steps),
-                    ActivityRing(value: distanceDisplay, goal: distanceGoalDisplay, color: PulseColors.distance),
-                    ActivityRing(value: effectiveActiveCalories, goal: Double(summary.goals.caloriesDaily), color: PulseColors.calories)
+                    ActivityRing(value: summary.steps.map(Double.init), goal: Double(summary.goals.stepsDaily), color: AgaraColors.steps),
+                    ActivityRing(value: distanceDisplay, goal: distanceGoalDisplay, color: AgaraColors.distance),
+                    ActivityRing(value: effectiveActiveCalories, goal: Double(summary.goals.caloriesDaily), color: AgaraColors.calories)
                 ], size: 88, stroke: 9, spacing: 4)
                 // Nudge into the card padding so the bigger loop doesn't crowd the numbers.
                 .padding(.leading, -6)
@@ -115,7 +115,7 @@ struct ActivityTileView: View {
                     ForEach(Array(values.enumerated()), id: \.offset) { _, value in
                         VStack(alignment: .leading, spacing: 0) {
                             Text(value.label)
-                                .font(PulseFont.micro.weight(.semibold))
+                                .font(AgaraFont.micro.weight(.semibold))
                                 .tracking(0.8)
                                 .foregroundStyle(value.color)
                             Text(value.text)
@@ -145,8 +145,8 @@ struct NutritionTileView: View {
     private var goal: Int? { goals.intakeCalories }
     private var remaining: Double? { goal.map { Double($0) - totals.calories } }
     private var headlineColor: Color {
-        goal.map { NutritionFormat.progressColor(consumed: totals.calories, goal: Double($0), base: PulseColors.textPrimary) }
-            ?? PulseColors.textPrimary
+        goal.map { NutritionFormat.progressColor(consumed: totals.calories, goal: Double($0), base: AgaraColors.textPrimary) }
+            ?? AgaraColors.textPrimary
     }
 
     private var headlineValue: String {
@@ -160,29 +160,29 @@ struct NutritionTileView: View {
 
     private var fuelSegments: [SleepStageSegment] {
         [
-            SleepStageSegment(minutes: totals.proteinG, color: PulseColors.macroProtein, label: "P"),
-            SleepStageSegment(minutes: totals.carbsG, color: PulseColors.macroCarbs, label: "C"),
-            SleepStageSegment(minutes: totals.fatG, color: PulseColors.macroFat, label: "F"),
+            SleepStageSegment(minutes: totals.proteinG, color: AgaraColors.macroProtein, label: "P"),
+            SleepStageSegment(minutes: totals.carbsG, color: AgaraColors.macroCarbs, label: "C"),
+            SleepStageSegment(minutes: totals.fatG, color: AgaraColors.macroFat, label: "F"),
         ].filter { $0.minutes > 0 }
     }
 
     var body: some View {
-        TodayTile(label: "Nutrition", color: PulseColors.calories, onTap: onTap) {
+        TodayTile(label: "Nutrition", color: AgaraColors.calories, onTap: onTap) {
             if totals.entryCount > 0 {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(alignment: .firstTextBaseline, spacing: 5) {
                         Text(headlineValue)
-                            .font(PulseFont.greeting)
+                            .font(AgaraFont.greeting)
                             .monospacedDigit()
                             .foregroundStyle(headlineColor)
                             .minimumScaleFactor(0.7)
                             .lineLimit(1)
                         Text(headlineLabel)
-                            .font(PulseFont.micro.weight(.semibold)).tracking(1.0)
-                            .foregroundStyle(PulseColors.textMuted)
+                            .font(AgaraFont.micro.weight(.semibold)).tracking(1.0)
+                            .foregroundStyle(AgaraColors.textMuted)
                     }
                     if fuelSegments.isEmpty {
-                        Capsule().fill(PulseColors.elevated).frame(height: 12)
+                        Capsule().fill(AgaraColors.elevated).frame(height: 12)
                     } else {
                         SleepStageBar(segments: fuelSegments)
                             .frame(height: 28)
@@ -191,21 +191,21 @@ struct NutritionTileView: View {
                     // always fit the half-width tile without wrapping.
                     HStack(alignment: .firstTextBaseline, spacing: 4) {
                         Text(NutritionFormat.kcal(totals.calories))
-                            .font(PulseFont.footnote.weight(.semibold))
+                            .font(AgaraFont.footnote.weight(.semibold))
                             .monospacedDigit()
-                            .foregroundStyle(PulseColors.textPrimary)
+                            .foregroundStyle(AgaraColors.textPrimary)
                         Text("EATEN")
-                            .font(PulseFont.nano).tracking(0.8)
-                            .foregroundStyle(PulseColors.calories)
+                            .font(AgaraFont.nano).tracking(0.8)
+                            .foregroundStyle(AgaraColors.calories)
                         if let goal {
                             Spacer(minLength: 4)
                             Text(goal.formatted())
-                                .font(PulseFont.footnote.weight(.semibold))
+                                .font(AgaraFont.footnote.weight(.semibold))
                                 .monospacedDigit()
-                                .foregroundStyle(PulseColors.textSecondary)
+                                .foregroundStyle(AgaraColors.textSecondary)
                             Text("GOAL")
-                                .font(PulseFont.nano).tracking(0.8)
-                                .foregroundStyle(PulseColors.textMuted)
+                                .font(AgaraFont.nano).tracking(0.8)
+                                .foregroundStyle(AgaraColors.textMuted)
                         }
                     }
                     .lineLimit(1)
@@ -215,9 +215,9 @@ struct NutritionTileView: View {
                 Spacer(minLength: 0)
                 VStack(spacing: 6) {
                     Image(systemName: "fork.knife")
-                        .font(PulseFont.title2.weight(.regular)).foregroundStyle(PulseColors.calories.opacity(0.7))
+                        .font(AgaraFont.title2.weight(.regular)).foregroundStyle(AgaraColors.calories.opacity(0.7))
                     Text("No meals logged")
-                        .font(PulseFont.footnote).foregroundStyle(PulseColors.textPrimary)
+                        .font(AgaraFont.footnote).foregroundStyle(AgaraColors.textPrimary)
                 }
                 .frame(maxWidth: .infinity)
                 Spacer(minLength: 0)
@@ -236,27 +236,27 @@ struct SleepTileView: View {
     var onTap: () -> Void
 
     var body: some View {
-        TodayTile(label: "Sleep", color: PulseColors.sleep, onTap: onTap) {
+        TodayTile(label: "Sleep", color: AgaraColors.sleep, onTap: onTap) {
             if let sleep {
                 let stages = SleepStageDistribution(sleep)
                 let score = SleepScore.calculate(sleep).score
                 VStack(alignment: .leading, spacing: 10) {
                     Text(SleepFormat.duration(sleep.session.totalMinutes))
-                        .font(PulseFont.greeting)
+                        .font(AgaraFont.greeting)
                         .monospacedDigit()
-                        .foregroundStyle(PulseColors.textPrimary)
+                        .foregroundStyle(AgaraColors.textPrimary)
                         .minimumScaleFactor(0.7)
                         .lineLimit(1)
                     SleepStageBar(segments: stages.segments)
                         .frame(height: 24)
                     HStack(alignment: .firstTextBaseline, spacing: 5) {
                         Text("\(score)")
-                            .font(PulseFont.greeting)
+                            .font(AgaraFont.greeting)
                             .monospacedDigit()
-                            .foregroundStyle(PulseColors.textPrimary)
+                            .foregroundStyle(AgaraColors.textPrimary)
                         Text("SCORE")
-                            .font(PulseFont.micro.weight(.semibold)).tracking(1.0)
-                            .foregroundStyle(PulseColors.textMuted)
+                            .font(AgaraFont.micro.weight(.semibold)).tracking(1.0)
+                            .foregroundStyle(AgaraColors.textMuted)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -264,9 +264,9 @@ struct SleepTileView: View {
                 Spacer(minLength: 0)
                 VStack(spacing: 6) {
                     Image(systemName: "moon.zzz")
-                        .font(PulseFont.title2.weight(.regular)).foregroundStyle(PulseColors.sleep.opacity(0.7))
+                        .font(AgaraFont.title2.weight(.regular)).foregroundStyle(AgaraColors.sleep.opacity(0.7))
                     Text("No sleep recorded")
-                        .font(PulseFont.footnote).foregroundStyle(PulseColors.textPrimary)
+                        .font(AgaraFont.footnote).foregroundStyle(AgaraColors.textPrimary)
                 }
                 .frame(maxWidth: .infinity)
                 Spacer(minLength: 0)
@@ -308,18 +308,18 @@ struct TodayChartTile: View {
         TodayTile(label: model.title, color: model.accentColor, onTap: onTap) {
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(model.valueText)
-                    .font(PulseFont.title).monospacedDigit()
-                    .foregroundStyle(PulseColors.textPrimary)
+                    .font(AgaraFont.title).monospacedDigit()
+                    .foregroundStyle(AgaraColors.textPrimary)
                     .minimumScaleFactor(0.7).lineLimit(1)
                 if let unit = model.unitText {
-                    Text(unit).font(PulseFont.caption2).foregroundStyle(PulseColors.textMuted)
+                    Text(unit).font(AgaraFont.caption2).foregroundStyle(AgaraColors.textMuted)
                         .lineLimit(1)
                 }
             }
             Spacer(minLength: 0)
             if model.isEmpty {
                 Text(model.statusText)
-                    .font(PulseFont.caption.weight(.regular)).foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.caption.weight(.regular)).foregroundStyle(AgaraColors.textMuted)
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 ZoneLineChart(
@@ -399,9 +399,9 @@ struct TodayBloodPressureTile: View {
             } else {
                 HStack(spacing: 6) {
                     ringColumn(title: "SYS", value: systolic!, domain: 80...190, zones: systolicZones,
-                               fallback: PulseColors.bloodPressure)
+                               fallback: AgaraColors.bloodPressure)
                     ringColumn(title: "DIA", value: diastolic!, domain: 50...130, zones: diastolicZones,
-                               fallback: PulseColors.bloodPressure.opacity(0.7))
+                               fallback: AgaraColors.bloodPressure.opacity(0.7))
                 }
                 .frame(maxWidth: .infinity)
             }
@@ -423,8 +423,8 @@ struct TodayBloodPressureTile: View {
                 lineWidth: 7
             )
             Text(title)
-                .font(PulseFont.micro.weight(.semibold)).tracking(0.8)
-                .foregroundStyle(PulseColors.textMuted)
+                .font(AgaraFont.micro.weight(.semibold)).tracking(0.8)
+                .foregroundStyle(AgaraColors.textMuted)
         }
         .frame(maxWidth: .infinity)
     }

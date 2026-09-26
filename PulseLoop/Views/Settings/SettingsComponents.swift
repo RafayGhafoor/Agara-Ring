@@ -36,9 +36,9 @@ struct SettingsSection: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text(title)
                     .textCase(.uppercase)
-                    .font(PulseFont.footnote.weight(.semibold))
+                    .font(AgaraFont.footnote.weight(.semibold))
                     .tracking(1.0)
-                    .foregroundStyle(PulseColors.textSecondary)
+                    .foregroundStyle(AgaraColors.textSecondary)
                     .padding(.leading, 16)
                     .accessibilityAddTraits(.isHeader)
 
@@ -47,7 +47,7 @@ struct SettingsSection: View {
                         SettingsRow(item: row, position: rowPosition(index))
                         if index < rows.count - 1 {
                             Rectangle()
-                                .fill(PulseColors.borderSubtle)
+                                .fill(AgaraColors.borderSubtle)
                                 .frame(height: 0.5)
                                 .padding(.leading, 64) // align with the row's text column
                                 .accessibilityHidden(true)
@@ -56,7 +56,7 @@ struct SettingsSection: View {
                 }
                 // iOS-Settings-style translucent grouped card: Liquid Glass on 26+,
                 // Material/solid fallback below and under Reduce Transparency.
-                .pulseGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .agaraGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
                 // Clip the row content (press highlights) to the rounded corners too —
                 // glassEffect only clips its own material, so an unclipped highlight
                 // rectangle would poke past the card's rounded corners.
@@ -75,40 +75,40 @@ struct SettingsRow: View {
         Button(action: item.action) {
             HStack(spacing: 14) {
                 Image(systemName: item.icon)
-                    .font(PulseFont.callout.weight(.semibold))
-                    .foregroundStyle(PulseColors.textPrimary)
+                    .font(AgaraFont.callout.weight(.semibold))
+                    .foregroundStyle(AgaraColors.textPrimary)
                     .frame(width: 34, height: 34)
                     // Neutral "white glass" tile (iOS Settings look): a light translucent
                     // fill with a top sheen — not glassEffect, which can't nest inside the
                     // glass section card. White glyph, no colour tint.
                     .background(
                         LinearGradient(
-                            colors: [PulseColors.textPrimary.opacity(0.16), PulseColors.textPrimary.opacity(0.07)],
+                            colors: [AgaraColors.textPrimary.opacity(0.16), AgaraColors.textPrimary.opacity(0.07)],
                             startPoint: .top, endPoint: .bottom
                         ),
                         in: RoundedRectangle(cornerRadius: 12, style: .continuous)
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .strokeBorder(PulseColors.textPrimary.opacity(0.18), lineWidth: 0.5)
+                            .strokeBorder(AgaraColors.textPrimary.opacity(0.18), lineWidth: 0.5)
                     )
 
                 Text(item.title)
-                    .font(PulseFont.body)
-                    .foregroundStyle(PulseColors.textPrimary)
+                    .font(AgaraFont.body)
+                    .foregroundStyle(AgaraColors.textPrimary)
 
                 Spacer(minLength: 8)
 
                 if let trailingValue = item.trailingValue {
                     Text(trailingValue)
-                        .font(PulseFont.subheadline.weight(.regular))
-                        .foregroundStyle(PulseColors.textSecondary)
+                        .font(AgaraFont.subheadline.weight(.regular))
+                        .foregroundStyle(AgaraColors.textSecondary)
                         .lineLimit(1)
                 }
 
                 Image(systemName: "chevron.right")
-                    .font(PulseFont.footnote.weight(.semibold))
-                    .foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.footnote.weight(.semibold))
+                    .foregroundStyle(AgaraColors.textMuted)
             }
             .padding(.horizontal, 16)
             .frame(maxWidth: .infinity, minHeight: 52)
@@ -132,7 +132,7 @@ struct SettingsRowButtonStyle: ButtonStyle {
             // section's outer corners on the first/last row, square in between —
             // glassEffect doesn't clip the row content, so we shape the fill itself.
             .background(
-                (configuration.isPressed ? PulseColors.textPrimary.opacity(0.08) : Color.clear)
+                (configuration.isPressed ? AgaraColors.textPrimary.opacity(0.08) : Color.clear)
                     .clipShape(highlightShape)
             )
             .animation(.easeOut(duration: 0.15), value: configuration.isPressed)

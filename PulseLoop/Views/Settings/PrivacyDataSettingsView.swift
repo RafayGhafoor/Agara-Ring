@@ -133,15 +133,15 @@ struct PrivacyDataSettingsView: View {
                     }
                     HStack(spacing: 12) {
                         Image(systemName: "dot.radiowaves.left.and.right")
-                            .font(PulseFont.body)
-                            .foregroundStyle(PulseColors.textPrimary)
+                            .font(AgaraFont.body)
+                            .foregroundStyle(AgaraColors.textPrimary)
                             .frame(width: 24)
                         Toggle(isOn: $exportIncludesPackets) {
                             Text("Include Bluetooth packets")
-                                .font(PulseFont.body)
-                                .foregroundStyle(PulseColors.textPrimary)
+                                .font(AgaraFont.body)
+                                .foregroundStyle(AgaraColors.textPrimary)
                         }
-                        .tint(PulseColors.accent)
+                        .tint(AgaraColors.accent)
                     }
                     .padding(.horizontal, 16)
                     .frame(minHeight: 50)
@@ -161,8 +161,8 @@ struct PrivacyDataSettingsView: View {
                     }
                     HStack(spacing: 12) {
                         Image(systemName: "dot.radiowaves.left.and.right")
-                            .font(PulseFont.body)
-                            .foregroundStyle(PulseColors.textPrimary)
+                            .font(AgaraFont.body)
+                            .foregroundStyle(AgaraColors.textPrimary)
                             .frame(width: 24)
                         Toggle(isOn: Binding(
                             get: { captureRawPackets },
@@ -172,10 +172,10 @@ struct PrivacyDataSettingsView: View {
                             }
                         )) {
                             Text("Capture Bluetooth diagnostics")
-                                .font(PulseFont.body)
-                                .foregroundStyle(PulseColors.textPrimary)
+                                .font(AgaraFont.body)
+                                .foregroundStyle(AgaraColors.textPrimary)
                         }
-                        .tint(PulseColors.accent)
+                        .tint(AgaraColors.accent)
                     }
                     .padding(.horizontal, 16)
                     .frame(minHeight: 50)
@@ -188,13 +188,13 @@ struct PrivacyDataSettingsView: View {
                     header: "App data",
                     footer: "Unpair releases the ring for other apps and keeps your health data. Resetting erases everything on this device and returns the app to onboarding."
                 ) {
-                    actionRow("Unpair ring", systemImage: "wave.3.right.circle", tint: PulseColors.danger) {
+                    actionRow("Unpair ring", systemImage: "wave.3.right.circle", tint: AgaraColors.danger) {
                         pendingReset = .unpairRing
                     }
-                    actionRow("Reset app data", systemImage: "trash", tint: PulseColors.danger) {
+                    actionRow("Reset app data", systemImage: "trash", tint: AgaraColors.danger) {
                         pendingReset = .resetAppData
                     }
-                    actionRow("Unpair ring & reset app data", systemImage: "trash.slash", tint: PulseColors.danger) {
+                    actionRow("Unpair ring & reset app data", systemImage: "trash.slash", tint: AgaraColors.danger) {
                         pendingReset = .unpairAndReset
                     }
                 }
@@ -213,7 +213,7 @@ struct PrivacyDataSettingsView: View {
             }
             .padding()
         }
-        .background(PulseColors.background)
+        .background(AgaraColors.background)
         .pageChrome("Privacy & Data")
         // Blocking overlay while an export/import runs — the work yields regularly, so the
         // spinner stays animated; the screen is disabled underneath.
@@ -222,7 +222,7 @@ struct PrivacyDataSettingsView: View {
                 ZStack {
                     Color.black.opacity(0.35).ignoresSafeArea()
                     ProgressView(workingLabel)
-                        .tint(PulseColors.accent)
+                        .tint(AgaraColors.accent)
                         .padding(24)
                         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
                 }
@@ -309,17 +309,17 @@ struct PrivacyDataSettingsView: View {
     private func actionRow(
         _ title: String,
         systemImage: String,
-        tint: Color = PulseColors.textPrimary,
+        tint: Color = AgaraColors.textPrimary,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
             HStack(spacing: 12) {
                 Image(systemName: systemImage)
-                    .font(PulseFont.body)
+                    .font(AgaraFont.body)
                     .foregroundStyle(tint)
                     .frame(width: 24)
                 Text(title)
-                    .font(PulseFont.body)
+                    .font(AgaraFont.body)
                     .foregroundStyle(tint)
                 Spacer(minLength: 0)
             }

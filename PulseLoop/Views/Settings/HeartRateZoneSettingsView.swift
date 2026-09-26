@@ -82,15 +82,15 @@ struct HeartRateZoneSettingsView: View {
                 Text("Medical guidelines describe 60–100 bpm as a typical adult resting range, but "
                      + "large studies of healthy adults find most rest between 50 and 90 bpm. "
                      + "\(AgaraCopy.appName)'s standard zones use 50–90. These ranges are informational, not a diagnosis.")
-                    .font(PulseFont.caption.weight(.regular))
-                    .foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.caption.weight(.regular))
+                    .foregroundStyle(AgaraColors.textMuted)
                     .padding(.horizontal, 16)
 
                 PrimaryButton(title: "Save", systemImage: "checkmark") { save() }
             }
             .padding()
         }
-        .background(PulseColors.background)
+        .background(AgaraColors.background)
         .pageChrome("Heart Rate Zones")
         .onAppear(perform: loadIfNeeded)
         .onChange(of: mode) { _, newMode in
@@ -125,10 +125,10 @@ struct HeartRateZoneSettingsView: View {
             ForEach(zones) { zone in
                 HStack(spacing: 10) {
                     Circle().fill(zone.color).frame(width: 8, height: 8)
-                    Text(zone.label).font(PulseFont.footnote).foregroundStyle(PulseColors.textPrimary)
+                    Text(zone.label).font(AgaraFont.footnote).foregroundStyle(AgaraColors.textPrimary)
                     Spacer()
-                    Text(rangeText(zone)).font(PulseFont.caption.weight(.regular)).monospacedDigit()
-                        .foregroundStyle(PulseColors.textMuted)
+                    Text(rangeText(zone)).font(AgaraFont.caption.weight(.regular)).monospacedDigit()
+                        .foregroundStyle(AgaraColors.textMuted)
                 }
             }
         }
@@ -149,8 +149,8 @@ struct HeartRateZoneSettingsView: View {
         FormValueRow(title: title) {
             Stepper(value: value, in: range) {
                 Text("\(value.wrappedValue) bpm")
-                    .font(PulseFont.body).monospacedDigit()
-                    .foregroundStyle(PulseColors.textPrimary)
+                    .font(AgaraFont.body).monospacedDigit()
+                    .foregroundStyle(AgaraColors.textPrimary)
             }
             .fixedSize()
         }
@@ -174,8 +174,8 @@ struct HeartRateZoneSettingsView: View {
     private func valueRow(_ title: String, _ value: Int) -> some View {
         FormValueRow(title: title) {
             Text("\(value) bpm")
-                .font(PulseFont.body).monospacedDigit()
-                .foregroundStyle(PulseColors.textSecondary)
+                .font(AgaraFont.body).monospacedDigit()
+                .foregroundStyle(AgaraColors.textSecondary)
         }
     }
 

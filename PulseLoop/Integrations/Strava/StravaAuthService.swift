@@ -59,6 +59,7 @@ final class StravaAuthService: StravaTokenProviding {
     static let shared = StravaAuthService()
 
     /// Registered as the app's Authorization Callback Domain (`localhost`) + custom scheme.
+    // Install-bound: the redirect is registered with Strava and the `pulseloop` URL type in Info.plist.
     static let redirectURI = "pulseloop://localhost/strava-auth"
     private static let callbackScheme = "pulseloop"
     /// Refresh when fewer than this many seconds of validity remain.

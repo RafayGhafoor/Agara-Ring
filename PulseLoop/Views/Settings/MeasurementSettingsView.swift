@@ -47,7 +47,7 @@ struct MeasurementSettingsView: View {
             }
             .padding()
         }
-        .background(PulseColors.background)
+        .background(AgaraColors.background)
         .pageChrome("Measurement")
         .onAppear(perform: loadIfNeeded)
     }
@@ -74,10 +74,10 @@ struct MeasurementSettingsView: View {
         PrimaryButton(title: "Save & sync to ring", systemImage: "checkmark") { save() }
 
         if let saveStatus {
-            Text(saveStatus).font(PulseFont.caption).foregroundStyle(PulseColors.textMuted)
+            Text(saveStatus).font(AgaraFont.caption).foregroundStyle(AgaraColors.textMuted)
         } else if ble.state != .connected {
             Text("Not connected — changes will apply the next time your ring syncs.")
-                .font(PulseFont.caption).foregroundStyle(PulseColors.textMuted)
+                .font(AgaraFont.caption).foregroundStyle(AgaraColors.textMuted)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
@@ -86,11 +86,11 @@ struct MeasurementSettingsView: View {
         FormField {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    Text("Measure every").font(PulseFont.subheadline).foregroundStyle(PulseColors.textPrimary)
+                    Text("Measure every").font(AgaraFont.subheadline).foregroundStyle(AgaraColors.textPrimary)
                     Spacer()
                     Text("\(hrIntervalMinutes) min")
-                        .font(PulseFont.callout.weight(.semibold)).monospacedDigit()
-                        .foregroundStyle(PulseColors.accent)
+                        .font(AgaraFont.callout.weight(.semibold)).monospacedDigit()
+                        .foregroundStyle(AgaraColors.accent)
                 }
                 Slider(
                     value: Binding(
@@ -100,9 +100,9 @@ struct MeasurementSettingsView: View {
                     in: 5...60,
                     step: 5
                 )
-                .tint(PulseColors.accent)
+                .tint(AgaraColors.accent)
                 Text("More frequent readings give finer trends but use more battery.")
-                    .font(PulseFont.caption).foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.caption).foregroundStyle(AgaraColors.textMuted)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }

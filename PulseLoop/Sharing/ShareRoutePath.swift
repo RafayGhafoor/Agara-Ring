@@ -111,7 +111,7 @@ struct ShareRouteView: View {
                     .stroke(Color.white.opacity(0.35), style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
                 if let start = points.first, let end = points.last {
                     Circle()
-                        .fill(PulseColors.success)
+                        .fill(AgaraColors.success)
                         .overlay(Circle().stroke(Color.white.opacity(0.9), lineWidth: 1.5))
                         .frame(width: 7, height: 7)
                         .position(start)

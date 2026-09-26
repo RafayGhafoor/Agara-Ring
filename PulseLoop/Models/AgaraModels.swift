@@ -191,7 +191,7 @@ final class Device {
     var deviceType: RingDeviceType {
         // An unrecognized raw value is a device row from a family this build no longer ships. It resolves
         // to the only family that exists so the app has something consistent to render, and the launch
-        // guard in `PulseServices` drops the row entirely — a ring we can't drive must not look paired.
+        // guard in `AgaraServices` drops the row entirely — a ring we can't drive must not look paired.
         get { RingDeviceType(rawValue: deviceTypeRaw) ?? .veepoo }
         set {
             deviceTypeRaw = newValue.rawValue

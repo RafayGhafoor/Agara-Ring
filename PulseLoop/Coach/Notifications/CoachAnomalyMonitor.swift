@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-/// Subscribes to `PulseEventBus` and runs a proactive anomaly check when fresh
+/// Subscribes to `AgaraEventBus` and runs a proactive anomaly check when fresh
 /// SpO₂ or sleep data lands, debounced so a burst of streamed packets coalesces
 /// into one check. The service self-gates (on-device only, enabled, deduped), so
 /// this just nudges it. Lives for the app lifetime, like `CoachSummaryCoordinator`.
@@ -21,14 +21,14 @@ final class CoachAnomalyMonitor {
     func start() {
         guard streamTask == nil else { return }
         streamTask = Task { [weak self] in
-            let stream = await PulseEventBus.shared.stream()
+            let stream = await AgaraEventBus.shared.stream()
             for await event in stream {
                 self?.handle(event)
             }
         }
     }
 
-    private func handle(_ event: PulseEvent) {
+    private func handle(_ event: AgaraEvent) {
         switch event {
         case .spo2Result, .sleepTimeline, .historyMeasurement:
             scheduleCheck()

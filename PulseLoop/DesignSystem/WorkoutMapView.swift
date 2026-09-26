@@ -45,7 +45,7 @@ struct WorkoutMapView: View {
                 MapPolyline(coordinates: coordinates)
                     .stroke(routeGradient, style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round))
                 if let start = coordinates.first {
-                    Annotation("Start", coordinate: start) { marker(PulseColors.success) }
+                    Annotation("Start", coordinate: start) { marker(AgaraColors.success) }
                 }
                 if let end = coordinates.last {
                     Annotation("", coordinate: end) { currentMarker }
@@ -66,7 +66,7 @@ struct WorkoutMapView: View {
                         followControls.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                     }
                 }
-                .pulseGlassContainer(spacing: 8)
+                .agaraGlassContainer(spacing: 8)
             }
             .onAppear { recenter() }
             .onChange(of: coordinates.count) { _, _ in
@@ -79,7 +79,7 @@ struct WorkoutMapView: View {
     }
 
     private var routeGradient: LinearGradient {
-        LinearGradient(colors: [PulseColors.accent, PulseColors.distance], startPoint: .topLeading, endPoint: .bottomTrailing)
+        LinearGradient(colors: [AgaraColors.accent, AgaraColors.distance], startPoint: .topLeading, endPoint: .bottomTrailing)
     }
 
     private func marker(_ color: Color) -> some View {
@@ -88,34 +88,34 @@ struct WorkoutMapView: View {
     }
 
     private var currentMarker: some View {
-        Circle().fill(PulseColors.accent).frame(width: 14, height: 14)
+        Circle().fill(AgaraColors.accent).frame(width: 14, height: 14)
             .overlay(Circle().stroke(.white, lineWidth: 2))
-            .overlay(Circle().fill(PulseColors.accent).frame(width: 22, height: 22).opacity(0.25))
+            .overlay(Circle().fill(AgaraColors.accent).frame(width: 22, height: 22).opacity(0.25))
             .shadow(radius: 3)
     }
 
     private var infoOverlay: some View {
         let text = latestAccuracy.map { "±\(Int($0))m · \(coordinates.count) pts" } ?? "\(coordinates.count) pts"
         return Text(text)
-            .font(PulseFont.micro).monospacedDigit()
-            .foregroundStyle(PulseColors.textSecondary)
+            .font(AgaraFont.micro).monospacedDigit()
+            .foregroundStyle(AgaraColors.textSecondary)
             .padding(.horizontal, 8).padding(.vertical, 4)
-            .pulseGlass(Capsule())
+            .agaraGlass(Capsule())
             .padding(8)
     }
 
     private var followControls: some View {
         HStack(spacing: 6) {
             Text(following ? "Following" : "Map unlocked")
-                .font(PulseFont.micro)
-                .foregroundStyle(following ? PulseColors.success : PulseColors.textMuted)
+                .font(AgaraFont.micro)
+                .foregroundStyle(following ? AgaraColors.success : AgaraColors.textMuted)
             Button { recenter() } label: {
-                Image(systemName: "location.fill").font(PulseFont.caption2.weight(.semibold))
-                    .foregroundStyle(PulseColors.accent)
+                Image(systemName: "location.fill").font(AgaraFont.caption2.weight(.semibold))
+                    .foregroundStyle(AgaraColors.accent)
             }
         }
         .padding(.horizontal, 8).padding(.vertical, 5)
-        .pulseGlass(Capsule(), interactive: true)
+        .agaraGlass(Capsule(), interactive: true)
         .padding(8)
     }
 
@@ -132,21 +132,21 @@ struct WorkoutMapView: View {
     private var placeholder: some View {
         VStack(spacing: 6) {
             Image(systemName: "map")
-                .font(PulseFont.title2.weight(.regular))
-                .foregroundStyle(PulseColors.textMuted)
+                .font(AgaraFont.title2.weight(.regular))
+                .foregroundStyle(AgaraColors.textMuted)
             Text(unavailable ? "GPS route unavailable" : "No route yet")
-                .font(PulseFont.subheadline)
-                .foregroundStyle(PulseColors.textPrimary)
+                .font(AgaraFont.subheadline)
+                .foregroundStyle(AgaraColors.textPrimary)
             Text(unavailable
                  ? "Distance uses the ring/app estimate where possible."
                  : "Move outdoors to start tracking your route.")
-                .font(PulseFont.caption.weight(.regular))
-                .foregroundStyle(PulseColors.textMuted)
+                .font(AgaraFont.caption.weight(.regular))
+                .foregroundStyle(AgaraColors.textMuted)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
         .frame(height: height)
-        .pulseGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     private var region: MKCoordinateRegion {

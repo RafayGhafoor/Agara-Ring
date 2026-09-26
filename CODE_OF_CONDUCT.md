@@ -1,6 +1,6 @@
 # Code of Conduct
 
-PulseLoop is a friendly, open project. To keep it that way, everyone taking part
+Agara Ring is a friendly, open project. To keep it that way, everyone taking part
 — in issues, pull requests, discussions, or anywhere else — is asked to follow a
 few simple rules.
 
@@ -26,4 +26,4 @@ handled discreetly.
 The maintainer may remove comments, reject contributions, or block anyone who
 doesn't follow this Code of Conduct.
 
-Thanks for helping keep PulseLoop a good place to build. 🫀
+Thanks for helping keep Agara Ring a good place to build. 🫀

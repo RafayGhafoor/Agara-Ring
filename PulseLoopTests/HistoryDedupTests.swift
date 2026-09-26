@@ -6,7 +6,7 @@ import SwiftData
 /// persistence layer upserts them on `(kind, timestamp)`. Live samples must keep append semantics.
 @MainActor
 final class HistoryDedupTests: XCTestCase {
-    private func historyEvent(bpm: Double, at timestamp: Date) -> PulseEvent {
+    private func historyEvent(bpm: Double, at timestamp: Date) -> AgaraEvent {
         .historyMeasurement(kind: .heartRate, value: bpm, timestamp: timestamp)
     }
 

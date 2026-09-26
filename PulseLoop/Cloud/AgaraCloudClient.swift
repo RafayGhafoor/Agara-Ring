@@ -106,7 +106,7 @@ final class AgaraCloudClient {
     let baseURL: URL
     private let session: URLSession
     private let store: AgaraCloudSession
-    private static let log = Logger(subsystem: "com.pulseloop.lab", category: "agara-cloud")
+    private static let log = Logger(subsystem: "com.agara.ring", category: "agara-cloud")
 
     init(
         store: AgaraCloudSession? = nil,

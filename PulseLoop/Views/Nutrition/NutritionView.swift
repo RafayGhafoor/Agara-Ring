@@ -8,7 +8,7 @@ struct NutritionView: View {
     @Environment(\.modelContext) private var modelContext
     @Binding var path: NavigationPath
 
-    @State private var dataChange = PulseDataChange.shared
+    @State private var dataChange = AgaraDataChange.shared
     @State private var selectedDay = Calendar.current.startOfDay(for: Date())
     // Cached off the render path (reload() on token/day change), mirroring ActivityView —
     // an @Query invalidation re-running the fetch every body eval flashes glass on iOS 26.
@@ -73,7 +73,7 @@ struct NutritionView: View {
 
                 CalorieBudgetGauge(totals: totals, goal: goals?.intakeCalories, burned: burned)
 
-                DetailCard(title: "Macros", color: PulseColors.calories) {
+                DetailCard(title: "Macros", color: AgaraColors.calories) {
                     VStack(spacing: 14) {
                         MacroProgressRow(kind: .protein, consumed: totals.proteinG, goal: goals?.intakeProteinG)
                         MacroProgressRow(kind: .carbs, consumed: totals.carbsG, goal: goals?.intakeCarbsG)
@@ -87,20 +87,20 @@ struct NutritionView: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 96)
         }
-        .background(PulseColors.background)
+        .background(AgaraColors.background)
         .pageChrome("Nutrition") {
             Button { path.append(AppRoute.settingsNutrition) } label: {
                 Image(systemName: "gearshape")
-                    .font(PulseFont.bodyEmphasis)
-                    .foregroundStyle(PulseColors.textPrimary)
+                    .font(AgaraFont.bodyEmphasis)
+                    .foregroundStyle(AgaraColors.textPrimary)
                     .frame(width: 36, height: 36)
-                    .pulseGlass(Circle(), interactive: true)
+                    .agaraGlass(Circle(), interactive: true)
                     .minTapTarget(visualSize: 36)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Nutrition settings")
         }
-        .pulseScrollEdges()
+        .agaraScrollEdges()
         .task(id: dataChange.token) { reload() }
         .onChange(of: selectedDay) { _, _ in reload() }
         .sheet(item: $logSheet) { request in
@@ -136,22 +136,22 @@ struct NutritionView: View {
             }
             logPill("magnifyingglass", "Search") { logSheet = LogSheetRequest(mealType: MealType.inferred()) }
         }
-        .pulseGlassContainer(spacing: 10)
+        .agaraGlassContainer(spacing: 10)
     }
 
     private func logPill(_ symbol: String, _ label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 6) {
                 Image(systemName: symbol)
-                    .font(PulseFont.subheadline)
-                    .foregroundStyle(PulseColors.calories)
+                    .font(AgaraFont.subheadline)
+                    .foregroundStyle(AgaraColors.calories)
                 Text(label)
-                    .font(PulseFont.subheadline)
-                    .foregroundStyle(PulseColors.textPrimary)
+                    .font(AgaraFont.subheadline)
+                    .foregroundStyle(AgaraColors.textPrimary)
             }
             .frame(maxWidth: .infinity)
             .frame(height: 40)
-            .pulseGlass(Capsule(), interactive: true)
+            .agaraGlass(Capsule(), interactive: true)
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -177,9 +177,9 @@ struct NutritionView: View {
         HStack(spacing: 24) {
             dayChevron("chevron.left", enabled: true) { shiftDay(-1) }
             Text(dayTitle.uppercased())
-                .font(PulseFont.caption2)
+                .font(AgaraFont.caption2)
                 .tracking(1.4)
-                .foregroundStyle(PulseColors.textMuted)
+                .foregroundStyle(AgaraColors.textMuted)
                 .frame(minWidth: 110)
             dayChevron("chevron.right", enabled: !isToday) { shiftDay(1) }
         }
@@ -189,10 +189,10 @@ struct NutritionView: View {
     private func dayChevron(_ symbol: String, enabled: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(PulseFont.footnote.weight(.semibold))
-                .foregroundStyle(enabled ? PulseColors.textPrimary : PulseColors.textMuted.opacity(0.4))
+                .font(AgaraFont.footnote.weight(.semibold))
+                .foregroundStyle(enabled ? AgaraColors.textPrimary : AgaraColors.textMuted.opacity(0.4))
                 .frame(width: 32, height: 32)
-                .pulseGlass(Circle(), interactive: true)
+                .agaraGlass(Circle(), interactive: true)
                 .minTapTarget(visualSize: 32)
         }
         .buttonStyle(.plain)
@@ -224,16 +224,16 @@ struct NutritionView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text(headerText(mealType, groupEntries))
-                    .font(PulseFont.caption2)
+                    .font(AgaraFont.caption2)
                     .tracking(1.4)
-                    .foregroundStyle(PulseColors.textMuted)
+                    .foregroundStyle(AgaraColors.textMuted)
                 Spacer()
                 Button { logSheet = LogSheetRequest(mealType: mealType) } label: {
                     Image(systemName: "plus")
-                        .font(PulseFont.footnote.weight(.semibold))
-                        .foregroundStyle(PulseColors.textPrimary)
+                        .font(AgaraFont.footnote.weight(.semibold))
+                        .foregroundStyle(AgaraColors.textPrimary)
                         .frame(width: 28, height: 28)
-                        .pulseGlass(Circle(), interactive: true)
+                        .agaraGlass(Circle(), interactive: true)
                         .minTapTarget(visualSize: 28)
                 }
                 .buttonStyle(.plain)

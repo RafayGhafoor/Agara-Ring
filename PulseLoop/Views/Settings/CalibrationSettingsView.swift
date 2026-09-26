@@ -51,7 +51,7 @@ struct CalibrationSettingsView: View {
                     if supportsGlucose { glucoseSection }
                     if ble.state != .connected {
                         Text("Not connected — calibration is saved and applied the next time your ring syncs.")
-                            .font(PulseFont.caption).foregroundStyle(PulseColors.textMuted)
+                            .font(AgaraFont.caption).foregroundStyle(AgaraColors.textMuted)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 } else {
@@ -65,7 +65,7 @@ struct CalibrationSettingsView: View {
             .padding()
         }
         .scrollDismissesKeyboard(.interactively)
-        .background(PulseColors.background)
+        .background(AgaraColors.background)
         .pageChrome("Calibration")
         .onAppear(perform: loadIfNeeded)
         .alert(
@@ -101,7 +101,7 @@ struct CalibrationSettingsView: View {
         }
 
         Text(bpLastMeasuredCopy)
-            .font(PulseFont.caption).foregroundStyle(PulseColors.textMuted)
+            .font(AgaraFont.caption).foregroundStyle(AgaraColors.textMuted)
             .frame(maxWidth: .infinity, alignment: .leading)
 
         PrimaryButton(
@@ -115,7 +115,7 @@ struct CalibrationSettingsView: View {
             SecondaryButton(title: "Reset", systemImage: "arrow.counterclockwise") { pendingReset = .bloodPressure }
         }
         if let bpStatus {
-            Text(bpStatus).font(PulseFont.caption).foregroundStyle(PulseColors.textMuted)
+            Text(bpStatus).font(AgaraFont.caption).foregroundStyle(AgaraColors.textMuted)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
@@ -151,7 +151,7 @@ struct CalibrationSettingsView: View {
             SecondaryButton(title: "Reset", systemImage: "arrow.counterclockwise") { pendingReset = .glucose }
         }
         if let glucoseStatus {
-            Text(glucoseStatus).font(PulseFont.caption).foregroundStyle(PulseColors.textMuted)
+            Text(glucoseStatus).font(AgaraFont.caption).foregroundStyle(AgaraColors.textMuted)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
@@ -161,7 +161,7 @@ struct CalibrationSettingsView: View {
             TextField("0", text: text)
                 .keyboardType(.numberPad)
                 .multilineTextAlignment(.trailing)
-                .foregroundStyle(PulseColors.textPrimary)
+                .foregroundStyle(AgaraColors.textPrimary)
                 .frame(maxWidth: 90)
         }
     }

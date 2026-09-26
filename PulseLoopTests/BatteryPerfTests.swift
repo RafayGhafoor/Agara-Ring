@@ -17,18 +17,18 @@ final class BatteryPerfTests: XCTestCase {
         subscriber.flush()
         let row = try XCTUnwrap(MetricsRepository.activity(on: now, context: context))
         let stamp = row.updatedAt
-        let token = PulseDataChange.shared.token
+        let token = AgaraDataChange.shared.token
 
         subscriber.persist(.activityUpdate(timestamp: now, steps: 1200, distanceMeters: 800, calories: 50))
         subscriber.flush()
         XCTAssertEqual(row.updatedAt, stamp, "an unchanged poll must not touch the row")
         XCTAssertFalse(context.hasChanges)
-        XCTAssertEqual(PulseDataChange.shared.token, token, "no data-change signal for an unchanged poll")
+        XCTAssertEqual(AgaraDataChange.shared.token, token, "no data-change signal for an unchanged poll")
 
         subscriber.persist(.activityUpdate(timestamp: now, steps: 1300, distanceMeters: 860, calories: 55))
         subscriber.flush()
         XCTAssertEqual(row.steps, 1300)
-        XCTAssertNotEqual(PulseDataChange.shared.token, token)
+        XCTAssertNotEqual(AgaraDataChange.shared.token, token)
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<DerivedUpdateRow>()), 0,
                        "no audit row per activity update any more")
     }
@@ -42,10 +42,10 @@ final class BatteryPerfTests: XCTestCase {
         subscriber.persist(.syncProgress(stage: "done"))   // clears the in-process dedup set
         subscriber.flush()
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<DerivedUpdateRow>()), 0)
-        let token = PulseDataChange.shared.token
+        let token = AgaraDataChange.shared.token
         subscriber.persist(.historyMeasurement(kind: .spo2, value: 97, timestamp: ts))
         subscriber.flush()
-        XCTAssertEqual(PulseDataChange.shared.token, token)
+        XCTAssertEqual(AgaraDataChange.shared.token, token)
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<PulseLoop.Measurement>()), 1)
     }
 
@@ -53,11 +53,11 @@ final class BatteryPerfTests: XCTestCase {
     func testNonDataEventsDoNotSignalAChange() throws {
         let context = try TestSupport.makeContext()
         let subscriber = EventPersistenceSubscriber(context: context)
-        let token = PulseDataChange.shared.token
+        let token = AgaraDataChange.shared.token
         subscriber.persist(.heartRateComplete(timestamp: Date()))
         subscriber.persist(.chargingState(false))
         subscriber.flush()
-        XCTAssertEqual(PulseDataChange.shared.token, token)
+        XCTAssertEqual(AgaraDataChange.shared.token, token)
     }
 
     // MARK: Rate limits

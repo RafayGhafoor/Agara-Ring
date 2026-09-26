@@ -200,7 +200,7 @@ nonisolated struct StravaHTTPClient: StravaAPIClient {
         if let description, !description.isEmpty { fields.append(("description", description)) }
         if trainer { fields.append(("trainer", "1")) }
 
-        let boundary = "pulseloop-\(UUID().uuidString)"
+        let boundary = "agara-\(UUID().uuidString)"
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         request.httpBody = Self.multipartBody(
             boundary: boundary,

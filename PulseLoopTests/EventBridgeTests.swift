@@ -1,7 +1,7 @@
 import XCTest
 @testable import PulseLoop
 
-/// The pure `RingDecodedEvent → [PulseEvent]` mapping, including its sanity gates.
+/// The pure `RingDecodedEvent → [AgaraEvent]` mapping, including its sanity gates.
 final class EventBridgeTests: XCTestCase {
 
     // MARK: - History-measurement plausibility

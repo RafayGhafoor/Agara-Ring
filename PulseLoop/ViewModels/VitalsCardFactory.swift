@@ -70,7 +70,7 @@ enum VitalsCardFactory {
         return VitalCardViewModel(
             metric: metric, title: metric.title,
             valueText: valueText, unitText: latest != nil && !metric.unit.isEmpty ? metric.unit : nil,
-            statusText: interp?.displayLabel ?? "No data", statusColor: interp?.statusColor ?? PulseColors.textMuted,
+            statusText: interp?.displayLabel ?? "No data", statusColor: interp?.statusColor ?? AgaraColors.textMuted,
             subtitleText: subtitle,
             samples: halfHourly(samples, quality: quality), zones: VitalsThresholdEngine.zones(for: metric, profile: profile),
             yDomain: domain, referenceBands: [], dashedRules: [],
@@ -96,7 +96,7 @@ enum VitalsCardFactory {
             metric: metric, title: metric.title,
             valueText: latest.map { BloodComponents.format($0, metric: metric, unit: unit) } ?? "--",
             unitText: latest != nil ? BloodComponents.displayUnit(metric: metric, unit: unit) : nil,
-            statusText: interp?.displayLabel ?? "No estimate", statusColor: interp?.statusColor ?? PulseColors.textMuted,
+            statusText: interp?.displayLabel ?? "No estimate", statusColor: interp?.statusColor ?? AgaraColors.textMuted,
             subtitleText: AgaraCopy.estimateDisclaimer,
             samples: chart, zones: [], yDomain: domain, referenceBands: [], dashedRules: [],
             trend: TrendSummary.compute(samples: chart, metric: metric),
@@ -123,7 +123,7 @@ enum VitalsCardFactory {
         return VitalCardViewModel(
             metric: .heartRate, title: MetricKind.heartRate.title,
             valueText: valueText, unitText: latest != nil ? "bpm range" : nil,
-            statusText: interp?.displayLabel ?? "No reading", statusColor: interp?.statusColor ?? PulseColors.textMuted,
+            statusText: interp?.displayLabel ?? "No reading", statusColor: interp?.statusColor ?? AgaraColors.textMuted,
             subtitleText: "\(resting) · \(peak)",
             samples: halfHourly(samples, quality: quality), zones: VitalsThresholdEngine.zones(for: .heartRate, profile: profile),
             yDomain: domain, referenceBands: bands(for: .heartRate, profile: profile, domain: domain),
@@ -148,7 +148,7 @@ enum VitalsCardFactory {
         return VitalCardViewModel(
             metric: .spo2, title: MetricKind.spo2.title,
             valueText: TodayInsights.averageLabel(samples, latest), unitText: latest != nil ? "% avg" : nil,
-            statusText: interp?.displayLabel ?? "No reading", statusColor: interp?.statusColor ?? PulseColors.textMuted,
+            statusText: interp?.displayLabel ?? "No reading", statusColor: interp?.statusColor ?? AgaraColors.textMuted,
             subtitleText: subtitle,
             // Spot readings stay individual; logged all day (5-min history) they average per half hour.
             samples: chart.count > ChartAxes.denseDayReadings ? halfHourly(samples, quality: quality) : chart,
@@ -189,7 +189,7 @@ enum VitalsCardFactory {
         return VitalCardViewModel(
             metric: .hrv, title: MetricKind.hrv.title,
             valueText: latest.map { "\(Int($0))" } ?? "--", unitText: latest != nil ? "ms" : nil,
-            statusText: interp?.displayLabel ?? "Building baseline", statusColor: interp?.statusColor ?? PulseColors.textMuted,
+            statusText: interp?.displayLabel ?? "Building baseline", statusColor: interp?.statusColor ?? AgaraColors.textMuted,
             subtitleText: subtitle,
             samples: halfHourly(samples, quality: quality), zones: VitalsThresholdEngine.zones(for: .hrv, profile: profile, baseline: baseline),
             yDomain: domain, referenceBands: bands, dashedRules: baseline.map { [$0.mean] } ?? [],
@@ -212,7 +212,7 @@ enum VitalsCardFactory {
         return VitalCardViewModel(
             metric: metric, title: metric.title,
             valueText: latest.map { "\(Int($0))" } ?? "--", unitText: nil,
-            statusText: interp?.displayLabel ?? "No data", statusColor: interp?.statusColor ?? PulseColors.textMuted,
+            statusText: interp?.displayLabel ?? "No data", statusColor: interp?.statusColor ?? AgaraColors.textMuted,
             subtitleText: subtitle,
             samples: chart, zones: VitalsThresholdEngine.zones(for: metric, profile: profile),
             yDomain: 0...100, referenceBands: [], dashedRules: [],
@@ -255,7 +255,7 @@ enum VitalsCardFactory {
         return VitalCardViewModel(
             metric: .temperature, title: MetricKind.temperature.title,
             valueText: formatted?.value ?? "--", unitText: formatted?.unit,
-            statusText: interp?.displayLabel ?? "No data", statusColor: interp?.statusColor ?? PulseColors.textMuted,
+            statusText: interp?.displayLabel ?? "No data", statusColor: interp?.statusColor ?? AgaraColors.textMuted,
             subtitleText: nil,
             samples: chart, zones: zones,
             yDomain: domain, referenceBands: [], dashedRules: [],
@@ -283,7 +283,7 @@ enum VitalsCardFactory {
         return VitalCardViewModel(
             metric: .bloodPressure, title: MetricKind.bloodPressure.title,
             valueText: valueText, unitText: (sys != nil) ? "mmHg" : nil,
-            statusText: interp?.displayLabel ?? "No reading", statusColor: interp?.statusColor ?? PulseColors.textMuted,
+            statusText: interp?.displayLabel ?? "No reading", statusColor: interp?.statusColor ?? AgaraColors.textMuted,
             // Systolic/diastolic values are now shown under each of the two gauges on the card, so the
             // subtitle would just repeat them.
             subtitleText: nil,
@@ -327,7 +327,7 @@ enum VitalsCardFactory {
         return VitalCardViewModel(
             metric: .glucose, title: MetricKind.glucose.title,
             valueText: formatted?.value ?? "--", unitText: formatted?.unit,
-            statusText: interp?.displayLabel ?? "No estimate", statusColor: interp?.statusColor ?? PulseColors.textMuted,
+            statusText: interp?.displayLabel ?? "No estimate", statusColor: interp?.statusColor ?? AgaraColors.textMuted,
             subtitleText: "Estimated wellness metric",
             samples: chart, zones: zones,
             yDomain: domain, referenceBands: [ReferenceBand(lower: gv(70), upper: gv(140), colorToken: .mint)], dashedRules: [],

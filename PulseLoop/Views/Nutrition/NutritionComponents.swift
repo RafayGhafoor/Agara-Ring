@@ -27,9 +27,9 @@ enum MacroKind: CaseIterable {
 
     var color: Color {
         switch self {
-        case .protein: return PulseColors.macroProtein
-        case .carbs: return PulseColors.macroCarbs
-        case .fat: return PulseColors.macroFat
+        case .protein: return AgaraColors.macroProtein
+        case .carbs: return AgaraColors.macroCarbs
+        case .fat: return AgaraColors.macroFat
         }
     }
 }
@@ -42,7 +42,7 @@ enum NutritionFormat {
     /// over, danger well over — mirrors the vitals zone idiom (never a hard red at 101%).
     static func progressColor(consumed: Double, goal: Double, base: Color) -> Color {
         guard goal > 0, consumed > goal else { return base }
-        return consumed <= goal * 1.15 ? PulseColors.warning : PulseColors.danger
+        return consumed <= goal * 1.15 ? AgaraColors.warning : AgaraColors.danger
     }
 }
 
@@ -64,7 +64,7 @@ struct MacroMiniBar: View {
     var body: some View {
         GeometryReader { proxy in
             ZStack(alignment: .leading) {
-                Capsule().fill(PulseColors.elevated)
+                Capsule().fill(AgaraColors.elevated)
                 if fraction > 0 {
                     Capsule()
                         .fill(goal.map { NutritionFormat.progressColor(consumed: value, goal: $0, base: color) } ?? color)
@@ -94,11 +94,11 @@ struct MacroMiniBars: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 3) {
                 Text(kind.letter)
-                    .font(PulseFont.micro.weight(.semibold))
+                    .font(AgaraFont.micro.weight(.semibold))
                     .foregroundStyle(kind.color)
                 Text(goal.map { "\(NutritionFormat.grams(value))/\($0)g" } ?? "\(NutritionFormat.grams(value))g")
-                    .font(PulseFont.micro.weight(.medium).monospacedDigit())
-                    .foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.micro.weight(.medium).monospacedDigit())
+                    .foregroundStyle(AgaraColors.textMuted)
                     .lineLimit(1)
             }
             MacroMiniBar(value: value, goal: goal.map(Double.init), color: kind.color)
@@ -122,18 +122,18 @@ struct MacroProgressRow: View {
                     Circle().fill(kind.color).frame(width: 8, height: 8)
                         .shadow(color: kind.color.opacity(0.7), radius: 5)
                     Text(kind.name)
-                        .font(PulseFont.subheadline)
-                        .foregroundStyle(PulseColors.textPrimary)
+                        .font(AgaraFont.subheadline)
+                        .foregroundStyle(AgaraColors.textPrimary)
                 }
                 Spacer()
                 HStack(alignment: .firstTextBaseline, spacing: 2) {
                     Text(NutritionFormat.grams(consumed))
-                        .font(PulseFont.numberM)
+                        .font(AgaraFont.numberM)
                         .monospacedDigit()
-                        .foregroundStyle(PulseColors.textPrimary)
+                        .foregroundStyle(AgaraColors.textPrimary)
                     Text(goal.map { "/ \($0) g" } ?? "g")
-                        .font(PulseFont.caption.weight(.regular).monospacedDigit())
-                        .foregroundStyle(PulseColors.textMuted)
+                        .font(AgaraFont.caption.weight(.regular).monospacedDigit())
+                        .foregroundStyle(AgaraColors.textMuted)
                 }
             }
             MacroMiniBar(value: consumed, goal: goal.map(Double.init), color: kind.color, height: 6)
@@ -154,8 +154,8 @@ struct CalorieBudgetGauge: View {
 
     private var remaining: Double? { goal.map { Double($0) - totals.calories } }
     private var ringColor: Color {
-        goal.map { NutritionFormat.progressColor(consumed: totals.calories, goal: Double($0), base: PulseColors.calories) }
-            ?? PulseColors.calories
+        goal.map { NutritionFormat.progressColor(consumed: totals.calories, goal: Double($0), base: AgaraColors.calories) }
+            ?? AgaraColors.calories
     }
 
     var body: some View {
@@ -163,7 +163,7 @@ struct CalorieBudgetGauge: View {
         // the whole story (Oura/Whoop idiom). Only the goal-less state gets one hint line.
         VStack(spacing: 12) {
             HStack(spacing: 12) {
-                stat("EATEN", NutritionFormat.kcal(totals.calories), PulseColors.calories)
+                stat("EATEN", NutritionFormat.kcal(totals.calories), AgaraColors.calories)
                 Spacer(minLength: 8)
                 ProgressRingView(
                     value: totals.calories,
@@ -175,37 +175,37 @@ struct CalorieBudgetGauge: View {
                     VStack(spacing: 2) {
                         if let remaining {
                             Text(NutritionFormat.kcal(max(0, remaining)))
-                                .font(PulseFont.numberXL)
+                                .font(AgaraFont.numberXL)
                                 .monospacedDigit()
-                                .foregroundStyle(PulseColors.textPrimary)
+                                .foregroundStyle(AgaraColors.textPrimary)
                             Text(remaining >= 0 ? "LEFT" : "OVER")
-                                .font(PulseFont.micro.weight(.semibold))
+                                .font(AgaraFont.micro.weight(.semibold))
                                 .tracking(1.0)
-                                .foregroundStyle(remaining >= 0 ? PulseColors.textMuted : ringColor)
+                                .foregroundStyle(remaining >= 0 ? AgaraColors.textMuted : ringColor)
                         } else {
                             Text(NutritionFormat.kcal(totals.calories))
-                                .font(PulseFont.numberXL)
+                                .font(AgaraFont.numberXL)
                                 .monospacedDigit()
-                                .foregroundStyle(PulseColors.textPrimary)
+                                .foregroundStyle(AgaraColors.textPrimary)
                             Text("KCAL")
-                                .font(PulseFont.micro.weight(.semibold))
+                                .font(AgaraFont.micro.weight(.semibold))
                                 .tracking(1.0)
-                                .foregroundStyle(PulseColors.textMuted)
+                                .foregroundStyle(AgaraColors.textMuted)
                         }
                     }
                 }
                 Spacer(minLength: 8)
-                stat("BURNED", burned.map { NutritionFormat.kcal($0) } ?? "—", PulseColors.textMuted)
+                stat("BURNED", burned.map { NutritionFormat.kcal($0) } ?? "—", AgaraColors.textMuted)
             }
             if goal == nil {
                 Text("No calorie goal set — add one in Nutrition settings")
-                    .font(PulseFont.caption.weight(.regular))
-                    .foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.caption.weight(.regular))
+                    .foregroundStyle(AgaraColors.textMuted)
             }
         }
         .frame(maxWidth: .infinity)
         .padding(16)
-        .pulseGlass(RoundedRectangle(cornerRadius: PulseRadius.card, style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous))
     }
 
     private func stat(_ label: String, _ value: String, _ color: Color) -> some View {
@@ -213,7 +213,7 @@ struct CalorieBudgetGauge: View {
             Text(value)
                 .activityValueStyle(size: 24)
             Text(label)
-                .font(PulseFont.micro.weight(.semibold))
+                .font(AgaraFont.micro.weight(.semibold))
                 .tracking(1.0)
                 .foregroundStyle(color)
         }
@@ -247,16 +247,16 @@ struct ProvenanceBadge: View {
 
     private var color: Color {
         switch source {
-        case .offBarcode, .offSearch: return PulseColors.success
-        case .llmEstimate: return PulseColors.accent
-        case .manual: return PulseColors.textSecondary
+        case .offBarcode, .offSearch: return AgaraColors.success
+        case .llmEstimate: return AgaraColors.accent
+        case .manual: return AgaraColors.textSecondary
         }
     }
 
     var body: some View {
         HStack(spacing: 4) {
-            Image(systemName: symbol).font(PulseFont.micro)
-            Text(label).font(PulseFont.micro.weight(.semibold)).tracking(0.4)
+            Image(systemName: symbol).font(AgaraFont.micro)
+            Text(label).font(AgaraFont.micro.weight(.semibold)).tracking(0.4)
         }
         .foregroundStyle(color)
         .padding(.horizontal, 8)
@@ -288,10 +288,10 @@ struct MealEntryRow: View {
                             .resizable().scaledToFill()
                     } else {
                         Image(systemName: "fork.knife")
-                            .font(PulseFont.title3.weight(.regular))
-                            .foregroundStyle(PulseColors.calories)
+                            .font(AgaraFont.title3.weight(.regular))
+                            .foregroundStyle(AgaraColors.calories)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .background(PulseColors.calories.opacity(0.18))
+                            .background(AgaraColors.calories.opacity(0.18))
                     }
                 }
                 .frame(width: 44, height: 44)
@@ -299,31 +299,31 @@ struct MealEntryRow: View {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack {
                         Text(entry.name)
-                            .font(PulseFont.subheadline.weight(.semibold))
-                            .foregroundStyle(PulseColors.textPrimary)
+                            .font(AgaraFont.subheadline.weight(.semibold))
+                            .foregroundStyle(AgaraColors.textPrimary)
                             .lineLimit(1)
                         Spacer()
                         Text(SleepFormat.clockTime(entry.timestamp))
-                            .font(PulseFont.caption2.weight(.regular).monospacedDigit())
-                            .foregroundStyle(PulseColors.textMuted)
+                            .font(AgaraFont.caption2.weight(.regular).monospacedDigit())
+                            .foregroundStyle(AgaraColors.textMuted)
                     }
                     // One headline metric per row (kcal); macros live on the detail page —
                     // per-row P/C/F tags made the list noisy. The sparkle stays: it's the
                     // at-a-glance provenance marker for unreviewed AI estimates.
                     HStack(spacing: 8) {
                         Text("\(NutritionFormat.kcal(entry.calories)) kcal")
-                            .font(PulseFont.caption.weight(.regular).monospacedDigit())
-                            .foregroundStyle(PulseColors.textMuted)
+                            .font(AgaraFont.caption.weight(.regular).monospacedDigit())
+                            .foregroundStyle(AgaraColors.textMuted)
                         if entry.source == .llmEstimate && !entry.userEdited {
                             Image(systemName: "sparkles")
-                                .font(PulseFont.micro)
-                                .foregroundStyle(PulseColors.accent)
+                                .font(AgaraFont.micro)
+                                .foregroundStyle(AgaraColors.accent)
                         }
                     }
                 }
             }
             .padding(16)
-            .pulseGlass(RoundedRectangle(cornerRadius: PulseRadius.card, style: .continuous))
+            .agaraGlass(RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -339,18 +339,18 @@ struct NutritionEmptyStateCard: View {
     var body: some View {
         VStack(spacing: 8) {
             Image(systemName: "fork.knife.circle")
-                .font(PulseFont.largeTitle.weight(.regular))
-                .foregroundStyle(PulseColors.calories)
+                .font(AgaraFont.largeTitle.weight(.regular))
+                .foregroundStyle(AgaraColors.calories)
             Text("Log your first meal")
-                .font(PulseFont.bodyEmphasis)
-                .foregroundStyle(PulseColors.textPrimary)
+                .font(AgaraFont.bodyEmphasis)
+                .foregroundStyle(AgaraColors.textPrimary)
             Text("Add meals manually, search the food database, or describe them to your coach. Everything stays on your device.")
-                .font(PulseFont.caption.weight(.regular))
-                .foregroundStyle(PulseColors.textMuted)
+                .font(AgaraFont.caption.weight(.regular))
+                .foregroundStyle(AgaraColors.textMuted)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
         .padding(20)
-        .pulseGlass(RoundedRectangle(cornerRadius: PulseRadius.card, style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous))
     }
 }

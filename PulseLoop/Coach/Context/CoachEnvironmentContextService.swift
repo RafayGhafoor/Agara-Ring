@@ -24,7 +24,7 @@ final class CoachEnvironmentContextService: NSObject, CLLocationManagerDelegate 
     private let manager = CLLocationManager()
     private let weather = WeatherService.shared
     private let defaults: UserDefaults
-    private static let cacheKey = "pulseloop.coach.environment.v1"
+    private static let cacheKey = "pulseloop.coach.environment.v1" // install-bound: pre-rename name kept so existing installs keep it
 
     /// Weather is re-fetched after this; the city/coords are kept much longer.
     private let weatherTTL: TimeInterval = 30 * 60

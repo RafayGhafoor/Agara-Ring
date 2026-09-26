@@ -69,12 +69,12 @@ struct SettingsView: View {
                     SettingsSection(title: "Metrics", rows: metricsRows)
                     SettingsSection(title: "Resources", rows: resourcesRows(caps))
                 }
-                .pulseGlassContainer(spacing: 20)
+                .agaraGlassContainer(spacing: 20)
             }
             .padding()
         }
-        .background(PulseColors.background)
-        .pulseScrollEdges(.top) // content frosts/dissolves under the top as it scrolls
+        .background(AgaraColors.background)
+        .agaraScrollEdges(.top) // content frosts/dissolves under the top as it scrolls
         .navigationTitle("Settings")
     }
 
@@ -85,13 +85,13 @@ struct SettingsView: View {
     /// configures coach alerts, so it's a coach sub-feature).
     private func generalRows(_ caps: Set<WearableCapability>) -> [SettingsRowItem] {
         var rows: [SettingsRowItem] = [
-            SettingsRowItem(icon: "person.crop.circle", tint: PulseColors.accent, title: "User Profile") {
+            SettingsRowItem(icon: "person.crop.circle", tint: AgaraColors.accent, title: "User Profile") {
                 path.append(AppRoute.settingsProfile)
             },
-            SettingsRowItem(icon: "lungs", tint: PulseColors.hrv, title: "Physiology") {
+            SettingsRowItem(icon: "lungs", tint: AgaraColors.hrv, title: "Physiology") {
                 path.append(AppRoute.settingsPhysiology)
             },
-            SettingsRowItem(icon: "paintpalette", tint: PulseColors.accent, title: "Appearance",
+            SettingsRowItem(icon: "paintpalette", tint: AgaraColors.accent, title: "Appearance",
                             trailingValue: appearanceTrailing) {
                 path.append(AppRoute.settingsAppearance)
             }
@@ -100,16 +100,16 @@ struct SettingsView: View {
         // declare `.measurementInterval` (the ring's 0x16 pref, the ring's 0x19 background-monitoring
         // cadence). Sits under Physiology, above the AI Coach.
         if caps.contains(.measurementInterval) {
-            rows.append(SettingsRowItem(icon: "timer", tint: PulseColors.spo2, title: "Measurement Frequency") {
+            rows.append(SettingsRowItem(icon: "timer", tint: AgaraColors.spo2, title: "Measurement Frequency") {
                 path.append(AppRoute.settingsMeasurement)
             })
         }
-        rows.append(SettingsRowItem(icon: "sparkles", tint: PulseColors.accent, title: "AI Coach", trailingValue: coachTrailing) {
+        rows.append(SettingsRowItem(icon: "sparkles", tint: AgaraColors.accent, title: "AI Coach", trailingValue: coachTrailing) {
             path.append(AppRoute.settingsCoach)
         })
         // Check-ins are a coach sub-feature — only show the row once the coach is on.
         if coachStore.settings.coachMasterEnabled {
-            rows.append(SettingsRowItem(icon: "bell.badge", tint: PulseColors.warning, title: "Coach Check-Ins", trailingValue: notificationsTrailing) {
+            rows.append(SettingsRowItem(icon: "bell.badge", tint: AgaraColors.warning, title: "Coach Check-Ins", trailingValue: notificationsTrailing) {
                 path.append(AppRoute.settingsNotifications)
             })
         }
@@ -118,25 +118,25 @@ struct SettingsView: View {
 
     private var metricsRows: [SettingsRowItem] {
         [
-            SettingsRowItem(icon: "circle.circle", tint: PulseColors.accent, title: "Today") {
+            SettingsRowItem(icon: "circle.circle", tint: AgaraColors.accent, title: "Today") {
                 path.append(AppRoute.settingsToday)
             },
-            SettingsRowItem(icon: "heart.text.square", tint: PulseColors.heartRate, title: "Vitals") {
+            SettingsRowItem(icon: "heart.text.square", tint: AgaraColors.heartRate, title: "Vitals") {
                 path.append(AppRoute.settingsVitals)
             },
-            SettingsRowItem(icon: "waveform.path.ecg", tint: PulseColors.heartRate, title: "Heart Rate Zones") {
+            SettingsRowItem(icon: "waveform.path.ecg", tint: AgaraColors.heartRate, title: "Heart Rate Zones") {
                 path.append(AppRoute.settingsHeartRateZones)
             },
-            SettingsRowItem(icon: "figure.run", tint: PulseColors.success, title: "Activity Tracking") {
+            SettingsRowItem(icon: "figure.run", tint: AgaraColors.success, title: "Activity Tracking") {
                 path.append(AppRoute.settingsActivityTracking)
             },
-            SettingsRowItem(icon: "target", tint: PulseColors.readiness, title: "Goals") {
+            SettingsRowItem(icon: "target", tint: AgaraColors.readiness, title: "Goals") {
                 path.append(AppRoute.settingsGoals)
             },
             // The only discovery point for the (off-by-default) nutrition feature — every other
             // surface hides entirely while the master toggle is off.
             SettingsRowItem(
-                icon: "fork.knife", tint: PulseColors.calories, title: "Nutrition",
+                icon: "fork.knife", tint: AgaraColors.calories, title: "Nutrition",
                 trailingValue: NutritionPrefsStore.shared.prefs.masterEnabled ? "On" : "Off"
             ) {
                 path.append(AppRoute.settingsNutrition)
@@ -148,30 +148,30 @@ struct SettingsView: View {
         var rows: [SettingsRowItem] = []
         // the ring-only: only the 56ff the ring measures BP / blood sugar, so Calibration hides otherwise.
         if caps.contains(.bloodPressure) || caps.contains(.bloodSugar) {
-            rows.append(SettingsRowItem(icon: "slider.horizontal.3", tint: PulseColors.bloodPressure, title: "Calibration") {
+            rows.append(SettingsRowItem(icon: "slider.horizontal.3", tint: AgaraColors.bloodPressure, title: "Calibration") {
                 path.append(AppRoute.settingsCalibration)
             })
         }
         // Hidden until unlocked by tapping the version 7× in About (like Android's developer options).
         if developerUnlocked {
-            rows.append(SettingsRowItem(icon: "ladybug", tint: PulseColors.danger, title: "Developer") {
+            rows.append(SettingsRowItem(icon: "ladybug", tint: AgaraColors.danger, title: "Developer") {
                 path.append(AppRoute.debug)
             })
         }
-        rows.append(SettingsRowItem(icon: "heart.fill", tint: PulseColors.heartRate, title: "Apple Health") {
+        rows.append(SettingsRowItem(icon: "heart.fill", tint: AgaraColors.heartRate, title: "Apple Health") {
             path.append(AppRoute.settingsHealth)
         })
         rows.append(SettingsRowItem(icon: "figure.run", tint: Color(hex: "#FC4C02"), title: "Strava") {
             path.append(AppRoute.settingsStrava)
         })
         // Agara cloud account: login + health-data sync to the PocketBase backend.
-        rows.append(SettingsRowItem(icon: "icloud.fill", tint: PulseColors.hrv, title: "Agara Cloud") {
+        rows.append(SettingsRowItem(icon: "icloud.fill", tint: AgaraColors.hrv, title: "Agara Cloud") {
             path.append(AppRoute.settingsCloud)
         })
-        rows.append(SettingsRowItem(icon: "lock.shield", tint: PulseColors.success, title: "Privacy & Data") {
+        rows.append(SettingsRowItem(icon: "lock.shield", tint: AgaraColors.success, title: "Privacy & Data") {
             path.append(AppRoute.settingsPrivacyData)
         })
-        rows.append(SettingsRowItem(icon: "info.circle", tint: PulseColors.textMuted, title: "About \(AgaraCopy.aboutProductName)") {
+        rows.append(SettingsRowItem(icon: "info.circle", tint: AgaraColors.textMuted, title: "About \(AgaraCopy.aboutProductName)") {
             path.append(AppRoute.settingsAbout)
         })
         return rows

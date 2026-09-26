@@ -7,7 +7,7 @@ import Foundation
 /// There is exactly one family: the Veepoo/TK20 **Agara Ring**. The other families this app once
 /// supported are gone — case, coordinator and driver. An old install can still be holding a raw value
 /// for one of them in `deviceTypeRaw`; such a device row is dropped at launch rather than reinterpreted,
-/// because this build cannot drive that ring (`Agara` in `PulseServices` does the dropping).
+/// because this build cannot drive that ring (`Agara` in `AgaraServices` does the dropping).
 enum RingDeviceType: String, Codable, CaseIterable, Sendable {
     /// Veepoo / Agara Rings — the "H Ring" vendor app (`cn.hring.veepoo`), sold here as the Agara Ring.
     /// F008/F002 GATT, A1 session auth, DF/E0 history. See `VeepooCoordinator` and
@@ -82,7 +82,7 @@ extension WearableCoordinator {
     ///   (an old firmware simply sends a shorter array), and a device whose metric card vanished mid-
     ///   session because of a truncated reply is a worse bug than one extra card.
     /// - A bitmap can never *add* a capability the family didn't list. A bit we mapped wrongly, or a
-    ///   metric PulseLoop has no decoder for, therefore cannot conjure a UI surface out of nothing.
+    ///   metric Agara Ring has no decoder for, therefore cannot conjure a UI surface out of nothing.
     func refinedCapabilities(bitmapDerived: Set<WearableCapability>) -> Set<WearableCapability> {
         capabilities.union(bitmapGatedCapabilities.intersection(bitmapDerived))
     }

@@ -1,7 +1,7 @@
 import SwiftUI
 
 // The app ↔ home-screen-widget data contract. Compiled into BOTH the app target and the
-// PulseLoopWidgets extension (like `WorkoutActivityAttributes.swift`), so keep it free of SwiftData
+// widget extension (like `WorkoutActivityAttributes.swift`), so keep it free of SwiftData
 // models and app services.
 //
 // Why a JSON snapshot instead of sharing the SwiftData store: widget data only changes when the app
@@ -19,8 +19,8 @@ import SwiftUI
 
 // MARK: - Storage location
 
-enum PulseWidgetStore {
-    static let suite = "group.xyz.sakshambhutani.pulseloop2"
+enum AgaraWidgetStore {
+    static let suite = "group.xyz.sakshambhutani.pulseloop2" // install-bound: App Group id (entitlements + provisioning)
     static let fileName = "widget-snapshot.json"
     /// Shared-defaults key holding the Date of the last background-triggered timeline reload
     /// (foreground reloads are free of the WidgetKit refresh budget; background ones are throttled).

@@ -15,7 +15,7 @@ import os
 final class AgaraCloudSync {
     static let shared = AgaraCloudSync()
     private let client = AgaraCloudClient.shared
-    private static let log = Logger(subsystem: "com.pulseloop.lab", category: "agara-sync")
+    private static let log = Logger(subsystem: "com.agara.ring", category: "agara-sync")
 
     // MARK: Push
 
@@ -120,8 +120,8 @@ final class AgaraCloudSync {
         for decoded in events {
             // trustTimestamps: cloud rows are our own server's, not the ring's year-less clock, so a
             // restored two-month account must not be trimmed by the history-window guard.
-            for pulseEvent in RingEventBridge.events(for: decoded, trustTimestamps: true) {
-                await PulseEventBus.shared.publish(pulseEvent)
+            for agaraEvent in RingEventBridge.events(for: decoded, trustTimestamps: true) {
+                await AgaraEventBus.shared.publish(agaraEvent)
             }
         }
         Self.log.info("pulled \(days.count) days, \(measurements.count) measurements")

@@ -22,31 +22,31 @@ struct VitalsResultsView: View {
         var tiles: [VitalTile] = []
         if let hr = v.heartRate {
             tiles.append(.init(name: "Heart Rate", value: "\(hr)", unit: "bpm",
-                               icon: "heart.fill", tint: PulseColors.heartRate))
+                               icon: "heart.fill", tint: AgaraColors.heartRate))
         }
         if let bp = v.bloodPressure {
             tiles.append(.init(name: "Blood Pressure", value: "\(bp.systolic)/\(bp.diastolic)", unit: "mmHg",
-                               icon: "heart.text.square", tint: PulseColors.bloodPressure))
+                               icon: "heart.text.square", tint: AgaraColors.bloodPressure))
         }
         if let spo2 = v.spo2 {
             tiles.append(.init(name: "Blood Oxygen", value: "\(spo2)", unit: "%",
-                               icon: "lungs.fill", tint: PulseColors.spo2))
+                               icon: "lungs.fill", tint: AgaraColors.spo2))
         }
         if let fatigue = v.fatigue {
             tiles.append(.init(name: "Fatigue", value: "\(fatigue)", unit: "",
-                               icon: "battery.25", tint: PulseColors.warning))
+                               icon: "battery.25", tint: AgaraColors.warning))
         }
         if let stress = v.stress {
             tiles.append(.init(name: "Stress", value: "\(stress)", unit: "",
-                               icon: "bolt.fill", tint: PulseColors.stress))
+                               icon: "bolt.fill", tint: AgaraColors.stress))
         }
         if let hrv = v.hrv {
             tiles.append(.init(name: "HRV", value: "\(hrv)", unit: "ms",
-                               icon: "waveform.path.ecg", tint: PulseColors.hrv))
+                               icon: "waveform.path.ecg", tint: AgaraColors.hrv))
         }
         if let sugar = v.bloodSugarMgdl {
             tiles.append(.init(name: "Blood Sugar", value: "\(Int(sugar.rounded()))", unit: "mg/dL",
-                               icon: "drop.fill", tint: PulseColors.bloodSugar))
+                               icon: "drop.fill", tint: AgaraColors.bloodSugar))
         }
         return tiles
     }
@@ -57,14 +57,14 @@ struct VitalsResultsView: View {
         VStack(alignment: .leading, spacing: 20) {
             HStack(spacing: 10) {
                 Image(systemName: "checkmark")
-                    .font(PulseFont.footnote.weight(.bold))
-                    .foregroundStyle(PulseColors.success)
+                    .font(AgaraFont.footnote.weight(.bold))
+                    .foregroundStyle(AgaraColors.success)
                     .frame(width: 30, height: 30)
-                    .background(PulseColors.success.opacity(0.10), in: Circle())
-                    .overlay(Circle().stroke(PulseColors.success.opacity(0.3), lineWidth: 1))
+                    .background(AgaraColors.success.opacity(0.10), in: Circle())
+                    .overlay(Circle().stroke(AgaraColors.success.opacity(0.3), lineWidth: 1))
                 Text("Reading complete")
-                    .font(PulseFont.bodyEmphasis)
-                    .foregroundStyle(PulseColors.textPrimary)
+                    .font(AgaraFont.bodyEmphasis)
+                    .foregroundStyle(AgaraColors.textPrimary)
                 Spacer(minLength: 0)
             }
 
@@ -87,25 +87,25 @@ struct VitalsResultsView: View {
     private func card(_ tile: VitalTile) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 7) {
-                Image(systemName: tile.icon).font(PulseFont.footnote).foregroundStyle(tile.tint)
+                Image(systemName: tile.icon).font(AgaraFont.footnote).foregroundStyle(tile.tint)
                 Text(tile.name)
-                    .font(PulseFont.caption)
-                    .foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.caption)
+                    .foregroundStyle(AgaraColors.textMuted)
                     .lineLimit(1).minimumScaleFactor(0.75)
             }
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(tile.value)
-                    .font(PulseFont.numberXL).monospacedDigit()
-                    .foregroundStyle(PulseColors.textPrimary)
+                    .font(AgaraFont.numberXL).monospacedDigit()
+                    .foregroundStyle(AgaraColors.textPrimary)
                     .lineLimit(1).minimumScaleFactor(0.5)
                 if !tile.unit.isEmpty {
-                    Text(tile.unit).font(PulseFont.caption).foregroundStyle(PulseColors.textMuted)
+                    Text(tile.unit).font(AgaraFont.caption).foregroundStyle(AgaraColors.textMuted)
                 }
             }
         }
         .padding(18)
         .frame(maxWidth: .infinity, minHeight: 108, alignment: .leading)
-        .background(PulseColors.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(PulseColors.borderSubtle, lineWidth: 1))
+        .background(AgaraColors.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(AgaraColors.borderSubtle, lineWidth: 1))
     }
 }

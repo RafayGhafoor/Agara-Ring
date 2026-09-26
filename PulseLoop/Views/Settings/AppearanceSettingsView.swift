@@ -34,9 +34,9 @@ struct AppearanceSettingsView: View {
 
                 VStack(alignment: .leading, spacing: 7) {
                     Text("COLOURS")
-                        .font(PulseFont.caption.weight(.semibold))
+                        .font(AgaraFont.caption.weight(.semibold))
                         .tracking(0.8)
-                        .foregroundStyle(PulseColors.textMuted)
+                        .foregroundStyle(AgaraColors.textMuted)
                         .padding(.leading, 16)
                         .accessibilityAddTraits(.isHeader)
                     LazyVGrid(columns: columns, spacing: 12) {
@@ -52,15 +52,15 @@ struct AppearanceSettingsView: View {
                     }
                     if store.storedFlavour == nil {
                         Text("Until you pick, colours follow your profile.")
-                            .font(PulseFont.caption.weight(.regular))
-                            .foregroundStyle(PulseColors.textMuted)
+                            .font(AgaraFont.caption.weight(.regular))
+                            .foregroundStyle(AgaraColors.textMuted)
                             .padding(.horizontal, 16)
                     }
                 }
             }
             .padding()
         }
-        .background(PulseColors.background)
+        .background(AgaraColors.background)
         .navigationTitle("Appearance")
     }
 }
@@ -99,18 +99,18 @@ private struct FlavourSwatchCard: View {
 
                 HStack {
                     Text(flavour.name)
-                        .font(PulseFont.callout.weight(.semibold))
-                        .foregroundStyle(PulseColors.textPrimary)
+                        .font(AgaraFont.callout.weight(.semibold))
+                        .foregroundStyle(AgaraColors.textPrimary)
                     Spacer()
                     Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                        .foregroundStyle(selected ? PulseColors.accent : PulseColors.textMuted)
+                        .foregroundStyle(selected ? AgaraColors.accent : AgaraColors.textMuted)
                 }
             }
             .padding(10)
-            .background(PulseColors.card, in: RoundedRectangle(cornerRadius: PulseRadius.compact, style: .continuous))
+            .background(AgaraColors.card, in: RoundedRectangle(cornerRadius: AgaraShape.radiusCompact, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: PulseRadius.compact, style: .continuous)
-                    .strokeBorder(selected ? PulseColors.accent : PulseColors.borderSubtle, lineWidth: selected ? 2 : 1)
+                RoundedRectangle(cornerRadius: AgaraShape.radiusCompact, style: .continuous)
+                    .strokeBorder(selected ? AgaraColors.accent : AgaraColors.borderSubtle, lineWidth: selected ? 2 : 1)
             }
             .contentShape(Rectangle())
         }

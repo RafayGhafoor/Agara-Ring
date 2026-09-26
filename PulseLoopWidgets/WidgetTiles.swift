@@ -24,13 +24,13 @@ struct WidgetTileHeader: View {
             Text(label.uppercased())
                 .font(AgaraFont.face(11, .medium))
                 .tracking(0.6)
-                .foregroundStyle(PulseColors.textMuted)
+                .foregroundStyle(AgaraColors.textMuted)
                 .lineLimit(1)
             if let asOf {
                 Spacer(minLength: 4)
                 Text(asOf, style: .time)
                     .font(AgaraFont.face(9, .medium))
-                    .foregroundStyle(PulseColors.textMuted.opacity(0.8))
+                    .foregroundStyle(AgaraColors.textMuted.opacity(0.8))
             }
         }
     }
@@ -48,7 +48,7 @@ extension SnapshotEntry {
 struct WidgetEmptyMessage: View {
     let systemImage: String
     let message: String
-    var color: Color = PulseColors.textMuted
+    var color: Color = AgaraColors.textMuted
 
     var body: some View {
         VStack(spacing: 6) {
@@ -56,7 +56,7 @@ struct WidgetEmptyMessage: View {
                 .font(.system(size: 24)).foregroundStyle(color.opacity(0.7))
             Text(message)
                 .font(AgaraFont.face(13, .medium))
-                .foregroundStyle(PulseColors.textPrimary)
+                .foregroundStyle(AgaraColors.textPrimary)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -73,9 +73,9 @@ struct WidgetActivityContent: View {
     private var values: [(label: String, text: String, color: Color)] {
         guard let payload, !rolledOver else { return [] }
         let rows: [(String, String?, Color)] = [
-            ("STEPS", payload.stepsText, PulseColors.steps),
-            (payload.distanceUnitLabel, payload.distanceText, PulseColors.distance),
-            ("CAL", payload.caloriesText, PulseColors.calories),
+            ("STEPS", payload.stepsText, AgaraColors.steps),
+            (payload.distanceUnitLabel, payload.distanceText, AgaraColors.distance),
+            ("CAL", payload.caloriesText, AgaraColors.calories),
         ]
         return rows.compactMap { label, text, color in text.map { (label, $0, color) } }
     }
@@ -83,17 +83,17 @@ struct WidgetActivityContent: View {
     private var rings: [ActivityRing] {
         let active = rolledOver ? nil : payload
         return [
-            ActivityRing(value: active?.steps, goal: active?.stepsGoal ?? 1, color: PulseColors.steps),
-            ActivityRing(value: active?.distanceDisplay, goal: active?.distanceGoalDisplay ?? 1, color: PulseColors.distance),
-            ActivityRing(value: active?.calories, goal: active?.caloriesGoal ?? 1, color: PulseColors.calories),
+            ActivityRing(value: active?.steps, goal: active?.stepsGoal ?? 1, color: AgaraColors.steps),
+            ActivityRing(value: active?.distanceDisplay, goal: active?.distanceGoalDisplay ?? 1, color: AgaraColors.distance),
+            ActivityRing(value: active?.calories, goal: active?.caloriesGoal ?? 1, color: AgaraColors.calories),
         ]
     }
 
     var body: some View {
         if values.isEmpty {
             WidgetEmptyMessage(systemImage: "figure.walk",
-                               message: rolledOver ? "No data yet today" : "Open PulseLoop to sync",
-                               color: PulseColors.steps)
+                               message: rolledOver ? "No data yet today" : "Open Agara Ring to sync",
+                               color: AgaraColors.steps)
         } else {
             HStack(spacing: 10) {
                 ActivityRingsView(rings: rings, size: 88, stroke: 9, spacing: 4)
@@ -139,17 +139,17 @@ struct WidgetNutritionContent: View {
                         .font(AgaraFont.face(30, .semibold))
                         .monospacedDigit()
                         .foregroundStyle(payload.kcalGoal > 0 && payload.kcal > payload.kcalGoal
-                                         ? Color(hex: payload.ringColorHex) : PulseColors.textPrimary)
+                                         ? Color(hex: payload.ringColorHex) : AgaraColors.textPrimary)
                         .minimumScaleFactor(0.7)
                         .lineLimit(1)
                     Text(payload.centerLabel)
                         .font(AgaraFont.face(10, .semibold))
                         .tracking(1.0)
-                        .foregroundStyle(PulseColors.textMuted)
+                        .foregroundStyle(AgaraColors.textMuted)
                 }
                 let segments = fuelSegments(payload)
                 if segments.isEmpty {
-                    Capsule().fill(PulseColors.elevated).frame(height: 12)
+                    Capsule().fill(AgaraColors.elevated).frame(height: 12)
                 } else {
                     SleepStageBar(segments: segments)
                         .frame(height: 28)
@@ -159,19 +159,19 @@ struct WidgetNutritionContent: View {
                     Text("\(Int(payload.kcal.rounded()).formatted())")
                         .font(AgaraFont.face(13, .semibold))
                         .monospacedDigit()
-                        .foregroundStyle(PulseColors.textPrimary)
+                        .foregroundStyle(AgaraColors.textPrimary)
                     Text("EATEN")
                         .font(AgaraFont.face(9, .semibold)).tracking(0.8)
-                        .foregroundStyle(PulseColors.calories)
+                        .foregroundStyle(AgaraColors.calories)
                     if payload.kcalGoal > 0 {
                         Spacer(minLength: 4)
                         Text("\(Int(payload.kcalGoal.rounded()).formatted())")
                             .font(AgaraFont.face(13, .semibold))
                             .monospacedDigit()
-                            .foregroundStyle(PulseColors.textSecondary)
+                            .foregroundStyle(AgaraColors.textSecondary)
                         Text("GOAL")
                             .font(AgaraFont.face(9, .semibold)).tracking(0.8)
-                            .foregroundStyle(PulseColors.textMuted)
+                            .foregroundStyle(AgaraColors.textMuted)
                     }
                 }
                 .lineLimit(1)
@@ -180,8 +180,8 @@ struct WidgetNutritionContent: View {
         } else {
             WidgetEmptyMessage(systemImage: "fork.knife",
                                message: rolledOver || (active?.kcal == 0) ? "No meals yet today"
-                                   : (payload == nil ? "Enable nutrition in PulseLoop" : "Open PulseLoop to sync"),
-                               color: PulseColors.calories)
+                                   : (payload == nil ? "Enable nutrition in Agara Ring" : "Open Agara Ring to sync"),
+                               color: AgaraColors.calories)
         }
     }
 }
@@ -196,26 +196,26 @@ struct WidgetActivityFullContent: View {
 
     var body: some View {
         if payload == nil {
-            WidgetEmptyMessage(systemImage: "figure.walk", message: "Open PulseLoop to sync",
-                               color: PulseColors.steps)
+            WidgetEmptyMessage(systemImage: "figure.walk", message: "Open Agara Ring to sync",
+                               color: AgaraColors.steps)
         } else {
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 14) {
                     HStack(alignment: .top, spacing: 12) {
-                        metric(label: "Steps", value: active?.stepsText ?? "—", unit: nil, color: PulseColors.steps)
+                        metric(label: "Steps", value: active?.stepsText ?? "—", unit: nil, color: AgaraColors.steps)
                         metric(label: "Distance", value: active?.distanceText ?? "—",
                                unit: active?.distanceText == nil ? nil : active?.distanceUnitLabel.lowercased(),
-                               color: PulseColors.distance)
+                               color: AgaraColors.distance)
                     }
                     metric(label: "Calories", value: active?.caloriesText ?? "—",
-                           unit: active?.caloriesText == nil ? nil : "cal", color: PulseColors.calories)
+                           unit: active?.caloriesText == nil ? nil : "cal", color: AgaraColors.calories)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 ActivityRingsView(rings: [
-                    ActivityRing(value: active?.steps, goal: active?.stepsGoal ?? 1, color: PulseColors.steps),
-                    ActivityRing(value: active?.distanceDisplay, goal: active?.distanceGoalDisplay ?? 1, color: PulseColors.distance),
-                    ActivityRing(value: active?.calories, goal: active?.caloriesGoal ?? 1, color: PulseColors.calories),
+                    ActivityRing(value: active?.steps, goal: active?.stepsGoal ?? 1, color: AgaraColors.steps),
+                    ActivityRing(value: active?.distanceDisplay, goal: active?.distanceGoalDisplay ?? 1, color: AgaraColors.distance),
+                    ActivityRing(value: active?.calories, goal: active?.caloriesGoal ?? 1, color: AgaraColors.calories),
                 ], size: 112, stroke: 11, spacing: 5)
                 .frame(width: 112, height: 112)
             }
@@ -234,7 +234,7 @@ struct WidgetActivityFullContent: View {
                 Text(value)
                     .activityValueStyle(size: 32)
                 if let unit {
-                    Text(unit).font(AgaraFont.face(14, .medium)).foregroundStyle(PulseColors.textMuted)
+                    Text(unit).font(AgaraFont.face(14, .medium)).foregroundStyle(AgaraColors.textMuted)
                 }
             }
         }
@@ -254,7 +254,7 @@ struct WidgetSleepContent: View {
                 Text(payload.durationText)
                     .font(AgaraFont.face(30, .semibold))
                     .monospacedDigit()
-                    .foregroundStyle(PulseColors.textPrimary)
+                    .foregroundStyle(AgaraColors.textPrimary)
                     .minimumScaleFactor(0.7)
                     .lineLimit(1)
                 SleepStageBar(segments: payload.segments.map {
@@ -265,16 +265,16 @@ struct WidgetSleepContent: View {
                     Text("\(payload.score)")
                         .font(AgaraFont.face(32, .semibold))
                         .monospacedDigit()
-                        .foregroundStyle(PulseColors.textPrimary)
+                        .foregroundStyle(AgaraColors.textPrimary)
                     Text("SCORE")
                         .font(AgaraFont.face(10, .semibold)).tracking(1.0)
-                        .foregroundStyle(PulseColors.textMuted)
+                        .foregroundStyle(AgaraColors.textMuted)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         } else {
             WidgetEmptyMessage(systemImage: "moon.zzz", message: "No sleep recorded",
-                               color: PulseColors.sleep)
+                               color: AgaraColors.sleep)
         }
     }
 }
@@ -291,17 +291,17 @@ struct WidgetChartContent: View {
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(payload.valueText)
                     .font(AgaraFont.face(26, .semibold)).monospacedDigit()
-                    .foregroundStyle(PulseColors.textPrimary)
+                    .foregroundStyle(AgaraColors.textPrimary)
                     .minimumScaleFactor(0.7).lineLimit(1)
                 if let unit = payload.unitText {
-                    Text(unit).font(AgaraFont.face(11, .medium)).foregroundStyle(PulseColors.textMuted)
+                    Text(unit).font(AgaraFont.face(11, .medium)).foregroundStyle(AgaraColors.textMuted)
                         .lineLimit(1)
                 }
             }
             Spacer(minLength: 0)
             if payload.isEmpty {
                 Text(payload.statusText)
-                    .font(AgaraFont.face(12)).foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.face(12)).foregroundStyle(AgaraColors.textMuted)
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 ZoneLineChart(
@@ -360,15 +360,15 @@ struct WidgetBloodPressureContent: View {
     var body: some View {
         if payload.isEmpty || payload.systolic == nil || payload.diastolic == nil {
             WidgetEmptyMessage(systemImage: "heart.text.square", message: payload.statusText,
-                               color: PulseColors.bloodPressure)
+                               color: AgaraColors.bloodPressure)
         } else {
             HStack(spacing: 6) {
                 ringColumn(title: "SYS", value: payload.systolic!, domain: 80...190,
                            zones: payload.systolicZones.map(\.metricZone),
-                           fallback: PulseColors.bloodPressure)
+                           fallback: AgaraColors.bloodPressure)
                 ringColumn(title: "DIA", value: payload.diastolic!, domain: 50...130,
                            zones: payload.diastolicZones.map(\.metricZone),
-                           fallback: PulseColors.bloodPressure.opacity(0.7))
+                           fallback: AgaraColors.bloodPressure.opacity(0.7))
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -389,7 +389,7 @@ struct WidgetBloodPressureContent: View {
             )
             Text(title)
                 .font(AgaraFont.face(10, .semibold)).tracking(0.8)
-                .foregroundStyle(PulseColors.textMuted)
+                .foregroundStyle(AgaraColors.textMuted)
         }
         .frame(maxWidth: .infinity)
     }
@@ -430,7 +430,7 @@ struct WidgetMetricTileView: View {
                 }
             } else {
                 WidgetEmptyMessage(systemImage: "waveform.path",
-                                   message: entry.snapshot == nil ? "Open PulseLoop to sync" : "No data",
+                                   message: entry.snapshot == nil ? "Open Agara Ring to sync" : "No data",
                                    color: metric.accentColor)
             }
         }

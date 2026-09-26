@@ -35,18 +35,18 @@ struct DebugView: View {
                         Text(String(format: "0x%02x", packet.commandId))
                         Spacer()
                         Text(packet.confidence.debugLabel)
-                            .foregroundStyle(packet.confidence == .unknown ? PulseColors.warning : PulseColors.success)
+                            .foregroundStyle(packet.confidence == .unknown ? AgaraColors.warning : AgaraColors.success)
                     }
-                    .font(PulseFont.caption.monospacedDigit())
+                    .font(AgaraFont.caption.monospacedDigit())
                     Text(packet.hexPayload)
-                        .font(PulseFont.caption2.monospacedDigit())
-                        .foregroundStyle(PulseColors.textMuted)
+                        .font(AgaraFont.caption2.monospacedDigit())
+                        .foregroundStyle(AgaraColors.textMuted)
                         .lineLimit(2)
                     Text(packet.decodedKind ?? "unknown")
-                        .font(PulseFont.caption)
-                        .foregroundStyle(PulseColors.textSecondary)
+                        .font(AgaraFont.caption)
+                        .foregroundStyle(AgaraColors.textSecondary)
                 }
-                .listRowBackground(PulseColors.card)
+                .listRowBackground(AgaraColors.card)
             }
             .scrollContentBackground(.hidden)
 
@@ -72,7 +72,7 @@ struct DebugView: View {
             .padding(.horizontal)
         }
         .id(refreshToken)
-        .background(PulseColors.background)
+        .background(AgaraColors.background)
         .pageChrome("Debug")
     }
 
@@ -83,13 +83,13 @@ struct DebugView: View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Show tips again")
-                    .font(PulseFont.body)
-                    .foregroundStyle(PulseColors.textPrimary)
+                    .font(AgaraFont.body)
+                    .foregroundStyle(AgaraColors.textPrimary)
                 Text(tipsReset
                      ? "Tips will show again."
                      : "The one-time hints (Measure, then the ring chip) appear again the next time their screen is shown.")
-                    .font(PulseFont.caption)
-                    .foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.caption)
+                    .foregroundStyle(AgaraColors.textMuted)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 8)
@@ -97,14 +97,14 @@ struct DebugView: View {
                 CoachMarkStore.shared.resetAll()
                 tipsReset = true
             }
-            .font(PulseFont.body.weight(.semibold))
-            .foregroundStyle(PulseColors.accent)
+            .font(AgaraFont.body.weight(.semibold))
+            .foregroundStyle(AgaraColors.accent)
             .buttonStyle(.plain)
             .frame(minHeight: 44)
             .accessibilityLabel("Show tips again")
         }
         .padding(12)
-        .background(PulseColors.card, in: RoundedRectangle(cornerRadius: 12))
+        .background(AgaraColors.card, in: RoundedRectangle(cornerRadius: 12))
     }
 
     private var packetFilter: DebugPacketFilter {
@@ -130,12 +130,12 @@ struct ComponentGalleryView: View {
                     summary: "You're at 9,342 steps, 7h 35m of sleep, and your latest reading is 72 bpm.",
                     chips: [ToneChip(label: "Steps +12%", tone: .up), ToneChip(label: "HR collected", tone: .neutral), ToneChip(label: "Sleep synced", tone: .neutral)]
                 )
-                MetricCardButton(metric: "hr", label: "Heart rate", value: "72", unit: "bpm", color: PulseColors.heartRate, sparkline: [62, 68, 72, 70, 76])
+                MetricCardButton(metric: "hr", label: "Heart rate", value: "72", unit: "bpm", color: AgaraColors.heartRate, sparkline: [62, 68, 72, 70, 76])
                 StatusCopy(title: "Empty state", body: "Reusable loading, empty, and error states use the same card hierarchy.")
             }
             .padding()
         }
-        .background(PulseColors.background)
+        .background(AgaraColors.background)
         .navigationTitle("Components")
     }
 }

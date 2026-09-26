@@ -410,7 +410,7 @@ enum LocalCapabilityProbe {
         "tools": [[
             "type": "function",
             "function": [
-                "name": "pulseloop_probe",
+                "name": "agara_probe",
                 "description": "Capability probe. Do not call.",
                 "parameters": ["type": "object", "properties": [String: Any]()],
             ],
@@ -423,7 +423,7 @@ enum LocalCapabilityProbe {
         "response_format": [
             "type": "json_schema",
             "json_schema": [
-                "name": "pulseloop_probe",
+                "name": "agara_probe",
                 "strict": true,
                 "schema": [
                     "type": "object",

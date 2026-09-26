@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        PulseLoop is built around a **device-agnostic driver layer** (`RingProtocol/`), so adding a
+        Agara Ring is built around a **device-agnostic driver layer** (`RingProtocol/`), so adding a
         wearable means writing a driver that declares its capabilities and decodes its packets.
         The more protocol detail you can give here, the more likely this gets implemented — and the
         easier it is to do it without owning the hardware. See [CONTRIBUTING.md](../CONTRIBUTING.md)

@@ -153,13 +153,13 @@ struct WorkoutMetricsSections: View {
     private var header: some View {
         VStack(spacing: 8) {
             Image(systemName: ActivityMeta.icon(session.type))
-                .font(PulseFont.largeTitle.weight(.regular)).foregroundStyle(PulseColors.accent)
-                .frame(width: 72, height: 72).background(PulseColors.accentSoft, in: Circle())
+                .font(AgaraFont.largeTitle.weight(.regular)).foregroundStyle(AgaraColors.accent)
+                .frame(width: 72, height: 72).background(AgaraColors.accentSoft, in: Circle())
             if savedBadge {
-                Text("WORKOUT SAVED").font(PulseFont.caption2).tracking(1.8).foregroundStyle(PulseColors.accent)
+                Text("WORKOUT SAVED").font(AgaraFont.caption2).tracking(1.8).foregroundStyle(AgaraColors.accent)
             }
-            Text(ActivityMeta.label(session.type)).font(PulseFont.title2).foregroundStyle(PulseColors.textPrimary)
-            Text(dateRange).font(PulseFont.footnote.weight(.regular)).foregroundStyle(PulseColors.textMuted)
+            Text(ActivityMeta.label(session.type)).font(AgaraFont.title2).foregroundStyle(AgaraColors.textPrimary)
+            Text(dateRange).font(AgaraFont.footnote.weight(.regular)).foregroundStyle(AgaraColors.textMuted)
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 8)
@@ -186,17 +186,17 @@ struct WorkoutMetricsSections: View {
     private func chartCard<Content: View>(title: String, footnote: String?, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(title).font(PulseFont.caption2).tracking(1.0).foregroundStyle(PulseColors.textMuted)
+                Text(title).font(AgaraFont.caption2).tracking(1.0).foregroundStyle(AgaraColors.textMuted)
                 Spacer()
                 if let footnote {
-                    Text(footnote).font(PulseFont.caption2.monospacedDigit()).foregroundStyle(PulseColors.textMuted)
+                    Text(footnote).font(AgaraFont.caption2.monospacedDigit()).foregroundStyle(AgaraColors.textMuted)
                 }
             }
             content()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .pulseGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     private var hrFootnote: String? {
@@ -250,16 +250,16 @@ private struct SummaryHeroBand: View {
         if session.showsGpsHeadline {
             let d = session.distanceMeters.map { UnitsFormatter.distance(meters: $0, units: units) }
             return [
-                Metric(value: d?.value ?? "—", label: (d?.unit ?? "km").uppercased(), tint: PulseColors.distance),
-                Metric(value: dur, label: "DURATION", tint: PulseColors.textPrimary),
+                Metric(value: d?.value ?? "—", label: (d?.unit ?? "km").uppercased(), tint: AgaraColors.distance),
+                Metric(value: dur, label: "DURATION", tint: AgaraColors.textPrimary),
                 thirdGpsMetric
             ]
         } else {
             let cals = session.calories.map { "\(Int($0))" } ?? "—"
             return [
-                Metric(value: dur, label: "DURATION", tint: PulseColors.textPrimary),
-                Metric(value: durationSeconds.map { "\($0 / 60)" } ?? "—", label: "ACTIVE MIN", tint: PulseColors.success),
-                Metric(value: cals, label: "CALORIES", tint: PulseColors.calories)
+                Metric(value: dur, label: "DURATION", tint: AgaraColors.textPrimary),
+                Metric(value: durationSeconds.map { "\($0 / 60)" } ?? "—", label: "ACTIVE MIN", tint: AgaraColors.success),
+                Metric(value: cals, label: "CALORIES", tint: AgaraColors.calories)
             ]
         }
     }
@@ -271,16 +271,16 @@ private struct SummaryHeroBand: View {
             if let meters = session.distanceMeters, let seconds = durationSeconds, seconds > 0, meters >= 50 {
                 let mps = meters / Double(seconds)
                 let value = units == .imperial ? String(format: "%.1f", mps * 2.23694) : String(format: "%.1f", mps * 3.6)
-                return Metric(value: value, label: units == .imperial ? "MPH" : "KM/H", tint: PulseColors.accent)
+                return Metric(value: value, label: units == .imperial ? "MPH" : "KM/H", tint: AgaraColors.accent)
             }
-            return Metric(value: "—", label: units == .imperial ? "MPH" : "KM/H", tint: PulseColors.accent)
+            return Metric(value: "—", label: units == .imperial ? "MPH" : "KM/H", tint: AgaraColors.accent)
         }
         if set.showsPace {
             let paceUnit = UnitsFormatter.paceUnit(units)
             let pace = ActivityMeta.pace(distanceMeters: session.distanceMeters, durationSeconds: durationSeconds, units: units)
-            return Metric(value: pace?.replacingOccurrences(of: " \(paceUnit)", with: "") ?? "—", label: "PACE \(paceUnit)", tint: PulseColors.accent)
+            return Metric(value: pace?.replacingOccurrences(of: " \(paceUnit)", with: "") ?? "—", label: "PACE \(paceUnit)", tint: AgaraColors.accent)
         }
-        return Metric(value: session.calories.map { "\(Int($0))" } ?? "—", label: "CALORIES", tint: PulseColors.calories)
+        return Metric(value: session.calories.map { "\(Int($0))" } ?? "—", label: "CALORIES", tint: AgaraColors.calories)
     }
 
     var body: some View {
@@ -288,22 +288,22 @@ private struct SummaryHeroBand: View {
             ForEach(Array(metrics.enumerated()), id: \.offset) { index, m in
                 VStack(spacing: 6) {
                     Text(m.value)
-                        .font(PulseFont.greeting).monospacedDigit()
+                        .font(AgaraFont.greeting).monospacedDigit()
                         .foregroundStyle(m.tint)
                         .minimumScaleFactor(0.5).lineLimit(1)
                     Text(m.label)
-                        .font(PulseFont.micro).tracking(0.8)
-                        .foregroundStyle(PulseColors.textMuted)
+                        .font(AgaraFont.micro).tracking(0.8)
+                        .foregroundStyle(AgaraColors.textMuted)
                 }
                 .frame(maxWidth: .infinity)
                 if index != metrics.count - 1 {
-                    Rectangle().fill(PulseColors.borderSubtle).frame(width: 1, height: 40)
+                    Rectangle().fill(AgaraColors.borderSubtle).frame(width: 1, height: 40)
                 }
             }
         }
         .padding(.vertical, 18).padding(.horizontal, 8)
         .frame(maxWidth: .infinity)
-        .pulseGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 }
 
@@ -324,34 +324,34 @@ private struct SplitsTable: View {
             let fastest = splits.min() ?? 0
             let slowest = splits.max() ?? 1
             VStack(alignment: .leading, spacing: 10) {
-                Text("SPLITS").font(PulseFont.caption2).tracking(1.0).foregroundStyle(PulseColors.textMuted)
+                Text("SPLITS").font(AgaraFont.caption2).tracking(1.0).foregroundStyle(AgaraColors.textMuted)
                 ForEach(Array(splits.enumerated()), id: \.offset) { index, seconds in
                     let isFastest = seconds == fastest
                     let frac = slowest > fastest ? (seconds - fastest) / (slowest - fastest) : 0
                     HStack(spacing: 12) {
                         Text("\(splitLabel) \(index + 1)")
-                            .font(PulseFont.caption.monospacedDigit())
-                            .foregroundStyle(PulseColors.textSecondary)
+                            .font(AgaraFont.caption.monospacedDigit())
+                            .foregroundStyle(AgaraColors.textSecondary)
                             .frame(width: 44, alignment: .leading)
                         GeometryReader { geo in
                             ZStack(alignment: .leading) {
-                                Capsule().fill(PulseColors.cardSoft)
-                                Capsule().fill(isFastest ? PulseColors.accent : PulseColors.distance)
+                                Capsule().fill(AgaraColors.cardSoft)
+                                Capsule().fill(isFastest ? AgaraColors.accent : AgaraColors.distance)
                                     // Faster = longer bar (invert the fraction).
                                     .frame(width: max(8, geo.size.width * (0.25 + 0.75 * (1 - frac))))
                             }
                         }
                         .frame(height: 8)
                         Text(paceLabel(seconds))
-                            .font(PulseFont.caption.monospacedDigit())
-                            .foregroundStyle(isFastest ? PulseColors.accent : PulseColors.textPrimary)
+                            .font(AgaraFont.caption.monospacedDigit())
+                            .foregroundStyle(isFastest ? AgaraColors.accent : AgaraColors.textPrimary)
                             .frame(width: 64, alignment: .trailing)
                     }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(16)
-            .pulseGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .agaraGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
     }
 
@@ -373,17 +373,17 @@ private struct HRZonesCard: View {
         let total = zones.reduce(0) { $0 + $1.seconds }
         if total > 0 {
             VStack(alignment: .leading, spacing: 10) {
-                Text("HEART RATE ZONES").font(PulseFont.caption2).tracking(1.0).foregroundStyle(PulseColors.textMuted)
+                Text("HEART RATE ZONES").font(AgaraFont.caption2).tracking(1.0).foregroundStyle(AgaraColors.textMuted)
                 ForEach(zones.reversed()) { zone in
                     let frac = zone.seconds / total
                     let pctText = "\(Int((frac * 100).rounded()))%"
                     HStack(spacing: 10) {
                         Text(zone.name)
-                            .font(PulseFont.caption.weight(.regular)).foregroundStyle(PulseColors.textSecondary)
+                            .font(AgaraFont.caption.weight(.regular)).foregroundStyle(AgaraColors.textSecondary)
                             .frame(width: 120, alignment: .leading).lineLimit(1)
                         GeometryReader { geo in
                             ZStack(alignment: .leading) {
-                                Capsule().fill(PulseColors.cardSoft)
+                                Capsule().fill(AgaraColors.cardSoft)
                                 Capsule().fill(zone.color)
                                     .frame(width: max(frac > 0 ? 6 : 0, geo.size.width * frac))
                             }
@@ -391,15 +391,15 @@ private struct HRZonesCard: View {
                         .frame(height: 8)
                         // Percentage of the workout spent in this zone.
                         Text(zone.seconds >= 1 ? pctText : "—")
-                            .font(PulseFont.caption.weight(.semibold).monospacedDigit())
-                            .foregroundStyle(zone.seconds >= 1 ? PulseColors.textPrimary : PulseColors.textMuted)
+                            .font(AgaraFont.caption.weight(.semibold).monospacedDigit())
+                            .foregroundStyle(zone.seconds >= 1 ? AgaraColors.textPrimary : AgaraColors.textMuted)
                             .frame(width: 48, alignment: .trailing)
                     }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(16)
-            .pulseGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .agaraGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
     }
 }

@@ -9,7 +9,7 @@ its own session handshake, and its own DF/E0 history transfer.
 
 The full byte-level reference lives in
 [`tasks/veepoo-protocol.md`](../../tasks/veepoo-protocol.md). This page is the
-PulseLoop implementation note.
+Agara Ring implementation note.
 
 ## At a glance
 
@@ -25,7 +25,7 @@ PulseLoop implementation note.
 
 ## How it was verified
 
-PulseLoop's decoder is a port of the standalone BLE harness this project built
+Agara Ring's decoder is a port of the standalone BLE harness this project built
 against the real ring (in `tools/`, run from a Bluetooth-authorized Terminal —
 CoreBluetooth access over SSH is denied, so a signed `.app` wrapper is used for
 headless runs; see the lab-workflow section of `tasks/veepoo-protocol.md`).

@@ -16,7 +16,7 @@ enum NotificationPromptBuilder {
         }
 
         return """
-        You write a single push notification for PulseLoop, a smart-ring health app. It is a short, friendly daily check-in grounded in the user's own ring data.
+        You write a single push notification for \(AgaraCopy.appName), a smart-ring health app. It is a short, friendly daily check-in grounded in the user's own ring data.
 
         \(slotGuidance)
 
@@ -59,7 +59,7 @@ enum NotificationPromptBuilder {
 
     static func anomalySystemPrompt() -> String {
         """
-        You write a single, gentle push notification for PulseLoop, a smart-ring health app, because something in the user's recent data is worth a soft heads-up.
+        You write a single, gentle push notification for \(AgaraCopy.appName), a smart-ring health app, because something in the user's recent data is worth a soft heads-up.
 
         Output ONLY JSON {"title","body","tip","followUp","skip"}:
         - title: ≤ ~6 words, calm and non-alarming.

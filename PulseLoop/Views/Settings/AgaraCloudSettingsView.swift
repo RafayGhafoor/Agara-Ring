@@ -15,7 +15,7 @@ struct AgaraCloudSettingsView: View {
     @State private var statusText: String?
     @State private var lastSync = UserDefaults.standard.object(forKey: "agara.lastSync") as? Date
     @State private var showSignOutDialog = false
-    private static let log = Logger(subsystem: "com.pulseloop.lab", category: "agara-settings")
+    private static let log = Logger(subsystem: "com.agara.ring", category: "agara-settings")
 
     private var signedIn: Bool { client.isSignedIn }
 
@@ -56,15 +56,15 @@ struct AgaraCloudSettingsView: View {
                         .disabled(working || !canSubmit)
                         if !password.isEmpty && !passwordValid {
                             Text("Password must be at least 8 characters.")
-                                .font(PulseFont.caption)
-                                .foregroundStyle(PulseColors.danger)
+                                .font(AgaraFont.caption)
+                                .foregroundStyle(AgaraColors.danger)
                         } else if !email.isEmpty && !emailValid {
                             Text("Enter a valid email address.")
-                                .font(PulseFont.caption)
-                                .foregroundStyle(PulseColors.danger)
+                                .font(AgaraFont.caption)
+                                .foregroundStyle(AgaraColors.danger)
                         } else if passwordValid {
                             Text("Password looks good.")
-                                .font(PulseFont.caption)
+                                .font(AgaraFont.caption)
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -80,18 +80,18 @@ struct AgaraCloudSettingsView: View {
 
                 if let lastSync {
                     Text("Last sync: \(lastSync.formatted(date: .abbreviated, time: .shortened))")
-                        .font(PulseFont.footnote)
+                        .font(AgaraFont.footnote)
                         .foregroundStyle(.secondary)
                 }
                 if let statusText {
                     Text(statusText)
-                        .font(PulseFont.footnote)
+                        .font(AgaraFont.footnote)
                         .foregroundStyle(.secondary)
                 }
             }
             .padding(16)
         }
-        .background(PulseColors.background)
+        .background(AgaraColors.background)
         .confirmationDialog(
             "Sign out of Agara Cloud? Your data stays on this device.",
             isPresented: $showSignOutDialog, titleVisibility: .visible

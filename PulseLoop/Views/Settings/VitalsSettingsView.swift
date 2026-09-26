@@ -46,7 +46,7 @@ struct MetricPrefsSettingsView: View {
             }
             .padding()
         }
-        .background(PulseColors.background)
+        .background(AgaraColors.background)
         .navigationTitle(navTitle)
     }
 
@@ -62,8 +62,8 @@ struct MetricPrefsSettingsView: View {
                 .pickerStyle(.segmented)
 
                 Text(store.resolution(for: scope).blurb)
-                    .font(PulseFont.caption)
-                    .foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.caption)
+                    .foregroundStyle(AgaraColors.textMuted)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -77,10 +77,10 @@ struct MetricPrefsSettingsView: View {
             )) {
                 HStack(spacing: 10) {
                     Circle().fill(color).frame(width: 8, height: 8)
-                    Text(label).font(PulseFont.subheadline).foregroundStyle(PulseColors.textPrimary)
+                    Text(label).font(AgaraFont.subheadline).foregroundStyle(AgaraColors.textPrimary)
                 }
             }
-            .tint(PulseColors.accent)
+            .tint(AgaraColors.accent)
         }
     }
 }
@@ -93,15 +93,15 @@ struct VitalsSettingsView: View {
             navTitle: "Vitals",
             visibilityBlurb: "Hidden vitals are removed from the Vitals screen. This doesn't stop the ring from collecting them — your data stays intact.",
             toggleable: [
-                (.heartRate, "Heart rate", PulseColors.heartRate),
-                (.spo2, "Blood oxygen", PulseColors.spo2),
-                (.calories, "Calories", PulseColors.calories),
-                (.stress, "Stress", PulseColors.stress),
-                (.hrv, "HRV", PulseColors.hrv),
-                (.temperature, "Skin temperature", PulseColors.temperature),
-                (.bloodPressureSystolic, "Blood pressure", PulseColors.bloodPressure),
-                (.bloodSugar, "Blood sugar", PulseColors.bloodSugar),
-                (.fatigue, "Fatigue", PulseColors.fatigue),
+                (.heartRate, "Heart rate", AgaraColors.heartRate),
+                (.spo2, "Blood oxygen", AgaraColors.spo2),
+                (.calories, "Calories", AgaraColors.calories),
+                (.stress, "Stress", AgaraColors.stress),
+                (.hrv, "HRV", AgaraColors.hrv),
+                (.temperature, "Skin temperature", AgaraColors.temperature),
+                (.bloodPressureSystolic, "Blood pressure", AgaraColors.bloodPressure),
+                (.bloodSugar, "Blood sugar", AgaraColors.bloodSugar),
+                (.fatigue, "Fatigue", AgaraColors.fatigue),
             ]
         )
     }
@@ -117,17 +117,17 @@ struct TodaySettingsView: View {
             navTitle: "Today",
             visibilityBlurb: "Choose which tiles appear on the Today screen. This only changes the Today layout — your data and the Vitals screen are unaffected.",
             toggleable: [
-                (.steps, "Activity", PulseColors.steps),
-                (.nutrition, "Nutrition", PulseColors.calories),
-                (.sleep, "Sleep", PulseColors.sleep),
-                (.heartRate, "Heart rate", PulseColors.heartRate),
-                (.spo2, "Blood oxygen", PulseColors.spo2),
-                (.hrv, "HRV", PulseColors.hrv),
-                (.temperature, "Skin temperature", PulseColors.temperature),
-                (.stress, "Stress", PulseColors.stress),
-                (.fatigue, "Fatigue", PulseColors.fatigue),
-                (.bloodPressureSystolic, "Blood pressure", PulseColors.bloodPressure),
-                (.bloodSugar, "Blood sugar", PulseColors.bloodSugar),
+                (.steps, "Activity", AgaraColors.steps),
+                (.nutrition, "Nutrition", AgaraColors.calories),
+                (.sleep, "Sleep", AgaraColors.sleep),
+                (.heartRate, "Heart rate", AgaraColors.heartRate),
+                (.spo2, "Blood oxygen", AgaraColors.spo2),
+                (.hrv, "HRV", AgaraColors.hrv),
+                (.temperature, "Skin temperature", AgaraColors.temperature),
+                (.stress, "Stress", AgaraColors.stress),
+                (.fatigue, "Fatigue", AgaraColors.fatigue),
+                (.bloodPressureSystolic, "Blood pressure", AgaraColors.bloodPressure),
+                (.bloodSugar, "Blood sugar", AgaraColors.bloodSugar),
             ]
         )
     }

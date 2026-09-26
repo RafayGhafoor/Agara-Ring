@@ -38,14 +38,14 @@ struct CoachToolTraceDisclosure: View {
                 } label: {
                     HStack(spacing: 5) {
                         Image(systemName: "wrench.and.screwdriver")
-                            .font(PulseFont.micro.weight(.regular))
+                            .font(AgaraFont.micro.weight(.regular))
                         Text(collapsedText)
-                            .font(PulseFont.caption2.weight(.regular))
+                            .font(AgaraFont.caption2.weight(.regular))
                             .lineLimit(1)
                         Image(systemName: expanded ? "chevron.up" : "chevron.down")
-                            .font(PulseFont.nano)
+                            .font(AgaraFont.nano)
                     }
-                    .foregroundStyle(PulseColors.textMuted)
+                    .foregroundStyle(AgaraColors.textMuted)
                 }
                 .buttonStyle(.plain)
 
@@ -65,17 +65,17 @@ struct CoachToolTraceDisclosure: View {
         let isError = call.statusRaw == "error"
         return HStack(alignment: .top, spacing: 6) {
             Image(systemName: isError ? "xmark.circle" : "checkmark.circle")
-                .font(PulseFont.caption2.weight(.regular))
-                .foregroundStyle(isError ? PulseColors.danger : PulseColors.success)
+                .font(AgaraFont.caption2.weight(.regular))
+                .foregroundStyle(isError ? AgaraColors.danger : AgaraColors.success)
                 .padding(.top, 1)
             VStack(alignment: .leading, spacing: 1) {
                 Text(Self.displayLabel(call))
-                    .font(PulseFont.caption2.weight(.regular))
-                    .foregroundStyle(PulseColors.textSecondary)
+                    .font(AgaraFont.caption2.weight(.regular))
+                    .foregroundStyle(AgaraColors.textSecondary)
                 if let summary = call.outputJSON, !summary.isEmpty {
                     Text(summary)
-                        .font(PulseFont.micro.weight(.regular))
-                        .foregroundStyle(PulseColors.textMuted)
+                        .font(AgaraFont.micro.weight(.regular))
+                        .foregroundStyle(AgaraColors.textMuted)
                         .lineLimit(1)
                 }
             }

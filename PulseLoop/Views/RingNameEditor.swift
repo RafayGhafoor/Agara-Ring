@@ -15,11 +15,11 @@ struct RingNameEditor: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
                 Image(systemName: "pencil")
-                    .foregroundStyle(PulseColors.textMuted)
+                    .foregroundStyle(AgaraColors.textMuted)
                     .accessibilityHidden(true)
                 TextField(RingNickname.defaultName, text: $text)
-                    .font(PulseFont.body)
-                    .foregroundStyle(PulseColors.textPrimary)
+                    .font(AgaraFont.body)
+                    .foregroundStyle(AgaraColors.textPrimary)
                     .textInputAutocapitalization(.words)
                     .autocorrectionDisabled()
                     .submitLabel(.done)
@@ -30,7 +30,7 @@ struct RingNameEditor: View {
                 if !text.isEmpty {
                     Button { text = "" } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(PulseColors.textMuted)
+                            .foregroundStyle(AgaraColors.textMuted)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Clear name")
@@ -38,7 +38,7 @@ struct RingNameEditor: View {
             }
             .padding(.horizontal, 14)
             .frame(minHeight: 50)
-            .pulseGlass(RoundedRectangle(cornerRadius: PulseRadius.control, style: .continuous), interactive: true)
+            .agaraGlass(RoundedRectangle(cornerRadius: AgaraShape.radiusControl, style: .continuous), interactive: true)
             .onChange(of: text) { _, new in
                 let clamped = RingNickname.clampInput(new)
                 if clamped != new { text = clamped }
@@ -51,8 +51,8 @@ struct RingNameEditor: View {
                     .monospacedDigit()
                     .accessibilityLabel("\(trimmedCount) of \(RingNickname.maxLength) characters")
             }
-            .font(PulseFont.caption)
-            .foregroundStyle(PulseColors.textMuted)
+            .font(AgaraFont.caption)
+            .foregroundStyle(AgaraColors.textMuted)
             .padding(.horizontal, 4)
 
             ViewThatFits(in: .horizontal) {
@@ -62,7 +62,7 @@ struct RingNameEditor: View {
                     HStack(spacing: 8) { chips(Array(RingNickname.suggestions.suffix(2))) }
                 }
             }
-            .pulseGlassContainer(spacing: 8)
+            .agaraGlassContainer(spacing: 8)
         }
     }
 
@@ -72,13 +72,13 @@ struct RingNameEditor: View {
             let selected = RingNickname.normalized(text) == name
             Button { text = name } label: {
                 Text(name)
-                    .font(PulseFont.subheadline.weight(.semibold))
-                    .foregroundStyle(selected ? PulseColors.textPrimary : PulseColors.textSecondary)
+                    .font(AgaraFont.subheadline.weight(.semibold))
+                    .foregroundStyle(selected ? AgaraColors.textPrimary : AgaraColors.textSecondary)
                     .lineLimit(1)
                     .fixedSize()
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
-                    .pulseGlass(Capsule(), interactive: true, tint: selected ? PulseColors.accent : nil)
+                    .agaraGlass(Capsule(), interactive: true, tint: selected ? AgaraColors.accent : nil)
             }
             .buttonStyle(.plain)
             .frame(minHeight: 44)
@@ -109,13 +109,13 @@ struct RenameRingSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Give your ring a name you'll recognise.")
-                        .font(PulseFont.subheadline)
-                        .foregroundStyle(PulseColors.textMuted)
+                        .font(AgaraFont.subheadline)
+                        .foregroundStyle(AgaraColors.textMuted)
                     RingNameEditor(text: $text, onSubmit: save)
                 }
                 .padding(20)
             }
-            .background(PulseColors.background.ignoresSafeArea())
+            .background(AgaraColors.background.ignoresSafeArea())
             .navigationTitle("Rename ring")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

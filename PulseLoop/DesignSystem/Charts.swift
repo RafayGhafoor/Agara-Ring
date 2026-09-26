@@ -4,13 +4,13 @@ import Charts
 /// Native Swift Charts ports of the web app's Recharts components, plus the
 /// custom sleep hypnogram. Colors/domains mirror `frontend/src/components/charts`.
 
-// MARK: - Sleep stage palette (catalog roles stage_*, same as Android PulseColors.stage*)
+// MARK: - Sleep stage palette (catalog roles stage_*, same as Android AgaraColors.stage*)
 
 enum SleepStageColors {
-    static var deep: Color { PulseColors.stageDeep }
-    static var light: Color { PulseColors.stageLight }
-    static var rem: Color { PulseColors.stageRem }
-    static var awake: Color { PulseColors.stageAwake }
+    static var deep: Color { AgaraColors.stageDeep }
+    static var light: Color { AgaraColors.stageLight }
+    static var rem: Color { AgaraColors.stageRem }
+    static var awake: Color { AgaraColors.stageAwake }
 
     static func color(for stage: SleepStage) -> Color {
         switch stage {
@@ -18,7 +18,7 @@ enum SleepStageColors {
         case .light: return light
         case .rem: return rem
         case .awake: return awake
-        case .unknown: return PulseColors.textMuted
+        case .unknown: return AgaraColors.textMuted
         }
     }
 }
@@ -45,7 +45,7 @@ struct HRLineChart: View {
                 )
                 .interpolationMethod(.monotone)
                 .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
-                .foregroundStyle(PulseColors.heartRate)
+                .foregroundStyle(AgaraColors.heartRate)
             }
         }
         .chartYScale(domain: lo...hi)
@@ -65,10 +65,10 @@ struct StressGaugeChart: View {
     var height: CGFloat = 160
 
     private let zones: [(upper: Double, color: Color, label: String)] = [
-        (29, PulseColors.success, "Relaxed"),
-        (59, PulseColors.info, "Normal"),
-        (79, PulseColors.warning, "Medium"),
-        (100, PulseColors.danger, "High"),
+        (29, AgaraColors.success, "Relaxed"),
+        (59, AgaraColors.info, "Normal"),
+        (79, AgaraColors.warning, "Medium"),
+        (100, AgaraColors.danger, "High"),
     ]
 
     private var zone: (upper: Double, color: Color, label: String) {
@@ -81,7 +81,7 @@ struct StressGaugeChart: View {
             // Background track
             Circle()
                 .trim(from: 0, to: 0.75)
-                .stroke(PulseColors.elevated, style: StrokeStyle(lineWidth: 14, lineCap: .round))
+                .stroke(AgaraColors.elevated, style: StrokeStyle(lineWidth: 14, lineCap: .round))
                 .rotationEffect(.degrees(135))
             // Value arc
             Circle()
@@ -90,10 +90,10 @@ struct StressGaugeChart: View {
                 .rotationEffect(.degrees(135))
             VStack(spacing: 2) {
                 Text("\(Int(value))")
-                    .font(PulseFont.largeTitle).monospacedDigit()
-                    .foregroundStyle(PulseColors.textPrimary)
+                    .font(AgaraFont.largeTitle).monospacedDigit()
+                    .foregroundStyle(AgaraColors.textPrimary)
                 Text(zone.label.uppercased())
-                    .font(PulseFont.micro.weight(.semibold)).tracking(1.2)
+                    .font(AgaraFont.micro.weight(.semibold)).tracking(1.2)
                     .foregroundStyle(zone.color)
             }
         }
@@ -129,18 +129,18 @@ struct HRVTrendBandChart: View {
                     yStart: .value("lo", mean - bandHalf),
                     yEnd: .value("hi", mean + bandHalf)
                 )
-                .foregroundStyle(PulseColors.hrv.opacity(0.12))
+                .foregroundStyle(AgaraColors.hrv.opacity(0.12))
             }
 
             RuleMark(y: .value("mean", mean))
                 .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                .foregroundStyle(PulseColors.hrv.opacity(0.4))
+                .foregroundStyle(AgaraColors.hrv.opacity(0.4))
 
             ForEach(samples) { sample in
                 LineMark(x: .value("Time", sample.timestamp), y: .value("ms", sample.value))
                     .interpolationMethod(.monotone)
                     .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
-                    .foregroundStyle(PulseColors.hrv)
+                    .foregroundStyle(AgaraColors.hrv)
             }
         }
         .chartYScale(domain: lo...hi)
@@ -173,14 +173,14 @@ struct TemperatureRangeChart: View {
                 .interpolationMethod(.monotone)
                 .foregroundStyle(
                     LinearGradient(
-                        colors: [PulseColors.temperature.opacity(0.28), PulseColors.temperature.opacity(0.02)],
+                        colors: [AgaraColors.temperature.opacity(0.28), AgaraColors.temperature.opacity(0.02)],
                         startPoint: .top, endPoint: .bottom
                     )
                 )
                 LineMark(x: .value("Time", sample.timestamp), y: .value("temp", sample.value))
                     .interpolationMethod(.monotone)
                     .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
-                    .foregroundStyle(PulseColors.temperature)
+                    .foregroundStyle(AgaraColors.temperature)
             }
         }
         .chartYScale(domain: lo...hi)
@@ -203,10 +203,10 @@ struct SpO2DotsChart: View {
                 LineMark(x: .value("Time", sample.timestamp), y: .value("spo2", sample.value))
                     .interpolationMethod(.monotone)
                     .lineStyle(StrokeStyle(lineWidth: 1))
-                    .foregroundStyle(PulseColors.spo2.opacity(0.25))
+                    .foregroundStyle(AgaraColors.spo2.opacity(0.25))
                 PointMark(x: .value("Time", sample.timestamp), y: .value("spo2", sample.value))
                     .symbolSize(34)
-                    .foregroundStyle(PulseColors.spo2)
+                    .foregroundStyle(AgaraColors.spo2)
             }
         }
         .chartYScale(domain: 90...100)
@@ -235,18 +235,18 @@ struct StepBarsChart: View {
                     width: .automatic
                 )
                 .clipShape(UnevenRoundedRectangle(topLeadingRadius: 6, topTrailingRadius: 6))
-                .foregroundStyle(PulseColors.steps.opacity(todayIndex == index ? 1 : 0.55))
+                .foregroundStyle(AgaraColors.steps.opacity(todayIndex == index ? 1 : 0.55))
             }
             if let goal {
                 RuleMark(y: .value("goal", goal))
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                    .foregroundStyle(PulseColors.textMuted.opacity(0.6))
+                    .foregroundStyle(AgaraColors.textMuted.opacity(0.6))
             }
         }
         .chartYAxis(.hidden)
         .chartXAxis {
             AxisMarks { _ in
-                AxisValueLabel().font(PulseFont.micro.weight(.regular)).foregroundStyle(PulseColors.textMuted)
+                AxisValueLabel().font(AgaraFont.micro.weight(.regular)).foregroundStyle(AgaraColors.textMuted)
             }
         }
         .chartValueMarker(
@@ -272,7 +272,7 @@ struct DistanceLineChart: View {
                 LineMark(x: .value("i", index), y: .value("km", value))
                     .interpolationMethod(.monotone)
                     .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
-                    .foregroundStyle(PulseColors.distance)
+                    .foregroundStyle(AgaraColors.distance)
             }
         }
         .chartYScale(domain: 0...max(hi, 0.5))
@@ -297,14 +297,14 @@ struct CaloriesAreaChart: View {
                     .interpolationMethod(.monotone)
                     .foregroundStyle(
                         LinearGradient(
-                            colors: [PulseColors.calories.opacity(0.45), PulseColors.calories.opacity(0)],
+                            colors: [AgaraColors.calories.opacity(0.45), AgaraColors.calories.opacity(0)],
                             startPoint: .top, endPoint: .bottom
                         )
                     )
                 LineMark(x: .value("i", index), y: .value("kcal", value))
                     .interpolationMethod(.monotone)
                     .lineStyle(StrokeStyle(lineWidth: 2))
-                    .foregroundStyle(PulseColors.calories)
+                    .foregroundStyle(AgaraColors.calories)
             }
         }
         .chartYScale(domain: 0...max(hi, 50))
@@ -333,14 +333,14 @@ struct ElevationAreaChart: View {
                     .interpolationMethod(.monotone)
                     .foregroundStyle(
                         LinearGradient(
-                            colors: [PulseColors.distance.opacity(0.40), PulseColors.distance.opacity(0)],
+                            colors: [AgaraColors.distance.opacity(0.40), AgaraColors.distance.opacity(0)],
                             startPoint: .top, endPoint: .bottom
                         )
                     )
                 LineMark(x: .value("i", index), y: .value("m", value))
                     .interpolationMethod(.monotone)
                     .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
-                    .foregroundStyle(PulseColors.distance)
+                    .foregroundStyle(AgaraColors.distance)
             }
         }
         .chartYScale(domain: lo...max(hi, lo + 1))
@@ -402,7 +402,7 @@ struct SleepDurationHistogramChart: View {
                     .clipShape(UnevenRoundedRectangle(topLeadingRadius: r, topTrailingRadius: r))
                     .foregroundStyle(
                         LinearGradient(
-                            colors: [PulseColors.sleep, PulseColors.stageDeep],
+                            colors: [AgaraColors.sleep, AgaraColors.stageDeep],
                             startPoint: .top, endPoint: .bottom
                         )
                     )
@@ -414,13 +414,13 @@ struct SleepDurationHistogramChart: View {
                         width: w
                     )
                     .clipShape(UnevenRoundedRectangle(topLeadingRadius: r, topTrailingRadius: r))
-                    .foregroundStyle(PulseColors.accent.opacity(0.05))
+                    .foregroundStyle(AgaraColors.accent.opacity(0.05))
                 }
             }
             if let goalMin, goalMin > 0 {
                 RuleMark(y: .value("goal", goalMin))
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                    .foregroundStyle(PulseColors.textMuted.opacity(0.5))
+                    .foregroundStyle(AgaraColors.textMuted.opacity(0.5))
             }
         }
         .chartYScale(domain: 0...yMax)
@@ -430,7 +430,7 @@ struct SleepDurationHistogramChart: View {
                 if let key = value.as(String.self),
                    let label = key.split(separator: ":").last.map(String.init) {
                     AxisValueLabel {
-                        Text(label).font(PulseFont.micro.weight(.regular)).foregroundStyle(PulseColors.textMuted)
+                        Text(label).font(AgaraFont.micro.weight(.regular)).foregroundStyle(AgaraColors.textMuted)
                     }
                 }
             }
@@ -440,7 +440,7 @@ struct SleepDurationHistogramChart: View {
         }
         .frame(height: height)
         .padding(8)
-        .pulseGlass(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }
 
@@ -542,7 +542,7 @@ struct SleepHypnogramView: View {
                         path.addLine(to: CGPoint(x: cx, y: laneY(cur.stage, in: size)))
                         context.stroke(
                             path,
-                            with: .color(PulseColors.textPrimary.opacity(0.36)),
+                            with: .color(AgaraColors.textPrimary.opacity(0.36)),
                             style: StrokeStyle(lineWidth: 1.2, lineCap: .round, dash: [2.5, 3])
                         )
                     }
@@ -574,7 +574,7 @@ struct SleepHypnogramView: View {
 
                     ForEach(lanes, id: \.self) { stage in
                         Text(stage.rawValue.uppercased())
-                            .font(PulseFont.micro.weight(.semibold))
+                            .font(AgaraFont.micro.weight(.semibold))
                             .tracking(1.4)
                             .foregroundStyle(SleepStageColors.color(for: stage))
                             .frame(width: gutterWidth, alignment: .leading)
@@ -588,7 +588,7 @@ struct SleepHypnogramView: View {
                 .allowsHitTesting(false)
             }
             .frame(height: height - 22)
-            .pulseGlass(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .agaraGlass(RoundedRectangle(cornerRadius: 16, style: .continuous))
             // Tick when the scrub latches a block or crosses into a new one — not on release
             // (nil), which would read as a false stage-change cue.
             .sensoryFeedback(.selection, trigger: scrub?.blockIndex) { _, new in new != nil }
@@ -607,8 +607,8 @@ struct SleepHypnogramView: View {
             HStack {
                 ForEach(Array(ticks.enumerated()), id: \.offset) { index, tick in
                     Text(tick.label)
-                        .font(PulseFont.micro.weight(.regular).monospacedDigit())
-                        .foregroundStyle(PulseColors.textMuted)
+                        .font(AgaraFont.micro.weight(.regular).monospacedDigit())
+                        .foregroundStyle(AgaraColors.textMuted)
                     if index != ticks.count - 1 { Spacer() }
                 }
             }
@@ -677,13 +677,13 @@ struct SleepHypnogramView: View {
             let laneCenterY = Self.plotInsets.top + Self.laneFraction(block.stage) * plotHeight
 
             Rectangle()
-                .fill(PulseColors.textMuted.opacity(0.5))
+                .fill(AgaraColors.textMuted.opacity(0.5))
                 .frame(width: 1, height: plotHeight)
                 .position(x: fingerX, y: Self.plotInsets.top + plotHeight / 2)
 
             Text(Self.readoutText(stage: block.stage, startMinute: block.startMinute,
                                   durationMinutes: block.durationMinutes, startTs: startTs))
-                .font(PulseFont.micro.weight(.semibold).monospacedDigit())
+                .font(AgaraFont.micro.weight(.semibold).monospacedDigit())
                 .foregroundStyle(SleepStageColors.color(for: block.stage))
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)

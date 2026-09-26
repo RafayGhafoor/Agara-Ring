@@ -10,7 +10,7 @@ import Foundation
 
 enum WidgetSnapshotLoader {
     static func load() -> WidgetSnapshot? {
-        guard let url = PulseWidgetStore.fileURL,
+        guard let url = AgaraWidgetStore.fileURL,
               let data = try? Data(contentsOf: url) else { return nil }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .secondsSince1970

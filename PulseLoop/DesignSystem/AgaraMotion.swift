@@ -2,7 +2,7 @@ import SwiftUI
 
 // Shared motion tokens so glass interactions feel coordinated across the app,
 // instead of each call site inventing its own duration/curve.
-enum PulseMotion {
+enum AgaraMotion {
     /// Standard interactive spring — tab switches, card taps, selection moves.
     static let spring: Animation = .snappy(duration: 0.3)
     /// Fast press feedback for buttons and tappable controls.
@@ -16,19 +16,19 @@ enum PulseMotion {
 /// Uniform press-scale feedback for tappable cards and controls. As a ButtonStyle
 /// (not a gesture) it consumes the touch — no tap-through — and keeps the glass-era
 /// press feel consistent everywhere it's applied.
-struct PulseTapStyle: ButtonStyle {
+struct AgaraTapStyle: ButtonStyle {
     var scale: CGFloat = 0.97
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? scale : 1)
-            .animation(PulseMotion.press, value: configuration.isPressed)
+            .animation(AgaraMotion.press, value: configuration.isPressed)
             .contentShape(Rectangle())
     }
 }
 
-extension ButtonStyle where Self == PulseTapStyle {
-    /// `.buttonStyle(.pulseTap)` — consistent press-scale for cards/controls.
-    static var pulseTap: PulseTapStyle { PulseTapStyle() }
+extension ButtonStyle where Self == AgaraTapStyle {
+    /// `.buttonStyle(.agaraTap)` — consistent press-scale for cards/controls.
+    static var agaraTap: AgaraTapStyle { AgaraTapStyle() }
 }
 
 // MARK: - Zoom navigation transitions (iOS 18+)
@@ -51,7 +51,7 @@ extension View {
     /// a `zoomNamespace` is published into the environment. Only wire a source when
     /// the matching destination also opts in, or the transition degrades badly.
     @ViewBuilder
-    func pulseZoomSource(_ id: AnyHashable?, in namespace: Namespace.ID?) -> some View {
+    func agaraZoomSource(_ id: AnyHashable?, in namespace: Namespace.ID?) -> some View {
         if let id, let namespace {
             self.matchedTransitionSource(id: id, in: namespace)
         } else {
@@ -60,9 +60,9 @@ extension View {
     }
 
     /// Zooms this pushed destination out of the matching source card. Only apply
-    /// when a matching `pulseZoomSource` exists — a sourceless zoom glitches.
+    /// when a matching `agaraZoomSource` exists — a sourceless zoom glitches.
     @ViewBuilder
-    func pulseZoomDestination(_ id: AnyHashable, in namespace: Namespace.ID?) -> some View {
+    func agaraZoomDestination(_ id: AnyHashable, in namespace: Namespace.ID?) -> some View {
         if let namespace {
             self.navigationTransition(.zoom(sourceID: id, in: namespace))
         } else {

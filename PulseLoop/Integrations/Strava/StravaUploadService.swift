@@ -42,7 +42,7 @@ final class StravaUploadService {
     @ObservationIgnored var pollNanoseconds: UInt64 = 2_000_000_000
     /// Delay before re-asserting sport_type when Strava's post-processing overwrote it.
     @ObservationIgnored var sportFixRetryNanoseconds: UInt64 = 3_000_000_000
-    private static let log = Logger(subsystem: "xyz.sakshambhutani.pulseloop2", category: "StravaSync")
+    private static let log = Logger(subsystem: "com.agara.ring", category: "StravaSync")
     @ObservationIgnored var maxPollAttempts = 15
 
     init(

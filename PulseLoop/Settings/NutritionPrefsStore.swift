@@ -48,7 +48,7 @@ final class NutritionPrefsStore {
 
     static let shared = NutritionPrefsStore()
 
-    private static let prefsKey = "pulseloop.nutrition.prefs.v1"
+    private static let prefsKey = "pulseloop.nutrition.prefs.v1" // install-bound: pre-rename name kept so existing installs keep it
     private let defaults: UserDefaults
 
     var prefs: NutritionPrefs {

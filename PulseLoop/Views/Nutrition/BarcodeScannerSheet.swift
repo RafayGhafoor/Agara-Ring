@@ -23,19 +23,19 @@ struct BarcodeScannerSheet: View {
                 } else {
                     VStack(spacing: 10) {
                         Image(systemName: "barcode.viewfinder")
-                            .font(PulseFont.largeTitle.weight(.regular))
-                            .foregroundStyle(PulseColors.textMuted)
+                            .font(AgaraFont.largeTitle.weight(.regular))
+                            .foregroundStyle(AgaraColors.textMuted)
                         Text("Scanning unavailable")
-                            .font(PulseFont.bodyEmphasis)
-                            .foregroundStyle(PulseColors.textPrimary)
+                            .font(AgaraFont.bodyEmphasis)
+                            .foregroundStyle(AgaraColors.textPrimary)
                         Text("Barcode scanning needs a device camera and camera access. Search by name instead.")
-                            .font(PulseFont.caption.weight(.regular))
-                            .foregroundStyle(PulseColors.textMuted)
+                            .font(AgaraFont.caption.weight(.regular))
+                            .foregroundStyle(AgaraColors.textMuted)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, 32)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(PulseColors.background)
+                    .background(AgaraColors.background)
                 }
             }
             .navigationTitle("Scan barcode")

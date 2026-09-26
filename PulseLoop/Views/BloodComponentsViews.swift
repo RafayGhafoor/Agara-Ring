@@ -15,28 +15,28 @@ struct VitalBloodComponentsCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Circle()
-                    .fill(PulseColors.bloodSugar)
+                    .fill(AgaraColors.bloodSugar)
                     .frame(width: 8, height: 8)
-                    .shadow(color: PulseColors.bloodSugar.opacity(0.7), radius: 5)
+                    .shadow(color: AgaraColors.bloodSugar.opacity(0.7), radius: 5)
                 Text("BLOOD COMPONENTS")
-                    .font(PulseFont.caption2).tracking(1.0)
-                    .foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.caption2).tracking(1.0)
+                    .foregroundStyle(AgaraColors.textMuted)
                 HelpTip(AgaraHelp.bloodComponents, size: 11)
                 Spacer(minLength: 4)
                 Text("ESTIMATED")
-                    .font(PulseFont.nano).tracking(0.8)
-                    .foregroundStyle(PulseColors.warning)
+                    .font(AgaraFont.nano).tracking(0.8)
+                    .foregroundStyle(AgaraColors.warning)
                     .padding(.horizontal, 8).padding(.vertical, 3)
-                    .background(PulseColors.warning.opacity(0.14), in: Capsule())
+                    .background(AgaraColors.warning.opacity(0.14), in: Capsule())
             }
 
             HStack(spacing: 6) {
                 Image(systemName: summary.abnormalCount == 0 ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
-                    .foregroundStyle(summary.abnormalCount == 0 ? PulseColors.success : PulseColors.warning)
+                    .foregroundStyle(summary.abnormalCount == 0 ? AgaraColors.success : AgaraColors.warning)
                     .accessibilityHidden(true)
                 Text(summary.abnormalText)
-                    .font(PulseFont.subheadline.weight(.semibold))
-                    .foregroundStyle(PulseColors.textPrimary)
+                    .font(AgaraFont.subheadline.weight(.semibold))
+                    .foregroundStyle(AgaraColors.textPrimary)
                 HelpTip(AgaraHelp.abnormalCount)
             }
 
@@ -49,14 +49,14 @@ struct VitalBloodComponentsCard: View {
             }
 
             Text(AgaraCopy.estimateDisclaimer)
-                .font(PulseFont.caption)
-                .foregroundStyle(PulseColors.textMuted)
+                .font(AgaraFont.caption)
+                .foregroundStyle(AgaraColors.textMuted)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 22)
         .padding(.vertical, 20)
-        .pulseGlass(RoundedRectangle(cornerRadius: PulseRadius.card, style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous))
     }
 }
 
@@ -74,21 +74,21 @@ private struct BloodComponentCell: View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(BloodComponentsResultView.shortName(metric))
-                    .font(PulseFont.caption2)
-                    .foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.caption2)
+                    .foregroundStyle(AgaraColors.textMuted)
                     .lineLimit(1)
                 Text(BloodComponents.format(value, metric: metric, unit: unit))
-                    .font(PulseFont.numberL).monospacedDigit()
-                    .foregroundStyle(abnormal ? PulseColors.warning : PulseColors.textPrimary)
+                    .font(AgaraFont.numberL).monospacedDigit()
+                    .foregroundStyle(abnormal ? AgaraColors.warning : AgaraColors.textPrimary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                 Text(BloodComponents.displayUnit(metric: metric, unit: unit))
-                    .font(PulseFont.caption2)
-                    .foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.caption2)
+                    .foregroundStyle(AgaraColors.textMuted)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(10)
-            .background(PulseColors.cardSoft, in: RoundedRectangle(cornerRadius: PulseRadius.compact, style: .continuous))
+            .background(AgaraColors.cardSoft, in: RoundedRectangle(cornerRadius: AgaraShape.radiusCompact, style: .continuous))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -123,31 +123,31 @@ struct BloodComponentsResultView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(abnormal == 0 ? "No values out of range"
                  : abnormal == 1 ? "1 value out of range" : "\(abnormal) values out of range")
-                .font(PulseFont.subheadline.weight(.semibold))
-                .foregroundStyle(abnormal == 0 ? PulseColors.success : PulseColors.warning)
+                .font(AgaraFont.subheadline.weight(.semibold))
+                .foregroundStyle(abnormal == 0 ? AgaraColors.success : AgaraColors.warning)
             ForEach(MetricKind.bloodComponents) { metric in
                 if let value = values[metric] {
                     HStack {
                         Text(metric.title)
-                            .font(PulseFont.subheadline)
-                            .foregroundStyle(PulseColors.textPrimary)
+                            .font(AgaraFont.subheadline)
+                            .foregroundStyle(AgaraColors.textPrimary)
                         Spacer()
                         Text("\(BloodComponents.format(value, metric: metric, unit: unit)) "
                              + BloodComponents.displayUnit(metric: metric, unit: unit))
-                            .font(PulseFont.subheadline.weight(.semibold)).monospacedDigit()
+                            .font(AgaraFont.subheadline.weight(.semibold)).monospacedDigit()
                             .foregroundStyle(BloodComponents.isAbnormal(value, metric: metric, sex: sex)
-                                             ? PulseColors.warning : PulseColors.textPrimary)
+                                             ? AgaraColors.warning : AgaraColors.textPrimary)
                     }
                     .padding(.vertical, 4)
                     .accessibilityElement(children: .combine)
                 }
             }
             Text(AgaraCopy.estimateDisclaimer)
-                .font(PulseFont.caption)
-                .foregroundStyle(PulseColors.textMuted)
+                .font(AgaraFont.caption)
+                .foregroundStyle(AgaraColors.textMuted)
                 .padding(.top, 4)
         }
         .padding(18)
-        .pulseGlass(RoundedRectangle(cornerRadius: PulseRadius.card, style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous))
     }
 }

@@ -32,7 +32,7 @@ import SwiftData
 /// The decoded archive (import side). The export never builds one of these — it streams rows straight
 /// to the file (`DataArchiveService.writeArchive`) — so this type only needs to *read* both the current
 /// (Android-shaped) layout and every older iOS one.
-nonisolated struct PulseArchive: Decodable, Sendable {
+nonisolated struct AgaraArchive: Decodable, Sendable {
     static let currentFormatVersion = 1
 
     var formatVersion: Int

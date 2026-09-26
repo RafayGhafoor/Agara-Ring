@@ -60,7 +60,7 @@ enum MainTab: String, CaseIterable, Identifiable {
 
 /// The theme in effect. Themes are defined in `docs/config/palette.yaml` and generated into `AgaraTheme.all`;
 /// nothing here lists them. Observable: `AppearanceStore` (Settings › Appearance, the system light/dark setting,
-/// the profile default) sets it and every view that read a `PulseColors` role in its body re-renders; the root
+/// the profile default) sets it and every view that read a `AgaraColors` role in its body re-renders; the root
 /// additionally re-identifies its content on a change so cached colours are rebuilt too. Debug builds can pin a
 /// theme with `-theme <name>`. The widget and Live Activity extensions never change it (they stay `.dark`).
 @Observable
@@ -69,7 +69,7 @@ nonisolated final class ThemeStore {
 
     var theme: AgaraTheme = .dark
 
-    /// Shorthand for `shared.theme` — what `PulseColors` and the extensions read.
+    /// Shorthand for `shared.theme` — what `AgaraColors` and the extensions read.
     static var current: AgaraTheme {
         get { shared.theme }
         set { if shared.theme.name != newValue.name { shared.theme = newValue } }
@@ -85,7 +85,7 @@ nonisolated final class ThemeStore {
 /// Colour roles for the current theme — the only way screens get a colour. Values come from the shared
 /// palette catalog (`docs/config/palette.yaml` → `AgaraTheme`), the same source Android reads. This file is
 /// compiled into the app *and* the widgets extension, and the generated file is a member of both targets.
-enum PulseColors {
+enum AgaraColors {
     private static var t: AgaraTheme { ThemeStore.current }
 
     // Surfaces
@@ -149,15 +149,6 @@ enum PulseColors {
     static var stageAwake: Color { t.stageAwake }
 }
 
-/// Corner-radius tokens so peer glass surfaces share one radius instead of the
-/// ad-hoc 16/18/20/22/24 mix. `card` for standard glass cards, `compact` for
-/// smaller/inset surfaces, `control` for buttons and small controls.
-enum PulseRadius {
-    static let card: CGFloat = AgaraShape.radiusCard
-    static let compact: CGFloat = AgaraShape.radiusCompact
-    static let control: CGFloat = AgaraShape.radiusControl
-}
-
 extension Color {
     init(hex: String) {
         let trimmed = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
@@ -202,7 +193,7 @@ extension Color {
     }
 }
 
-struct PulseCard<Content: View>: View {
+struct AgaraCard<Content: View>: View {
     var padding: CGFloat = 16
     var cornerRadius: CGFloat = 20
     @ViewBuilder var content: Content
@@ -211,7 +202,7 @@ struct PulseCard<Content: View>: View {
         content
             .padding(padding)
             // Liquid Glass card surface (glass 26+, Material 18–25, solid on Reduce Transparency).
-            .pulseGlass(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .agaraGlass(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
     }
 }
 
@@ -223,27 +214,27 @@ struct MetricTile: View {
     var trend: [Double] = []
     
     var body: some View {
-        PulseCard {
+        AgaraCard {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 8) {
                     Circle().fill(color).frame(width: 8, height: 8)
                     Text(title.uppercased())
-                        .font(PulseFont.caption2)
-                        .foregroundStyle(PulseColors.textMuted)
+                        .font(AgaraFont.caption2)
+                        .foregroundStyle(AgaraColors.textMuted)
                         .lineLimit(1)
                 }
                 
                 HStack(alignment: .firstTextBaseline, spacing: 5) {
                     Text(value)
-                        .font(PulseFont.numberXL)
+                        .font(AgaraFont.numberXL)
                         .monospacedDigit()
-                        .foregroundStyle(PulseColors.textPrimary)
+                        .foregroundStyle(AgaraColors.textPrimary)
                         .minimumScaleFactor(0.75)
                         .lineLimit(1)
                     if let unit {
                         Text(unit)
-                            .font(PulseFont.caption)
-                            .foregroundStyle(PulseColors.textMuted)
+                            .font(AgaraFont.caption)
+                            .foregroundStyle(AgaraColors.textMuted)
                     }
                 }
                 
@@ -289,7 +280,7 @@ struct PrimaryButton: View {
     private var label: some View {
         Label(title, systemImage: systemImage ?? "arrow.right")
             .labelStyle(.titleAndIcon)
-            .font(PulseFont.bodyEmphasis)
+            .font(AgaraFont.bodyEmphasis)
             .frame(maxWidth: .infinity)
             .frame(height: 56)
     }
@@ -299,16 +290,16 @@ struct PrimaryButton: View {
             // Primary action = translucent Liquid Glass with an accent tint (real
             // lensing, not a flat fill). Glass provides the surface; no manual fill.
             Button(action: action) {
-                label.foregroundStyle(PulseColors.textPrimary)
+                label.foregroundStyle(AgaraColors.textPrimary)
             }
             .buttonStyle(.glass)
-            .tint(PulseColors.accent)
+            .tint(AgaraColors.accent)
             .clipShape(Capsule())
         } else {
             Button(action: action) {
                 label
-                    .foregroundStyle(PulseColors.textPrimary)
-                    .background(PulseColors.accent)
+                    .foregroundStyle(AgaraColors.textPrimary)
+                    .background(AgaraColors.accent)
                     .clipShape(Capsule())
             }
         }
@@ -325,12 +316,12 @@ struct DestructiveButton: View {
     var body: some View {
         Button(action: action) {
             Label(title, systemImage: systemImage ?? "xmark.circle")
-                .font(PulseFont.callout.weight(.semibold))
+                .font(AgaraFont.callout.weight(.semibold))
                 .frame(maxWidth: .infinity)
                 .frame(height: AgaraShape.buttonHeight)
-                .foregroundStyle(PulseColors.danger)
-                .background(PulseColors.danger.opacity(0.12), in: Capsule())
-                .overlay { Capsule().stroke(PulseColors.danger.opacity(0.28), lineWidth: 1) }
+                .foregroundStyle(AgaraColors.danger)
+                .background(AgaraColors.danger.opacity(0.12), in: Capsule())
+                .overlay { Capsule().stroke(AgaraColors.danger.opacity(0.28), lineWidth: 1) }
         }
         .buttonStyle(.plain)
     }
@@ -344,7 +335,7 @@ struct SecondaryButton: View {
 
     private var label: some View {
         Label(title, systemImage: systemImage ?? "circle")
-            .font(PulseFont.callout.weight(.semibold))
+            .font(AgaraFont.callout.weight(.semibold))
             .frame(maxWidth: .infinity)
             .frame(height: 52)
     }
@@ -353,18 +344,18 @@ struct SecondaryButton: View {
         if #available(iOS 26, *), !reduceTransparency {
             // Secondary action = neutral interactive Liquid Glass.
             Button(action: action) {
-                label.foregroundStyle(PulseColors.textPrimary)
+                label.foregroundStyle(AgaraColors.textPrimary)
             }
             .buttonStyle(.glass)
             .clipShape(Capsule())
         } else {
             Button(action: action) {
                 label
-                    .foregroundStyle(PulseColors.textPrimary)
-                    .background(PulseColors.card)
+                    .foregroundStyle(AgaraColors.textPrimary)
+                    .background(AgaraColors.card)
                     .clipShape(Capsule())
                     .overlay {
-                        Capsule().stroke(PulseColors.borderSubtle, lineWidth: 1)
+                        Capsule().stroke(AgaraColors.borderSubtle, lineWidth: 1)
                     }
             }
         }

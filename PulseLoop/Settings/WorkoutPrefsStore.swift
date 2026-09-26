@@ -77,7 +77,7 @@ final class WorkoutPrefsStore {
 
     static let shared = WorkoutPrefsStore()
 
-    private static let storageKey = "pulseloop.workoutprefs.v1"
+    private static let storageKey = "pulseloop.workoutprefs.v1" // install-bound: pre-rename name kept so existing installs keep it
     private let defaults: UserDefaults
 
     var settings: WorkoutPrefs {

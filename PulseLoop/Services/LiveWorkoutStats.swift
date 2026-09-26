@@ -8,7 +8,7 @@ enum LiveHRSource: Sendable {
     case ringLog
 }
 
-/// Rolling stats for the workout currently recording, maintained incrementally from `PulseEventBus`
+/// Rolling stats for the workout currently recording, maintained incrementally from `AgaraEventBus`
 /// events so the live screen and Live Activity read O(1) values instead of re-fetching and
 /// re-walking the whole route every second. Owned by `LiveWorkoutManager`: created at start,
 /// seeded from the store on recovery, torn down at finish/cancel.

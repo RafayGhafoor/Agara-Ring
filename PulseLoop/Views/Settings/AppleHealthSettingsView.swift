@@ -14,7 +14,7 @@ struct AppleHealthSettingsView: View {
     @State private var store = AppleHealthPrefsStore.shared
     /// First-enable backfill choice ("all history" vs "new only" vs cancel).
     @State private var showBackfillDialog = false
-    /// Confirmation before deleting PulseLoop's samples out of Apple Health.
+    /// Confirmation before deleting Agara Ring's samples out of Apple Health.
     @State private var showRemoveAlert = false
     /// Set when authorization was refused — surfaces the "Open Health" hint row.
     @State private var accessDenied = false
@@ -48,7 +48,7 @@ struct AppleHealthSettingsView: View {
             }
             .padding()
         }
-        .background(PulseColors.background)
+        .background(AgaraColors.background)
         .pageChrome("Apple Health")
         .confirmationDialog("Sync your history?", isPresented: $showBackfillDialog, titleVisibility: .visible) {
             Button("Sync all history") { startFullHistoryBackfill() }
@@ -86,8 +86,8 @@ struct AppleHealthSettingsView: View {
     @ViewBuilder private var accessDeniedHint: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(AgaraCopy.healthPermissionDenied)
-                .font(PulseFont.caption)
-                .foregroundStyle(PulseColors.danger)
+                .font(AgaraFont.caption)
+                .foregroundStyle(AgaraColors.danger)
             QuickActionButton(label: "Open Health") { openHealthApp() }
         }
         .padding(.horizontal, 4)
@@ -124,8 +124,8 @@ struct AppleHealthSettingsView: View {
             .disabled(service.isSyncing)
             if let result = service.lastResult {
                 Text(result)
-                    .font(PulseFont.caption)
-                    .foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.caption)
+                    .foregroundStyle(AgaraColors.textMuted)
                     .padding(.horizontal, 4)
             }
         }
@@ -138,8 +138,8 @@ struct AppleHealthSettingsView: View {
             } label: {
                 HStack {
                     Text("Remove \(AgaraCopy.appName) data from Apple Health")
-                        .font(PulseFont.body)
-                        .foregroundStyle(PulseColors.danger)
+                        .font(AgaraFont.body)
+                        .foregroundStyle(AgaraColors.danger)
                     Spacer()
                 }
                 .padding(.horizontal, 16)
@@ -229,8 +229,8 @@ struct AppleHealthSettingsView: View {
         Task { await service.exportIncremental(context: modelContext) }
     }
 
-    /// Deep-link into the Health app so the user can flip PulseLoop's access back on; fall back to
-    /// PulseLoop's iOS Settings page if the Health URL scheme can't be opened.
+    /// Deep-link into the Health app so the user can flip Agara Ring's access back on; fall back to
+    /// Agara Ring's iOS Settings page if the Health URL scheme can't be opened.
     private func openHealthApp() {
         if let health = URL(string: "x-apple-health://"), UIApplication.shared.canOpenURL(health) {
             UIApplication.shared.open(health)

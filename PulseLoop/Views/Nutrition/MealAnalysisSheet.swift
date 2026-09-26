@@ -68,7 +68,7 @@ struct MealAnalysisSheet: View {
                 }
                 .padding(16)
             }
-            .background(PulseColors.background)
+            .background(AgaraColors.background)
             .navigationTitle("AI meal log")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -116,11 +116,11 @@ struct MealAnalysisSheet: View {
                     .resizable().scaledToFill()
                     .frame(maxWidth: .infinity)
                     .frame(height: 220)
-                    .clipShape(RoundedRectangle(cornerRadius: PulseRadius.card, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous))
                     .overlay(alignment: .topTrailing) {
                         Button { self.image = nil } label: {
                             Image(systemName: "xmark.circle.fill")
-                                .font(PulseFont.title3)
+                                .font(AgaraFont.title3)
                                 .foregroundStyle(.white.opacity(0.9))
                                 .padding(8)
                                 .minTapTarget(visualSize: 40)
@@ -139,15 +139,15 @@ struct MealAnalysisSheet: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 Text(image == nil ? "OR DESCRIBE IT" : "ADD DETAIL (OPTIONAL)")
-                    .font(PulseFont.caption2)
+                    .font(AgaraFont.caption2)
                     .tracking(1.4)
-                    .foregroundStyle(PulseColors.textMuted)
+                    .foregroundStyle(AgaraColors.textMuted)
                 TextField("e.g. two eggs, toast with butter, black coffee", text: $describeText, axis: .vertical)
-                    .font(PulseFont.body)
-                    .foregroundStyle(PulseColors.textPrimary)
+                    .font(AgaraFont.body)
+                    .foregroundStyle(AgaraColors.textPrimary)
                     .lineLimit(3...6)
                     .padding(12)
-                    .pulseGlass(RoundedRectangle(cornerRadius: PulseRadius.compact, style: .continuous))
+                    .agaraGlass(RoundedRectangle(cornerRadius: AgaraShape.radiusCompact, style: .continuous))
             }
 
             PrimaryButton(title: "Analyze", systemImage: "sparkles") {
@@ -157,8 +157,8 @@ struct MealAnalysisSheet: View {
             .opacity(canAnalyze ? 1 : 0.5)
 
             Text("Sent to your configured AI provider only when you tap Analyze. Estimates are labeled and editable.")
-                .font(PulseFont.caption.weight(.regular))
-                .foregroundStyle(PulseColors.textMuted)
+                .font(AgaraFont.caption.weight(.regular))
+                .foregroundStyle(AgaraColors.textMuted)
                 .multilineTextAlignment(.center)
         }
     }
@@ -169,13 +169,13 @@ struct MealAnalysisSheet: View {
                 Image(uiImage: image)
                     .resizable().scaledToFill()
                     .frame(maxWidth: .infinity).frame(height: 180)
-                    .clipShape(RoundedRectangle(cornerRadius: PulseRadius.card, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous))
                     .opacity(0.7)
             }
             ProgressView()
             Text("Estimating nutrition…")
-                .font(PulseFont.subheadline)
-                .foregroundStyle(PulseColors.textSecondary)
+                .font(AgaraFont.subheadline)
+                .foregroundStyle(AgaraColors.textSecondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 24)
@@ -187,20 +187,20 @@ struct MealAnalysisSheet: View {
                 ProvenanceBadge(source: .llmEstimate)
                 if confidence != "high" {
                     Text("\(confidence.capitalized) confidence")
-                        .font(PulseFont.caption.weight(.regular))
-                        .foregroundStyle(PulseColors.textMuted)
+                        .font(AgaraFont.caption.weight(.regular))
+                        .foregroundStyle(AgaraColors.textMuted)
                 }
                 Spacer()
             }
             if !assumptions.isEmpty {
                 Text(assumptions)
-                    .font(PulseFont.caption.weight(.regular))
-                    .foregroundStyle(PulseColors.textSecondary)
+                    .font(AgaraFont.caption.weight(.regular))
+                    .foregroundStyle(AgaraColors.textSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(12)
-                    .pulseGlass(RoundedRectangle(cornerRadius: PulseRadius.compact, style: .continuous))
+                    .agaraGlass(RoundedRectangle(cornerRadius: AgaraShape.radiusCompact, style: .continuous))
             }
-            DetailCard(title: "Review & adjust", color: PulseColors.calories) {
+            DetailCard(title: "Review & adjust", color: AgaraColors.calories) {
                 VStack(spacing: 10) {
                     editRow("Name") {
                         TextField("Meal", text: $name).multilineTextAlignment(.trailing)
@@ -216,19 +216,19 @@ struct MealAnalysisSheet: View {
                 .disabled(!canSave)
                 .opacity(canSave ? 1 : 0.5)
             Button("Re-analyze") { phase = .input }
-                .font(PulseFont.subheadline)
-                .foregroundStyle(PulseColors.accent)
+                .font(AgaraFont.subheadline)
+                .foregroundStyle(AgaraColors.accent)
         }
     }
 
     private func failedPhase(_ message: String) -> some View {
         VStack(spacing: 12) {
             Image(systemName: "exclamationmark.triangle")
-                .font(PulseFont.title2)
-                .foregroundStyle(PulseColors.warning)
+                .font(AgaraFont.title2)
+                .foregroundStyle(AgaraColors.warning)
             Text(message)
-                .font(PulseFont.subheadline.weight(.regular))
-                .foregroundStyle(PulseColors.textSecondary)
+                .font(AgaraFont.subheadline.weight(.regular))
+                .foregroundStyle(AgaraColors.textSecondary)
                 .multilineTextAlignment(.center)
             SecondaryButton(title: "Try again", systemImage: "arrow.clockwise") { phase = .input }
         }
@@ -244,25 +244,25 @@ struct MealAnalysisSheet: View {
     private func photoLabel(_ symbol: String, _ label: String) -> some View {
         VStack(spacing: 6) {
             Image(systemName: symbol)
-                .font(PulseFont.title2.weight(.regular))
-                .foregroundStyle(PulseColors.calories)
+                .font(AgaraFont.title2.weight(.regular))
+                .foregroundStyle(AgaraColors.calories)
             Text(label)
-                .font(PulseFont.caption)
-                .foregroundStyle(PulseColors.textPrimary)
+                .font(AgaraFont.caption)
+                .foregroundStyle(AgaraColors.textPrimary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 22)
-        .pulseGlass(RoundedRectangle(cornerRadius: PulseRadius.compact, style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: AgaraShape.radiusCompact, style: .continuous))
         .contentShape(Rectangle())
     }
 
     private func editRow<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
         HStack {
-            Text(label).font(PulseFont.subheadline).foregroundStyle(PulseColors.textSecondary)
+            Text(label).font(AgaraFont.subheadline).foregroundStyle(AgaraColors.textSecondary)
             Spacer()
             content()
-                .font(PulseFont.body.monospacedDigit())
-                .foregroundStyle(PulseColors.textPrimary)
+                .font(AgaraFont.body.monospacedDigit())
+                .foregroundStyle(AgaraColors.textPrimary)
                 .frame(maxWidth: 160)
         }
     }

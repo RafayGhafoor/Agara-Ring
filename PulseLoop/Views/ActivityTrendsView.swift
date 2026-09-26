@@ -34,7 +34,7 @@ struct ActivityTrendsView: View {
             .padding(.bottom, 40)
             .animation(.easeInOut(duration: 0.25), value: period)
         }
-        .background(PulseColors.background)
+        .background(AgaraColors.background)
         .pageChrome("Activity Trends")
     }
 
@@ -42,15 +42,15 @@ struct ActivityTrendsView: View {
 
     private var explainer: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("WHAT THIS MEANS").font(PulseFont.caption2.weight(.semibold)).tracking(1.0).foregroundStyle(PulseColors.textMuted)
+            Text("WHAT THIS MEANS").font(AgaraFont.caption2.weight(.semibold)).tracking(1.0).foregroundStyle(AgaraColors.textMuted)
             Text("Each bar is one day's total (or a month's daily average for the year). The dashed line is your daily goal — "
                  + "bars above it are days you hit it. The value up top is your average for the range.")
-                .font(PulseFont.footnote.weight(.regular)).foregroundStyle(PulseColors.textSecondary)
+                .font(AgaraFont.footnote.weight(.regular)).foregroundStyle(AgaraColors.textSecondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .pulseGlass(RoundedRectangle(cornerRadius: PulseRadius.card, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(PulseColors.borderSubtle, lineWidth: 1))
+        .agaraGlass(RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(AgaraColors.borderSubtle, lineWidth: 1))
     }
 
     // MARK: - Period selector
@@ -129,7 +129,7 @@ struct ActivityTrendsView: View {
         let avg = dailyAverage(values)
         return metricSection(
             title: "Steps",
-            color: PulseColors.steps,
+            color: AgaraColors.steps,
             values: values,
             samples: samples,
             average: avg.map { "\(Int($0.rounded()).formatted()) steps/day" },
@@ -146,7 +146,7 @@ struct ActivityTrendsView: View {
         let goalDisplay = Double(UnitsFormatter.distance(meters: summary.goals.distanceMetersDaily, units: units).value) ?? 0
         return metricSection(
             title: "Distance",
-            color: PulseColors.distance,
+            color: AgaraColors.distance,
             values: values,
             samples: samples,
             average: avg.map { String(format: "%.2f \(distanceUnit)/day", $0) },
@@ -164,7 +164,7 @@ struct ActivityTrendsView: View {
         let avg = dailyAverage(values)
         return metricSection(
             title: "Calories",
-            color: PulseColors.calories,
+            color: AgaraColors.calories,
             values: values,
             samples: samples,
             average: avg.map { "\(Int($0.rounded()).formatted()) cal/day" },
@@ -187,19 +187,19 @@ struct ActivityTrendsView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
                 Text(title)
-                    .font(PulseFont.title3.weight(.bold))
+                    .font(AgaraFont.title3.weight(.bold))
                     .foregroundStyle(color)
                 Spacer()
                 HelpTip(AgaraHelp.avgPerDay)
                 Text(average ?? "— /day")
-                    .font(PulseFont.title3).monospacedDigit()
-                    .foregroundStyle(average == nil ? PulseColors.textMuted : PulseColors.textPrimary)
+                    .font(AgaraFont.title3).monospacedDigit()
+                    .foregroundStyle(average == nil ? AgaraColors.textMuted : AgaraColors.textPrimary)
                     .minimumScaleFactor(0.7)
                     .lineLimit(1)
             }
             Text(rangeLabel(samples: samples))
-                .font(PulseFont.caption.weight(.regular))
-                .foregroundStyle(PulseColors.textMuted)
+                .font(AgaraFont.caption.weight(.regular))
+                .foregroundStyle(AgaraColors.textMuted)
 
             TrendBarChart(
                 values: values,
@@ -215,8 +215,8 @@ struct ActivityTrendsView: View {
                 if !tracked.isEmpty {
                     HStack(spacing: 2) {
                         Text("Goal met \(tracked.filter { $0 >= goal }.count) of \(tracked.count) days")
-                            .font(PulseFont.caption.weight(.regular))
-                            .foregroundStyle(PulseColors.textSecondary)
+                            .font(AgaraFont.caption.weight(.regular))
+                            .foregroundStyle(AgaraColors.textSecondary)
                         HelpTip(AgaraHelp.goalDays, size: 11)
                     }
                 }
@@ -224,7 +224,7 @@ struct ActivityTrendsView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        .pulseGlass(RoundedRectangle(cornerRadius: PulseRadius.card, style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous))
     }
 
     // MARK: - Derived values
@@ -348,7 +348,7 @@ private struct TrendBarChart: View {
                     .annotation(position: .top, alignment: .trailing) {
                         if let goalLabel {
                             Text(goalLabel)
-                                .font(PulseFont.micro.weight(.semibold))
+                                .font(AgaraFont.micro.weight(.semibold))
                                 .foregroundStyle(color)
                         }
                     }
@@ -361,7 +361,7 @@ private struct TrendBarChart: View {
             AxisMarks(values: orderedKeys) { value in
                 if let k = value.as(String.self), let index = Int(k), let label = axisLabels[index] {
                     AxisValueLabel {
-                        Text(label).font(PulseFont.micro.weight(.regular)).foregroundStyle(PulseColors.textMuted)
+                        Text(label).font(AgaraFont.micro.weight(.regular)).foregroundStyle(AgaraColors.textMuted)
                     }
                 }
             }
@@ -369,7 +369,7 @@ private struct TrendBarChart: View {
         .overlay(alignment: .center) {
             if values.isEmpty {
                 Text("No data for this period")
-                    .font(PulseFont.caption.weight(.regular)).foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.caption.weight(.regular)).foregroundStyle(AgaraColors.textMuted)
             }
         }
     }

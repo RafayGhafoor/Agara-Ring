@@ -4,7 +4,7 @@ import AuthenticationServices
 /// Strava detail screen. A master toggle gates uploading workouts to Strava; enabling it runs the
 /// OAuth connect flow when no account is linked (cancel/failure → revert the toggle). An upload-mode
 /// selector (manual per-workout vs automatic on finish) appears once connected, and a destructive
-/// disconnect action revokes PulseLoop's access. When the build ships without StravaSecrets.plist
+/// disconnect action revokes Agara Ring's access. When the build ships without StravaSecrets.plist
 /// the whole screen degrades to an explanatory "not configured" state (mirrors the Apple Health
 /// availability gate).
 struct StravaSettingsView: View {
@@ -33,8 +33,8 @@ struct StravaSettingsView: View {
 
                 if let connectError {
                     Text(connectError)
-                        .font(PulseFont.caption)
-                        .foregroundStyle(PulseColors.danger)
+                        .font(AgaraFont.caption)
+                        .foregroundStyle(AgaraColors.danger)
                         .padding(.horizontal, 4)
                 }
 
@@ -48,7 +48,7 @@ struct StravaSettingsView: View {
             }
             .padding()
         }
-        .background(PulseColors.background)
+        .background(AgaraColors.background)
         .pageChrome("Strava")
         .confirmationDialog(
             "Disconnect from Strava?",
@@ -103,8 +103,8 @@ struct StravaSettingsView: View {
             } label: {
                 HStack {
                     Text("Disconnect from Strava")
-                        .font(PulseFont.body)
-                        .foregroundStyle(PulseColors.danger)
+                        .font(AgaraFont.body)
+                        .foregroundStyle(AgaraColors.danger)
                     Spacer()
                 }
                 .padding(.horizontal, 16)

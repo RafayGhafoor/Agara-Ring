@@ -109,7 +109,7 @@ struct CoachView: View {
                 }
                 .scrollDismissesKeyboard(.immediately)
                 .simultaneousGesture(TapGesture().onEnded { composerFocused = false })
-                .pulseScrollEdges(.top)
+                .agaraScrollEdges(.top)
             }
 
             VStack(spacing: 0) {
@@ -119,26 +119,26 @@ struct CoachView: View {
                             ForEach(coldStartPrompts, id: \.self) { prompt in
                                 Button { send(prompt) } label: {
                                     Text(prompt)
-                                        .font(PulseFont.caption.weight(.regular))
-                                        .foregroundStyle(PulseColors.textSecondary)
+                                        .font(AgaraFont.caption.weight(.regular))
+                                        .foregroundStyle(AgaraColors.textSecondary)
                                         .padding(.horizontal, 12).padding(.vertical, 7)
-                                        .pulseGlass(Capsule())
+                                        .agaraGlass(Capsule())
                                 }
                                 .buttonStyle(.plain)
                             }
                         }
                         .padding(.horizontal, 12).padding(.vertical, 8)
                         // Prompt chips share one container so their glass renders/blends together.
-                        .pulseGlassContainer(spacing: 6)
+                        .agaraGlassContainer(spacing: 6)
                     }
                 }
                 composer
             }
             // Clears the nav bar when idle; rises above the keyboard when typing.
             .padding(.bottom, composerBottomInset)
-            .background(PulseColors.secondaryBackground)
+            .background(AgaraColors.secondaryBackground)
         }
-        .background(PulseColors.background)
+        .background(AgaraColors.background)
         // Pin the keyboard safe area so only our manual lift moves the composer —
         // otherwise the sheet's native avoidance double-lifts it.
         .ignoresSafeArea(.keyboard)
@@ -211,36 +211,36 @@ struct CoachView: View {
         HStack(spacing: 12) {
             CoachOrb(size: 40)
             VStack(alignment: .leading, spacing: 1) {
-                Text(AgaraCopy.coachTitle).font(PulseFont.subheadline.weight(.semibold)).foregroundStyle(PulseColors.textPrimary)
-                Text("Using your latest ring sync").font(PulseFont.caption2.weight(.regular)).foregroundStyle(PulseColors.textMuted)
+                Text(AgaraCopy.coachTitle).font(AgaraFont.subheadline.weight(.semibold)).foregroundStyle(AgaraColors.textPrimary)
+                Text("Using your latest ring sync").font(AgaraFont.caption2.weight(.regular)).foregroundStyle(AgaraColors.textMuted)
             }
             Spacer()
             // Sibling glass circles share one container so their glass renders/blends together.
             HStack(spacing: 12) {
                 Button { composerFocused = false; showUsage = true } label: {
-                    Image(systemName: "info.circle").font(PulseFont.body).foregroundStyle(PulseColors.textSecondary)
-                        .frame(width: 36, height: 36).pulseGlass(Circle(), interactive: true)
+                    Image(systemName: "info.circle").font(AgaraFont.body).foregroundStyle(AgaraColors.textSecondary)
+                        .frame(width: 36, height: 36).agaraGlass(Circle(), interactive: true)
                         .minTapTarget(visualSize: 36)
                 }
                 .accessibilityLabel("Usage and privacy")
                 Button { newConversation() } label: {
-                    Image(systemName: "plus").font(PulseFont.body).foregroundStyle(PulseColors.textSecondary)
-                        .frame(width: 36, height: 36).pulseGlass(Circle(), interactive: true)
+                    Image(systemName: "plus").font(AgaraFont.body).foregroundStyle(AgaraColors.textSecondary)
+                        .frame(width: 36, height: 36).agaraGlass(Circle(), interactive: true)
                         .minTapTarget(visualSize: 36)
                 }
                 .accessibilityLabel("New conversation")
                 Button { composerFocused = false; showHistory = true } label: {
-                    Image(systemName: "clock.arrow.circlepath").font(PulseFont.body).foregroundStyle(PulseColors.textSecondary)
-                        .frame(width: 36, height: 36).pulseGlass(Circle(), interactive: true)
+                    Image(systemName: "clock.arrow.circlepath").font(AgaraFont.body).foregroundStyle(AgaraColors.textSecondary)
+                        .frame(width: 36, height: 36).agaraGlass(Circle(), interactive: true)
                         .minTapTarget(visualSize: 36)
                 }
                 .accessibilityLabel("Conversation history")
             }
-            .pulseGlassContainer(spacing: 8)
+            .agaraGlassContainer(spacing: 8)
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
-        .background(PulseColors.secondaryBackground)
-        .overlay(alignment: .bottom) { Rectangle().fill(PulseColors.borderSubtle).frame(height: 1) }
+        .background(AgaraColors.secondaryBackground)
+        .overlay(alignment: .bottom) { Rectangle().fill(AgaraColors.borderSubtle).frame(height: 1) }
     }
 
     private var composer: some View {
@@ -258,8 +258,8 @@ struct CoachView: View {
                         else { showPhotosPicker = true }
                     } label: {
                         Image(systemName: "camera")
-                            .font(PulseFont.headline.weight(.regular)).foregroundStyle(PulseColors.textSecondary)
-                            .frame(width: 36, height: 36).pulseGlass(Circle(), interactive: true)
+                            .font(AgaraFont.headline.weight(.regular)).foregroundStyle(AgaraColors.textSecondary)
+                            .frame(width: 36, height: 36).agaraGlass(Circle(), interactive: true)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Add a photo")
@@ -267,23 +267,23 @@ struct CoachView: View {
                 TextField("Ask the coach...", text: $draft)
                     .focused($composerFocused)
                     .textFieldStyle(.plain)
-                    .font(PulseFont.subheadline.weight(.regular))
+                    .font(AgaraFont.subheadline.weight(.regular))
                     .padding(.horizontal, 16).padding(.vertical, 10)
-                    .pulseGlass(Capsule())
+                    .agaraGlass(Capsule())
                     .onSubmit { send(draft) }
                 Button { send(draft) } label: {
                     Image(systemName: "arrow.up")
-                        .font(PulseFont.bodyEmphasis)
-                        .foregroundStyle(canSend ? PulseColors.onAccent : PulseColors.textMuted)
+                        .font(AgaraFont.bodyEmphasis)
+                        .foregroundStyle(canSend ? AgaraColors.onAccent : AgaraColors.textMuted)
                         .frame(width: 36, height: 36)
-                        .pulseGlass(Circle(), interactive: true, tint: canSend ? PulseColors.accent : nil)
+                        .agaraGlass(Circle(), interactive: true, tint: canSend ? AgaraColors.accent : nil)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Send")
                 .disabled(!canSend)
             }
             // Camera / field / send glass share one container so they render/blend together.
-            .pulseGlassContainer(spacing: 8)
+            .agaraGlassContainer(spacing: 8)
         }
         .padding(.horizontal, 12).padding(.vertical, 10)
         .photosPicker(isPresented: $showPhotosPicker, selection: $photosPickerItem, matching: .images)
@@ -305,10 +305,10 @@ struct CoachView: View {
                     .resizable().scaledToFill()
                     .frame(width: 64, height: 64)
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(PulseColors.borderSubtle, lineWidth: 1))
+                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(AgaraColors.borderSubtle, lineWidth: 1))
                 Button { clearStagedImage() } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .font(PulseFont.title3.weight(.regular))
+                        .font(AgaraFont.title3.weight(.regular))
                         .foregroundStyle(.white, Color.black.opacity(0.55))
                         .minTapTarget(visualSize: 24)
                 }
@@ -424,7 +424,7 @@ struct CoachHistorySheet: View {
             Group {
                 if conversations.isEmpty {
                     Text("No conversations yet.")
-                        .font(PulseFont.subheadline.weight(.regular)).foregroundStyle(PulseColors.textMuted)
+                        .font(AgaraFont.subheadline.weight(.regular)).foregroundStyle(AgaraColors.textMuted)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     List {
@@ -433,25 +433,25 @@ struct CoachHistorySheet: View {
                                 HStack {
                                     VStack(alignment: .leading, spacing: 3) {
                                         Text(convo.title)
-                                            .font(PulseFont.callout)
-                                            .foregroundStyle(PulseColors.textPrimary)
+                                            .font(AgaraFont.callout)
+                                            .foregroundStyle(AgaraColors.textPrimary)
                                         Text(Self.dateFormatter.string(from: convo.updatedAt))
-                                            .font(PulseFont.caption2.weight(.regular))
-                                            .foregroundStyle(PulseColors.textMuted)
+                                            .font(AgaraFont.caption2.weight(.regular))
+                                            .foregroundStyle(AgaraColors.textMuted)
                                     }
                                     Spacer()
                                     if convo.id == activeId {
-                                        Image(systemName: "checkmark").foregroundStyle(PulseColors.accent)
+                                        Image(systemName: "checkmark").foregroundStyle(AgaraColors.accent)
                                     }
                                 }
                             }
-                            .listRowBackground(PulseColors.card)
+                            .listRowBackground(AgaraColors.card)
                         }
                     }
                     .scrollContentBackground(.hidden)
                 }
             }
-            .background(PulseColors.background)
+            .background(AgaraColors.background)
             .navigationTitle("Conversations")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -476,17 +476,17 @@ struct CoachOrb: View {
         Circle()
             .fill(
                 AngularGradient(
-                    colors: [PulseColors.accent, PulseColors.spo2, PulseColors.sleep, PulseColors.accent],
+                    colors: [AgaraColors.accent, AgaraColors.spo2, AgaraColors.sleep, AgaraColors.accent],
                     center: .center
                 )
             )
             .frame(width: size, height: size)
-            .overlay(Circle().fill(PulseColors.background.opacity(0.25)))
+            .overlay(Circle().fill(AgaraColors.background.opacity(0.25)))
             .overlay(
                 Circle().fill(.white.opacity(0.9)).frame(width: size * 0.22, height: size * 0.22)
                     .offset(x: -size * 0.12, y: -size * 0.12)
             )
-            .shadow(color: PulseColors.accent.opacity(0.5), radius: animate ? 10 : 4)
+            .shadow(color: AgaraColors.accent.opacity(0.5), radius: animate ? 10 : 4)
             .onAppear { withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) { animate = true } }
     }
 }
@@ -567,14 +567,14 @@ struct CoachBubble: View {
         } else if let structured {
             CoachResponseView(response: structured, onChipTap: onChipTap)
                 .padding(14)
-                .pulseGlass(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .agaraGlass(RoundedRectangle(cornerRadius: 18, style: .continuous))
         } else if message.role == "user" && message.body.isEmpty && !attachments.isEmpty {
             // Image-only message: the image is the bubble, no empty text bubble below.
             EmptyView()
         } else {
             (message.role == "user" ? Text(message.body) : Text(coachMarkdown: message.body))
-                .font(PulseFont.subheadline.weight(.regular))
-                .foregroundStyle(message.role == "user" ? PulseColors.onAccent : PulseColors.textPrimary)
+                .font(AgaraFont.subheadline.weight(.regular))
+                .foregroundStyle(message.role == "user" ? AgaraColors.onAccent : AgaraColors.textPrimary)
                 .padding(14)
                 .modifier(CoachBubbleSurface(isUser: message.role == "user"))
         }
@@ -588,13 +588,13 @@ struct CoachBubble: View {
                 .resizable().scaledToFill()
                 .frame(maxWidth: 240, maxHeight: 220)
                 .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(PulseColors.borderSubtle, lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(AgaraColors.borderSubtle, lineWidth: 1))
         } else {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(PulseColors.card)
+                .fill(AgaraColors.card)
                 .frame(width: 120, height: 90)
-                .overlay(Image(systemName: "photo").foregroundStyle(PulseColors.textMuted))
-                .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(PulseColors.borderSubtle, lineWidth: 1))
+                .overlay(Image(systemName: "photo").foregroundStyle(AgaraColors.textMuted))
+                .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(AgaraColors.borderSubtle, lineWidth: 1))
         }
     }
 }
@@ -602,7 +602,7 @@ struct CoachBubble: View {
 /// Red-bordered error bubble shown when a coach turn fails. Displays the error
 /// code (e.g. "HTTP 401") and the full reason so failures are explicit in chat,
 /// across all providers. Matches the chat design system (card background, 18pt
-/// radius, 14pt padding) with a `PulseColors.danger` accent.
+/// radius, 14pt padding) with a `AgaraColors.danger` accent.
 struct CoachErrorBubble: View {
     let error: CoachTurnError
 
@@ -610,27 +610,27 @@ struct CoachErrorBubble: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .font(PulseFont.footnote.weight(.semibold))
+                    .font(AgaraFont.footnote.weight(.semibold))
                 Text("Coach error")
-                    .font(PulseFont.footnote.weight(.semibold))
-                Text("·").foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.footnote.weight(.semibold))
+                Text("·").foregroundStyle(AgaraColors.textMuted)
                 Text(error.code)
                     .font(AgaraFont.face(12, .semibold).monospacedDigit())
             }
-            .foregroundStyle(PulseColors.danger)
+            .foregroundStyle(AgaraColors.danger)
 
             Text(error.reason)
-                .font(PulseFont.subheadline.weight(.regular))
-                .foregroundStyle(PulseColors.textPrimary)
+                .font(AgaraFont.subheadline.weight(.regular))
+                .foregroundStyle(AgaraColors.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
                 .textSelection(.enabled)
         }
         .padding(14)
-        .background(PulseColors.danger.opacity(0.10))
+        .background(AgaraColors.danger.opacity(0.10))
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(PulseColors.danger, lineWidth: 1.5)
+                .stroke(AgaraColors.danger, lineWidth: 1.5)
         )
     }
 }
@@ -684,27 +684,27 @@ struct CoachTraceStrip: View {
             ForEach(completedSteps) { step in
                 HStack(spacing: 6) {
                     Image(systemName: step.failed ? "xmark.circle" : "checkmark.circle")
-                        .font(PulseFont.caption2)
-                        .foregroundStyle(step.failed ? PulseColors.danger : PulseColors.success)
+                        .font(AgaraFont.caption2)
+                        .foregroundStyle(step.failed ? AgaraColors.danger : AgaraColors.success)
                     Text(step.label)
-                        .font(PulseFont.caption.weight(.regular))
-                        .foregroundStyle(PulseColors.textSecondary)
+                        .font(AgaraFont.caption.weight(.regular))
+                        .foregroundStyle(AgaraColors.textSecondary)
                         .lineLimit(1)
                     Spacer(minLength: 0)
                 }
             }
             HStack(spacing: 8) {
-                ProgressView().controlSize(.small).tint(PulseColors.accent)
+                ProgressView().controlSize(.small).tint(AgaraColors.accent)
                 Text(currentLabel)
-                    .font(PulseFont.caption.weight(.regular))
-                    .foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.caption.weight(.regular))
+                    .foregroundStyle(AgaraColors.textMuted)
                     .lineLimit(1)
                 Spacer(minLength: 0)
             }
         }
         .padding(.horizontal, 14).padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .pulseGlass(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .animation(.easeOut(duration: 0.18), value: completedSteps.count)
     }
 }
@@ -716,10 +716,10 @@ private struct CoachBubbleSurface: ViewModifier {
     func body(content: Content) -> some View {
         if isUser {
             content
-                .background(PulseColors.accent)
+                .background(AgaraColors.accent)
                 .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         } else {
-            content.pulseGlass(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            content.agaraGlass(RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
     }
 }

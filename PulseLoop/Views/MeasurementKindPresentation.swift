@@ -34,12 +34,12 @@ extension MeasurementSheet.Kind {
 
     var tint: Color {
         switch self {
-        case .hr, .vitals: return PulseColors.heartRate
-        case .spo2: return PulseColors.spo2
-        case .hrv: return PulseColors.hrv
-        case .bloodPressure: return PulseColors.bloodPressure
-        case .stress: return PulseColors.stress
-        case .glucose, .bloodComponents: return PulseColors.bloodSugar
+        case .hr, .vitals: return AgaraColors.heartRate
+        case .spo2: return AgaraColors.spo2
+        case .hrv: return AgaraColors.hrv
+        case .bloodPressure: return AgaraColors.bloodPressure
+        case .stress: return AgaraColors.stress
+        case .glucose, .bloodComponents: return AgaraColors.bloodSugar
         }
     }
 
@@ -134,10 +134,10 @@ extension MeasurementSheet.Stage {
 
     func eyebrowColor(tint: Color) -> Color {
         switch self {
-        case .preparing: return PulseColors.textMuted
+        case .preparing: return AgaraColors.textMuted
         case .searching, .locking: return tint
-        case .result: return PulseColors.success
-        case .error: return PulseColors.danger
+        case .result: return AgaraColors.success
+        case .error: return AgaraColors.danger
         }
     }
 }

@@ -27,7 +27,7 @@ struct FeatureFlagsView: View {
                 }
                 .padding()
             }
-            .background(PulseColors.background)
+            .background(AgaraColors.background)
             .navigationTitle("Feature flags")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

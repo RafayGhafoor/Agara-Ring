@@ -84,8 +84,8 @@ final class StravaPrefsStore {
 
     static let shared = StravaPrefsStore()
 
-    private static let prefsKey = "pulseloop.strava.prefs.v1"
-    private static let stateKey = "pulseloop.strava.state.v1"
+    private static let prefsKey = "pulseloop.strava.prefs.v1" // install-bound: pre-rename name kept so existing installs keep it
+    private static let stateKey = "pulseloop.strava.state.v1" // install-bound: pre-rename name kept so existing installs keep it
     private let defaults: UserDefaults
 
     /// User-facing upload preferences. Master toggle defaults **off** (privacy-first).

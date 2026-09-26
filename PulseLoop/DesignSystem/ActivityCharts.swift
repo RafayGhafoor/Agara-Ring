@@ -77,7 +77,7 @@ struct ActivityZoneLineChart: View {
             ForEach(dashedRules, id: \.self) { rule in
                 RuleMark(y: .value("Rule", rule))
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                    .foregroundStyle(PulseColors.textMuted.opacity(0.5))
+                    .foregroundStyle(AgaraColors.textMuted.opacity(0.5))
             }
             if showPoints {
                 ForEach(points) { p in
@@ -95,16 +95,16 @@ struct ActivityZoneLineChart: View {
                 AxisTick().foregroundStyle(.clear)
                 AxisValueLabel {
                     if let minute = value.as(Double.self) {
-                        Text("\(Int(minute))m").font(PulseFont.micro.weight(.regular)).foregroundStyle(PulseColors.textMuted)
+                        Text("\(Int(minute))m").font(AgaraFont.micro.weight(.regular)).foregroundStyle(AgaraColors.textMuted)
                     }
                 }
             }
         }
         .chartYAxis {
             AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) { _ in
-                AxisGridLine().foregroundStyle(PulseColors.borderSubtle)
+                AxisGridLine().foregroundStyle(AgaraColors.borderSubtle)
                 AxisTick().foregroundStyle(.clear)
-                AxisValueLabel().font(PulseFont.micro.weight(.regular)).foregroundStyle(PulseColors.textMuted)
+                AxisValueLabel().font(AgaraFont.micro.weight(.regular)).foregroundStyle(AgaraColors.textMuted)
             }
         }
         .chartOverlay { proxy in

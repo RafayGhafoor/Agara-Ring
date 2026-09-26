@@ -1,4 +1,4 @@
-site_name: PulseLoop
+site_name: Agara Ring
 site_description: >-
   An LLM-native, local-first health app that turns a cheap Bluetooth smart ring
   into a real, conversational health tracker — on iOS and Android.
@@ -92,10 +92,10 @@ extra:
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/saksham2001/PulseLoopiOS
-      name: PulseLoop on iOS (GitHub)
+      name: Agara Ring on iOS (GitHub)
     - icon: fontawesome/brands/android
       link: https://github.com/foureight84/PulseLoopAndroid
-      name: PulseLoop on Android (GitHub)
+      name: Agara Ring on Android (GitHub)
     - icon: fontawesome/brands/discord
       link: https://discord.gg/t9y85ebaKD
       name: Join the PulseLoop Discord

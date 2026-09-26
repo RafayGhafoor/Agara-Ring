@@ -66,7 +66,7 @@ final class RingIdentityMemoryTests: XCTestCase {
 
     // MARK: - The name that reaches the store
 
-    private func identified(_ advertisedName: String?) -> PulseEvent {
+    private func identified(_ advertisedName: String?) -> AgaraEvent {
         .deviceIdentified(
             deviceType: .veepoo,
             wearableModelID: "tk20",

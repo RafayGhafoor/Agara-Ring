@@ -313,7 +313,7 @@ final class CoachSettingsStore {
 
     nonisolated deinit {}   // skip the main-actor isolated-deinit hop (crashes on older sim runtimes)
 
-    private static let storageKey = "pulseloop.coach.settings.v1"
+    private static let storageKey = "pulseloop.coach.settings.v1" // install-bound: pre-rename name kept so existing installs keep it
     private let defaults: UserDefaults
 
     var settings: CoachSettings {

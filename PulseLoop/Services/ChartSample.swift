@@ -1,6 +1,6 @@
 import Foundation
 
-// NOTE: This file is compiled into both the app and the PulseLoopWidgets extension targets — keep it
+// NOTE: This file is compiled into both the app and the widget extension targets — keep it
 // free of SwiftData model types and app services. Model-touching helpers (e.g. building samples from
 // `[MetricSample]`) live in Services/VitalsModelBridge.swift.
 

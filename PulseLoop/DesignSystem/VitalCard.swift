@@ -31,7 +31,7 @@ struct VitalCard<Content: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, compact ? 16 : 22)
             .padding(.vertical, compact ? 16 : 20)
-            .pulseGlass(RoundedRectangle(cornerRadius: PulseRadius.card, style: .continuous))
+            .agaraGlass(RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(onTap == nil)
@@ -51,8 +51,8 @@ struct VitalCard<Content: View>: View {
                 .frame(width: 8, height: 8)
                 .shadow(color: model.accentColor.opacity(0.7), radius: 5)
             Text(model.title.uppercased())
-                .font(PulseFont.caption2).tracking(1.0)
-                .foregroundStyle(PulseColors.textMuted)
+                .font(AgaraFont.caption2).tracking(1.0)
+                .foregroundStyle(AgaraColors.textMuted)
             if let help = model.metric.helpText, !compact {
                 HelpTip(help, size: 11)
             }
@@ -61,8 +61,8 @@ struct VitalCard<Content: View>: View {
             // Suppressed when the ESTIMATED chip is present so the two don't crowd the header.
             if let footer = footerText, !compact, !model.isEstimated {
                 Text(footer)
-                    .font(PulseFont.caption2.weight(.regular))
-                    .foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.caption2.weight(.regular))
+                    .foregroundStyle(AgaraColors.textMuted)
                     .lineLimit(1)
                     .layoutPriority(-1)
             }
@@ -74,10 +74,10 @@ struct VitalCard<Content: View>: View {
 
     private var estimatedChip: some View {
         Text("ESTIMATED")
-            .font(PulseFont.nano).tracking(0.8)
-            .foregroundStyle(PulseColors.warning)
+            .font(AgaraFont.nano).tracking(0.8)
+            .foregroundStyle(AgaraColors.warning)
             .padding(.horizontal, 8).padding(.vertical, 3)
-            .background(PulseColors.warning.opacity(0.14), in: Capsule())
+            .background(AgaraColors.warning.opacity(0.14), in: Capsule())
     }
 
     // MARK: - Value + status + trend
@@ -88,28 +88,28 @@ struct VitalCard<Content: View>: View {
                 Text(model.valueText)
                     .font(AgaraFont.face(valueFontSize, .semibold).monospacedDigit())
                     .monospacedDigit()
-                    .foregroundStyle(PulseColors.textPrimary)
+                    .foregroundStyle(AgaraColors.textPrimary)
                     .contentTransition(.numericText())
                 if let unit = model.unitText {
                     Text(unit)
-                        .font(PulseFont.footnote)
-                        .foregroundStyle(PulseColors.textMuted)
+                        .font(AgaraFont.footnote)
+                        .foregroundStyle(AgaraColors.textMuted)
                 }
             }
             HStack(spacing: 10) {
                 Text(model.statusText.uppercased())
-                    .font(PulseFont.caption2.weight(.semibold)).tracking(0.8)
+                    .font(AgaraFont.caption2.weight(.semibold)).tracking(0.8)
                     .foregroundStyle(model.statusColor)
                 if let delta = model.trend.deltaText {
                     HStack(spacing: 3) {
-                        Image(systemName: model.trend.symbol).font(PulseFont.micro.weight(.semibold))
-                        Text(delta).font(PulseFont.caption2)
+                        Image(systemName: model.trend.symbol).font(AgaraFont.micro.weight(.semibold))
+                        Text(delta).font(AgaraFont.caption2)
                     }
-                    .foregroundStyle(PulseColors.textMuted)
+                    .foregroundStyle(AgaraColors.textMuted)
                 }
             }
             if let subtitle = model.subtitleText {
-                Text(subtitle).font(PulseFont.caption.weight(.regular)).foregroundStyle(PulseColors.textMuted)
+                Text(subtitle).font(AgaraFont.caption.weight(.regular)).foregroundStyle(AgaraColors.textMuted)
             }
         }
         .sensoryFeedback(.success, trigger: model.valueText)

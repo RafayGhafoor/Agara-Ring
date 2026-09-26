@@ -252,10 +252,10 @@ final class AppearanceTests: XCTestCase {
         XCTAssertEqual(store.resolvedTheme(systemIsDark: true, sex: nil).name, "dark")
     }
 
-    func testThemeStoreIsWhatPulseColorsReads() {
+    func testThemeStoreIsWhatAgaraColorsReads() {
         ThemeStore.current = AppearanceStore.resolve(mode: .light, systemIsDark: true, flavour: "rose")
         XCTAssertEqual(ThemeStore.shared.theme.name, "rose_light")
-        XCTAssertEqual(PulseColors.accent, AgaraTheme.roseLight.accent)
+        XCTAssertEqual(AgaraColors.accent, AgaraTheme.roseLight.accent)
     }
 }
 

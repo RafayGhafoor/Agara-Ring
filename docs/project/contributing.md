@@ -5,7 +5,7 @@ description: How to get set up, the standards PRs are held to, and how to add a 
 
 # Contributing
 
-Thank you! PulseLoop is an open, privacy-first health app that turns a cheap
+Thank you! Agara Ring is an open, privacy-first health app that turns a cheap
 Bluetooth ring into a real, local-first health tracker. Contributions of all
 kinds are welcome — bug reports, new ring drivers, coach improvements, UI polish,
 and docs.
@@ -60,7 +60,7 @@ mocked client (`sk-test`), so they need no network and no secrets.
     ```sh
     xcodebuild test \
       -project PulseLoop.xcodeproj \
-      -scheme PulseLoop \
+      -scheme Agara Ring \
       -destination 'platform=iOS Simulator,name=iPhone 16'
     ```
 
@@ -79,7 +79,7 @@ math, and coach tools.
 
 ## Adding support for a new wearable
 
-PulseLoop has a **device-agnostic driver layer** (`RingProtocol/` on iOS). Each
+Agara Ring has a **device-agnostic driver layer** (`RingProtocol/` on iOS). Each
 device declares the capabilities it supports, and the UI shows only those
 features. To add a ring:
 
@@ -114,7 +114,7 @@ others help. Mark anything you couldn't verify on real hardware as 🧪
 Keep PRs focused — one logical change per PR is much easier to review.
 
 !!! warning "Privacy expectations"
-    PulseLoop's promise is that **your health data stays on your device**. Any PR
+    Agara Ring's promise is that **your health data stays on your device**. Any PR
     that changes what data leaves the device, or how it's stored, must call that
     out clearly in the PR description and will get extra scrutiny. Never commit
     secrets, API keys, or real personal health data. See [Privacy](privacy.md).

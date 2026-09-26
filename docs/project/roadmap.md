@@ -1,6 +1,6 @@
 ---
 title: Roadmap
-description: Long-term direction and guiding principles for PulseLoop, across both the iOS and Android ports.
+description: Long-term direction and guiding principles for Agara Ring, across both the iOS and Android ports.
 ---
 
 # Roadmap

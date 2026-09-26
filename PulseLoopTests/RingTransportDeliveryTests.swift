@@ -4,7 +4,7 @@ import XCTest
 @MainActor
 final class RingTransportDeliveryTests: XCTestCase {
     func testFragmentsAndRejectedNotificationsAreCapturedBeforeDecode() {
-        var events: [PulseEvent] = []
+        var events: [AgaraEvent] = []
         for data in [Data([0xAB]), Data([0x00, 0xFF])] {
             let before = events.count
             RingNotificationDelivery.receive(data, decode: {
@@ -23,7 +23,7 @@ final class RingTransportDeliveryTests: XCTestCase {
             .heartRateSample(bpm: 72, timestamp: Date()),
             .measurementRejected(mode: 0x09)
         ]
-        var events: [PulseEvent] = []
+        var events: [AgaraEvent] = []
         RingNotificationDelivery.receive(Data([0xAB, 1, 2]), decode: { decoded },
             publish: { events.append($0) },
             deliver: { events.append(contentsOf: RingNotificationDelivery.events(for: $0)) })

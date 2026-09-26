@@ -8,12 +8,12 @@ import Foundation
 final class CoachNotificationScheduler {
     static let shared = CoachNotificationScheduler()
     /// App-refresh task (short budget) — used for the lightweight cloud providers.
-    static let taskIdentifier = "com.pulseloop.coach.refresh"
+    static let taskIdentifier = "com.pulseloop.coach.refresh" // install-bound: pre-rename name kept so existing installs keep it (Info.plist BGTaskSchedulerPermittedIdentifiers)
     /// Processing task (longer budget, no network required) — used for the
     /// on-device provider, whose local inference needs more CPU time than a
     /// network round-trip. Must also appear in Info.plist's
     /// `BGTaskSchedulerPermittedIdentifiers`.
-    static let processingTaskIdentifier = "com.pulseloop.coach.process"
+    static let processingTaskIdentifier = "com.pulseloop.coach.process" // install-bound: pre-rename name kept so existing installs keep it (Info.plist BGTaskSchedulerPermittedIdentifiers)
 
     /// Builds a service bound to the live model context + ring coordinator. The parameter is the
     /// sync-wait budget (seconds) — how long the service's pre-notification sync may run, sized to

@@ -1,18 +1,18 @@
 ---
 title: Getting Started — iOS
-description: Install PulseLoop on iOS via TestFlight or build it from source in Xcode.
+description: Install Agara Ring on iOS via TestFlight or build it from source in Xcode.
 ---
 
 # Getting Started on iOS
 
-PulseLoop for iOS is a native SwiftUI app with SwiftData persistence, Live
+Agara Ring for iOS is a native SwiftUI app with SwiftData persistence, Live
 Activities, and a Dynamic Island widget. There are two ways to run it: the
 upcoming public TestFlight beta, or building from source in Xcode.
 
 !!! info "Pick a ring first"
-    PulseLoop talks to a real Bluetooth ring. Before you start, check the
+    Agara Ring talks to a real Bluetooth ring. Before you start, check the
     [supported hardware](../hardware/index.md) to make sure your ring
-    is one PulseLoop can drive. No ring yet? You can still explore the whole app
+    is one Agara Ring can drive. No ring yet? You can still explore the whole app
     with [demo data](#demo-data-no-ring-required).
 
 ## :material-apple: TestFlight beta
@@ -26,8 +26,8 @@ to request an invite, or ask on the [Discord](https://discord.gg/t9y85ebaKD).
 
 !!! note "Ring not receiving any data?"
     Some users have reported receiving no data when setting the ring up
-    directly with PulseLoop. If this happens, set the ring up once using the
-    **Jring** app first, then unpair it from Jring and use it with PulseLoop.
+    directly with Agara Ring. If this happens, set the ring up once using the
+    **Jring** app first, then unpair it from Jring and use it with Agara Ring.
 
 ## :material-hammer-wrench: Build from source (Xcode)
 
@@ -90,7 +90,7 @@ mocked client, so they need no network and no secrets.
     ```sh
     xcodebuild test \
       -project PulseLoop.xcodeproj \
-      -scheme PulseLoop \
+      -scheme Agara Ring \
       -destination 'platform=iOS Simulator,name=iPhone 16'
     ```
 

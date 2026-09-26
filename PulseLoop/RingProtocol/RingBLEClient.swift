@@ -14,8 +14,8 @@ import Foundation
 /// buffers, sync-machine state — never leaks across reconnects). Adding a new wearable is "append a
 /// coordinator to the registry."
 ///
-/// Every outgoing and incoming frame is still published as `PulseEvent.rawPacket` (for the hidden
-/// debug feed), and decoded notifications are fanned out to typed `PulseEvent`s via `RingEventBridge`.
+/// Every outgoing and incoming frame is still published as `AgaraEvent.rawPacket` (for the hidden
+/// debug feed), and decoded notifications are fanned out to typed `AgaraEvent`s via `RingEventBridge`.
 ///
 /// The central manager is created with `queue: nil`, so all delegate callbacks arrive on the main
 /// thread; the class is `@MainActor` and the delegate methods use `MainActor.assumeIsolated`. Writes
@@ -223,7 +223,7 @@ final class RingBLEClient: NSObject {
             central = CBCentralManager(
                 delegate: self,
                 queue: nil,
-                options: [CBCentralManagerOptionRestoreIdentifierKey: "pulseloop.ring.central"]
+                options: [CBCentralManagerOptionRestoreIdentifierKey: "pulseloop.ring.central"] // install-bound: state-restoration id
             )
         }
     }
@@ -755,8 +755,8 @@ final class RingBLEClient: NSObject {
         publish(.rawPacket(direction: direction, data: data, decoded: decoded))
     }
 
-    private func publish(_ event: PulseEvent) {
-        Task { await PulseEventBus.shared.publish(event) }
+    private func publish(_ event: AgaraEvent) {
+        Task { await AgaraEventBus.shared.publish(event) }
     }
 
     /// Lift CoreBluetooth's raw advertisement dictionary into `AdvertisementInfo` and claim it against
@@ -990,12 +990,12 @@ extension RingBLEClient {
     /// The raw-packet capture keeps each OTA frame's header/offset/status (never block payloads).
     private func publishOtaPacket(_ frame: Data, outgoing: Bool) {
         guard RawPacketCapture.isEnabled else { return }
-        let event = PulseEvent.rawPacket(
+        let event = AgaraEvent.rawPacket(
             direction: outgoing ? .outgoing : .incoming,
             data: AbOta.logBytes(frame, outgoing: outgoing),
             decoded: .otaFrame(commandId: frame.first ?? 0, summary: AbOta.summary(frame, outgoing: outgoing))
         )
-        Task { await PulseEventBus.shared.publish(event) }
+        Task { await AgaraEventBus.shared.publish(event) }
     }
 
     /// Find `F031` / `F032` in the `F003` service (never subscribed until an install asks).

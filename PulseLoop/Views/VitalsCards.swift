@@ -136,14 +136,14 @@ struct VitalBloodPressureCard: View {
                         value: systolic!,
                         domain: 80...190,
                         zones: systolicZones,
-                        fallback: PulseColors.bloodPressure
+                        fallback: AgaraColors.bloodPressure
                     )
                     ringColumn(
                         title: "Diastolic",
                         value: diastolic!,
                         domain: 50...130,
                         zones: diastolicZones,
-                        fallback: PulseColors.bloodPressure.opacity(0.7)
+                        fallback: AgaraColors.bloodPressure.opacity(0.7)
                     )
                 }
                 .frame(maxWidth: .infinity)
@@ -168,8 +168,8 @@ struct VitalBloodPressureCard: View {
                 lineWidth: 11
             )
             Text(title.uppercased())
-                .font(PulseFont.caption2.weight(.semibold)).tracking(0.8)
-                .foregroundStyle(PulseColors.textMuted)
+                .font(AgaraFont.caption2.weight(.semibold)).tracking(0.8)
+                .foregroundStyle(AgaraColors.textMuted)
         }
         .frame(maxWidth: .infinity)
     }
@@ -190,12 +190,12 @@ struct VitalEmptyState: View {
                 .foregroundStyle(metric.accentColor.opacity(0.7))
             Text(title)
                 .font(AgaraFont.face(compact ? 12 : 14, .medium))
-                .foregroundStyle(PulseColors.textPrimary)
+                .foregroundStyle(AgaraColors.textPrimary)
                 .multilineTextAlignment(.center)
             if !compact {
                 Text(action)
-                    .font(PulseFont.caption.weight(.regular))
-                    .foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.caption.weight(.regular))
+                    .foregroundStyle(AgaraColors.textMuted)
                     .multilineTextAlignment(.center)
             }
         }

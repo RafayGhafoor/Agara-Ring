@@ -1,6 +1,6 @@
 //
 //  WorkoutLiveActivityService.swift
-//  PulseLoop
+//  Agara Ring
 //
 //  App-side controller for the workout Live Activity. Wraps
 //  Activity<WorkoutActivityAttributes>. Every ActivityKit call is guarded so a
@@ -12,7 +12,7 @@ import Combine
 import ActivityKit
 import os.log
 
-private let liveActivityLog = Logger(subsystem: "xyz.sakshambhutani.pulseloop2", category: "LiveActivity")
+private let liveActivityLog = Logger(subsystem: "com.agara.ring", category: "LiveActivity")
 
 struct WorkoutLiveActivityDisplayOptions {
     let usesGps: Bool

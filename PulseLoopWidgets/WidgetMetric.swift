@@ -75,10 +75,10 @@ enum WidgetMetric: String, CaseIterable, AppEnum {
 
     var accentColor: Color {
         switch self {
-        case .activity: return PulseColors.steps
-        case .nutrition: return PulseColors.calories
-        case .sleep: return PulseColors.sleep
-        default: return metricKind?.accentColor ?? PulseColors.accent
+        case .activity: return AgaraColors.steps
+        case .nutrition: return AgaraColors.calories
+        case .sleep: return AgaraColors.sleep
+        default: return metricKind?.accentColor ?? AgaraColors.accent
         }
     }
 }

@@ -54,7 +54,7 @@ struct MealLogSheet: View {
                     searchScreen
                 }
             }
-            .background(PulseColors.background)
+            .background(AgaraColors.background)
             .navigationTitle(editingId == nil ? "Log meal" : "Edit meal")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -88,11 +88,11 @@ struct MealLogSheet: View {
                 HStack(spacing: 10) {
                     HStack(spacing: 8) {
                         Image(systemName: "magnifyingglass")
-                            .font(PulseFont.subheadline)
-                            .foregroundStyle(PulseColors.textMuted)
+                            .font(AgaraFont.subheadline)
+                            .foregroundStyle(AgaraColors.textMuted)
                         TextField("Search foods", text: $query)
-                            .font(PulseFont.body)
-                            .foregroundStyle(PulseColors.textPrimary)
+                            .font(AgaraFont.body)
+                            .foregroundStyle(AgaraColors.textPrimary)
                             .autocorrectionDisabled()
                             .submitLabel(.search)
                         if searching {
@@ -102,7 +102,7 @@ struct MealLogSheet: View {
                                 query = ""
                             } label: {
                                 Image(systemName: "xmark.circle.fill")
-                                    .foregroundStyle(PulseColors.textMuted)
+                                    .foregroundStyle(AgaraColors.textMuted)
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel("Clear search")
@@ -110,14 +110,14 @@ struct MealLogSheet: View {
                     }
                     .padding(.horizontal, 14)
                     .frame(height: 46)
-                    .pulseGlass(Capsule())
+                    .agaraGlass(Capsule())
 
                     Button { showScanner = true } label: {
                         Image(systemName: "barcode.viewfinder")
-                            .font(PulseFont.title3.weight(.regular))
-                            .foregroundStyle(PulseColors.textPrimary)
+                            .font(AgaraFont.title3.weight(.regular))
+                            .foregroundStyle(AgaraColors.textPrimary)
                             .frame(width: 46, height: 46)
-                            .pulseGlass(Circle(), interactive: true)
+                            .agaraGlass(Circle(), interactive: true)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Scan barcode")
@@ -144,7 +144,7 @@ struct MealLogSheet: View {
             }
             .padding(16)
         }
-        .background(PulseColors.background)
+        .background(AgaraColors.background)
         .scrollDismissesKeyboard(.immediately)
         .task(id: query) { await runSearch() }
         .sheet(isPresented: $showScanner) {
@@ -158,15 +158,15 @@ struct MealLogSheet: View {
     private func inlineNotice(_ text: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle")
-                .font(PulseFont.caption)
-                .foregroundStyle(PulseColors.warning)
+                .font(AgaraFont.caption)
+                .foregroundStyle(AgaraColors.warning)
             Text(text)
-                .font(PulseFont.caption.weight(.regular))
-                .foregroundStyle(PulseColors.textSecondary)
+                .font(AgaraFont.caption.weight(.regular))
+                .foregroundStyle(AgaraColors.textSecondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
-        .pulseGlass(RoundedRectangle(cornerRadius: PulseRadius.compact, style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: AgaraShape.radiusCompact, style: .continuous))
     }
 
     @ViewBuilder
@@ -175,8 +175,8 @@ struct MealLogSheet: View {
             productSection("RESULTS", products: results, viaBarcode: false)
         } else if !searching && searchError == nil {
             Text("No matches — try another name or enter it manually.")
-                .font(PulseFont.caption.weight(.regular))
-                .foregroundStyle(PulseColors.textMuted)
+                .font(AgaraFont.caption.weight(.regular))
+                .foregroundStyle(AgaraColors.textMuted)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, 4)
         }
@@ -192,9 +192,9 @@ struct MealLogSheet: View {
     private func productSection(_ header: String, products: [FoodProduct], viaBarcode: Bool) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(header)
-                .font(PulseFont.caption2)
+                .font(AgaraFont.caption2)
                 .tracking(1.4)
-                .foregroundStyle(PulseColors.textMuted)
+                .foregroundStyle(AgaraColors.textMuted)
             ForEach(products, id: \.code) { product in
                 NavigationLink(value: PickedProduct(product: product, viaBarcode: viaBarcode)) {
                     FoodProductRow(product: product)
@@ -270,28 +270,28 @@ struct FoodProductRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: "checkmark.seal")
-                .font(PulseFont.subheadline)
-                .foregroundStyle(PulseColors.success)
+                .font(AgaraFont.subheadline)
+                .foregroundStyle(AgaraColors.success)
                 .frame(width: 36, height: 36)
-                .background(PulseColors.success.opacity(0.14))
+                .background(AgaraColors.success.opacity(0.14))
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(product.name)
-                    .font(PulseFont.subheadline.weight(.semibold))
-                    .foregroundStyle(PulseColors.textPrimary)
+                    .font(AgaraFont.subheadline.weight(.semibold))
+                    .foregroundStyle(AgaraColors.textPrimary)
                     .lineLimit(1)
                 Text(subtitle)
-                    .font(PulseFont.caption.weight(.regular).monospacedDigit())
-                    .foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.caption.weight(.regular).monospacedDigit())
+                    .foregroundStyle(AgaraColors.textMuted)
                     .lineLimit(1)
             }
             Spacer()
             Image(systemName: "chevron.right")
-                .font(PulseFont.caption.weight(.semibold))
-                .foregroundStyle(PulseColors.textMuted)
+                .font(AgaraFont.caption.weight(.semibold))
+                .foregroundStyle(AgaraColors.textMuted)
         }
         .padding(12)
-        .pulseGlass(RoundedRectangle(cornerRadius: PulseRadius.compact, style: .continuous))
+        .agaraGlass(RoundedRectangle(cornerRadius: AgaraShape.radiusCompact, style: .continuous))
         .contentShape(Rectangle())
     }
 
@@ -341,20 +341,20 @@ struct ServingPickerView: View {
             VStack(spacing: 16) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(product.name)
-                        .font(PulseFont.title3)
-                        .foregroundStyle(PulseColors.textPrimary)
+                        .font(AgaraFont.title3)
+                        .foregroundStyle(AgaraColors.textPrimary)
                     HStack(spacing: 8) {
                         if let brand = product.brand {
                             Text(brand)
-                                .font(PulseFont.caption.weight(.regular))
-                                .foregroundStyle(PulseColors.textMuted)
+                                .font(AgaraFont.caption.weight(.regular))
+                                .foregroundStyle(AgaraColors.textMuted)
                         }
                         ProvenanceBadge(source: viaBarcode ? .offBarcode : .offSearch)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                DetailCard(title: "Amount", color: PulseColors.calories) {
+                DetailCard(title: "Amount", color: AgaraColors.calories) {
                     VStack(spacing: 12) {
                         if servingGrams != nil {
                             Picker("Mode", selection: $mode) {
@@ -366,23 +366,23 @@ struct ServingPickerView: View {
                         if mode == .servings {
                             Stepper(value: $servings, in: 0.25...20, step: 0.25) {
                                 HStack {
-                                    Text("Servings").font(PulseFont.body).foregroundStyle(PulseColors.textPrimary)
+                                    Text("Servings").font(AgaraFont.body).foregroundStyle(AgaraColors.textPrimary)
                                     Spacer()
                                     Text(servingsText)
-                                        .font(PulseFont.subheadline.monospacedDigit())
-                                        .foregroundStyle(PulseColors.textSecondary)
+                                        .font(AgaraFont.subheadline.monospacedDigit())
+                                        .foregroundStyle(AgaraColors.textSecondary)
                                 }
                             }
-                            .tint(PulseColors.accent)
+                            .tint(AgaraColors.accent)
                         } else {
                             HStack {
-                                Text("Grams").font(PulseFont.body).foregroundStyle(PulseColors.textPrimary)
+                                Text("Grams").font(AgaraFont.body).foregroundStyle(AgaraColors.textPrimary)
                                 Spacer()
                                 TextField("100", text: $gramsText)
                                     .keyboardType(.decimalPad)
                                     .multilineTextAlignment(.trailing)
-                                    .font(PulseFont.body.monospacedDigit())
-                                    .foregroundStyle(PulseColors.textPrimary)
+                                    .font(AgaraFont.body.monospacedDigit())
+                                    .foregroundStyle(AgaraColors.textPrimary)
                                     .frame(width: 80)
                             }
                         }
@@ -390,12 +390,12 @@ struct ServingPickerView: View {
                     .padding(.top, 12)
                 }
 
-                DetailCard(title: "Nutrition", color: PulseColors.calories) {
+                DetailCard(title: "Nutrition", color: AgaraColors.calories) {
                     VStack(spacing: 8) {
                         previewRow("Calories", scaled(product.energyKcal100g), "kcal")
-                        previewRow("Protein", scaled(product.protein100g), "g", color: PulseColors.macroProtein)
-                        previewRow("Carbs", scaled(product.carbs100g), "g", color: PulseColors.macroCarbs)
-                        previewRow("Fat", scaled(product.fat100g), "g", color: PulseColors.macroFat)
+                        previewRow("Protein", scaled(product.protein100g), "g", color: AgaraColors.macroProtein)
+                        previewRow("Carbs", scaled(product.carbs100g), "g", color: AgaraColors.macroCarbs)
+                        previewRow("Fat", scaled(product.fat100g), "g", color: AgaraColors.macroFat)
                         if let fiber = product.fiber100g {
                             previewRow("Fiber", scaled(fiber), "g")
                         }
@@ -412,7 +412,7 @@ struct ServingPickerView: View {
             }
             .padding(16)
         }
-        .background(PulseColors.background)
+        .background(AgaraColors.background)
         .navigationTitle("Serving")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
@@ -437,16 +437,16 @@ struct ServingPickerView: View {
         NutritionMath.scaled(per100g: per100g, grams: totalGrams)
     }
 
-    private func previewRow(_ label: String, _ value: Double, _ unit: String, color: Color = PulseColors.textSecondary) -> some View {
+    private func previewRow(_ label: String, _ value: Double, _ unit: String, color: Color = AgaraColors.textSecondary) -> some View {
         HStack {
             HStack(spacing: 8) {
                 Circle().fill(color).frame(width: 6, height: 6)
-                Text(label).font(PulseFont.subheadline).foregroundStyle(PulseColors.textSecondary)
+                Text(label).font(AgaraFont.subheadline).foregroundStyle(AgaraColors.textSecondary)
             }
             Spacer()
             Text("\(Int(value.rounded())) \(unit)")
-                .font(PulseFont.subheadline.monospacedDigit())
-                .foregroundStyle(PulseColors.textPrimary)
+                .font(AgaraFont.subheadline.monospacedDigit())
+                .foregroundStyle(AgaraColors.textPrimary)
         }
     }
 

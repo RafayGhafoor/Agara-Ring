@@ -167,7 +167,7 @@ extension DeviceRepository {
         }
         device.updatedAt = Date()
         try? context.save()
-        PulseDataChange.shared.notify()
+        AgaraDataChange.shared.notify()
         return device
     }
 }

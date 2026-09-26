@@ -64,16 +64,16 @@ enum BatteryAlertEngine {
 
 // MARK: - Monitor
 
-/// Subscribes to `PulseEventBus` and fires a local notification when the ring's battery crosses the
+/// Subscribes to `AgaraEventBus` and fires a local notification when the ring's battery crosses the
 /// low (<20%) / critical (<10%) thresholds. Pure engine + level-latched state persisted in
 /// UserDefaults, so a single crossing fires once per day per threshold. Lives for the app lifetime,
-/// like `CoachAnomalyMonitor`; started from `PulseLoopApp`.
+/// like `CoachAnomalyMonitor`; started from `AgaraApp`.
 @MainActor
 final class BatteryAlertMonitor {
     /// UserDefaults key gating the feature. **Absent = enabled** (default ON).
-    static let enabledKey = "pulseloop.batteryalerts.enabled"
+    static let enabledKey = "pulseloop.batteryalerts.enabled" // install-bound: pre-rename name kept so existing installs keep it
     /// UserDefaults key for the persisted `BatteryAlertState` JSON.
-    static let stateKey = "pulseloop.batteryalerts.state.v1"
+    static let stateKey = "pulseloop.batteryalerts.state.v1" // install-bound: pre-rename name kept so existing installs keep it
     /// Stable notification identifier for both severities — a critical alert replaces a pending low one.
     static let notificationIdentifier = "ring.battery.alert"
 
@@ -92,14 +92,14 @@ final class BatteryAlertMonitor {
     func start() {
         guard streamTask == nil else { return }
         streamTask = Task { [weak self] in
-            let stream = await PulseEventBus.shared.stream()
+            let stream = await AgaraEventBus.shared.stream()
             for await event in stream {
                 self?.handle(event)
             }
         }
     }
 
-    private func handle(_ event: PulseEvent) {
+    private func handle(_ event: AgaraEvent) {
         guard case let .batteryLevel(percent) = event else { return }
         handle(percent: percent, now: Date())
     }

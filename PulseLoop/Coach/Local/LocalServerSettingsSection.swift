@@ -62,13 +62,13 @@ struct LocalServerSettingsSection: View {
                         .autocorrectionDisabled()
                         .keyboardType(.URL)
                         .font(AgaraFont.face(14, .regular).monospacedDigit())
-                        .foregroundStyle(PulseColors.textPrimary)
+                        .foregroundStyle(AgaraColors.textPrimary)
                         .padding(.horizontal, 14).padding(.vertical, 10)
-                        .pulseGlass(Capsule())
+                        .agaraGlass(Capsule())
 
                     Text(localURLProblem.map(LocalEndpoint.message) ?? Self.addressHint)
-                        .font(PulseFont.caption)
-                        .foregroundStyle(localURLProblem == nil ? PulseColors.textMuted : PulseColors.danger)
+                        .font(AgaraFont.caption)
+                        .foregroundStyle(localURLProblem == nil ? AgaraColors.textMuted : AgaraColors.danger)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -88,15 +88,15 @@ struct LocalServerSettingsSection: View {
 
                     if localProbeBusy {
                         Text("Sending three tiny test messages. This can take a minute if the model still has to load.")
-                            .font(PulseFont.caption).foregroundStyle(PulseColors.textMuted)
+                            .font(AgaraFont.caption).foregroundStyle(AgaraColors.textMuted)
                     }
                     if let localProbeResult {
                         Text(localProbeResult)
-                            .font(PulseFont.caption)
-                            .foregroundStyle(localProbeOK ? PulseColors.textSecondary : PulseColors.danger)
+                            .font(AgaraFont.caption)
+                            .foregroundStyle(localProbeOK ? AgaraColors.textSecondary : AgaraColors.danger)
                     }
                     ForEach(localProbeNotes, id: \.self) { note in
-                        Text(note).font(PulseFont.caption2).foregroundStyle(PulseColors.textMuted)
+                        Text(note).font(AgaraFont.caption2).foregroundStyle(AgaraColors.textMuted)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -120,12 +120,12 @@ struct LocalServerSettingsSection: View {
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .font(AgaraFont.face(14, .regular).monospacedDigit())
-                        .foregroundStyle(PulseColors.textPrimary)
+                        .foregroundStyle(AgaraColors.textPrimary)
                         .padding(.horizontal, 14).padding(.vertical, 10)
-                        .pulseGlass(Capsule())
+                        .agaraGlass(Capsule())
 
                     Text("llama.cpp ignores this unless started with --alias; every other engine needs it to match.")
-                        .font(PulseFont.caption).foregroundStyle(PulseColors.textMuted)
+                        .font(AgaraFont.caption).foregroundStyle(AgaraColors.textMuted)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -159,13 +159,13 @@ struct LocalServerSettingsSection: View {
         title: String, placeholder: String, binding: Binding<String>
     ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(title).font(PulseFont.caption).foregroundStyle(PulseColors.textMuted)
+            Text(title).font(AgaraFont.caption).foregroundStyle(AgaraColors.textMuted)
             TextField(placeholder, text: binding)
                 .keyboardType(.numberPad)
                 .font(AgaraFont.face(14, .regular).monospacedDigit())
-                .foregroundStyle(PulseColors.textPrimary)
+                .foregroundStyle(AgaraColors.textPrimary)
                 .padding(.horizontal, 14).padding(.vertical, 10)
-                .pulseGlass(Capsule())
+                .agaraGlass(Capsule())
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

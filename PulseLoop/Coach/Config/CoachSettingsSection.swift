@@ -134,8 +134,8 @@ struct CoachSettingsSection: View {
 
         if checkInPermissionDenied {
             Text(AgaraCopy.notificationsDisabled)
-                .font(PulseFont.caption)
-                .foregroundStyle(PulseColors.danger)
+                .font(AgaraFont.caption)
+                .foregroundStyle(AgaraColors.danger)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
 
@@ -267,7 +267,7 @@ struct CoachSettingsSection: View {
                             Text("High").tag("high")
                         }
                         .pickerStyle(.menu)
-                        .tint(PulseColors.accent)
+                        .tint(AgaraColors.accent)
                     }
 
                     FormToggleRow(title: "Privacy routing", isOn: privacyRoutingBinding)
@@ -280,7 +280,7 @@ struct CoachSettingsSection: View {
                             Text("Latency").tag("latency")
                         }
                         .pickerStyle(.menu)
-                        .tint(PulseColors.accent)
+                        .tint(AgaraColors.accent)
                     }
                 }
             }
@@ -319,21 +319,21 @@ struct CoachSettingsSection: View {
             HStack(alignment: .top, spacing: 10) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(memory.key)
-                        .font(PulseFont.footnote)
-                        .foregroundStyle(PulseColors.textPrimary)
+                        .font(AgaraFont.footnote)
+                        .foregroundStyle(AgaraColors.textPrimary)
                     Text(memory.value)
-                        .font(PulseFont.caption.weight(.regular))
-                        .foregroundStyle(PulseColors.textSecondary)
+                        .font(AgaraFont.caption.weight(.regular))
+                        .foregroundStyle(AgaraColors.textSecondary)
                     Text(memory.memoryType.replacingOccurrences(of: "_", with: " "))
-                        .font(PulseFont.nano.weight(.medium)).tracking(0.6)
-                        .foregroundStyle(PulseColors.textMuted)
+                        .font(AgaraFont.nano.weight(.medium)).tracking(0.6)
+                        .foregroundStyle(AgaraColors.textMuted)
                 }
                 Spacer(minLength: 8)
                 Button {
                     modelContext.delete(memory)
                     try? modelContext.save()
                 } label: {
-                    Image(systemName: "trash").font(PulseFont.subheadline.weight(.regular)).foregroundStyle(PulseColors.danger)
+                    Image(systemName: "trash").font(AgaraFont.subheadline.weight(.regular)).foregroundStyle(AgaraColors.danger)
                         .frame(width: 36, height: 36)
                 }
                 .buttonStyle(.plain)
@@ -368,14 +368,14 @@ struct CoachSettingsSection: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .font(AgaraFont.face(14, .regular).monospacedDigit())
-                    .foregroundStyle(PulseColors.textPrimary)
+                    .foregroundStyle(AgaraColors.textPrimary)
                     .padding(.horizontal, 14).padding(.vertical, 10)
-                    .pulseGlass(Capsule())
+                    .agaraGlass(Capsule())
 
                     Button { showRaw.wrappedValue.toggle() } label: {
                         Image(systemName: showRaw.wrappedValue ? "eye.slash" : "eye")
-                            .font(PulseFont.callout.weight(.regular))
-                            .foregroundStyle(PulseColors.textMuted)
+                            .font(AgaraFont.callout.weight(.regular))
+                            .foregroundStyle(AgaraColors.textMuted)
                             .frame(width: 40, height: 40)
                     }
                     .buttonStyle(.plain)
@@ -390,9 +390,9 @@ struct CoachSettingsSection: View {
                 }
 
                 if let error {
-                    Text(error).font(PulseFont.caption).foregroundStyle(PulseColors.danger)
+                    Text(error).font(AgaraFont.caption).foregroundStyle(AgaraColors.danger)
                 } else {
-                    Text(hint).font(PulseFont.caption).foregroundStyle(PulseColors.textMuted)
+                    Text(hint).font(AgaraFont.caption).foregroundStyle(AgaraColors.textMuted)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -411,20 +411,20 @@ struct CoachSettingsSection: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 8) {
                     Image(systemName: availability.isAvailable ? "lock.iphone" : "exclamationmark.triangle")
-                        .font(PulseFont.callout.weight(.regular))
-                        .foregroundStyle(availability.isAvailable ? PulseColors.accent : PulseColors.danger)
+                        .font(AgaraFont.callout.weight(.regular))
+                        .foregroundStyle(availability.isAvailable ? AgaraColors.accent : AgaraColors.danger)
                     Text(availability.isAvailable ? "On-device · private" : "On-device unavailable")
-                        .font(PulseFont.subheadline.weight(.semibold))
-                        .foregroundStyle(PulseColors.textPrimary)
+                        .font(AgaraFont.subheadline.weight(.semibold))
+                        .foregroundStyle(AgaraColors.textPrimary)
                 }
                 Text(availability.isAvailable
                      ? "Your health data is analyzed entirely on your iPhone and never leaves the device. No API key, no network — works offline and free of charge."
                      : availability.statusMessage)
-                    .font(PulseFont.caption.weight(.regular))
-                    .foregroundStyle(PulseColors.textSecondary)
+                    .font(AgaraFont.caption.weight(.regular))
+                    .foregroundStyle(AgaraColors.textSecondary)
                 Text("On-device coaching gives summaries, check-ins and chat. Charts, AI actions and web search need a cloud provider.")
-                    .font(PulseFont.caption)
-                    .foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.caption)
+                    .foregroundStyle(AgaraColors.textMuted)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -461,12 +461,12 @@ struct CoachSettingsSection: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .font(AgaraFont.face(14, .regular).monospacedDigit())
-                    .foregroundStyle(PulseColors.textPrimary)
+                    .foregroundStyle(AgaraColors.textPrimary)
                     .padding(.horizontal, 14).padding(.vertical, 10)
-                    .pulseGlass(Capsule())
+                    .agaraGlass(Capsule())
 
                 Text("Any model slug from openrouter.ai/models — e.g. anthropic/claude-sonnet-4.6.")
-                    .font(PulseFont.caption).foregroundStyle(PulseColors.textMuted)
+                    .font(AgaraFont.caption).foregroundStyle(AgaraColors.textMuted)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
