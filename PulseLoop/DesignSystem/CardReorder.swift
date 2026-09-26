@@ -493,7 +493,7 @@ extension MetricKey {
         case .stress: return "brain.head.profile"
         case .fatigue: return "battery.25"
         case .bloodSugar: return "cube.fill"
-        case .bloodPressureSystolic, .bloodPressureDiastolic: return "heart.text.square"
+        case .bloodPressureSystolic, .bloodPressureDiastolic: return "waveform.path.ecg.rectangle.fill"
         case .calories: return "flame.fill"
         case .distance: return "location.fill"
         case .activeMinutes: return "figure.run"

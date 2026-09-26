@@ -26,11 +26,11 @@ struct VitalsResultsView: View {
         }
         if let bp = v.bloodPressure {
             tiles.append(.init(name: "Blood Pressure", value: "\(bp.systolic)/\(bp.diastolic)", unit: "mmHg",
-                               icon: "heart.text.square", tint: AgaraColors.bloodPressure))
+                               icon: "waveform.path.ecg.rectangle.fill", tint: AgaraColors.bloodPressure))
         }
         if let spo2 = v.spo2 {
             tiles.append(.init(name: "Blood Oxygen", value: "\(spo2)", unit: "%",
-                               icon: "lungs.fill", tint: AgaraColors.spo2))
+                               icon: "drop.fill", tint: AgaraColors.spo2))
         }
         if let fatigue = v.fatigue {
             tiles.append(.init(name: "Fatigue", value: "\(fatigue)", unit: "",

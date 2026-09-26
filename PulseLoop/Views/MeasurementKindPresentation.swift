@@ -45,15 +45,17 @@ extension MeasurementSheet.Kind {
         }
     }
 
+    /// One glyph meaning per metric on both apps (Android `MeasurementSpec` icons: Favorite, WaterDrop, MonitorHeart,
+    /// Psychology, Bloodtype, Science) — SF Symbols picked to read the same.
     var symbolName: String {
         switch self {
         case .hr, .vitals: return "heart.fill"
-        case .spo2: return "lungs.fill"
+        case .spo2: return "drop.fill"
         case .hrv: return "waveform.path.ecg"
-        case .bloodPressure: return "heart.text.square"
+        case .bloodPressure: return "waveform.path.ecg.rectangle.fill"
         case .stress: return "brain.head.profile"
-        case .glucose: return "drop.fill"
-        case .bloodComponents: return "drop.triangle.fill"
+        case .glucose: return "drop.halffull"
+        case .bloodComponents: return "flask.fill"
         }
     }
 

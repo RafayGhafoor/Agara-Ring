@@ -125,7 +125,7 @@ struct OnboardingSyncingView: View {
         let items: [(String, String, Int, Color)] = [
             ("figure.walk", "steps", c.steps, AgaraColors.steps),
             ("heart.fill", "HR", c.heartRate, AgaraColors.heartRate),
-            ("lungs.fill", "SpO₂", c.spo2, AgaraColors.spo2),
+            ("drop.fill", "SpO₂", c.spo2, AgaraColors.spo2),
             ("waveform.path.ecg", "HRV", c.hrv, AgaraColors.hrv),
             ("brain.head.profile", "stress", c.stress, AgaraColors.stress),
             ("moon.fill", c.sleepNights == 1 ? "night" : "nights", c.sleepNights, AgaraColors.sleep),
