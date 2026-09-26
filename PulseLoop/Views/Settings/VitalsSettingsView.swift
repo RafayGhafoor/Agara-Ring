@@ -22,7 +22,7 @@ struct MetricPrefsSettingsView: View {
     private var supported: [(metric: MetricKey, label: String, color: Color)] {
         toggleable.filter {
             // Nutrition is feature-gated (master toggle), not device-gated.
-            if $0.metric == .nutrition { return NutritionPrefsStore.shared.prefs.masterEnabled }
+            if $0.metric == .nutrition { return NutritionPrefsStore.shared.isActive }
             return MetricsService.supports($0.metric, context: modelContext)
         }
     }
@@ -36,12 +36,14 @@ struct MetricPrefsSettingsView: View {
                     }
                 }
 
+                if AgaraFeatureStore.shared.isOn(.chartResolutionSetting) {
                 SettingsGroup(
                     header: "Chart detail",
                     footer: "When the ring measures often, charts can look busy. Smoother levels average nearby points into a cleaner line — "
                         + "this only changes the display on this page, not your stored data."
                 ) {
                     resolutionCard
+                }
                 }
             }
             .padding()

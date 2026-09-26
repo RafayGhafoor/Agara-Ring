@@ -39,7 +39,8 @@ struct ActivityView: View {
                     let days = weeklyDays(summary: summary, stepGoal: stepGoal, todayIndex: todayWeekIndex())
                     let activeDayCount = days.filter(\.completed).count
 
-                    if !stale.isEmpty {
+                    // Flag `stale_workout_recovery` (iOS only today).
+                    if !stale.isEmpty, AgaraFeatureStore.shared.isOn(.staleWorkoutRecovery) {
                         StaleSessionRecoveryCard(sessions: stale)
                     }
 
@@ -427,13 +428,16 @@ struct WorkoutHistorySheet: View {
 
 /// Today's ring step buckets grouped by hour, only the hours with steps. The ring reports every 5-minute
 /// slot walking or not (~190 a day, a handful with steps), so a raw list was nearly all zeros. Collapsed by
-/// default; Android's version also deletes an hour (issue #70), which iOS has no data path for yet.
+/// default. Each hour can be deleted (port of Android's issue #70 — `ActivityBucketDeletion`: tombstoned so a
+/// re-sync doesn't bring it back, and the day's deficit keeps the ring's live total from restoring it).
 struct StepsByHourCard: View {
     let units: UnitsPreference
     let reloadToken: Int
     @Environment(\.modelContext) private var modelContext
     @State private var expanded = false
     @State private var hours: [HourRecord]?
+    /// Delete-an-hour awaiting confirmation (`ConfirmAction`).
+    @State private var confirm: ConfirmAction?
 
     struct HourRecord: Identifiable, Equatable {
         let start: Date
@@ -489,6 +493,13 @@ struct StepsByHourCard: View {
                                         let d = UnitsFormatter.distance(meters: hour.distanceMeters, units: units)
                                         Text("· \(d.value) \(d.unit)").font(AgaraFont.caption2).foregroundStyle(AgaraColors.textMuted)
                                     }
+                                    Button { askDelete(hour) } label: {
+                                        Image(systemName: "trash").font(AgaraFont.caption).foregroundStyle(AgaraColors.danger)
+                                            .frame(width: 28, height: 28)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel("Delete this hour's steps")
+                                    .accessibilityIdentifier("steps.hour.delete")
                                 }
                                 // A bar relative to the day's busiest hour, so the list reads at a glance.
                                 GeometryReader { geo in
@@ -508,6 +519,14 @@ struct StepsByHourCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .agaraGlass(RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous))
         .task(id: reloadToken) { reload() }
+        .confirmAction($confirm)
+    }
+
+    private func askDelete(_ hour: HourRecord) {
+        confirm = .deleteSteps(steps: hour.steps, hours: Self.hourLabel(hour.start)) {
+            ActivityBucketDeletion.deleteBuckets(from: hour.start, to: hour.start.addingTimeInterval(3600), context: modelContext)
+            reload()
+        }
     }
 
     private func reload() {

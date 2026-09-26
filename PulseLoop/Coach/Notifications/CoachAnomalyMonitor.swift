@@ -40,7 +40,8 @@ final class CoachAnomalyMonitor {
     private func scheduleCheck() {
         // Cheap pre-gate so we don't spin up a debounce when the feature is off.
         let settings = CoachSettingsStore.shared.settings
-        guard settings.coachMasterEnabled, settings.proactiveAlertsEnabled,
+        guard AgaraFeatureStore.isOn(.coach), AgaraFeatureStore.isOn(.coachCheckinExtras),
+              settings.coachMasterEnabled, settings.proactiveAlertsEnabled,
               settings.providerMode == .appleOnDevice else { return }
 
         debounce?.cancel()

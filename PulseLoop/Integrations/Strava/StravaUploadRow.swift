@@ -20,7 +20,7 @@ struct StravaUploadRow: View {
     private static let stravaOrange = Color(red: 0.988, green: 0.298, blue: 0.008)
 
     var body: some View {
-        if StravaPrefsStore.shared.prefs.masterEnabled, session.status == .finished {
+        if AgaraFeatureStore.isOn(.strava), StravaPrefsStore.shared.prefs.masterEnabled, session.status == .finished {
             VStack(spacing: 8) {
                 if let activityId = session.stravaActivityId {
                     uploadedRow(activityId: activityId)

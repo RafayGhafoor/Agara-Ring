@@ -16,6 +16,7 @@ struct ProfileSettingsView: View {
         ScrollView {
             VStack(spacing: 16) {
                 ProfileEditorView(draft: $draft)
+                unitsGroup
                 appleHealthImport
             }
             .padding()
@@ -27,6 +28,39 @@ struct ProfileSettingsView: View {
         // Autosave: every field edit persists immediately — no explicit Save step. Health-imported
         // values flow through the same `draft` bindings, so this also persists them.
         .onChange(of: draft) { _, _ in autosave() }
+    }
+
+    /// Display units. The glucose unit lives here (not in Physiology) so it stays reachable with the
+    /// `physiology` flag off — parity audit 2026-09-26, same move as Android.
+    private var unitsGroup: some View {
+        SettingsGroup(header: "Units", footer: "How blood glucose readings are shown.") {
+            FormValueRow(title: "Glucose unit") {
+                Picker("Glucose unit", selection: Binding(
+                    get: { profiles.first?.preferredGlucoseUnit ?? .mgdl },
+                    set: { setGlucoseUnit($0) }
+                )) {
+                    ForEach(GlucoseUnit.allCases) { Text($0.label).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .fixedSize()
+                .accessibilityIdentifier("profile.glucoseUnit")
+            }
+        }
+    }
+
+    private func setGlucoseUnit(_ unit: GlucoseUnit) {
+        let profile: UserProfile
+        if let existing = profiles.first {
+            profile = existing
+        } else {
+            profile = UserProfile()
+            modelContext.insert(profile)
+        }
+        guard profile.preferredGlucoseUnit != unit else { return }
+        profile.preferredGlucoseUnit = unit
+        // `updatedAt` is what the vitals cards watch to re-render in the new unit.
+        profile.updatedAt = Date()
+        try? modelContext.save()
     }
 
     /// One-way import of age/sex/height/weight from Apple Health. This never writes to Health — the

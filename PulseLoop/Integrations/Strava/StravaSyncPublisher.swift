@@ -69,7 +69,8 @@ final class StravaSyncPublisher {
     }
 
     private func shouldUpload() -> Bool {
-        StravaPrefsStore.shared.prefs.masterEnabled
+        AgaraFeatureStore.isOn(.strava)   // parity flag (phase 6)
+            && StravaPrefsStore.shared.prefs.masterEnabled
             && StravaPrefsStore.shared.prefs.uploadMode == .automatic
             && StravaAuthService.shared.isConnected
     }

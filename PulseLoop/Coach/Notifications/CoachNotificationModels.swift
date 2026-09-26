@@ -9,6 +9,10 @@ enum CoachNotificationSlot: String, Codable, CaseIterable {
 
     var label: String { rawValue.capitalized }
 
+    /// Pass as `middayHour` to drop the midday slot (flag `coach_checkin_extras` off): its window never opens
+    /// and `nextWindowStart` skips it (no hour 24 exists on any day).
+    static let noMidday = 24
+
     /// The active slot for `date` given the user's configured hours, or nil when
     /// outside all windows. Each window opens at its hour and stays open ~4h,
     /// clamped to end before the next window opens so they never overlap.

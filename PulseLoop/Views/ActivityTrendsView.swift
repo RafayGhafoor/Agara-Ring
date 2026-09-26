@@ -18,6 +18,8 @@ struct ActivityTrendsView: View {
     private var units: UnitsPreference { profiles.first?.units ?? .metric }
     private var distanceUnit: String { UnitsFormatter.distance(meters: 0, units: units).unit }
 
+    private var extrasOn: Bool { AgaraFeatureStore.shared.isOn(.activityTrendsYear) }
+
     var body: some View {
         let summary = MetricsService.buildTodaySummary(context: modelContext)
         ScrollView {
@@ -26,8 +28,12 @@ struct ActivityTrendsView: View {
                     .padding(.bottom, 2)
 
                 stepsSection(summary)
-                distanceSection(summary)
-                caloriesSection(summary)
+                // Year range + distance/calories trends: flag `activity_trends_year` (iOS only today; Android
+                // has a Steps detail — week/month steps stay the common ground).
+                if extrasOn {
+                    distanceSection(summary)
+                    caloriesSection(summary)
+                }
                 explainer
             }
             .padding(16)
@@ -59,7 +65,7 @@ struct ActivityTrendsView: View {
         Picker("Period", selection: $period) {
             Text("Week").tag(MetricRange.sevenDays)
             Text("Month").tag(MetricRange.thirtyDays)
-            Text("Year").tag(MetricRange.twelveMonths)
+            if extrasOn { Text("Year").tag(MetricRange.twelveMonths) }
         }
         .pickerStyle(.segmented)
     }

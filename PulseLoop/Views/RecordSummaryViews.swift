@@ -105,8 +105,10 @@ struct RecordSummaryView: View {
             .navigationBarBackButtonHidden(true)
             .safeAreaInset(edge: .bottom) {
                 HStack(spacing: 12) {
-                    SecondaryButton(title: "Share", systemImage: "square.and.arrow.up") { presentingShare = true }
-                        .frame(width: 130)
+                    if AgaraFeatureStore.shared.isOn(.shareCard) {   // flag `share_card` (iOS only today)
+                        SecondaryButton(title: "Share", systemImage: "square.and.arrow.up") { presentingShare = true }
+                            .frame(width: 130)
+                    }
                     PrimaryButton(title: "Done", systemImage: "checkmark") { done(session) }
                 }
                 .padding(16)

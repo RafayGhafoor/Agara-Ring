@@ -67,7 +67,7 @@ final class HealthSyncService {
         // Dietary types join the share set only once the nutrition feature is enabled, so users
         // who never opted in never see dietary rows on the Health authorization sheet. Enabling
         // nutrition later re-runs authorization from the settings screen (the only auth path).
-        if NutritionPrefsStore.shared.prefs.masterEnabled {
+        if NutritionPrefsStore.shared.isActive {
             identifiers += [
                 .dietaryEnergyConsumed, .dietaryProtein, .dietaryCarbohydrates,
                 .dietaryFatTotal, .dietaryFiber, .dietarySugar, .dietarySodium

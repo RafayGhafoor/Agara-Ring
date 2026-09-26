@@ -63,19 +63,36 @@ final class AgaraFeatureStore {
         persist()
     }
 
+    /// The parity switches (features.yaml "Parity switches", phase 6): features one app has and the other
+    /// doesn't yet. Grouped in Settings › Developer › Feature flags; `parity=on` turns them all on.
+    static let parityFlags: [AgaraFeature] = [
+        .coach, .coachHistory, .coachCheckinExtras, .physiology, .nutrition, .strava, .agaraCloud,
+        .hrZonesEditor, .activityTrackingSettings, .chartResolutionSetting, .liveHrToggle, .shareCard,
+        .staleWorkoutRecovery, .activityTrendsYear,
+    ]
+
     /// Parse `"a=on,b=off"`. Accepts on/off, true/false, 1/0, yes/no (any case, spaces ignored); unknown
-    /// flags and malformed pairs are skipped rather than failing the whole spec.
+    /// flags and malformed pairs are skipped rather than failing the whole spec. Two group keys: `all`
+    /// (every flag) and `parity` (`parityFlags`); later pairs win, so `all=on,coach=off` works.
     static func parse(_ spec: String) -> [AgaraFeature: Bool] {
         var result: [AgaraFeature: Bool] = [:]
         for pair in spec.split(separator: ",") {
             let parts = pair.split(separator: "=", maxSplits: 1).map {
                 $0.trimmingCharacters(in: .whitespaces).lowercased()
             }
-            guard parts.count == 2, let feature = AgaraFeature(rawValue: parts[0]) else { continue }
+            guard parts.count == 2 else { continue }
+            let value: Bool
             switch parts[1] {
-            case "on", "true", "1", "yes": result[feature] = true
-            case "off", "false", "0", "no": result[feature] = false
+            case "on", "true", "1", "yes": value = true
+            case "off", "false", "0", "no": value = false
             default: continue
+            }
+            switch parts[0] {
+            case "all": for feature in AgaraFeature.allCases { result[feature] = value }
+            case "parity": for feature in parityFlags { result[feature] = value }
+            default:
+                guard let feature = AgaraFeature(rawValue: parts[0]) else { continue }
+                result[feature] = value
             }
         }
         return result

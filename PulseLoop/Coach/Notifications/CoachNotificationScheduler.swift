@@ -46,7 +46,7 @@ final class CoachNotificationScheduler {
     func scheduleNext(now: Date = Date()) {
         guard isRegistered else { return }
         let settings = CoachSettingsStore.shared.settings
-        guard settings.coachMasterEnabled, settings.notificationsEnabled else { return }
+        guard settings.coachMasterEnabled, settings.notificationsEnabled, AgaraFeatureStore.isOn(.coach) else { return }
 
         // Clear any pending request of the other kind so switching provider doesn't
         // leave a stale wake queued.
@@ -54,7 +54,8 @@ final class CoachNotificationScheduler {
 
         let begin = CoachNotificationSlot.nextWindowStart(
             after: now, morningHour: settings.morningHour,
-            middayHour: settings.middayHour, eveningHour: settings.eveningHour
+            middayHour: AgaraFeatureStore.isOn(.coachCheckinExtras) ? settings.middayHour : CoachNotificationSlot.noMidday,
+            eveningHour: settings.eveningHour
         )
 
         let request: BGTaskRequest

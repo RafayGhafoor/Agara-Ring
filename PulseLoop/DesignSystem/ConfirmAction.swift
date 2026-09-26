@@ -33,12 +33,12 @@ struct ConfirmAction: Identifiable {
 // MARK: - The standard actions (copy mirrors Android's `ConfirmActions`)
 
 extension ConfirmAction {
-    /// Forget unbinds the ring and removes it from the app; history stays (audit batch A #24 copy).
+    /// Forget unbinds the ring and removes it from the app; history stays. Copy from `brand.yaml` (both apps).
     static func forgetRing(_ perform: @escaping () -> Void) -> ConfirmAction {
         ConfirmAction(
             key: "forgetRing",
-            title: "Forget this ring?",
-            message: "The ring is unbound and removed from the app. Your stored history stays. You can pair it again later.",
+            title: AgaraCopy.confirmForgetTitle,
+            message: AgaraCopy.confirmForgetBody,
             confirmLabel: "Forget",
             perform: perform
         )
@@ -48,8 +48,8 @@ extension ConfirmAction {
     static func disconnectRing(_ perform: @escaping () -> Void) -> ConfirmAction {
         ConfirmAction(
             key: "disconnectRing",
-            title: "Disconnect the ring?",
-            message: "The ring stays paired but stops syncing until you reconnect it. Measurements and live heart rate pause.",
+            title: AgaraCopy.confirmDisconnectTitle,
+            message: AgaraCopy.confirmDisconnectBody,
             confirmLabel: "Disconnect",
             severity: .normal,
             perform: perform
@@ -59,8 +59,8 @@ extension ConfirmAction {
     static func deleteMeal(name: String?, _ perform: @escaping () -> Void) -> ConfirmAction {
         ConfirmAction(
             key: "deleteMeal",
-            title: "Delete this meal?",
-            message: name.map { "\($0) is removed from your food log." } ?? "The meal is removed from your food log.",
+            title: AgaraCopy.confirmDeleteMealTitle,
+            message: name.map { "\($0): " + AgaraCopy.confirmDeleteMealBody } ?? AgaraCopy.confirmDeleteMealBody,
             confirmLabel: "Delete",
             perform: perform
         )
@@ -69,8 +69,8 @@ extension ConfirmAction {
     static func resetCalibration(_ target: CalibrationResetTarget, _ perform: @escaping () -> Void) -> ConfirmAction {
         ConfirmAction(
             key: "resetCalibration.\(target)",
-            title: target.title,
-            message: "Readings go back to the ring's uncalibrated values. You can calibrate again any time.",
+            title: AgaraCopy.confirmResetCalibrationTitle,
+            message: "\(target.label): " + AgaraCopy.confirmResetCalibrationBody,
             confirmLabel: "Reset",
             perform: perform
         )
@@ -104,8 +104,8 @@ extension ConfirmAction {
     static func disconnectStrava(_ perform: @escaping () -> Void) -> ConfirmAction {
         ConfirmAction(
             key: "disconnectStrava",
-            title: "Disconnect from Strava?",
-            message: AgaraCopy.stravaDisconnectCopy + " Workouts already uploaded stay on Strava.",
+            title: AgaraCopy.confirmDisconnectStravaTitle,
+            message: AgaraCopy.confirmDisconnectStravaBody,
             confirmLabel: "Disconnect",
             perform: perform
         )
@@ -114,8 +114,8 @@ extension ConfirmAction {
     static func signOutCloud(_ perform: @escaping () -> Void) -> ConfirmAction {
         ConfirmAction(
             key: "signOutCloud",
-            title: "Sign out of Agara Cloud?",
-            message: "Your data stays on this device.",
+            title: AgaraCopy.confirmSignOutTitle,
+            message: AgaraCopy.confirmSignOutBody,
             confirmLabel: "Sign out",
             perform: perform
         )
@@ -131,11 +131,48 @@ extension ConfirmAction {
         )
     }
 
+    /// Delete one vital reading (Android's copy, issue #60). A history reading gets the "stays deleted" line.
+    static func deleteReading(value: String, time: String, fromHistory: Bool, _ perform: @escaping () -> Void) -> ConfirmAction {
+        ConfirmAction(
+            key: "deleteReading",
+            title: AgaraCopy.confirmDeleteReadingTitle,
+            message: "\(value) at \(time).\n\n" + AgaraCopy.confirmDeleteReadingBody,
+            confirmLabel: "Delete",
+            perform: perform
+        )
+    }
+
+    /// Delete an hour of steps (Android's copy, issue #70).
+    static func deleteSteps(steps: Int, hours: String, _ perform: @escaping () -> Void) -> ConfirmAction {
+        ConfirmAction(
+            key: "deleteSteps",
+            title: AgaraCopy.confirmDeleteStepsHourTitle,
+            message: "\(steps.formatted()) steps between \(hours).\n\n" + AgaraCopy.confirmDeleteStepsHourBody,
+            confirmLabel: "Delete",
+            perform: perform
+        )
+    }
+
+    static func resetAppData(confirmLabel: String = "Reset app data", _ perform: @escaping () -> Void) -> ConfirmAction {
+        ConfirmAction(key: "resetAppData", title: AgaraCopy.confirmResetAppDataTitle, message: AgaraCopy.confirmResetAppDataBody,
+                      confirmLabel: confirmLabel, perform: perform)
+    }
+
+    static func reseedDemo(_ perform: @escaping () -> Void) -> ConfirmAction {
+        ConfirmAction(key: "reseedDemo", title: AgaraCopy.confirmReseedDemoTitle, message: AgaraCopy.confirmReseedDemoBody,
+                      confirmLabel: "Load", perform: perform)
+    }
+
+    static func clearDemo(_ perform: @escaping () -> Void) -> ConfirmAction {
+        ConfirmAction(key: "clearDemo", title: AgaraCopy.confirmClearDemoTitle, message: AgaraCopy.confirmClearDemoBody,
+                      confirmLabel: "Clear", perform: perform)
+    }
+
     static func replaceAllData(_ perform: @escaping () -> Void) -> ConfirmAction {
         ConfirmAction(
             key: "replaceAllData",
-            title: "Replace all data?",
-            message: "This permanently deletes everything currently in the app and replaces it with the contents of this file. This can't be undone.",
+            title: AgaraCopy.confirmReplaceDataTitle,
+            message: AgaraCopy.confirmReplaceDataBody,
             confirmLabel: "Delete old data & import",
             perform: perform
         )

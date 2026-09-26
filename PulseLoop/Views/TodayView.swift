@@ -43,11 +43,11 @@ struct TodayView: View {
     /// (+ its own "show on Today" pref) instead.
     private var nutritionTileAvailable: Bool {
         let prefs = NutritionPrefsStore.shared.prefs
-        return prefs.masterEnabled && prefs.showOnToday
+        return NutritionPrefsStore.shared.isActive && prefs.showOnToday
     }
 
     private var summaryService: CoachSummaryService { CoachSummaryService(modelContext: modelContext) }
-    private var coachEnabled: Bool { coachStore.settings.coachMasterEnabled }
+    private var coachEnabled: Bool { AgaraFeatureStore.shared.isOn(.coach) && coachStore.settings.coachMasterEnabled }
     private var units: UnitsPreference { profiles.first?.units ?? .metric }
 
     private var profile: UserProfile? { profiles.first }

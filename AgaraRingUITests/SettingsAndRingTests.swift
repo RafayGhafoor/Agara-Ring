@@ -164,7 +164,7 @@ final class SettingsAndRingTests: AgaraUITestCase {
         scrollTo(disconnect)
         waitFor(disconnect).tap()
         // Disconnect asks first (ConfirmAction).
-        let confirm = app.alerts["Disconnect the ring?"].buttons["Disconnect"]
+        let confirm = app.alerts["Disconnect ring?"].buttons["Disconnect"]
         waitFor(confirm, timeout: 5, "Disconnect did not ask first").tap()
         waitFor(text(containing: "No ring connected"), timeout: 15, "did not disconnect")
         attachScreenshot("disconnected")

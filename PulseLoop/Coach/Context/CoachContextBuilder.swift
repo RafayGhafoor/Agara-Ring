@@ -42,7 +42,7 @@ enum CoachContextBuilder {
         // Nutrition rides the packet only when the feature is on AND shared with the coach;
         // callers can additionally opt out (notification path honors its own sub-toggle).
         let nutritionPrefs = NutritionPrefsStore.shared.prefs
-        let shareNutrition = includeNutrition && nutritionPrefs.masterEnabled && nutritionPrefs.shareWithCoach
+        let shareNutrition = includeNutrition && NutritionPrefsStore.shared.isActive && nutritionPrefs.shareWithCoach
 
         let goals = CoachContextPacket.GoalContext(
             stepsDaily: summary.goals.stepsDaily,

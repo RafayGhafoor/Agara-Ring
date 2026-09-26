@@ -48,7 +48,7 @@ final class CoachNotificationDataTrigger {
 
     private func runAfterSync() async {
         let settings = CoachSettingsStore.shared.settings
-        guard settings.coachMasterEnabled, settings.notificationsEnabled else { return }
+        guard CoachGate.isOn, settings.notificationsEnabled else { return }
         // The BLE wake that delivered the sync's last packet grants only ~10s; ask for the standard
         // ~30s finite-task extension so LLM generation (on-device or one remote round-trip) can
         // finish. If iOS calls the expiration handler first, the work is simply cut short — the slot

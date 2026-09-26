@@ -193,7 +193,8 @@ final class CoachNotificationSyncGatingTests: XCTestCase {
             syncWaitTimeout: 1, staleDataPolicy: policy,
             clientFactory: { _ in StubResponsesClient([
                 OpenAIResponse(id: "n", outputItems: [.message(text: notificationJSON())])
-            ]) }
+            ]) },
+            featureOn: { _ in true }
         )
     }
 
@@ -270,7 +271,8 @@ final class CoachNotificationSyncGatingTests: XCTestCase {
             syncWaitTimeout: 1,
             clientFactory: { _ in StubResponsesClient([
                 OpenAIResponse(id: "n", outputItems: [.message(text: notificationJSON())])
-            ]) }
+            ]) },
+            featureOn: { _ in true }
         )
         let outcome = await svc.runDueSlot(now: morning())
         XCTAssertEqual(outcome, .skippedStaleData)
@@ -369,5 +371,20 @@ final class CoachNotificationFreshnessTests: XCTestCase {
 
         subscriber.persist(.syncProgress(stage: "done"))
         XCTAssertNotNil(DeviceRepository.current(context: c)?.lastFullSyncAt)
+    }
+}
+
+/// Phase 6: the shared `coach` flag gates every non-forced check-in, whatever the user's own switch says.
+@MainActor
+final class CoachParityFlagTests: XCTestCase {
+    func testCheckInsSkipWithCoachFlagOff() async throws {
+        let c = try TestSupport.makeContext()
+        let store = CoachSettingsStore(defaults: UserDefaults(suiteName: UUID().uuidString)!)
+        store.settings = TestSupport.enabledCoachSettings()
+        store.settings.notificationsEnabled = true
+        let svc = CoachNotificationService(modelContext: c, coordinator: nil, keyStore: StubKeyStore(key: "sk-test"),
+                                           settingsStore: store, featureOn: { $0 != .coach })
+        let outcome = await svc.runDueSlot(now: Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: Date())!)
+        XCTAssertEqual(outcome, .skippedDisabled)
     }
 }

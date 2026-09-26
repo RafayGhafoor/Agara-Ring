@@ -18,6 +18,12 @@ struct MetricDetailView: View {
     @State private var secondary: [MetricSample] = []   // diastolic, for BP
     /// Observed so the detail chart/tiles re-fetch when a background sync lands while this is open.
     @State private var dataChange = AgaraDataChange.shared
+    /// The period's individual readings (newest first), for the Readings card and single-reading delete.
+    @State private var readings: [ReadingItem] = []
+    @State private var readingsOpen = false
+    @State private var readingsShown = 20
+    /// Delete-a-reading awaiting confirmation (`ConfirmAction`).
+    @State private var confirm: ConfirmAction?
 
     private var profile: UserPhysiologyProfile { UserPhysiologyProfile(profiles.first) }
     private var units: UnitsPreference { profiles.first?.units ?? .metric }
@@ -74,6 +80,7 @@ struct MetricDetailView: View {
                 periodSelector
                 chartSection
                 statTiles
+                readingsCard
                 legend
                 explainer
                 if isEstimatedMetric { disclaimer }
@@ -87,6 +94,7 @@ struct MetricDetailView: View {
         // Shared glass chrome: centered title + glass back button, no system nav
         // bar (so the zoom transition doesn't reflow the content).
         .pageChrome(metric.title)
+        .confirmAction($confirm)
         .task(id: period) { reload() }
         .onChange(of: dataChange.token) { _, _ in reload() }
     }
@@ -273,7 +281,7 @@ struct MetricDetailView: View {
                 Text("REFERENCE ZONES").font(AgaraFont.caption2.weight(.semibold)).tracking(1.0).foregroundStyle(AgaraColors.textMuted)
                 Spacer()
                 // HR zones are user-configurable (Standard / Auto / Custom) — deep-link to the editor.
-                if metric == .heartRate {
+                if metric == .heartRate, AgaraFeatureStore.shared.isOn(.hrZonesEditor) {
                     Button("Edit") { path.append(AppRoute.settingsHeartRateZones) }
                         .font(AgaraFont.caption.weight(.semibold))
                         .foregroundStyle(AgaraColors.accent)
@@ -325,6 +333,115 @@ struct MetricDetailView: View {
         } else {
             primary = window(MetricsService.metricRange(metric: metric.metricKey, range: period.range, context: modelContext))
             secondary = []
+        }
+        loadReadings()
+    }
+
+    /// One reading as the user sees it: blood pressure is one item over its two rows.
+    struct ReadingItem: Identifiable {
+        let id: UUID
+        let timestamp: Date
+        let rows: [PulseLoop.Measurement]
+        let text: String
+        var fromHistory: Bool { rows.contains { $0.sourceRaw == MeasurementSource.history.rawValue } }
+    }
+
+    private func loadReadings() {
+        let now = Date()
+        let start: Date
+        switch period {
+        case .today: start = Calendar.current.startOfDay(for: now)
+        case .week: start = Calendar.current.date(byAdding: .day, value: -7, to: now) ?? now
+        case .month: start = Calendar.current.date(byAdding: .day, value: -30, to: now) ?? now
+        }
+        let cal = CalibrationStore.shared.settings
+        func rows(_ kind: MeasurementKind) -> [PulseLoop.Measurement] {
+            let raw = kind.rawValue
+            var d = FetchDescriptor<PulseLoop.Measurement>(
+                predicate: #Predicate { $0.kindRaw == raw && $0.timestamp >= start },
+                sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
+            )
+            d.fetchLimit = 2_000
+            return (try? modelContext.fetch(d)) ?? []
+        }
+        if metric == .bloodPressure {
+            let dia = Dictionary(rows(.bloodPressureDiastolic).map { ($0.timestamp, $0) }, uniquingKeysWith: { a, _ in a })
+            readings = rows(.bloodPressureSystolic).map { sys in
+                let d = dia[sys.timestamp]
+                let text = "\(Int(cal.adjusted(sys.value, kind: .bloodPressureSystolic).rounded()))/"
+                    + (d.map { "\(Int(cal.adjusted($0.value, kind: .bloodPressureDiastolic).rounded()))" } ?? "--")
+                return ReadingItem(id: sys.id, timestamp: sys.timestamp, rows: [sys] + (d.map { [$0] } ?? []), text: text)
+            }
+        } else if let kind = metric.measurementKind {
+            readings = rows(kind).map { row in
+                ReadingItem(id: row.id, timestamp: row.timestamp, rows: [row],
+                            text: fmt(toDisplay(cal.adjusted(row.value, kind: kind))))
+            }
+        } else {
+            readings = []
+        }
+    }
+
+    private func readingTime(_ date: Date) -> String {
+        period == .today
+            ? date.formatted(date: .omitted, time: .shortened)
+            : date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).hour().minute())
+    }
+
+    /// Readings (port of Android's detail-screen list, issue #60): collapsed by default, paged, each with a
+    /// delete that asks first. A deleted history reading stays deleted on the next sync (`ReadingDeletion`).
+    private var readingsCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Button { withAnimation(.easeInOut(duration: 0.2)) { readingsOpen.toggle() } } label: {
+                HStack {
+                    Text("READINGS").font(AgaraFont.caption2.weight(.semibold)).tracking(1.0).foregroundStyle(AgaraColors.textMuted)
+                    Text("\(readings.count)").font(AgaraFont.caption2.weight(.semibold)).foregroundStyle(AgaraColors.textMuted)
+                    Spacer()
+                    Text(readingsOpen ? "Hide readings" : "Show readings")
+                        .font(AgaraFont.caption.weight(.semibold)).foregroundStyle(AgaraColors.accent)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("detail.readings.toggle")
+            if readingsOpen {
+                if readings.isEmpty {
+                    Text("No readings in this period.").font(AgaraFont.footnote).foregroundStyle(AgaraColors.textSecondary)
+                }
+                ForEach(readings.prefix(readingsShown)) { item in
+                    HStack(spacing: 12) {
+                        Text(readingTime(item.timestamp))
+                            .font(AgaraFont.footnote).foregroundStyle(AgaraColors.textSecondary)
+                        Spacer()
+                        Text("\(item.text) \(unitLabel)")
+                            .font(AgaraFont.body.weight(.semibold)).foregroundStyle(AgaraColors.textPrimary)
+                        Button { askDelete(item) } label: {
+                            Image(systemName: "trash").font(AgaraFont.footnote).foregroundStyle(AgaraColors.danger)
+                                .frame(width: 32, height: 32)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Delete this reading")
+                        .accessibilityIdentifier("detail.reading.delete")
+                    }
+                    .accessibilityElement(children: .contain)
+                }
+                if readings.count > readingsShown {
+                    Button("Show \(min(20, readings.count - readingsShown)) more") { readingsShown += 20 }
+                        .font(AgaraFont.caption.weight(.semibold))
+                        .foregroundStyle(AgaraColors.accent)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .agaraGlass(RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous))
+    }
+
+    private func askDelete(_ item: ReadingItem) {
+        let text = "\(item.text) \(unitLabel)".trimmingCharacters(in: .whitespaces)
+        confirm = .deleteReading(value: text, time: readingTime(item.timestamp), fromHistory: item.fromHistory) {
+            ReadingDeletion.delete(item.rows, context: modelContext)
+            reload()
         }
     }
 

@@ -55,6 +55,11 @@ final class NutritionPrefsStore {
         didSet { persist(prefs, forKey: Self.prefsKey) }
     }
 
+    /// Nutrition is live: the shared `nutrition` flag (parity phase 6; off until Android ships it) and the
+    /// user's own master toggle. Every runtime surface (Today tile, Activity card, coach context, Health export)
+    /// reads this rather than `prefs.masterEnabled`.
+    var isActive: Bool { AgaraFeatureStore.isOn(.nutrition) && prefs.masterEnabled }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         self.prefs = Self.load(NutritionPrefs.self, forKey: Self.prefsKey, from: defaults) ?? .default

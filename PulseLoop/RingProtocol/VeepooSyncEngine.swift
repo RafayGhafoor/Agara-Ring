@@ -137,6 +137,9 @@ final class VeepooSyncEngine: RingSyncEngine {
         case let .commandAck(commandId) where commandId == 0xA1 && !authenticated:
             authenticated = true
             runPostAuthentication()
+        case let .settingAck(commandId, _) where commandId == 0xB3:
+            // Read the table back after every set, ok or not, so the app shows what the ring now holds.
+            writer?.enqueue(VeepooEncoder.autoMeasureRead())
         case let .unknown(commandId, raw) where commandId == 0xE0:
             handleSleepFrame(raw)
         case let .unknown(commandId, raw) where commandId == 0xDF:
@@ -560,6 +563,13 @@ final class VeepooSyncEngine: RingSyncEngine {
 
     func stopFindDevice() {
         writer?.enqueue(VeepooEncoder.findDeviceStop())
+    }
+
+    /// `b3 01` set, one metric (flag `auto_measure_settings`); the ack triggers a `b3 02` read-back in `handle`.
+    func setAutoMeasure(_ entry: AutoMeasureEntry) -> Bool {
+        guard authenticated, let writer, isFeatureOn(.autoMeasureSettings) else { return false }
+        for frame in AutoMeasure.setFrames(entry) { writer.enqueue(frame) }
+        return true
     }
 
     /// The step goal rides the `a3` profile frame, sent by `applyUserProfile` (flag `profile_sync`).

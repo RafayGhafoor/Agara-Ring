@@ -228,6 +228,11 @@ final class ActivityDaily {
     /// total adds the BMR baseline at read. Optional/defaulted for additive lightweight migration —
     /// same pattern as `UserProfile`'s physiology fields.
     var estimatedActiveCalories: Double? = nil
+    /// Steps / metres the user deleted from this day (`ActivityBucketDeletion`). The ring's live cumulative
+    /// count still includes them, so every later reading is corrected by this deficit (same as Android's
+    /// `deletedSteps`/`deletedDistanceMeters`). Defaulted for additive lightweight migration.
+    var deletedSteps: Int = 0
+    var deletedDistanceMeters: Double = 0
 
     init(
         id: UUID = UUID(),
@@ -746,6 +751,25 @@ final class ActivitySample {
 /// Keyed by `startEpoch` (the bucket's unix start time) so re-syncing the same bucket **replaces** it
 /// rather than accumulating — the daily total is then the sum of distinct buckets at read time. This
 /// is the GadgetBridge model and the fix for daily totals drifting upward across repeated syncs.
+/// A tombstone: a reading or activity bucket the user deleted, which a later ring sync must not write back
+/// (`MeasurementDeletion`, `ActivityBucketDeletion`; Android's `measurement_deletions`, issue #60/#70). Keys
+/// are Android's so an archive round-trips between the apps: `history:<kind>:<epoch ms>` for a history
+/// reading, `activity:<epoch ms>` for an activity bucket.
+@Model
+final class MeasurementDeletion {
+    @Attribute(.unique) var measurementId: String
+    var kindRaw: String
+    var timestamp: Date
+    var deletedAt: Date
+
+    init(measurementId: String, kindRaw: String, timestamp: Date, deletedAt: Date = Date()) {
+        self.measurementId = measurementId
+        self.kindRaw = kindRaw
+        self.timestamp = timestamp
+        self.deletedAt = deletedAt
+    }
+}
+
 @Model
 final class ActivityBucketSample {
     // Audit batch B: the per-session / per-day / time-window reads this model serves.

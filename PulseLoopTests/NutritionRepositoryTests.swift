@@ -156,7 +156,9 @@ final class NutritionRepositoryTests: XCTestCase {
 
         let store = NutritionPrefsStore.shared
         let original = store.prefs
-        defer { store.prefs = original }
+        let flag = AgaraFeatureStore.shared.override(for: .nutrition)
+        AgaraFeatureStore.shared.setOverride(.nutrition, true)   // the parity flag; this test is about the user toggle
+        defer { store.prefs = original; AgaraFeatureStore.shared.setOverride(.nutrition, flag) }
 
         store.prefs.masterEnabled = false
         XCTAssertNil(MetricsService.buildTodaySummary(context: context).nutrition)
@@ -164,6 +166,10 @@ final class NutritionRepositoryTests: XCTestCase {
         store.prefs.masterEnabled = true
         let nutrition = MetricsService.buildTodaySummary(context: context).nutrition
         XCTAssertEqual(nutrition?.calories, 750)
+
+        // With the parity flag off, the user toggle alone doesn't bring nutrition back.
+        AgaraFeatureStore.shared.setOverride(.nutrition, false)
+        XCTAssertNil(MetricsService.buildTodaySummary(context: context).nutrition)
     }
 
     func testGoalsSummaryCarriesIntakeGoals() throws {

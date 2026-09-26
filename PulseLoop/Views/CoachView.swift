@@ -229,12 +229,15 @@ struct CoachView: View {
                         .minTapTarget(visualSize: 36)
                 }
                 .accessibilityLabel("New conversation")
-                Button { composerFocused = false; showHistory = true } label: {
-                    Image(systemName: "clock.arrow.circlepath").font(AgaraFont.body).foregroundStyle(AgaraColors.textSecondary)
-                        .frame(width: 36, height: 36).agaraGlass(Circle(), interactive: true)
-                        .minTapTarget(visualSize: 36)
+                // Conversation history: flag `coach_history` (iOS only today; Android port pending).
+                if CoachGate.historyOn {
+                    Button { composerFocused = false; showHistory = true } label: {
+                        Image(systemName: "clock.arrow.circlepath").font(AgaraFont.body).foregroundStyle(AgaraColors.textSecondary)
+                            .frame(width: 36, height: 36).agaraGlass(Circle(), interactive: true)
+                            .minTapTarget(visualSize: 36)
+                    }
+                    .accessibilityLabel("Conversation history")
                 }
-                .accessibilityLabel("Conversation history")
             }
             .agaraGlassContainer(spacing: 8)
         }

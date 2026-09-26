@@ -186,6 +186,11 @@ extension AgaraNotification {
                           body: "\(title): \(result)", deepLink: .measure)
     }
 
+    static func measurementFailed(_ title: String) -> AgaraNotification {
+        AgaraNotification(id: measurementId, category: .measurement, title: AgaraCopy.notificationMeasuredFailedTitle,
+                          body: "\(title): \(AgaraCopy.measurementNoReading)", deepLink: .measure)
+    }
+
     static func syncing(_ summary: String) -> AgaraNotification {
         AgaraNotification(id: syncId, category: .sync, title: AgaraCopy.notificationSyncTitle, body: summary,
                           deepLink: .sync, throttle: 10, silent: true)

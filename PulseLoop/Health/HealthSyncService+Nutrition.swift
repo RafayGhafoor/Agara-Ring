@@ -15,7 +15,7 @@ extension HealthSyncService {
     func exportNutrition(context: ModelContext, state: inout AppleHealthSyncState,
                          counts: inout SyncCounts, now: Date) async throws {
         guard AppleHealthPrefsStore.shared.prefs.syncNutrition,
-              NutritionPrefsStore.shared.prefs.masterEnabled else { return }
+              NutritionPrefsStore.shared.isActive else { return }
 
         let watermark = state.nutritionExportedThrough ?? .distantPast
         let descriptor = FetchDescriptor<MealEntry>(

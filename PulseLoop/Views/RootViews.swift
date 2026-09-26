@@ -106,6 +106,7 @@ struct RootAppView: View {
                 #endif
                 // Test tooling: flip the (off-by-default) nutrition feature on via launch arg.
                 if DebugLaunch.bool("enableNutrition") {
+                    AgaraFeatureStore.shared.setOverride(.nutrition, true)   // the parity flag, then the user toggle
                     NutritionPrefsStore.shared.prefs.masterEnabled = true
                     AgaraDataChange.shared.notify()
                 }
@@ -130,6 +131,15 @@ struct RootAppView: View {
                 }
                 if DebugLaunch.bool("openRecord") {
                     path.append(AppRoute.recordSelect)
+                }
+                // Test tooling: `-openRoute about` opens a Settings screen for screenshots (the simulator is
+                // headless). Names: about, dataExport, privacy, wearable, autoMeasure, profile.
+                if let raw = DebugLaunch.string("openRoute") {
+                    let routes: [String: AppRoute] = [
+                        "about": .settingsAbout, "dataExport": .settingsDataExport, "privacy": .settingsPrivacyData,
+                        "wearable": .settingsWearable, "autoMeasure": .settingsAutoMeasure, "profile": .settingsProfile,
+                    ]
+                    if let route = routes[raw] { path.append(route) }
                 }
                 // Test tooling: `-openMetric heartRate` opens a metric's detail chart for screenshots.
                 if let raw = DebugLaunch.string("openMetric"),
@@ -183,8 +193,10 @@ struct RootAppView: View {
                     CoachSettingsDetailView()
                 case .settingsWearable:
                     WearableSettingsView(path: $path)
-                case .settingsMeasurement:
-                    MeasurementSettingsView()
+                case .settingsAutoMeasure:
+                    AutoMeasureSettingsView()
+                case .settingsDataExport:
+                    DataExportSettingsView()
                 case .settingsActivityTracking:
                     WorkoutSettingsView()
                 case .settingsGoals:
@@ -204,7 +216,7 @@ struct RootAppView: View {
                 case .settingsCloud:
                     AgaraCloudSettingsView()
                 case .settingsPrivacyData:
-                    PrivacyDataSettingsView()
+                    PrivacySettingsView()
                 case .settingsAbout:
                     AboutSettingsView(path: $path)
                 case .settingsNutrition:
@@ -292,7 +304,9 @@ struct MainTabView: View {
         _selected = State(initialValue: Self.sessionTab ?? (requested == .coach ? .today : requested))
     }
 
-    private var coachEnabled: Bool { coachStore.settings.coachMasterEnabled }
+    @State private var features = AgaraFeatureStore.shared
+    /// Coach FAB + sheet: flag `coach` and the user's master switch (`CoachGate`).
+    private var coachEnabled: Bool { features.isOn(.coach) && coachStore.settings.coachMasterEnabled }
     private var visibleTabs: [MainTab] {
         // Coach is intentionally NOT a tab — it opens as a sheet. Keeping it a tab
         // pushed the count to 6 and iOS collapsed everything into a "More" tab.

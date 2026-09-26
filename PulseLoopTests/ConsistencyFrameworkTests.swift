@@ -379,11 +379,14 @@ final class ConsistencyBuildingBlockTests: XCTestCase {
         let forget = ConfirmAction.forgetRing { ran = true }
         XCTAssertEqual(forget.severity, .destructive)
         XCTAssertEqual(forget.confirmLabel, "Forget")
-        XCTAssertEqual(forget.title, "Forget this ring?")
+        XCTAssertEqual(forget.title, AgaraCopy.confirmForgetTitle)
+        XCTAssertEqual(forget.message, AgaraCopy.confirmForgetBody)
         let disconnect = ConfirmAction.disconnectRing {}
+        XCTAssertEqual(disconnect.title, AgaraCopy.confirmDisconnectTitle)
+        XCTAssertEqual(disconnect.message, AgaraCopy.confirmDisconnectBody)
         XCTAssertEqual(disconnect.severity, .normal)
         XCTAssertEqual(disconnect.confirmLabel, "Disconnect")
-        XCTAssertEqual(ConfirmAction.resetCalibration(.glucose) {}.title, "Reset glucose calibration?")
+        XCTAssertEqual(ConfirmAction.resetCalibration(.glucose) {}.title, AgaraCopy.confirmResetCalibrationTitle)
         forget.perform()
         XCTAssertTrue(ran)
     }

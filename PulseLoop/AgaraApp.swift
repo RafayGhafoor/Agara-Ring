@@ -198,6 +198,9 @@ struct AgaraApp: App {
         AgaraNotifications.shared.start()
         // Per-day sync progress (onboarding Syncing step, header bar, background sync notification).
         SyncProgress.shared.start()
+        // Auto-measure writes (`b3 01`): the store tracks ack + read-back, the coordinator sends.
+        AutoMeasureStore.shared.sender = { [coordinator] entry in coordinator.setAutoMeasure(entry) }
+        AutoMeasureStore.shared.start()
         // Daily check-in notifications: route taps + register the background wake.
         UNUserNotificationCenter.current().delegate = notificationDelegate
         let ctx = container.mainContext
@@ -244,7 +247,7 @@ struct AgaraApp: App {
             // scheduler gates on `coachMasterEnabled`, and `runDueSlot` short
             // -circuits via the feature-flags gate.
             CoachNotificationScheduler.shared.scheduleNext()
-            guard CoachSettingsStore.shared.settings.coachMasterEnabled else { return }
+            guard CoachGate.isOn else { return }
             // Foreground catch-up: deliver a due check-in we missed while away.
             let ctx = container.mainContext
             let coordinator = coordinator

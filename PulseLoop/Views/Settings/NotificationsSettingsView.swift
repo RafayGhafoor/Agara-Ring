@@ -11,9 +11,7 @@ struct NotificationsSettingsView: View {
     @State private var store = CoachSettingsStore.shared
     @State private var testStatus: String?
     @State private var notifPermissionDenied = false
-    /// Mirrors the raw `pulseloop.batteryalerts.enabled` default (absent = ON). Held in @State so the
-    /// toggle refreshes reliably; seeded in `onAppear`.
-    @State private var batteryAlertsEnabled = true
+    @State private var features = AgaraFeatureStore.shared
 
     private var coachEnabled: Bool { store.settings.coachMasterEnabled }
 
@@ -31,29 +29,13 @@ struct NotificationsSettingsView: View {
                     .disabled(!coachEnabled)
                     .opacity(coachEnabled ? 1 : 0.5)
 
-                // Ring battery alerts are independent of the AI Coach — no LLM involved — so this
-                // section sits outside the coach-gated block above.
-                batteryAlertControls
+                // Ring battery alerts moved to the Wearable screen (`RingBatteryAlertToggle`) so they stay
+                // reachable with the coach off (parity audit 2026-09-26).
             }
             .padding()
         }
         .background(AgaraColors.background)
         .pageChrome("Coach Check-Ins")
-        .onAppear {
-            batteryAlertsEnabled = UserDefaults.standard.object(forKey: BatteryAlertMonitor.enabledKey) as? Bool ?? true
-        }
-    }
-
-    @ViewBuilder private var batteryAlertControls: some View {
-        SettingsGroup(
-            header: "Ring battery alerts",
-            footer: "Get a heads-up when your ring drops below 20% and 10%."
-        ) {
-            FormToggleRow(title: "Low battery notifications", isOn: Binding(
-                get: { batteryAlertsEnabled },
-                set: { setBatteryAlerts($0) }
-            ))
-        }
     }
 
     @ViewBuilder private var notificationsControls: some View {
@@ -64,7 +46,9 @@ struct NotificationsSettingsView: View {
             ))
             if store.settings.notificationsEnabled {
                 FormValueRow(title: "Morning") { hourPicker(hourBinding(\.morningHour)) }
-                FormValueRow(title: "Midday") { hourPicker(hourBinding(\.middayHour)) }
+                if features.isOn(.coachCheckinExtras) {
+                    FormValueRow(title: "Midday") { hourPicker(hourBinding(\.middayHour)) }
+                }
                 FormValueRow(title: "Evening") { hourPicker(hourBinding(\.eveningHour)) }
             }
         }
@@ -76,8 +60,9 @@ struct NotificationsSettingsView: View {
                     .padding(.horizontal, 4)
             }
 
-            // Proactive anomaly alerts — on-device only (free/private local
+            // Proactive anomaly alerts — on-device only; behind `coach_checkin_extras` (iOS only today) (free/private local
             // inference makes "watch the stream and speak up" practical).
+            if features.isOn(.coachCheckinExtras) {
             SettingsGroup(
                 header: "Proactive alerts",
                 footer: store.settings.providerMode == .appleOnDevice
@@ -88,6 +73,7 @@ struct NotificationsSettingsView: View {
                     get: { store.settings.proactiveAlertsEnabled },
                     set: { store.settings.proactiveAlertsEnabled = $0 }
                 ))
+            }
             }
         }
         if notifPermissionDenied {
@@ -126,23 +112,6 @@ struct NotificationsSettingsView: View {
             store.settings.notificationsEnabled = granted
             notifPermissionDenied = !granted
             if granted { CoachNotificationScheduler.shared.scheduleNext() }
-        }
-    }
-
-    /// Toggle ring battery alerts. Turning ON mirrors `setNotifications`: request authorization and, if
-    /// refused, leave the toggle off + surface the denied hint. Turning OFF just writes false.
-    private func setBatteryAlerts(_ on: Bool) {
-        guard on else {
-            batteryAlertsEnabled = false
-            UserDefaults.standard.set(false, forKey: BatteryAlertMonitor.enabledKey)
-            return
-        }
-        Task {
-            let granted = (try? await UNUserNotificationCenter.current()
-                .requestAuthorization(options: [.alert, .sound, .badge])) ?? false
-            batteryAlertsEnabled = granted
-            UserDefaults.standard.set(granted, forKey: BatteryAlertMonitor.enabledKey)
-            notifPermissionDenied = !granted
         }
     }
 

@@ -15,11 +15,22 @@ struct FeatureFlagsView: View {
                     SettingsGroup(
                         header: "Feature flags",
                         footer: "Debug builds only. Overrides persist until reset; launch with "
-                            + "-features \"name=on,name=off\" to set them at start-up."
+                            + "-features \"name=on,name=off\" (or all=on / parity=on) to set them at start-up."
                     ) {
-                        ForEach(AgaraFeature.allCases, id: \.self) { feature in
+                        ForEach(AgaraFeature.allCases.filter { !AgaraFeatureStore.parityFlags.contains($0) }, id: \.self) { feature in
                             FormToggleRow(title: title(feature), isOn: binding(feature))
                         }
+                    }
+                    SettingsGroup(
+                        header: "Parity switches",
+                        footer: "Features only one app has so far — off in release until the other app ships them."
+                    ) {
+                        ForEach(AgaraFeatureStore.parityFlags, id: \.self) { feature in
+                            FormToggleRow(title: title(feature), isOn: binding(feature))
+                        }
+                    }
+                    SecondaryButton(title: "Turn every flag on", systemImage: "checkmark.circle") {
+                        for feature in AgaraFeature.allCases where !feature.defaultOn { store.setOverride(feature, true) }
                     }
                     SecondaryButton(title: "Reset to defaults", systemImage: "arrow.uturn.backward") {
                         store.resetAll()

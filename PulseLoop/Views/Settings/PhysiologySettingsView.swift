@@ -14,7 +14,6 @@ struct PhysiologySettingsView: View {
     @State private var altitudeText = ""
     @State private var betaBlockers: TriState = .unset
     @State private var lungCondition: TriState = .unset
-    @State private var glucoseUnit: GlucoseUnit = .mgdl
     @State private var units: UnitsPreference = .metric
     @State private var loaded = false
 
@@ -50,15 +49,6 @@ struct PhysiologySettingsView: View {
                 ) {
                     triStateRow("Beta-blockers", selection: $betaBlockers)
                     triStateRow("Known lung condition", selection: $lungCondition)
-                }
-
-                SettingsGroup(header: "Units") {
-                    FormValueRow(title: "Glucose unit") {
-                        Picker("Glucose unit", selection: $glucoseUnit) {
-                            ForEach(GlucoseUnit.allCases) { Text($0.label).tag($0) }
-                        }
-                        .pickerStyle(.segmented)
-                    }
                 }
 
                 PrimaryButton(title: "Save", systemImage: "checkmark") { save() }
@@ -103,7 +93,6 @@ struct PhysiologySettingsView: View {
         athleteMode = p.athleteMode
         betaBlockers = TriState(p.usesBetaBlockers)
         lungCondition = TriState(p.hasKnownLungCondition)
-        glucoseUnit = p.preferredGlucoseUnit
         if let alt = p.altitudeMeters {
             altitudeText = units == .metric ? "\(Int(alt))" : "\(Int((alt / 0.3048).rounded()))"
         }
@@ -118,7 +107,6 @@ struct PhysiologySettingsView: View {
         profile.athleteMode = athleteMode
         profile.usesBetaBlockers = betaBlockers.boolValue
         profile.hasKnownLungCondition = lungCondition.boolValue
-        profile.preferredGlucoseUnit = glucoseUnit
         // Altitude entered in display units; store canonical metres.
         if let entered = Double(altitudeText.trimmingCharacters(in: .whitespaces)), entered > 0 {
             profile.altitudeMeters = units == .metric ? entered : entered * 0.3048

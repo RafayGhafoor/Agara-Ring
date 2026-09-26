@@ -171,7 +171,9 @@ final class AgaraPairingTests: XCTestCase {
     }
 
     func testCalibrationResetConfirmationNamesTheCalibration() {
-        XCTAssertEqual(CalibrationResetTarget.glucose.title, "Reset glucose calibration?")
-        XCTAssertEqual(CalibrationResetTarget.bloodPressure.title, "Reset blood pressure calibration?")
+        // Title/body from brand.yaml (both apps); the body names which calibration is reset.
+        XCTAssertEqual(ConfirmAction.resetCalibration(.glucose) {}.title, AgaraCopy.confirmResetCalibrationTitle)
+        XCTAssertTrue(ConfirmAction.resetCalibration(.glucose) {}.message.hasPrefix("Glucose: "))
+        XCTAssertTrue(ConfirmAction.resetCalibration(.bloodPressure) {}.message.hasPrefix("Blood pressure: "))
     }
 }

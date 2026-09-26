@@ -224,6 +224,9 @@ protocol RingSyncEngine: AnyObject {
     /// Stop a running find-device vibration. Default no-op.
     func stopFindDevice()
     func setGoal(steps: Int)
+    /// Write one row of the ring's automatic-measurement schedule (`AutoMeasure`); the engine reads the table
+    /// back once the ring acks. Returns false when the engine can't write it. Default: unsupported.
+    func setAutoMeasure(_ entry: AutoMeasureEntry) -> Bool
 
     // On-demand spot tests beyond HR/SpO₂/BP (stress, glucose, blood components). Default no-ops; the
     // Agara engine runs them like SpO₂/BP (`startSpotTest`), so the poll tick stays silent.
@@ -304,6 +307,7 @@ enum FirmwareUpdateHold {
 
 extension RingSyncEngine {
     var isHistorySyncing: Bool { false }
+    func setAutoMeasure(_ entry: AutoMeasureEntry) -> Bool { false }
     func enterFirmwareHold() {}
     func resumeAfterFirmwareHold() {}
 

@@ -285,7 +285,12 @@ struct VeepooDecoder {
                         startHour: window.count > 0 ? Int(window[0]) : 0,
                         startMinute: window.count > 1 ? Int(window[1]) : 0,
                         endHour: window.count > 2 ? Int(window[2]) : 0,
-                        endMinute: window.count > 3 ? Int(window[3]) : 0
+                        endMinute: window.count > 3 ? Int(window[3]) : 0,
+                        protocolVersion: Int(fields[0xD0]?.first ?? 0),
+                        stepMinutes: veepooUInt16LE(fields[0xD3] ?? [], 0),
+                        windowModifiable: (fields[0xD4]?.first ?? 0) == 1,
+                        intervalModifiable: (fields[0xD4].flatMap { $0.count > 1 ? $0[1] : nil } ?? 0) == 1,
+                        allowedWindow: (fields[0xD5] ?? [0, 0, 0, 0]).prefix(4).map(Int.init)
                     ))
                 }
             }

@@ -1,5 +1,15 @@
 import Foundation
 
+/// The shared `coach` flag (docs/config/features.yaml, parity phase 6) over the user's own master switch: the
+/// coach, its FAB, cards, summaries and check-ins exist only when both are on. One place so every surface agrees.
+@MainActor
+enum CoachGate {
+    /// The coach may appear/run: the parity flag is on and the user turned the coach on.
+    static var isOn: Bool { AgaraFeatureStore.isOn(.coach) && CoachSettingsStore.shared.settings.coachMasterEnabled }
+    /// Conversation history (list of past chats) — flag `coach_history`, iOS only today.
+    static var historyOn: Bool { AgaraFeatureStore.isOn(.coachHistory) }
+}
+
 /// Resolves "can the real coach run, and which tool classes are allowed" from
 /// the user's settings plus whether a key is actually present. Mirrors the web
 /// app's `settings.coach_enabled` gate, extended with per-class tool toggles.

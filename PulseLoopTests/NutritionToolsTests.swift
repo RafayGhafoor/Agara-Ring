@@ -277,7 +277,10 @@ final class NutritionContextTests: XCTestCase {
     private func withPrefs(master: Bool, share: Bool = true, _ body: () throws -> Void) rethrows {
         let store = NutritionPrefsStore.shared
         let original = store.prefs
-        defer { store.prefs = original }
+        // The shared `nutrition` parity flag gates the feature too (phase 6); these tests exercise the user toggle.
+        let flag = AgaraFeatureStore.shared.override(for: .nutrition)
+        AgaraFeatureStore.shared.setOverride(.nutrition, true)
+        defer { store.prefs = original; AgaraFeatureStore.shared.setOverride(.nutrition, flag) }
         store.prefs.masterEnabled = master
         store.prefs.shareWithCoach = share
         try body()

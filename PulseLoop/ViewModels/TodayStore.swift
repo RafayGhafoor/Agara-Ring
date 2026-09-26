@@ -175,7 +175,7 @@ final class TodayStore {
         // collapses to a constant while the feature is off.
         let nPrefs = NutritionPrefsStore.shared.prefs
         let nutritionSig: String
-        if nPrefs.masterEnabled {
+        if NutritionPrefsStore.shared.isActive {
             let count = NutritionRepository.entries(on: Date(), context: context).count
             let intakeSig = goal.map { "\($0.intakeCalories ?? 0)/\($0.intakeProteinG ?? 0)/\($0.intakeCarbsG ?? 0)/\($0.intakeFatG ?? 0)" } ?? "·"
             nutritionSig = "n\(nPrefs.showOnToday)/\(count)@\(stamp(NutritionRepository.latestEntryUpdate(context: context)))/\(intakeSig)"

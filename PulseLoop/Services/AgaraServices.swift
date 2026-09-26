@@ -84,7 +84,7 @@ enum MetricsService {
             isDemo: isDemo,
             // Consumed nutrition rides the summary only when the feature is on; nil otherwise so
             // every consumer (tiles, cards, widgets, coach) inherits the master-toggle gate.
-            nutrition: NutritionPrefsStore.shared.prefs.masterEnabled
+            nutrition: NutritionPrefsStore.shared.isActive
                 ? NutritionRepository.dayTotals(on: Date(), context: context)
                 : nil
         )
@@ -146,7 +146,11 @@ enum MetricsService {
 
     static func displaySamples(_ raw: [MetricSample], range: MetricRange,
                                scope: MetricScope = .vitals) -> [MetricSample] {
-        let targetBuckets = MetricPrefsStore.shared.resolution(for: scope).targetBuckets(for: range)
+        // The user's chart resolution applies only with its setting shown (flag `chart_resolution_setting`,
+        // iOS only today); otherwise every chart draws at the shipped default, like Android.
+        let resolution = AgaraFeatureStore.isOn(.chartResolutionSetting)
+            ? MetricPrefsStore.shared.resolution(for: scope) : MetricPrefs.default.resolution
+        let targetBuckets = resolution.targetBuckets(for: range)
         // "Full" resolution is still capped: Swift Charts lays out every mark, and a day of live samples
         // is thousands of them for a chart a few hundred points wide.
         let buckets = targetBuckets > 0 ? min(targetBuckets, maxChartPoints) : maxChartPoints
@@ -850,10 +854,21 @@ enum ActivityService {
             context.insert(row)
             changed = true
         }
-        if let steps = update.steps, steps > row.steps { row.steps = steps; changed = true }
-        if let calories = update.calories, calories > row.calories { row.calories = calories; changed = true }
-        if let distanceMeters = update.distanceMeters, distanceMeters > row.distanceMeters {
-            row.distanceMeters = distanceMeters; changed = true
+        // The ring's cumulative count still includes any block the user deleted today — correct it by the day's
+        // deficit (`ActivityBucketDeletion.ratchetAgainstRing`); with nothing deleted this is the plain ratchet.
+        if let steps = update.steps {
+            let next = ActivityBucketDeletion.ratchetAgainstRing(stored: row.steps, ringTotal: steps, deleted: row.deletedSteps)
+            if next != row.steps { row.steps = next; changed = true }
+        }
+        // While a deficit exists the ring's calorie figure is known to include the deleted block — leave the
+        // day's own estimate in charge instead of raising it (Android does the same).
+        if let calories = update.calories, calories > row.calories, row.deletedSteps == 0 {
+            row.calories = calories; changed = true
+        }
+        if let distanceMeters = update.distanceMeters {
+            let next = ActivityBucketDeletion.ratchetAgainstRing(stored: row.distanceMeters, ringTotal: distanceMeters,
+                                                                 deleted: row.deletedDistanceMeters)
+            if next != row.distanceMeters { row.distanceMeters = next; changed = true }
         }
         if let activeMinutes = update.activeMinutes, activeMinutes > row.activeMinutes {
             row.activeMinutes = activeMinutes; changed = true
@@ -892,6 +907,13 @@ enum ActivityService {
     static func applyActivityBucket(date timestamp: Date, steps: Int, distanceMeters: Double, syncedAt: Date = Date(), context: ModelContext) -> ActivityDaily {
         let dayStart = Calendar.current.startOfDay(for: timestamp)
         let epoch = Int(timestamp.timeIntervalSince1970)
+        // A bucket the user deleted stays deleted (tombstone, `ActivityBucketDeletion`).
+        if ReadingDeletion.isActivityDeleted(startEpoch: epoch, context: context) {
+            if let row = MetricsRepository.activity(on: dayStart, context: context) { return row }
+            let row = ActivityDaily(date: dayStart, source: ringHistorySource)
+            context.insert(row)
+            return row
+        }
 
         // Upsert the bucket sample by its unique start epoch (replace on re-sync). Buckets inserted
         // earlier in this (unsaved) batch are found in `pendingBuckets` — SwiftData fetches don't always

@@ -220,6 +220,8 @@ final class VeepooDriver: WearableDriver {
     /// `b3 02 01 <seq>` read-reply frames; the header TLV in frame 1 says how many to expect.
     private func autoMeasureEvents(_ data: Data) -> [RingDecodedEvent] {
         let bytes = [UInt8](data)
+        // `b3 01 01` / `b3 01 00`: the ring's answer to a `b3 01` set (`AutoMeasure.setFrames`).
+        if bytes.count >= 3, bytes[1] == 0x01 { return [.settingAck(commandId: 0xB3, ok: bytes[2] == 0x01)] }
         guard bytes.count >= 5, bytes[1] == 0x02, bytes[2] == 0x01 else { return [.unknown(commandId: data[0], raw: data)] }
         let seq = Int(bytes[3])
         if seq == 1 { autoMeasureFrames.removeAll() }

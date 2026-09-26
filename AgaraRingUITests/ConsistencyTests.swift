@@ -81,7 +81,7 @@ final class ConsistencyTests: AgaraUITestCase {
         let disconnect = app.buttons["Disconnect"]
         scrollTo(disconnect)
         waitFor(disconnect).tap()
-        let disconnectAlert = app.alerts["Disconnect the ring?"]
+        let disconnectAlert = app.alerts["Disconnect ring?"]
         waitFor(disconnectAlert, timeout: 5, "Disconnect did not ask first")
         attachScreenshot("confirm-disconnect")
         disconnectAlert.buttons["Cancel"].tap()

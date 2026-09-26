@@ -142,6 +142,56 @@ enum SleepFormat {
     }
 }
 
+// MARK: - Ring records (port of Android `sleepRecordRuns`)
+
+/// One ring record inside a merged night. A ring closes a session when the wearer gets up and opens a new one
+/// when they settle, so one night can arrive as two or three records; the app merges them (that is the night),
+/// and this recovers the parts from stored data so the "recorded in N parts" card can show them.
+struct SleepRecordRun: Equatable {
+    let startAt: Date
+    let endAt: Date
+    let asleepMinutes: Int
+}
+
+enum SleepRecordRuns {
+    /// Split `blocks` into the ring records they came from. The boundary is read, not inferred: each block
+    /// carries its record's declared start (`recordStartAt`), so blocks group by it — all-or-nothing, since a
+    /// night part-stamped and part-legacy has no consistent boundary. Rows written before that field existed
+    /// fall back to splitting at gaps of `minGapMinutes` or more. One run = an unsplit night (the common case).
+    static func runs(_ blocks: [SleepStageBlock], minGapMinutes: Int = 2) -> [SleepRecordRun] {
+        runs(blocks.map { (start: $0.startAt, minutes: $0.durationMinutes, awake: $0.stage == .awake, record: $0.recordStartAt) },
+             minGapMinutes: minGapMinutes)
+    }
+
+    static func runs(_ blocks: [(start: Date, minutes: Int, awake: Bool, record: Date?)], minGapMinutes: Int = 2) -> [SleepRecordRun] {
+        guard !blocks.isEmpty else { return [] }
+        let ordered = blocks.sorted { $0.start < $1.start }
+        func end(_ b: (start: Date, minutes: Int, awake: Bool, record: Date?)) -> Date { b.start.addingTimeInterval(TimeInterval(b.minutes * 60)) }
+        func run(_ group: [(start: Date, minutes: Int, awake: Bool, record: Date?)]) -> SleepRecordRun {
+            let sorted = group.sorted { $0.start < $1.start }
+            return SleepRecordRun(startAt: sorted[0].start, endAt: sorted.map(end).max() ?? sorted[0].start,
+                                  asleepMinutes: max(0, sorted.filter { !$0.awake }.reduce(0) { $0 + $1.minutes }))
+        }
+        if ordered.allSatisfy({ $0.record != nil }) {
+            let groups = Dictionary(grouping: ordered) { $0.record! }
+            return groups.keys.sorted().map { run(groups[$0]!) }
+        }
+        var runs: [SleepRecordRun] = []
+        var current = [ordered[0]]
+        for block in ordered.dropFirst() {
+            let lastEnd = current.map(end).max() ?? block.start
+            if block.start.timeIntervalSince(lastEnd) >= TimeInterval(minGapMinutes * 60) {
+                runs.append(run(current))
+                current = [block]
+            } else {
+                current.append(block)
+            }
+        }
+        runs.append(run(current))
+        return runs
+    }
+}
+
 // MARK: - Coach interpretation
 
 struct SleepCoach {

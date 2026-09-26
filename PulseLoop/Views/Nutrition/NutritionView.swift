@@ -37,7 +37,7 @@ struct NutritionView: View {
     /// and the nutrition photo-analysis sub-toggle.
     private var photoAnalysisAvailable: Bool {
         let coach = CoachSettingsStore.shared.settings
-        return coach.coachMasterEnabled
+        return CoachGate.isOn
             && coach.providerMode != .appleOnDevice
             && NutritionPrefsStore.shared.prefs.photoAnalysisEnabled
     }
@@ -46,7 +46,7 @@ struct NutritionView: View {
     /// structured estimator).
     private var describeAnalysisAvailable: Bool {
         let coach = CoachSettingsStore.shared.settings
-        return coach.coachMasterEnabled && coach.providerMode != .appleOnDevice
+        return CoachGate.isOn && coach.providerMode != .appleOnDevice
     }
 
     private var isToday: Bool { Calendar.current.isDateInToday(selectedDay) }

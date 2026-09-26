@@ -211,11 +211,14 @@ struct ActivityDetailView: View {
             }
             .background(AgaraColors.background)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { presentingShare = true } label: {
-                        Image(systemName: "square.and.arrow.up")
+                // Workout share card: flag `share_card` (iOS only today).
+                if AgaraFeatureStore.shared.isOn(.shareCard) {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button { presentingShare = true } label: {
+                            Image(systemName: "square.and.arrow.up")
+                        }
+                        .tint(AgaraColors.accent)
                     }
-                    .tint(AgaraColors.accent)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { editing = true } label: {
@@ -238,8 +241,8 @@ struct ActivityDetailView: View {
             }
             .sheet(isPresented: $confirmingDelete) {
                 WorkoutEndSheet(
-                    title: "Delete this workout?",
-                    message: "This permanently removes the workout and its recorded heart-rate, GPS, and sensor data. This can't be undone.",
+                    title: AgaraCopy.confirmDeleteWorkoutTitle,
+                    message: AgaraCopy.confirmDeleteWorkoutBody,
                     stats: deleteSheetStats(session),
                     confirmTitle: "Delete workout",
                     confirmIcon: "trash",

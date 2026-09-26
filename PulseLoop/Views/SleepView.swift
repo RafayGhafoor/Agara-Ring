@@ -31,7 +31,7 @@ struct SleepView: View {
     }
 
     private var summaryService: CoachSummaryService { CoachSummaryService(modelContext: modelContext) }
-    private var coachEnabled: Bool { coachStore.settings.coachMasterEnabled }
+    private var coachEnabled: Bool { AgaraFeatureStore.shared.isOn(.coach) && coachStore.settings.coachMasterEnabled }
 
     private var daySummary: CoachSummary? {
         allSummaries.filter { $0.kind == "sleep_day" }.max(by: { $0.updatedAt < $1.updatedAt })
@@ -164,6 +164,33 @@ struct SleepView: View {
         VisualizationCard(eyebrow: "Stages", title: "Night timeline", legend: true) {
             SleepHypnogramView(blocks: s.blocks, totalMin: s.session.totalMinutes, startTs: s.session.startAt,
                                onScrubActiveChanged: { hypnogramScrubbing = $0 })
+        }
+        // "Recorded in N parts" (port of Android's Records card): only for a night the ring split.
+        let runs = SleepRecordRuns.runs(s.blocks)
+        if runs.count > 1 {
+            VisualizationCard(eyebrow: "Records", title: "The ring recorded this night in \(runs.count) parts", legend: false) {
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(Array(runs.enumerated()), id: \.offset) { index, run in
+                        HStack(alignment: .top, spacing: 0) {
+                            Text("\(index + 1)").font(AgaraFont.caption2).foregroundStyle(AgaraColors.textMuted)
+                                .frame(width: 18, alignment: .leading)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("\(SleepFormat.clockTime(run.startAt)) – \(SleepFormat.clockTime(run.endAt))")
+                                    .font(AgaraFont.subheadline).foregroundStyle(AgaraColors.textPrimary)
+                                Text("Asleep \(SleepFormat.duration(run.asleepMinutes))")
+                                    .font(AgaraFont.caption).foregroundStyle(AgaraColors.textMuted)
+                            }
+                        }
+                        if index < runs.count - 1 {
+                            let gap = Int(runs[index + 1].startAt.timeIntervalSince(run.endAt) / 60)
+                            Text("Awake \(SleepFormat.duration(gap)) between")
+                                .font(AgaraFont.caption).foregroundStyle(AgaraColors.textMuted)
+                                .padding(.leading, 18)
+                        }
+                    }
+                }
+            }
+            .accessibilityIdentifier("sleep.records")
         }
         SleepStageSummaryCardsView(
             deep: SleepFormat.duration(s.deepMinutes),

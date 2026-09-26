@@ -242,7 +242,13 @@ final class MeasurementService {
         errorMessage = message
         stage = .error
         trace("measurement \(spec.title): \(message)")
-        notifications.remove(ids: [AgaraNotification.measurementId])
+        // Backgrounded: replace "Measuring…" with "Measurement didn't finish" (brand.yaml, same as Android);
+        // in the foreground the sheet shows the error, so just clear it.
+        if notifications.isAppInBackground {
+            Task { await notifications.post(.measurementFailed(spec.title)) }
+        } else {
+            notifications.remove(ids: [AgaraNotification.measurementId])
+        }
         finishBackgroundWork()
     }
 

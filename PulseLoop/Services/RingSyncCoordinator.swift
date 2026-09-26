@@ -567,6 +567,12 @@ final class RingSyncCoordinator {
         if client.state == .connected { engine?.stopFindDevice() }
     }
 
+    /// Write one auto-measure row to the ring (`AutoMeasureStore.set`). False when no ring is connected.
+    func setAutoMeasure(_ entry: AutoMeasureEntry) -> Bool {
+        guard client.state == .connected, let engine else { return false }
+        return engine.setAutoMeasure(entry)
+    }
+
     func setGoal(steps: Int) {
         if client.state == .connected {
             engine?.setGoal(steps: steps)

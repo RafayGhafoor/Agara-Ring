@@ -57,7 +57,7 @@ final class CoachSummaryCoordinator {
             guard let self, !Task.isCancelled else { return }
             // Skip background regeneration entirely when the user has turned the
             // coach off; the views won't render the summaries anyway.
-            guard CoachSettingsStore.shared.settings.coachMasterEnabled else {
+            guard CoachGate.isOn else {
                 pendingToday = false; pendingSleep = false; return
             }
             if pendingToday { pendingToday = false; await service.refreshTodayIfNeeded() }

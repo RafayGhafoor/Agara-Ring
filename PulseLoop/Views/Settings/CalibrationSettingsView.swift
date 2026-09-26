@@ -243,10 +243,10 @@ struct CalibrationSettingsView: View {
 enum CalibrationResetTarget: Equatable {
     case bloodPressure, glucose
 
-    var title: String {
+    var label: String {
         switch self {
-        case .bloodPressure: return "Reset blood pressure calibration?"
-        case .glucose: return "Reset glucose calibration?"
+        case .bloodPressure: return "Blood pressure"
+        case .glucose: return "Glucose"
         }
     }
 }

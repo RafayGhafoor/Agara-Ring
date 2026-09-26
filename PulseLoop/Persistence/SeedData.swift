@@ -348,6 +348,8 @@ enum SeedData {
         deleteAll(CoachToolCall.self, context)
         deleteAll(MealEntry.self, context)
         deleteAll(CachedFoodProduct.self, context)
+        deleteAll(MeasurementDeletion.self, context)
+        ReadingDeletion.invalidate()
         try? context.save()
     }
     

@@ -55,6 +55,9 @@ final class CoachNotificationService {
     private let syncWaitTimeout: TimeInterval
     /// Whether a stale-data result should still send (with last-known data) or skip.
     private let staleDataPolicy: StaleDataPolicy
+    /// Shared feature flags: `coach` gates every check-in, `coach_checkin_extras` the midday slot and the
+    /// anomaly heads-ups (parity audit 2026-09-26). Injectable for tests.
+    private let featureOn: @MainActor (AgaraFeature) -> Bool
 
     nonisolated deinit {}   // skip the main-actor isolated-deinit hop (crashes on older sim runtimes)
 
@@ -68,8 +71,10 @@ final class CoachNotificationService {
         settingsStore: CoachSettingsStore = .shared,
         syncWaitTimeout: TimeInterval = 15,
         staleDataPolicy: StaleDataPolicy = .skip,
-        clientFactory: @escaping (String) -> ResponsesClient = { OpenAIResponsesClient(apiKey: $0) }
+        clientFactory: @escaping (String) -> ResponsesClient = { OpenAIResponsesClient(apiKey: $0) },
+        featureOn: (@MainActor (AgaraFeature) -> Bool)? = nil
     ) {
+        self.featureOn = featureOn ?? { AgaraFeatureStore.isOn($0) }
         self.modelContext = modelContext
         self.syncGate = coordinator
         self.keyStore = keyStore
@@ -100,7 +105,8 @@ final class CoachNotificationService {
 
         let resolved = CoachNotificationSlot.current(
             for: now, morningHour: settings.morningHour,
-            middayHour: settings.middayHour, eveningHour: settings.eveningHour
+            middayHour: featureOn(.coachCheckinExtras) ? settings.middayHour : CoachNotificationSlot.noMidday,
+            eveningHour: settings.eveningHour
         )
         guard let slot = resolved ?? (force ? forcedSlot(now: now) : nil) else { return .skippedNoSlot }
 
@@ -108,7 +114,7 @@ final class CoachNotificationService {
 
         let (apiKey, activeClient) = resolveClient()
         let flags = CoachFeatureFlags(settings: settings, hasAPIKey: apiKey != nil)
-        guard force || flags.coachEnabled else { return .skippedDisabled }
+        guard force || (flags.coachEnabled && featureOn(.coach)) else { return .skippedDisabled }
 
         // Morning-only: don't fire until last night's sleep has fully synced — otherwise
         // the check-in leads with partial/absent sleep. Skip WITHOUT recording so a
@@ -151,7 +157,8 @@ final class CoachNotificationService {
     @discardableResult
     func runProactiveAlertIfNeeded(force: Bool = false, now: Date = Date()) async -> Outcome {
         let settings = settingsStore.settings
-        guard force || (settings.coachMasterEnabled
+        guard force || (featureOn(.coach) && featureOn(.coachCheckinExtras)
+                        && settings.coachMasterEnabled
                         && settings.notificationsEnabled
                         && settings.proactiveAlertsEnabled
                         && settings.providerMode == .appleOnDevice

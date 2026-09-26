@@ -67,6 +67,9 @@ nonisolated struct AgaraArchive: Decodable, Sendable {
     var wearableLogs: [ArchiveWearableLog]
     var mealEntries: [ArchiveMealEntry]
     var foodProducts: [ArchiveFoodProduct]
+    /// Deletion tombstones (Android's `measurementDeletions`): a restore wipes every table first, and without
+    /// them the next sync would bring the deleted readings/buckets back.
+    var measurementDeletions: [ArchiveMeasurementDeletion] = []
 
     /// Raw UserDefaults JSON blobs keyed by their storage key (metric prefs, workout prefs,
     /// calibration, coach settings, Apple Health prefs). Opaque pass-through — never re-encoded.
@@ -127,7 +130,7 @@ nonisolated struct AgaraArchive: Decodable, Sendable {
         wearableLogs = try list(.wearableLogs)
         mealEntries = try list(.mealEntries)
         foodProducts = try list(.foodProducts)
-        // `measurementDeletions` (Android's tombstones) has no iOS model yet — read past it.
+        measurementDeletions = try list(.measurementDeletions)
         settings = try c.decodeIfPresent([String: String].self, forKey: .settings)
         attachments = try c.decodeIfPresent([ArchiveAttachment].self, forKey: .attachments)
     }
@@ -325,6 +328,9 @@ nonisolated struct ArchiveActivityDaily: Codable, Sendable {
     var updatedAt: Date
     /// Optional: absent from older iOS archives.
     var estimatedActiveCalories: Double?
+    /// The day's deleted-steps deficit (issue #70); optional — absent from older archives.
+    var deletedSteps: Int?
+    var deletedDistanceMeters: Double?
 
     @MainActor init(_ m: ActivityDaily) {
         id = m.id
@@ -338,6 +344,8 @@ nonisolated struct ArchiveActivityDaily: Codable, Sendable {
         createdAt = m.createdAt
         updatedAt = m.updatedAt
         estimatedActiveCalories = m.estimatedActiveCalories
+        deletedSteps = m.deletedSteps
+        deletedDistanceMeters = m.deletedDistanceMeters
     }
 
     @MainActor func insert(into context: ModelContext) {
@@ -353,6 +361,8 @@ nonisolated struct ArchiveActivityDaily: Codable, Sendable {
         m.createdAt = createdAt
         m.updatedAt = updatedAt
         m.estimatedActiveCalories = estimatedActiveCalories
+        m.deletedSteps = deletedSteps ?? 0
+        m.deletedDistanceMeters = deletedDistanceMeters ?? 0
         context.insert(m)
     }
 }
@@ -824,6 +834,30 @@ nonisolated struct ArchiveActivitySample: Codable, Sendable {
         m.id = id
         m.confidenceRaw = confidenceRaw
         context.insert(m)
+    }
+}
+
+/// A deletion tombstone in Android's shape: `measurementId` is the key (`history:<kind>:<ms>` /
+/// `activity:<ms>`), `kindRaw` Android's enum name (`HEART_RATE`, `ACTIVITY_BUCKET`).
+nonisolated struct ArchiveMeasurementDeletion: Codable, Sendable {
+    static let activityKind = "ACTIVITY_BUCKET"
+    static let localActivityKind = "activity_bucket"
+
+    var measurementId: String
+    var kindRaw: String
+    var timestamp: Date
+    var deletedAt: Date
+
+    @MainActor init(_ m: MeasurementDeletion) {
+        measurementId = m.measurementId
+        kindRaw = m.kindRaw == Self.localActivityKind ? Self.activityKind : ArchiveInterop.exportKind(m.kindRaw)
+        timestamp = m.timestamp
+        deletedAt = m.deletedAt
+    }
+
+    @MainActor func insert(into context: ModelContext) {
+        let local = kindRaw == Self.activityKind ? Self.localActivityKind : ArchiveInterop.importKind(kindRaw)
+        context.insert(MeasurementDeletion(measurementId: measurementId, kindRaw: local, timestamp: timestamp, deletedAt: deletedAt))
     }
 }
 

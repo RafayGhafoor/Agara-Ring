@@ -169,9 +169,10 @@ enum DataArchiveService {
         }
         try await table("mealEntries", "meal_entries", MealEntry.self) { ArchiveMealEntry($0) }
         try await table("foodProducts", "food_products", CachedFoodProduct.self) { ArchiveFoodProduct($0) }
-        // Android's deletion tombstones: no iOS model yet, written empty so the shape matches.
-        try sink.write(Data(",\"measurementDeletions\":[]".utf8))
-        counts.append(("measurement_deletions", 0))
+        // Deletion tombstones (readings + activity buckets), Android's key and shape.
+        try await table("measurementDeletions", "measurement_deletions", MeasurementDeletion.self) {
+            ArchiveMeasurementDeletion($0)
+        }
 
         var settings: [String: String] = [:]
         for key in settingsKeys {
@@ -378,6 +379,8 @@ enum DataArchiveService {
         try deleteAll(WearableLog.self, context)
         try deleteAll(MealEntry.self, context)
         try deleteAll(CachedFoodProduct.self, context)
+        try deleteAll(MeasurementDeletion.self, context)
+        ReadingDeletion.invalidate()
     }
 
     private static func deleteAll<T: PersistentModel>(_ type: T.Type, _ context: ModelContext) throws {
@@ -413,6 +416,8 @@ enum DataArchiveService {
         insert(archive.wearableLogs, context)
         insert(archive.mealEntries, context)
         insert(archive.foodProducts, context)
+        insert(archive.measurementDeletions, context)
+        ReadingDeletion.invalidate()
     }
 
     private static func insert(_ rows: [some ArchiveInsertable], _ context: ModelContext) {
@@ -530,6 +535,7 @@ protocol ArchiveInsertable {
 }
 
 extension ArchiveDevice: ArchiveInsertable {}
+extension ArchiveMeasurementDeletion: ArchiveInsertable {}
 extension ArchiveActivityDaily: ArchiveInsertable {}
 extension ArchiveMeasurement: ArchiveInsertable {}
 extension ArchiveBatterySample: ArchiveInsertable {}

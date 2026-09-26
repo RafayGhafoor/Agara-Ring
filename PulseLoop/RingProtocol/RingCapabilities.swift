@@ -105,20 +105,70 @@ struct RingCapabilities: Codable, Equatable, Sendable {
     }
 }
 
-/// One row of the ring's automatic-measurement schedule (`b3` "Health & Monitor" read reply). Read-only
-/// for now (flag `auto_measure_settings`); editing is a later change.
+/// One row of the ring's automatic-measurement schedule (`b3` "Health & Monitor" read reply). Carries every
+/// field of the row's `a1 21` TLV, so a `b3 01` set (`AutoMeasure.setFrames`) can write it back byte-exact
+/// with only the on/off and interval changed (flag `auto_measure_settings`, research 03 §2.4).
 struct AutoMeasureEntry: Codable, Equatable, Sendable, Identifiable {
     /// Ring type code: 0 heart rate, 1 blood pressure, 2 glucose, 3 stress, 4 SpO₂, 5 temperature,
     /// 6 Lorenz (HRV scatter), 7 HRV, 8 blood components.
     let type: Int
-    let enabled: Bool
-    let intervalMinutes: Int
+    var enabled: Bool
+    var intervalMinutes: Int
     let startHour: Int
     let startMinute: Int
     let endHour: Int
     let endMinute: Int
+    /// `d0` protocol byte (0 on our ring).
+    var protocolVersion: Int = 0
+    /// `d3` interval step in minutes — the ring accepts multiples of it (30 on ours, 60 for SpO₂, 5 Lorenz).
+    var stepMinutes: Int = 0
+    /// `d4` byte 0: the time window may be changed.
+    var windowModifiable: Bool = false
+    /// `d4` byte 1: the interval (and on/off) may be changed. Lorenz on our ring is locked (00 00).
+    var intervalModifiable: Bool = false
+    /// `d5` allowed window (sh sm eh em); 00:00–00:00 = all day.
+    var allowedWindow: [Int] = [0, 0, 0, 0]
 
     var id: Int { type }
+
+    init(type: Int, enabled: Bool, intervalMinutes: Int, startHour: Int, startMinute: Int, endHour: Int,
+         endMinute: Int, protocolVersion: Int = 0, stepMinutes: Int = 0, windowModifiable: Bool = false,
+         intervalModifiable: Bool = false, allowedWindow: [Int] = [0, 0, 0, 0]) {
+        self.type = type
+        self.enabled = enabled
+        self.intervalMinutes = intervalMinutes
+        self.startHour = startHour
+        self.startMinute = startMinute
+        self.endHour = endHour
+        self.endMinute = endMinute
+        self.protocolVersion = protocolVersion
+        self.stepMinutes = stepMinutes
+        self.windowModifiable = windowModifiable
+        self.intervalModifiable = intervalModifiable
+        self.allowedWindow = allowedWindow
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case type, enabled, intervalMinutes, startHour, startMinute, endHour, endMinute
+        case protocolVersion, stepMinutes, windowModifiable, intervalModifiable, allowedWindow
+    }
+
+    /// Rows stored before the set fields existed decode with them zero (read-only until the next read).
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        type = try c.decode(Int.self, forKey: .type)
+        enabled = try c.decode(Bool.self, forKey: .enabled)
+        intervalMinutes = try c.decode(Int.self, forKey: .intervalMinutes)
+        startHour = try c.decode(Int.self, forKey: .startHour)
+        startMinute = try c.decode(Int.self, forKey: .startMinute)
+        endHour = try c.decode(Int.self, forKey: .endHour)
+        endMinute = try c.decode(Int.self, forKey: .endMinute)
+        protocolVersion = try c.decodeIfPresent(Int.self, forKey: .protocolVersion) ?? 0
+        stepMinutes = try c.decodeIfPresent(Int.self, forKey: .stepMinutes) ?? 0
+        windowModifiable = try c.decodeIfPresent(Bool.self, forKey: .windowModifiable) ?? false
+        intervalModifiable = try c.decodeIfPresent(Bool.self, forKey: .intervalModifiable) ?? false
+        allowedWindow = try c.decodeIfPresent([Int].self, forKey: .allowedWindow) ?? [0, 0, 0, 0]
+    }
 
     /// A zero-length window (00:00–00:00) means all day, which is how the ring encodes it.
     var isAllDay: Bool { startHour == endHour && startMinute == endMinute }

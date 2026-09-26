@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UserNotifications
 
 /// Wearable detail screen: connection state and the ring actions (sync / find / disconnect / forget /
 /// pair). Relocated from the old flat `SettingsView` Ring section.
@@ -86,6 +87,56 @@ struct WearableSettingsView: View {
         return Self.relativeFormatter.localizedString(for: date, relativeTo: Date())
     }
 
+    /// Find ring · Disconnect · Forget in one group (consistency plan B). Disconnect and Forget ask first
+    /// (`ConfirmAction`, copy from `brand.yaml`); Forget is the one destructive row.
+    private var ringActions: some View {
+        SettingsGroup(header: "Ring actions") {
+            if canFindRing {
+                // The ring vibrates for up to 10 s; tap again to stop it sooner.
+                if coordinator.isFindingRing {
+                    Button { coordinator.stopFindingRing() } label: { ringActionLabel("Stop", systemImage: "stop.fill") }
+                        .buttonStyle(.plain)
+                } else {
+                    Button { coordinator.findRing() } label: { ringActionLabel("Find ring", systemImage: "bell.fill") }
+                        .buttonStyle(.plain)
+                        .accessibilityHint(AgaraHelp.findRing)
+                        .help(AgaraHelp.findRing)
+                }
+            }
+            Button { confirm = .disconnectRing { [ble] in ble.disconnect() } } label: {
+                ringActionLabel("Disconnect", systemImage: "xmark.circle")
+            }
+            .buttonStyle(.plain)
+            Button { confirm = .forgetRing { [ble] in ble.forget() } } label: {
+                ringActionLabel("Forget ring", systemImage: "trash", tint: AgaraColors.danger)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    /// A full-width action row (icon + title) inside a `SettingsGroup`.
+    private func ringActionLabel(_ title: String, systemImage: String, tint: Color = AgaraColors.textPrimary,
+                                 chevron: Bool = false) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: systemImage)
+                .font(AgaraFont.body)
+                .foregroundStyle(tint == AgaraColors.textPrimary ? AgaraColors.accent : tint)
+                .frame(width: 24)
+            Text(title)
+                .font(AgaraFont.body)
+                .foregroundStyle(tint)
+            Spacer(minLength: 0)
+            if chevron {
+                Image(systemName: "chevron.right")
+                    .font(AgaraFont.footnote.weight(.semibold))
+                    .foregroundStyle(AgaraColors.textMuted)
+            }
+        }
+        .padding(.horizontal, 16)
+        .frame(minHeight: 50)
+        .contentShape(Rectangle())
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
@@ -118,22 +169,20 @@ struct WearableSettingsView: View {
                         }
                         FormValueRow(title: "Last synced") { Text(lastSyncedLabel).foregroundStyle(AgaraColors.textMuted) }
                     }
-                    if features.isOn(.autoMeasureSettings), let schedule = devices.first?.autoMeasureSchedule, !schedule.isEmpty {
-                        SettingsGroup(
-                            header: "Automatic measurements",
-                            footer: "How often the ring measures on its own. Read from the ring — editing comes later."
-                        ) {
-                            ForEach(schedule) { entry in
-                                FormValueRow(title: entry.title) {
-                                    Text(entry.summary).foregroundStyle(AgaraColors.textMuted)
-                                }
+                    ringActions
+                    SecondaryButton(title: "Sync now", systemImage: "arrow.triangle.2.circlepath") { coordinator.syncNow() }
+                    if features.isOn(.autoMeasureSettings), !(devices.first?.autoMeasureSchedule.isEmpty ?? true) {
+                        SettingsGroup(footer: "How often the ring measures on its own.") {
+                            Button { path.append(AppRoute.settingsAutoMeasure) } label: {
+                                ringActionLabel("Auto-measure", systemImage: "timer", chevron: true)
                             }
+                            .buttonStyle(.plain)
                         }
                     }
                     BatteryHistorySection()
-                    // Veepoo/TK20: continuous HR streaming is optional (battery). Other families have
-                    // no live HR channel, so the toggle only appears for the Agara ring.
-                    if ble.activeDeviceType == .veepoo {
+                    RingBatteryAlertToggle()
+                    // Continuous HR streaming is optional (battery); flag `live_hr_toggle` (iOS only today).
+                    if features.isOn(.liveHrToggle), ble.activeDeviceType == .veepoo {
                         SettingsGroup(
                             header: "Live data",
                             footer: "Streams heart rate continuously while connected so the HR card ticks in real time (drains battery). Turn off to revert to periodic updates only."
@@ -141,24 +190,6 @@ struct WearableSettingsView: View {
                             FormToggleRow(title: "Live heart rate", isOn: liveHeartRateBinding)
                         }
                     }
-                    HStack(spacing: 10) {
-                        SecondaryButton(title: "Sync now", systemImage: "arrow.triangle.2.circlepath") { coordinator.syncNow() }
-                        if canFindRing {
-                            // The ring vibrates for up to 10 s; tap again to stop it sooner.
-                            if coordinator.isFindingRing {
-                                SecondaryButton(title: "Stop", systemImage: "stop.fill") { coordinator.stopFindingRing() }
-                            } else {
-                                SecondaryButton(title: "Find ring", systemImage: "bell.fill") { coordinator.findRing() }
-                                    .accessibilityHint(AgaraHelp.findRing)
-                                    .help(AgaraHelp.findRing)
-                            }
-                        }
-                    }
-                    SecondaryButton(title: "Disconnect", systemImage: "xmark") {
-                        confirm = .disconnectRing { [ble] in ble.disconnect() }
-                    }
-                    // Forget unbinds the ring: the one destructive action here (Android matches).
-                    DestructiveButton(title: "Forget ring", systemImage: "trash") { confirm = .forgetRing { [ble] in ble.forget() } }
                 } else {
                     SettingsGroup(header: "No ring connected") {
                         if ble.hasLastKnownRing && devices.first != nil { nameRow }
@@ -171,6 +202,7 @@ struct WearableSettingsView: View {
                         SecondaryButton(title: "Reconnect last ring", systemImage: "arrow.clockwise") { ble.connectLastKnown() }
                         DestructiveButton(title: "Forget ring", systemImage: "trash") { confirm = .forgetRing { [ble] in ble.forget() } }
                     }
+                    RingBatteryAlertToggle()
                 }
             }
             .padding()
@@ -184,6 +216,40 @@ struct WearableSettingsView: View {
                 initialText: RingNickname.prefill(identifier: ble.deviceIdentifier, row: devices.first),
                 peripheralIdentifier: ble.deviceIdentifier
             )
+        }
+    }
+}
+
+/// Low-battery notifications for the ring (20 % and 10 %). Lives on the Wearable screen so it is reachable
+/// with the coach off (it used to sit under Coach Check-Ins; parity audit 2026-09-26). The truth is the raw
+/// `BatteryAlertMonitor.enabledKey` default (absent = on).
+struct RingBatteryAlertToggle: View {
+    @State private var enabled = UserDefaults.standard.object(forKey: BatteryAlertMonitor.enabledKey) as? Bool ?? true
+    @State private var denied = false
+
+    var body: some View {
+        SettingsGroup(
+            header: "Ring battery alerts",
+            footer: denied ? AgaraCopy.notificationsDisabled : "Get a heads-up when your ring drops below 20% and 10%."
+        ) {
+            FormToggleRow(title: "Low battery notifications", isOn: Binding(get: { enabled }, set: set))
+                .accessibilityIdentifier("wearable.batteryAlerts")
+        }
+    }
+
+    /// Turning on asks for notification permission first; refused leaves it off with the hint.
+    private func set(_ on: Bool) {
+        guard on else {
+            enabled = false
+            UserDefaults.standard.set(false, forKey: BatteryAlertMonitor.enabledKey)
+            return
+        }
+        Task {
+            let granted = (try? await UNUserNotificationCenter.current()
+                .requestAuthorization(options: [.alert, .sound, .badge])) ?? false
+            enabled = granted
+            denied = !granted
+            UserDefaults.standard.set(granted, forKey: BatteryAlertMonitor.enabledKey)
         }
     }
 }

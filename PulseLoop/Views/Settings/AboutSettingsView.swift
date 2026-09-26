@@ -1,6 +1,10 @@
 import SwiftUI
 
-/// About detail screen: app version, a short description, and project/license info.
+/// About (consistency framework phase 5): a hero (logo, product name, tagline), the real version from the bundle
+/// ("1.0.0 (1)" — tap it 7× to unlock Developer), the brand description, an icon row for the social links and a
+/// contact row (email, phone), then the licences as small secondary text behind a "Licences" row and a small
+/// upstream credit. All copy and links come from `docs/strings/brand.yaml` (`AgaraCopy`); an empty link hides
+/// its icon.
 struct AboutSettingsView: View {
     @Binding var path: NavigationPath
     /// Persisted developer unlock, surfaced as the Settings "Developer" row.
@@ -9,70 +13,149 @@ struct AboutSettingsView: View {
     @State private var lastVersionTap: Date?
     @State private var toast: String?
     @State private var toastToken = 0
+    @State private var showsLicences = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Android-style: 7 quick taps on the version unlock Developer options.
     private let developerTapThreshold = 7
 
-    /// 0…1 progress toward unlock, used to build an accent tint/border as taps accumulate.
+    /// 0…1 progress toward unlock, used to build an accent tint as taps accumulate.
     private var tapProgress: Double {
         guard !developerUnlocked else { return 0 }
         return Double(min(versionTapCount, developerTapThreshold - 1)) / Double(developerTapThreshold - 1)
     }
 
     private let repoURL = URL(string: "https://github.com/saksham2001/PulseLoopiOS")!
-    private let discordURL = URL(string: "https://discord.gg/t9y85ebaKD")!
 
-    /// Read from the bundle rather than hardcoded, so this row can't drift from the shipped build.
-    private var appVersionLabel: String {
+    /// "1.0.0 (1)", read from the bundle so it can't drift from the shipped build.
+    static var appVersionLabel: String {
         let short = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—"
-        return "v\(short) (\(build))"
+        return "\(short) (\(build))"
+    }
+
+    /// One social/contact link; nil when the catalog value is empty (the row then hides it).
+    struct AboutLink: Identifiable {
+        let id: String
+        let label: String
+        let systemImage: String
+        let url: URL
+    }
+
+    static func link(_ id: String, _ label: String, _ systemImage: String, _ raw: String) -> AboutLink? {
+        let trimmed = raw.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty, let url = URL(string: trimmed) else { return nil }
+        return AboutLink(id: id, label: label, systemImage: systemImage, url: url)
+    }
+
+    static var socialLinks: [AboutLink] {
+        [
+            link("website", "Website", "globe", AgaraCopy.socialWebsiteUrl),
+            link("instagram", "Instagram", "camera", AgaraCopy.socialInstagramUrl),
+            link("telegram", "Telegram", "paperplane.fill", AgaraCopy.socialTelegramUrl),
+        ].compactMap { $0 }
+    }
+
+    /// `tel:` URL from the displayed number: "(213) 286-1434" → `tel:+12132861434` (NANP numbers get +1).
+    static func telURL(_ display: String) -> URL? {
+        let digits = display.filter(\.isNumber)
+        guard !digits.isEmpty else { return nil }
+        let e164 = digits.count == 10 ? "+1" + digits : (display.hasPrefix("+") ? "+" + digits : digits)
+        return URL(string: "tel:" + e164)
+    }
+
+    static var contactLinks: [AboutLink] {
+        var links: [AboutLink] = []
+        let email = AgaraCopy.supportEmail.trimmingCharacters(in: .whitespaces)
+        if !email.isEmpty, let url = URL(string: "mailto:" + email) {
+            links.append(AboutLink(id: "email", label: email, systemImage: "envelope.fill", url: url))
+        }
+        if let url = telURL(AgaraCopy.supportPhone) {
+            links.append(AboutLink(id: "phone", label: AgaraCopy.supportPhone, systemImage: "phone.fill", url: url))
+        }
+        return links
     }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                SettingsGroup(header: "App") {
-                    FormField {
-                        Button(action: registerVersionTap) {
-                            StatusCopy(title: "Version", body: appVersionLabel)
+            VStack(spacing: 22) {
+                hero
+                SettingsGroup(footer: AgaraCopy.aboutDescription) {
+                    Button(action: registerVersionTap) {
+                        FormValueRow(title: "Version") {
+                            Text(Self.appVersionLabel).foregroundStyle(AgaraColors.textMuted)
                         }
-                        .buttonStyle(VersionRowButtonStyle())
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                .fill(AgaraColors.accent.opacity(tapProgress * 0.22))
-                                .allowsHitTesting(false)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(VersionRowButtonStyle())
+                    .background(AgaraColors.accent.opacity(tapProgress * 0.18))
+                    .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: versionTapCount)
+                    .accessibilityIdentifier("about.version")
+                    .accessibilityHint("Tap repeatedly to unlock developer options.")
+                    .sensoryFeedback(trigger: versionTapCount) { _, count in
+                        guard count > 0 else { return nil }
+                        if count >= developerTapThreshold { return .success }
+                        return count > 3 ? .impact(weight: .medium) : .impact(weight: .light)
+                    }
+                }
+                if !Self.socialLinks.isEmpty {
+                    HStack(spacing: 18) {
+                        ForEach(Self.socialLinks) { link in
+                            Link(destination: link.url) {
+                                IconTile(systemName: link.systemImage, style: .neutral, size: .large)
+                            }
+                            .accessibilityLabel(link.label)
+                            .accessibilityIdentifier("about.social.\(link.id)")
                         }
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                .strokeBorder(AgaraColors.accent.opacity(tapProgress * 0.9), lineWidth: 1.5)
-                                .allowsHitTesting(false)
-                        }
-                        .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: versionTapCount)
-                        .accessibilityHint("Tap repeatedly to unlock developer options.")
-                        .keyframeAnimator(initialValue: 1.0, trigger: versionTapCount) { content, value in
-                            content.scaleEffect(reduceMotion ? 1.0 : value)
-                        } keyframes: { _ in
-                            LinearKeyframe(0.96, duration: 0.08)
-                            SpringKeyframe(1.0, duration: 0.28, spring: .bouncy(extraBounce: 0.15))
-                        }
-                        .sensoryFeedback(trigger: versionTapCount) { _, count in
-                            guard count > 0 else { return nil }
-                            if count >= developerTapThreshold { return .success }
-                            return count > 3 ? .impact(weight: .medium) : .impact(weight: .light)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                if !Self.contactLinks.isEmpty {
+                    SettingsGroup(header: "Contact") {
+                        ForEach(Self.contactLinks) { link in
+                            Link(destination: link.url) {
+                                HStack(spacing: 12) {
+                                    Image(systemName: link.systemImage)
+                                        .foregroundStyle(AgaraColors.accent)
+                                        .frame(width: 24)
+                                    Text(link.label)
+                                        .font(AgaraFont.body)
+                                        .foregroundStyle(AgaraColors.textPrimary)
+                                    Spacer(minLength: 0)
+                                }
+                                .padding(.horizontal, 16)
+                                .frame(minHeight: 50)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("about.contact.\(link.id)")
                         }
                     }
                 }
-                StatusCopy(
-                    title: AgaraCopy.aboutProductName,
-                    body: """
-                    \(AgaraCopy.aboutDescription)
-
-                    Creative Commons Attribution 4.0 International (CC BY 4.0). Free to share and \
-                    adapt, including commercially, with appropriate credit: PulseLoop by Saksham Bhutani.
-                    """
-                )
+                SettingsGroup {
+                    Button { withAnimation(.easeInOut(duration: 0.2)) { showsLicences.toggle() } } label: {
+                        HStack {
+                            Text("Licences").font(AgaraFont.body).foregroundStyle(AgaraColors.textPrimary)
+                            Spacer()
+                            Image(systemName: showsLicences ? "chevron.up" : "chevron.down")
+                                .font(AgaraFont.footnote.weight(.semibold))
+                                .foregroundStyle(AgaraColors.textMuted)
+                        }
+                        .padding(.horizontal, 16)
+                        .frame(minHeight: 50)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("about.licences")
+                    if showsLicences {
+                        FormField {
+                            Text("Based on PulseLoop by Saksham Bhutani, licensed under Creative Commons Attribution 4.0 International (CC BY 4.0) — free to share and adapt, including commercially, with appropriate credit. Fonts: Manrope (SIL Open Font License 1.1).")
+                                .font(AgaraFont.caption)
+                                .foregroundStyle(AgaraColors.textSecondary)
+                        }
+                    }
+                }
+                linkCard(icon: "arrow.up.right", title: "Built on PulseLoop", subtitle: "GitHub", url: repoURL)
             }
             .padding()
         }
@@ -91,6 +174,28 @@ struct AboutSettingsView: View {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: toast)
+    }
+
+    private var hero: some View {
+        VStack(spacing: 10) {
+            Image("agara-logo")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 88, height: 88)
+                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .accessibilityHidden(true)
+            Text(AgaraCopy.aboutProductName)
+                .font(AgaraFont.title2.weight(.bold))
+                .foregroundStyle(AgaraColors.textPrimary)
+            Text(AgaraCopy.aboutTagline)
+                .font(AgaraFont.subheadline)
+                .foregroundStyle(AgaraColors.textSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 8)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("about.hero")
     }
 
     // MARK: - Developer unlock (tap the version 7×, Android-style)

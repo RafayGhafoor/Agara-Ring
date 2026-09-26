@@ -450,6 +450,11 @@ final class EventPersistenceSubscriber {
     /// re-request a day, and the epochs it stamps are deterministic, so an exact-timestamp match is a
     /// valid identity. Live samples keep append semantics (two readings a second apart are two events).
     private func persistMeasurement(kind: MeasurementKind, value: Double, timestamp: Date, source: MeasurementSource, kindLabel: String) {
+        // A history reading the user deleted stays deleted (tombstone, `ReadingDeletion`) — checked first.
+        if source == .history, ReadingDeletion.isHistoryDeleted(kindRaw: kind.rawValue, timestamp: timestamp, context: context) {
+            noopWrite = true
+            return
+        }
         if source == .history, let unchanged = isDuplicateHistory(kind: kind, value: value, timestamp: timestamp) {
             // A re-synced slot with the same value writes nothing (a revised value updates in place).
             if unchanged { noopWrite = true }
