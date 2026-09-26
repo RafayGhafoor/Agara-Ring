@@ -36,6 +36,15 @@ enum AgaraConfig {
         static let chargeEstimateTaperStartPercent: Int = 80
         static let chargeEstimateTaperFactor: String = "0.4"
         static let chargeEstimateRoundMin: Int = 5
+        static let findRssiRightHereDbm: String = "-55"
+        static let findRssiVeryCloseDbm: String = "-67"
+        static let findRssiWarmerDbm: String = "-78"
+        static let findRssiFarDbm: String = "-88"
+        static let findSignalLostS: Int = 5
+        static let findRssiPollMs: Int = 500
+        static let findSmoothingS: Int = 2
+        static let findTrendWindowS: Int = 4
+        static let findTrendThresholdDb: Int = 3
     }
     enum Emulator {
         static let defaultPort: Int = 9909
@@ -121,6 +130,8 @@ enum AgaraFeature: String, CaseIterable {
     case staleWorkoutRecovery = "stale_workout_recovery"
     /// Activity Trends Year range + distance/calories trends (iOS only today; Android has a Steps detail).
     case activityTrendsYear = "activity_trends_year"
+    /// Find ring screen with live proximity (RSSI bands, colour circle, trend); vibrate only on tap (owner, 2026-09-26).
+    case findRingProximity = "find_ring_proximity"
 
     /// The shipped default for each flag.
     var defaultOn: Bool {
@@ -155,6 +166,7 @@ enum AgaraFeature: String, CaseIterable {
         case .shareCard: return false
         case .staleWorkoutRecovery: return false
         case .activityTrendsYear: return false
+        case .findRingProximity: return true
         }
     }
 }
