@@ -17,18 +17,15 @@ struct PrivacyDataSettingsView: View {
     /// Mirrors `RawPacketCapture.userOptedIn` so the toggle re-renders; the defaults key is the truth.
     @State private var captureRawPackets = RawPacketCapture.userOptedIn
 
-    /// Which destructive App-data action is awaiting confirmation.
-    @State private var pendingReset: ResetAction?
-    /// "Clear captured packets" / "Clear demo data" / "Reseed demo data" awaiting confirmation.
-    @State private var pendingClear: ClearAction?
+    /// The destructive action awaiting confirmation (reset, clear, import-replace) — `ConfirmAction`.
+    @State private var confirm: ConfirmAction?
+    @State private var features = AgaraFeatureStore.shared
 
     // Backup (full export/import) state.
     @State private var exportURL: URL?
     /// Include captured raw BLE packets in the backup (Android's "include diagnostics"; off by default).
     @State private var exportIncludesPackets = false
     @State private var showImporter = false
-    /// File picked while the app still has data — held until the user confirms the replace.
-    @State private var pendingImportURL: URL?
     /// Non-nil while an export/import runs; the label shown under the blocking spinner.
     @State private var workingLabel: String?
     @State private var backupError: String?
@@ -63,6 +60,16 @@ struct PrivacyDataSettingsView: View {
             case .reseedDemo: return "Replace"
             }
         }
+    }
+
+    private func ask(_ action: ClearAction) {
+        confirm = ConfirmAction(key: "clear.\(action)", title: action.title, message: action.message,
+                                confirmLabel: action.confirmLabel) { performClear(action) }
+    }
+
+    private func ask(_ action: ResetAction) {
+        confirm = ConfirmAction(key: "reset.\(action)", title: action.title, message: action.message,
+                                confirmLabel: action.confirmLabel) { perform(action) }
     }
 
     private func performClear(_ action: ClearAction) {
@@ -180,7 +187,7 @@ struct PrivacyDataSettingsView: View {
                     .padding(.horizontal, 16)
                     .frame(minHeight: 50)
                     actionRow("Clear captured packets", systemImage: "trash") {
-                        pendingClear = .capturedPackets
+                        ask(ClearAction.capturedPackets)
                     }
                 }
 
@@ -189,25 +196,29 @@ struct PrivacyDataSettingsView: View {
                     footer: "Unpair releases the ring for other apps and keeps your health data. Resetting erases everything on this device and returns the app to onboarding."
                 ) {
                     actionRow("Unpair ring", systemImage: "wave.3.right.circle", tint: AgaraColors.danger) {
-                        pendingReset = .unpairRing
+                        ask(ResetAction.unpairRing)
                     }
                     actionRow("Reset app data", systemImage: "trash", tint: AgaraColors.danger) {
-                        pendingReset = .resetAppData
+                        ask(ResetAction.resetAppData)
                     }
                     actionRow("Unpair ring & reset app data", systemImage: "trash.slash", tint: AgaraColors.danger) {
-                        pendingReset = .unpairAndReset
+                        ask(ResetAction.unpairAndReset)
                     }
                 }
 
-                SettingsGroup(
-                    header: "Demo data",
-                    footer: "Sample data for exploring the app without a ring."
-                ) {
-                    actionRow("Clear demo data", systemImage: "trash") {
-                        pendingClear = .demoData
-                    }
-                    actionRow("Reseed demo data", systemImage: "arrow.clockwise") {
-                        pendingClear = .reseedDemo
+                // Demo data rows only behind the `demo_data` flag (off in release; debug turns it on via the
+                // feature-flag override) — consistency plan B.
+                if features.isOn(.demoData) {
+                    SettingsGroup(
+                        header: "Demo data",
+                        footer: "Sample data for exploring the app without a ring."
+                    ) {
+                        actionRow("Clear demo data", systemImage: "trash") {
+                            ask(ClearAction.demoData)
+                        }
+                        actionRow("Reseed demo data", systemImage: "arrow.clockwise") {
+                            ask(ClearAction.reseedDemo)
+                        }
                     }
                 }
             }
@@ -229,16 +240,7 @@ struct PrivacyDataSettingsView: View {
             }
         }
         .disabled(workingLabel != nil)
-        .alert(
-            pendingClear?.title ?? "",
-            isPresented: Binding(get: { pendingClear != nil }, set: { if !$0 { pendingClear = nil } }),
-            presenting: pendingClear
-        ) { action in
-            Button(action.confirmLabel, role: .destructive) { performClear(action) }
-            Button("Cancel", role: .cancel) {}
-        } message: { action in
-            Text(action.message)
-        }
+        .confirmAction($confirm)
         .sheet(item: $diagnosticsURL) { url in
             DiagnosticsShareSheet(items: [url])
         }
@@ -248,26 +250,10 @@ struct PrivacyDataSettingsView: View {
         .fileImporter(isPresented: $showImporter, allowedContentTypes: [.json, .gzip, .data]) { result in
             guard case let .success(url) = result else { return }
             if DataArchiveService.hasAnyData(context: modelContext) {
-                pendingImportURL = url   // destructive — confirm below before touching anything
+                confirm = .replaceAllData { importData(from: url) }   // destructive — confirm first
             } else {
                 importData(from: url)
             }
-        }
-        .confirmationDialog(
-            "Replace all data?",
-            isPresented: Binding(
-                get: { pendingImportURL != nil },
-                set: { if !$0 { pendingImportURL = nil } }
-            ),
-            titleVisibility: .visible,
-            presenting: pendingImportURL
-        ) { url in
-            Button("Delete old data & import", role: .destructive) {
-                importData(from: url)
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: { _ in
-            Text("This permanently deletes everything currently in the app and replaces it with the contents of this file. This can't be undone.")
         }
         .alert("Couldn't complete", isPresented: Binding(
             get: { backupError != nil },
@@ -281,22 +267,6 @@ struct PrivacyDataSettingsView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text("Your data has been restored from the backup.")
-        }
-        .confirmationDialog(
-            pendingReset?.title ?? "",
-            isPresented: Binding(
-                get: { pendingReset != nil },
-                set: { if !$0 { pendingReset = nil } }
-            ),
-            titleVisibility: .visible,
-            presenting: pendingReset
-        ) { action in
-            Button(action.confirmLabel, role: .destructive) {
-                perform(action)
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: { action in
-            Text(action.message)
         }
     }
 
@@ -347,7 +317,6 @@ struct PrivacyDataSettingsView: View {
     }
 
     private func importData(from url: URL) {
-        pendingImportURL = nil
         workingLabel = "Importing…"
         Task {
             defer { workingLabel = nil }

@@ -69,7 +69,15 @@ struct ActivityZoneLineChart: View {
 
     var body: some View {
         let points = minuteSamples
-        Chart {
+        let unit = metric == .spo2 ? "%" : " bpm"
+        AgaraChart(
+            points: points.map { AgaraChartPoint(x: $0.minute, y: $0.value) },
+            height: height,
+            empty: AgaraChartEmpty(minimumPoints: 1),
+            accessibilityTitle: metric == .spo2 ? "Blood oxygen during the activity" : "Heart rate during the activity",
+            valueLabel: { "\(Int($0.rounded()))\(unit)" },
+            xLabel: { "\(Int($0)) min in" }
+        ) {
             ForEach(referenceBands) { band in
                 RectangleMark(yStart: .value("Band low", band.lower), yEnd: .value("Band high", band.upper))
                     .foregroundStyle(band.color)
@@ -86,6 +94,13 @@ struct ActivityZoneLineChart: View {
                         .foregroundStyle(colorForValue(p.value))
                 }
             }
+        } overlay: { proxy, geo in
+            Canvas { context, _ in
+                guard let anchor = proxy.plotFrame else { return }
+                let plot = geo[anchor]
+                drawLine(points, context: &context, plot: plot, proxy: proxy)
+            }
+            .allowsHitTesting(false)
         }
         .chartXScale(domain: 0...maxMinute)
         .chartYScale(domain: yDomain)
@@ -107,16 +122,6 @@ struct ActivityZoneLineChart: View {
                 AxisValueLabel().font(AgaraFont.micro.weight(.regular)).foregroundStyle(AgaraColors.textMuted)
             }
         }
-        .chartOverlay { proxy in
-            GeometryReader { geo in
-                Canvas { context, _ in
-                    guard let anchor = proxy.plotFrame else { return }
-                    let plot = geo[anchor]
-                    drawLine(points, context: &context, plot: plot, proxy: proxy)
-                }
-            }
-        }
-        .frame(height: height)
     }
 
     /// Draw the zone-colored line: break at dropouts, split each pair at zone thresholds, color each

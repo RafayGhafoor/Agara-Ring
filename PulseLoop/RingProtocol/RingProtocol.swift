@@ -3,6 +3,31 @@ enum RingProtocolError: Error {
     case invalidLength(Int)
     case invalidHex(String)
 }
+/// Records one history day brought down, per metric — the onboarding "Syncing" rows and the sync notification.
+struct SyncDayCounts: Equatable, Sendable {
+    var steps = 0
+    var heartRate = 0
+    var spo2 = 0
+    var hrv = 0
+    var stress = 0
+    var sleepNights = 0
+
+    var isEmpty: Bool { self == SyncDayCounts() }
+
+    static func + (a: SyncDayCounts, b: SyncDayCounts) -> SyncDayCounts {
+        SyncDayCounts(steps: a.steps + b.steps, heartRate: a.heartRate + b.heartRate, spo2: a.spo2 + b.spo2,
+                      hrv: a.hrv + b.hrv, stress: a.stress + b.stress, sleepNights: a.sleepNights + b.sleepNights)
+    }
+}
+
+/// The history day loop's progress: day `day` (0 = today) of `totalDays` started (`counts == nil`) or finished
+/// with `counts`. Emitted by the sync engine; `SyncProgress` turns it into state.
+struct SyncDayProgress: Equatable, Sendable {
+    let day: Int
+    let totalDays: Int
+    var counts: SyncDayCounts?
+}
+
 enum RingDecodedEvent: Sendable {
     case activityUpdate(timestamp: Date, steps: Int, distanceMeters: Double, calories: Double)
     /// One intraday activity bucket (e.g. a the ring quarter-hour history sample). Unlike the cumulative
@@ -27,6 +52,8 @@ enum RingDecodedEvent: Sendable {
     case fatigueSample(value: Int, timestamp: Date)        // 0–100 scale
     case bloodSugarSample(mgdl: Double, timestamp: Date)
     case historySyncProgress(stage: String)
+    /// A history day started or finished (`SyncDayProgress`); feeds `SyncProgress` via `.decodedPacket`.
+    case historyDayProgress(SyncDayProgress)
     case historySyncFinished
     case battery(percent: Int)
     case status(address: String?)
@@ -103,6 +130,7 @@ enum RingDecodedEvent: Sendable {
         case .fatigueSample: return "fatigue_sample"
         case .bloodSugarSample: return "blood_sugar_sample"
         case .historySyncProgress: return "history_sync_progress"
+        case .historyDayProgress: return "history_day_progress"
         case .historySyncFinished: return "history_sync_finished"
         case .battery: return "battery"
         case .status: return "status"

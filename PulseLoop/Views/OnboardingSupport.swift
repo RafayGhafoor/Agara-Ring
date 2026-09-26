@@ -32,6 +32,8 @@ enum LocalizedDecimalInput {
 enum OnboardingStep: String, CaseIterable, Codable, Identifiable {
     case welcome
     case ring
+    /// After pairing: the history sync day by day (leave-able; the sync continues in the background).
+    case syncing
     case profile
     case goals
     case baseline

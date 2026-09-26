@@ -30,6 +30,8 @@ final class VeepooSyncEngine: RingSyncEngine {
     /// How many days of history the ring can hold / the loop walks. The verified run read 7 days
     /// (offsets 0–6) and the ring answered no-data past what it retained.
     private let historyDays: Int
+    /// What the current history day has brought down so far (reported with the day's progress event).
+    private var dayCounts = SyncDayCounts()
 
     private var authenticated = false
     private var currentDay = 0
@@ -169,6 +171,7 @@ final class VeepooSyncEngine: RingSyncEngine {
         }
         historyInFlight = true
         lastProgressTick = pollTick
+        beginHistoryDay(0)
         requestHistory(VeepooEncoder.sleepHistory(dayOffset: 0))
         startPolling()
     }
@@ -307,6 +310,7 @@ final class VeepooSyncEngine: RingSyncEngine {
         let source = writer?.connectionSource
         for summary in decoder.sleepSummaries(payload: payload) {
             writer?.emit(.sleepTimeline(timestamp: summary.start, stages: summary.stages, source: source))
+            dayCounts.sleepNights += 1
         }
     }
 
@@ -335,6 +339,7 @@ final class VeepooSyncEngine: RingSyncEngine {
         dailyComplete = true
         lastProgressTick = pollTick
         emitDailyRecords()
+        writer?.emit(.historyDayProgress(SyncDayProgress(day: currentDay, totalDays: historyDays, counts: dayCounts)))
         currentDay += 1
         if currentDay < historyDays {
             // Reset the per-day phases before asking for the next day. Without this, `sleepComplete`
@@ -346,6 +351,7 @@ final class VeepooSyncEngine: RingSyncEngine {
             dailyComplete = false
             sleepFrames.removeAll()
             dailyFrames.removeAll()
+            beginHistoryDay(currentDay)
             requestHistory(VeepooEncoder.sleepHistory(dayOffset: currentDay))
         } else {
             writer?.emit(.historySyncFinished)
@@ -368,6 +374,11 @@ final class VeepooSyncEngine: RingSyncEngine {
             case .checksumMismatch: corrupt += 1; continue
             }
             guard let record = decoder.dailyRecord(payload: payload) else { continue }
+            dayCounts.steps += record.steps
+            dayCounts.heartRate += record.heartRates.filter { $0 > 0 }.count
+            dayCounts.spo2 += record.oxygen.filter { $0 > 0 }.count
+            dayCounts.hrv += record.hrv.filter { $0 > 0 }.count
+            if record.stress > 0 { dayCounts.stress += 1 }
 
             // Activity slot (B2): the day total is recomputed as the sum of distinct-timestamp
             // buckets, so re-syncs are idempotent.
@@ -613,6 +624,13 @@ final class VeepooSyncEngine: RingSyncEngine {
         }
         historyInFlight = true
         lastProgressTick = pollTick
+        beginHistoryDay(0)
         requestHistory(VeepooEncoder.sleepHistory(dayOffset: 0))
+    }
+
+    /// Reset the day's counts and say the day started (`SyncProgress` shows it as "syncing").
+    private func beginHistoryDay(_ day: Int) {
+        dayCounts = SyncDayCounts()
+        writer?.emit(.historyDayProgress(SyncDayProgress(day: day, totalDays: historyDays)))
     }
 }

@@ -27,14 +27,20 @@ final class CoachNavigation {
     }
 }
 
-/// UNUserNotificationCenter delegate: shows check-ins while foreground and
-/// deep-links a tap to the coach thread.
+/// UNUserNotificationCenter delegate for every `AgaraNotifications` category: shows alerts (coach, battery)
+/// while foreground, keeps progress news (measurement, sync) out of the way — the in-app UI shows those — and
+/// routes a tap to its deep link (the coach thread, the Measure sheet, Today, Wearable).
 final class CoachNotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
-        [.banner, .sound]
+        switch notification.request.content.categoryIdentifier {
+        case AgaraNotificationCategory.measurement.identifier, AgaraNotificationCategory.sync.identifier:
+            return [.list]
+        default:
+            return [.banner, .sound]
+        }
     }
 
     func userNotificationCenter(
@@ -45,6 +51,8 @@ final class CoachNotificationDelegate: NSObject, UNUserNotificationCenterDelegat
         if let idString = info[CoachNotificationService.conversationIdKey] as? String,
            let id = UUID(uuidString: idString) {
             await MainActor.run { CoachNavigation.shared.open(id) }
+        } else if let link = AgaraNotifications.deepLink(from: info) {
+            await MainActor.run { AgaraDeepLinks.shared.pending = link }
         }
     }
 }

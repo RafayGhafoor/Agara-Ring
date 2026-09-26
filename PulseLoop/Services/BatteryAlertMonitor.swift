@@ -143,30 +143,20 @@ final class BatteryAlertMonitor {
     /// Deliver a battery alert. No LLM / coach coupling — a plain local notification. Requests
     /// permission once if undetermined and proceeds only if granted; silently skips when denied.
     static func deliver(_ alert: BatteryAlertKind) async {
-        let center = UNUserNotificationCenter.current()
-        let settings = await center.notificationSettings()
-        switch settings.authorizationStatus {
-        case .notDetermined:
-            let granted = (try? await center.requestAuthorization(options: [.alert, .sound, .badge])) ?? false
-            guard granted else { return }
-        case .denied:
-            return
-        default:
-            break
-        }
-
-        let content = UNMutableNotificationContent()
+        guard await AgaraNotifications.shared.requestAuthorizationIfUndetermined() else { return }
+        let title: String, body: String
         switch alert {
         case let .low(percent):
-            content.title = "Ring battery low"
-            content.body = "Your ring is at \(percent)%. Charge it soon so tracking doesn't stop."
+            title = "Ring battery low"
+            body = "Your ring is at \(percent)%. Charge it soon so tracking doesn't stop."
         case let .critical(percent):
-            content.title = "Ring battery critically low"
-            content.body = "Your ring is at \(percent)% and will shut down soon. Charge it now."
+            title = "Ring battery critically low"
+            body = "Your ring is at \(percent)% and will shut down soon. Charge it now."
         }
-        content.sound = .default
-        // Shared identifier: a critical alert replaces a still-pending low one.
-        let request = UNNotificationRequest(identifier: notificationIdentifier, content: content, trigger: nil)
-        try? await center.add(request)
+        // Shared identifier: a critical alert replaces a still-pending low one. Shown in the foreground too.
+        await AgaraNotifications.shared.post(AgaraNotification(
+            id: notificationIdentifier, category: .battery, title: title, body: body,
+            deepLink: .wearable, onlyInBackground: false
+        ))
     }
 }

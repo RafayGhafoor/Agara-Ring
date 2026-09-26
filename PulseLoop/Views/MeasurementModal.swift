@@ -5,9 +5,11 @@ import UIKit
 import SwiftData
 #endif
 
-/// Live measurement sheet ported from `frontend/src/components/measurement/MeasurementModal.tsx`.
-/// Drives the `RingSyncCoordinator` measure flow. A disconnected ring surfaces an error — it never
-/// fabricates a reading, because a fake vital saved to history is indistinguishable from a real one.
+/// Live measurement sheet — a view of `MeasurementService`, the app-scoped engine that actually runs the test.
+/// Opening the sheet starts the spec (or resumes the one already running); closing it with a swipe leaves the
+/// measurement running (the in-app pill and, in the background, a notification report it); Cancel stops it.
+/// A disconnected ring surfaces an error — it never fabricates a reading, because a fake vital saved to history
+/// is indistinguishable from a real one.
 ///
 /// THE RING IS ONE CLOCK, and it only ever tells the truth about time:
 ///
@@ -28,33 +30,23 @@ struct MeasurementSheet: View {
     /// The measurement lifecycle. `searching` is the working state — counting down (HR) or up (rest).
     enum Stage { case preparing, searching, locking, result, error }
 
-    let kind: Kind
+    let spec: MeasurementSpec
+    private var kind: Kind { spec.kind }
     @Environment(\.dismiss) private var dismiss
-    /// Only the demo path writes through this — a real reading is persisted by the coordinator's event
-    /// subscriber as its samples arrive.
-    @Environment(\.modelContext) private var modelContext
     @Environment(RingBLEClient.self) private var ble
     @Environment(RingSyncCoordinator.self) private var coordinator
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Query private var profiles: [UserProfile]
     @State private var features = AgaraFeatureStore.shared
+    /// The engine: stage, reading, clock and error all live there, so they outlive this sheet.
+    @State private var service = MeasurementService.shared
 
-    // MARK: State
-    @State private var stage: Stage = .preparing
-    @State private var value: Int?
-    /// Diastolic, for blood pressure — the only single reading that is a pair.
-    @State private var secondaryValue: Int?
-    /// Populated for `.vitals`: every metric the sweep returned.
-    @State private var vitals: RingSyncCoordinator.VitalsReading?
-    /// Populated for `.bloodComponents`: the five estimates.
-    @State private var components: BloodComponentsReading?
-    /// A formatted reading that isn't a whole number (glucose in mmol/L), shown instead of `value`.
-    @State private var formattedValue: String?
-    /// Wall-clock anchor for the ring. `TimelineView` derives fill + elapsed/remaining from it.
-    @State private var measureStart: Date?
-    /// Bumping this cancels the in-flight `.task` and starts a fresh run — that's the whole retry
-    /// mechanism, and why there's no hand-rolled `Task` handle to leak or double-cancel.
-    @State private var attempt = 0
+    // MARK: State (view-only; the measurement's own state is the service's)
+    private var stage: Stage { service.spec?.id == spec.id ? service.stage : .preparing }
+    private var reading: MeasurementReading? { service.spec?.id == spec.id ? service.reading : nil }
+    private var measureStart: Date? { service.spec?.id == spec.id ? service.measureStart : nil }
+    /// The sheet opened on an outcome that landed while it was closed: hold it until Done, so it can be read.
+    @State private var openedOnOutcome = false
     /// Coarse elapsed clock (0.5s), used only for copy swaps and the throttled VoiceOver bucket —
     /// never for the ring, which is time-derived.
     @State private var elapsed: TimeInterval = 0
@@ -104,16 +96,22 @@ struct MeasurementSheet: View {
     /// The big number in the ring. Blood pressure shows the systolic/diastolic pair.
     private var readingText: String? {
         if kind == .bloodComponents { return nil }   // five values: shown in the result grid, not the ring
-        if let formattedValue { return formattedValue }
-        guard let value else { return nil }
-        if kind == .bloodPressure, let secondaryValue { return "\(value)/\(secondaryValue)" }
+        guard let reading else { return nil }
+        if kind == .glucose, let mgdl = reading.glucoseMgdl {
+            return UnitsFormatter.glucose(mgdl: mgdl, unit: glucoseUnit).value
+        }
+        guard let value = reading.value else { return nil }
+        if kind == .bloodPressure, let secondary = reading.secondary { return "\(value)/\(secondary)" }
         return "\(value)"
     }
+
+    private var vitals: RingSyncCoordinator.VitalsReading? { reading?.vitals }
+    private var components: BloodComponentsReading? { reading?.components }
 
     /// Explicit Done (vs auto-dismiss) is required under VoiceOver or Switch Control — and for the
     /// combined sweep, which has several numbers to read.
     private var needsExplicitDone: Bool {
-        if kind == .vitals || kind == .bloodComponents { return true }
+        if kind == .vitals || kind == .bloodComponents || openedOnOutcome { return true }
         #if DEBUG
         // `-measureHoldResult YES` (E2E tooling): keep the result on screen until Done, so a UI test can
         // read it instead of racing the 1.3 s auto-dismiss.
@@ -165,7 +163,21 @@ struct MeasurementSheet: View {
             softImpact.impactOccurred(intensity: 0.7)
             #endif
         }
-        .task(id: attempt) { await run() }
+        .onAppear(perform: startOrResume)
+        .onChange(of: service.stage) { _, new in
+            guard service.spec?.id == spec.id else { return }
+            apply(new)
+        }
+        .onChange(of: service.runID) { _, _ in resetVisuals() }
+        // A result that auto-dismisses; one the user must read waits for Done.
+        .task(id: stage) {
+            guard stage == .result, !needsExplicitDone else { return }
+            try? await Task.sleep(for: .seconds(1.8))
+            if Task.isCancelled { return }
+            close()
+        }
+        // The user saw the outcome once the sheet goes away (swipe included); a running test keeps going.
+        .onDisappear { if service.spec?.id == spec.id { service.acknowledge() } }
     }
 
     // MARK: - Header
@@ -189,12 +201,11 @@ struct MeasurementSheet: View {
         Group {
             switch stage {
             case .preparing, .searching, .locking:
-                // Dismissing tears down the `.task`, which cancels the measurement and stops the ring's
-                // stream — no separate cancel plumbing to keep in sync.
-                Button("Cancel") { dismiss() }
+                // Cancel stops the ring's test; a swipe down leaves it running in the background.
+                Button("Cancel") { service.cancel(); dismiss() }
                     .accessibilityHint("Stops measuring and closes without saving.")
             case .result:
-                Button("Done") { dismiss() }
+                Button("Done") { close() }
             case .error:
                 EmptyView()
             }
@@ -332,7 +343,7 @@ struct MeasurementSheet: View {
                     .agaraGlassButton(prominent: true)
                     .accessibilityFocused($errorFocus)
 
-                Button("Close") { dismiss() }
+                Button("Close") { close() }
                     .font(AgaraFont.subheadline.weight(.semibold))
                     .foregroundStyle(AgaraColors.textPrimary)
                     .padding(.horizontal, 20)
@@ -344,17 +355,9 @@ struct MeasurementSheet: View {
         }
     }
 
+    /// Chosen by the service when the test failed (not connected, charging, refused, not worn, or generic).
     private var errorMessage: String {
-        guard ble.state == .connected else {
-            return "Your ring isn't connected. Reconnect it and try again."
-        }
-        // The ring is on its charger, or said why it refused (busy, low battery, charging, not worn).
-        if ringCharging { return MeasurementRefusal.chargingMessage }
-        if let message = coordinator.measureRefusal?.message(isCharging: ble.isCharging) { return message }
-        // The ring told us it wasn't on the finger, so the generic "keep still" advice would send the
-        // user to fix the wrong thing — an optical sensor with no skin contact cannot read at all.
-        if coordinator.measureNotWorn { return kind.notWornMessage }
-        return kind.failureMessage
+        service.errorMessage ?? kind.failureMessage
     }
 
     // MARK: - VoiceOver status
@@ -392,15 +395,54 @@ struct MeasurementSheet: View {
         }
     }
 
-    // MARK: - Stage transitions
+    // MARK: - Stage transitions (visuals only — the service drives the stages)
+
+    /// Open on this spec: resume it if the service is already on it (running or finished), else start it.
+    private func startOrResume() {
+        #if canImport(UIKit)
+        lightImpact.prepare()
+        softImpact.prepare()
+        notify.prepare()
+        #endif
+        if service.spec?.id == spec.id {
+            openedOnOutcome = service.hasUnacknowledgedOutcome
+            restoreVisuals(for: service.stage)
+        } else {
+            service.start(spec, glucoseUnit: glucoseUnit)
+        }
+    }
+
+    /// Reopened mid-measurement or on a result: set the picture without replaying haptics or announcements.
+    private func restoreVisuals(for stage: Stage) {
+        switch stage {
+        case .searching, .locking:
+            ambientPulse = true
+            beatPulse = true
+            elapsed = measureStart.map { Date().timeIntervalSince($0) } ?? 0
+        case .result:
+            ringColor = AgaraColors.success
+        case .preparing, .error:
+            break
+        }
+    }
+
+    private func apply(_ stage: Stage) {
+        switch stage {
+        case .preparing: break
+        case .searching: enterSearching()
+        case .locking: enterLocking()
+        case .result: enterResult()
+        case .error: enterError()
+        }
+    }
 
     private func enterSearching() {
-        withAnimation(.easeInOut(duration: 0.25)) { stage = .searching }
-        measureStart = Date()
         elapsed = 0
         announcedStillWorking = false
-        ambientPulse = true
-        beatPulse = true
+        withAnimation(.easeInOut(duration: 0.25)) {
+            ambientPulse = true
+            beatPulse = true
+        }
         #if canImport(UIKit)
         lightImpact.impactOccurred()
         #endif
@@ -408,12 +450,11 @@ struct MeasurementSheet: View {
     }
 
     private func enterLocking() {
-        guard stage == .searching else { return }
-        withAnimation(reduceMotion ? .none : AgaraMotion.bouncy) { stage = .locking }
+        // The stage itself changes in the service; this is only the bounce.
+        withAnimation(reduceMotion ? .none : AgaraMotion.bouncy) { resultBounce = 1 }
     }
 
     private func enterResult() {
-        withAnimation(.easeInOut(duration: 0.25)) { stage = .result }
         withAnimation(.easeInOut(duration: 0.3)) { ringColor = AgaraColors.success }
         #if canImport(UIKit)
         notify.notificationOccurred(.success)
@@ -423,16 +464,13 @@ struct MeasurementSheet: View {
             withAnimation(.spring(response: 0.35, dampingFraction: 0.6).delay(0.18)) { resultBounce = 1.0 }
         }
         announce(statusValue)
-        logOutcome()
     }
 
     private func enterError() {
-        withAnimation(.easeInOut(duration: 0.25)) { stage = .error }
         #if canImport(UIKit)
         notify.notificationOccurred(.error)
         #endif
         announce(errorMessage)
-        logOutcome()
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(0.4))
             errorFocus = true
@@ -448,14 +486,6 @@ struct MeasurementSheet: View {
         }
     }
 
-    /// E2E tooling: one line per terminal stage, so a run the UI test runner can't drive (the Mac build)
-    /// still leaves evidence of how the measurement ended.
-    private func logOutcome() {
-        #if DEBUG
-        E2ETrace.log("measurement \(name): \(statusValue)")
-        #endif
-    }
-
     private func announce(_ message: String) {
         #if canImport(UIKit)
         guard UIAccessibility.isVoiceOverRunning else { return }
@@ -463,16 +493,13 @@ struct MeasurementSheet: View {
         #endif
     }
 
-    /// Bumping `attempt` cancels the running `.task` (which stops the ring's stream) and starts a
-    /// clean one.
-    private func retry() {
-        stage = .preparing
-        value = nil
-        secondaryValue = nil
-        vitals = nil
-        components = nil
-        formattedValue = nil
-        measureStart = nil
+    /// Done / Close / auto-dismiss: the outcome has been seen.
+    private func close() {
+        service.acknowledge()
+        dismiss()
+    }
+
+    private func resetVisuals() {
         elapsed = 0
         ringColor = .clear
         ambientPulse = false
@@ -480,132 +507,12 @@ struct MeasurementSheet: View {
         resultBounce = 1
         acquiredHaptic = false
         announcedStillWorking = false
-        attempt += 1
+        openedOnOutcome = false
     }
 
-    // MARK: - Driver
-
-    @MainActor
-    private func run() async {
-        #if canImport(UIKit)
-        lightImpact.prepare()
-        softImpact.prepare()
-        notify.prepare()
-        #endif
-
-        stage = .preparing
-        try? await Task.sleep(for: .seconds(3.0))   // instruction hold
-        if Task.isCancelled { return }
-
-        // A ring that isn't connected splits two ways, and conflating them was the bug: the sheet used
-        // to fabricate a reading for BOTH.
-        //
-        //  * Nobody has ever paired a ring → this is the "Explore without ring" visitor. The demo
-        //    reading is the point, and it is tagged `source: .mock`, which the charts and the coach
-        //    both key off (`isDemo`). Keep it.
-        //  * A ring IS paired, it just isn't connected right now → the user believes they are taking a
-        //    real measurement. Handing them an invented number here is indefensible. Error instead.
-        guard ble.state == .connected else {
-            if MetricsService.fetchDevices(modelContext).isEmpty {
-                await runDemoMeasurement()
-            } else {
-                enterError()
-            }
-            return
-        }
-
-        enterSearching()
-
-        if kind == .vitals {
-            await runCombinedVitals()
-            return
-        }
-
-        let result: Int?
-        switch kind {
-        case .hr: result = await coordinator.measureHR()
-        case .spo2: result = await coordinator.measureSpO2()
-        case .hrv: result = await coordinator.measureHRV()
-        case .bloodPressure:
-            let reading = await coordinator.measureBloodPressure()
-            secondaryValue = reading?.diastolic
-            result = reading?.systolic
-        case .stress: result = await coordinator.measureStress()
-        case .glucose:
-            let mgdl = await coordinator.measureGlucose()
-            formattedValue = mgdl.map { UnitsFormatter.glucose(mgdl: $0, unit: glucoseUnit).value }
-            result = mgdl.map { Int($0.rounded()) }
-        case .bloodComponents:
-            components = await coordinator.measureBloodComponents()
-            result = components == nil ? nil : 1
-        case .vitals: return   // handled above
-        }
-        if Task.isCancelled { return }
-
-        await reveal(result)
-    }
-
-    /// One sweep, every metric.
-    @MainActor
-    private func runCombinedVitals() async {
-        vitals = await coordinator.measureVitals()
-        if Task.isCancelled { return }
-        await revealVitals()
-    }
-
-    /// The "Explore without ring" path — see `MeasurementDemoData`, which owns the seeding and the
-    /// `source: .mock` tagging. The sheet just runs its usual window so the demo feels like the real one.
-    @MainActor
-    private func runDemoMeasurement() async {
-        enterSearching()
-        try? await Task.sleep(for: .seconds(kind == .hr ? 2.2 : 3.0))
-        if Task.isCancelled { return }
-
-        let demo = MeasurementDemoData.seed(kind, context: modelContext)
-        secondaryValue = demo.secondary
-        vitals = demo.vitals
-        components = demo.components
-        if kind == .glucose, let mgdl = demo.value {
-            formattedValue = UnitsFormatter.glucose(mgdl: Double(mgdl), unit: glucoseUnit).value
-        }
-        if kind == .vitals {
-            await revealVitals()
-        } else {
-            await reveal(demo.value)
-        }
-    }
-
-    /// The combined sweep succeeds on *any* metric — the ring populates whatever it can, so this never
-    /// hangs its success on one number the way a single-metric reading does. Always waits for "Done".
-    @MainActor
-    private func revealVitals() async {
-        if Task.isCancelled { return }
-        guard let vitals, !vitals.isEmpty else { enterError(); return }
-        enterLocking()
-        try? await Task.sleep(for: .seconds(0.5))
-        if Task.isCancelled { return }
-        enterResult()
-    }
-
-    /// Land a finished single-metric reading: fill the ring, show the number, and (unless the user is
-    /// on VoiceOver) close the sheet behind them.
-    @MainActor
-    private func reveal(_ result: Int?) async {
-        if Task.isCancelled { return }
-        guard let result else { enterError(); return }
-        // A BP reading without its diastolic half is not a usable reading.
-        if kind == .bloodPressure, secondaryValue == nil { enterError(); return }
-
-        enterLocking()
-        value = result
-        // Let the ring visibly finish its fill before the number lands.
-        try? await Task.sleep(for: .seconds(0.5))
-        if Task.isCancelled { return }
-        enterResult()
-
-        guard !needsExplicitDone else { return }
-        try? await Task.sleep(for: .seconds(1.3))
-        if Task.isCancelled { return }
-        dismiss()
+    /// "Try again": a fresh run of the same spec (the service replaces the failed outcome).
+    private func retry() {
+        resetVisuals()
+        service.start(spec, glucoseUnit: glucoseUnit)
     }
 }

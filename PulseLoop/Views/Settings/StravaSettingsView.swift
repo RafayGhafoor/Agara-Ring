@@ -11,7 +11,7 @@ struct StravaSettingsView: View {
     @State private var auth = StravaAuthService.shared
     @State private var store = StravaPrefsStore.shared
     /// Confirmation before revoking Strava access.
-    @State private var showDisconnectDialog = false
+    @State private var confirm: ConfirmAction?
     /// Set when the connect flow fails for a reason other than the user cancelling.
     @State private var connectError: String?
 
@@ -50,19 +50,7 @@ struct StravaSettingsView: View {
         }
         .background(AgaraColors.background)
         .pageChrome("Strava")
-        .confirmationDialog(
-            "Disconnect from Strava?",
-            isPresented: $showDisconnectDialog,
-            titleVisibility: .visible
-        ) {
-            Button("Disconnect", role: .destructive) {
-                Task { await auth.disconnect() }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text(AgaraCopy.stravaDisconnectCopy + " "
-                + "Workouts already uploaded stay on Strava.")
-        }
+        .confirmAction($confirm)
     }
 
     // MARK: - Sections
@@ -99,7 +87,7 @@ struct StravaSettingsView: View {
     @ViewBuilder private var dangerGroup: some View {
         SettingsGroup(footer: "Workouts already uploaded stay on Strava.") {
             Button {
-                showDisconnectDialog = true
+                confirm = .disconnectStrava { Task { await auth.disconnect() } }
             } label: {
                 HStack {
                     Text("Disconnect from Strava")

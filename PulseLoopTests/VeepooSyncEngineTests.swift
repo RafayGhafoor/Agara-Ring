@@ -219,6 +219,30 @@ final class VeepooSyncEngineTests: XCTestCase {
     }
 
 
+    /// Each day of the loop reports its start and, on its end marker, what came down (`SyncProgress` rows).
+    func testDayLoopReportsPerDayProgressWithCounts() {
+        writer = RecordingWriter()
+        let engine = VeepooSyncEngine(writer: writer, decoder: VeepooDecoder(), historyDays: 2)
+        engine.connectionDidStart()
+        engine.handle(.commandAck(commandId: 0xA1))
+        let end = hex("dfffff58" + String(repeating: "00", count: 16))
+        for day in 0..<2 {
+            frame(engine, hex("e00000" + String(format: "%02x", day) + String(repeating: "00", count: 16)))
+            frame(engine, part1)
+            frame(engine, part2)
+            frame(engine, end)
+        }
+        let progress: [SyncDayProgress] = writer.emitted.compactMap {
+            if case let .historyDayProgress(p) = $0 { return p }
+            return nil
+        }
+        XCTAssertEqual(progress.map(\.day), [0, 0, 1, 1])
+        XCTAssertEqual(progress.map { $0.counts == nil }, [true, false, true, false])
+        XCTAssertTrue(progress.allSatisfy { $0.totalDays == 2 })
+        XCTAssertEqual(progress[1].counts?.heartRate, 5, "the fixture record carries five HR samples")
+        engine.connectionDidEnd()
+    }
+
     // MARK: Day-loop guards
 
     func testStrayEndMarkerDuringSleepPhaseDoesNotAdvance() {

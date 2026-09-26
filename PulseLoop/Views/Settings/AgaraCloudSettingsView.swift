@@ -14,7 +14,7 @@ struct AgaraCloudSettingsView: View {
     @State private var working = false
     @State private var statusText: String?
     @State private var lastSync = UserDefaults.standard.object(forKey: "agara.lastSync") as? Date
-    @State private var showSignOutDialog = false
+    @State private var confirm: ConfirmAction?
     private static let log = Logger(subsystem: "com.agara.ring", category: "agara-settings")
 
     private var signedIn: Bool { client.isSignedIn }
@@ -73,7 +73,7 @@ struct AgaraCloudSettingsView: View {
                         Button("Sync now") { Task { await syncNow() } }
                             .buttonStyle(.borderedProminent)
                             .disabled(working)
-                        Button("Sign out", role: .destructive) { showSignOutDialog = true }
+                        Button("Sign out", role: .destructive) { confirm = .signOutCloud { client.signOut(); statusText = nil } }
                             .disabled(working)
                     }
                 }
@@ -92,15 +92,7 @@ struct AgaraCloudSettingsView: View {
             .padding(16)
         }
         .background(AgaraColors.background)
-        .confirmationDialog(
-            "Sign out of Agara Cloud? Your data stays on this device.",
-            isPresented: $showSignOutDialog, titleVisibility: .visible
-        ) {
-            Button("Sign out", role: .destructive) {
-                client.signOut()
-                statusText = nil
-            }
-        }
+        .confirmAction($confirm)
         .task {
             // Prefill the last-used email so signing back in is quick.
             if email.isEmpty, let known = client.email {

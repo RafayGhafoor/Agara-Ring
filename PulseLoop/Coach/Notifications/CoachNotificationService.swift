@@ -361,19 +361,17 @@ final class CoachNotificationService {
     }
 
     private func deliver(_ notification: CoachNotification, conversationId: UUID) async {
-        let content = UNMutableNotificationContent()
-        content.title = notification.title
         // Keep the push terse: body, plus the tip if it stays within a glanceable
         // length. The full tip + follow-up live in the chat thread.
         var pushBody = notification.body
         if !notification.tip.isEmpty, pushBody.count + notification.tip.count < 150 {
             pushBody += " \(notification.tip)"
         }
-        content.body = pushBody
-        content.sound = .default
-        content.userInfo = [CoachNotificationService.conversationIdKey: conversationId.uuidString]
-        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
-        try? await UNUserNotificationCenter.current().add(request)
+        await AgaraNotifications.shared.post(AgaraNotification(
+            id: UUID().uuidString, category: .coach, title: notification.title, body: pushBody,
+            deepLink: .coach, onlyInBackground: false,
+            extraUserInfo: [CoachNotificationService.conversationIdKey: conversationId.uuidString]
+        ))
     }
 
     /// userInfo key the app delegate reads to deep-link a tap to the coach thread.

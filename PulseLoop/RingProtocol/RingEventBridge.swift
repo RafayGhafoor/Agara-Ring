@@ -122,6 +122,10 @@ enum RingEventBridge {
         case .historySyncFinished:
             return [.syncProgress(stage: "done")]
 
+        case .historyDayProgress:
+            // Reaches `SyncProgress` as `.decodedPacket`; no bus event of its own.
+            return []
+
         case let .sleepTimeline(timestamp, stages, source):
             guard trustTimestamps || isPlausibleSleepStart(timestamp, now: now), !stages.isEmpty else { return [] }
             return [.sleepTimeline(timestamp: timestamp, stages: stages, source: source)]

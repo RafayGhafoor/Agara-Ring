@@ -166,6 +166,17 @@ final class VirtualRingLink {
             try context.save()
             NSLog("[VirtualRing] seeded a default goal row")
         }
+        // A day of battery drain, so Wearable › Battery history (and its scrub tooltip) has a line to show —
+        // the emulator only reports its level once a minute, and the history is throttled.
+        let dayAgo = Date().addingTimeInterval(-24 * 3600)
+        if try context.fetchCount(FetchDescriptor<BatterySample>(predicate: #Predicate { $0.timestamp > dayAgo })) < 2 {
+            for hour in 0..<24 {
+                context.insert(BatterySample(percent: 95 - hour * 3 / 2,
+                                             timestamp: dayAgo.addingTimeInterval(Double(hour) * 3600 + 600)))
+            }
+            try context.save()
+            NSLog("[VirtualRing] seeded 24 h of battery history")
+        }
         let finishedToday = try context.fetchCount(FetchDescriptor<ActivitySession>(
             predicate: #Predicate { $0.statusRaw == "finished" }))
         guard finishedToday == 0 else { return }

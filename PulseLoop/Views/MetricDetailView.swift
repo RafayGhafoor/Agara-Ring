@@ -156,6 +156,9 @@ struct MetricDetailView: View {
                     xDomain: xDomain,
                     yTicks: axis.ticks,
                     drawsLine: ChartAxes.style(for: metric) != .dots,
+                    interactive: true,
+                    valueLabel: { value in unitLabel.isEmpty ? fmt(value) : "\(fmt(value)) \(unitLabel)" },
+                    accessibilityTitle: "\(metric.title) chart",
                     colorForValue: { value in
                         // Samples are in display units; color lookup needs canonical units.
                         VitalsThresholdEngine.colorToken(forValue: toRaw(value), metric: metric, profile: profile, baseline: baseline).color
@@ -182,7 +185,14 @@ struct MetricDetailView: View {
     private var bloodPressureChart: some View {
         let bars = ChartAxes.rangeBuckets(systolic: primary, diastolic: secondary, bucket: bpBucket)
         let axis = ChartAxes.fixedAxis(.bloodPressure, data: bars.flatMap { [$0.low, $0.high] })!
-        return Chart {
+        return AgaraChart(
+            points: bars.map { AgaraChartPoint(x: $0.time, y: $0.high,
+                                               valueText: "\(Int($0.high.rounded()))/\(Int($0.low.rounded())) mmHg") },
+            height: 220,
+            accessibilityTitle: "Blood pressure chart",
+            valueLabel: { "\(Int($0.rounded())) mmHg" },
+            xLabel: AgaraChartLabels.time(for: period.range)
+        ) {
             ForEach(bars, id: \.time) { bar in
                 let (time, sys, dia) = (bar.time, bar.high, bar.low)
                 RuleMark(x: .value("Time", time), yStart: .value("Diastolic", dia), yEnd: .value("Systolic", sys))
@@ -199,7 +209,6 @@ struct MetricDetailView: View {
             if let xDomain { chart.chartXScale(domain: xDomain) } else { chart }
         }
         .vitalsAxes(showAxes: true, range: period.range, yTicks: axis.ticks)
-        .frame(height: 220)
     }
 
     // MARK: - Stat tiles

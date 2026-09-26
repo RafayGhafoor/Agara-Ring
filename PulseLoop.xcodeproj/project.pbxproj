@@ -108,6 +108,7 @@
 			membershipExceptions = (
 				App/AppTheme.swift,
 				DesignSystem/ActivityRings.swift,
+				DesignSystem/AgaraChart.swift,
 				DesignSystem/GlassCompat.swift,
 				DesignSystem/AgaraFontExtras.swift,
 				DesignSystem/SleepStageBar.swift,

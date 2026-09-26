@@ -276,6 +276,8 @@ struct MainTabView: View {
     @State private var reorder = CardReorderSession.shared
     /// Route requested from inside the Coach sheet, pushed once the sheet dismisses.
     @State private var pendingCoachRoute: AppRoute?
+    /// A tapped notification's destination (`AgaraNotifications` deep links).
+    @State private var deepLinks = AgaraDeepLinks.shared
 
     /// The tab in use, kept across a theme change (which rebuilds this view) for the rest of the session.
     private static var sessionTab: MainTab?
@@ -319,6 +321,24 @@ struct MainTabView: View {
         nav.showCoach = false
     }
 
+    /// Follow (and clear) a notification's deep link. `.measure` lands on Vitals, which opens the Measure sheet
+    /// on the running or finished measurement.
+    private func followDeepLink() {
+        guard let link = deepLinks.pending else { return }
+        deepLinks.pending = nil
+        switch link {
+        case .measure:
+            selected = .vitals
+            deepLinks.openMeasureSheet = true
+        case .sync:
+            selected = .today
+        case .wearable:
+            path.append(AppRoute.settingsWearable)
+        case .coach:
+            CoachNavigation.shared.openRoot()
+        }
+    }
+
     private func pushPendingCoachRoute() {
         guard let route = pendingCoachRoute else { return }
         pendingCoachRoute = nil
@@ -333,11 +353,14 @@ struct MainTabView: View {
             // bar (glass light-bending in/out) instead of a hard opacity cut.
             Group {
                 if coordinator.isSyncing {
-                    SyncProgressBar()
+                    // Bar + "Syncing day N of M · counts" from the one sync-progress model.
+                    SyncStatusHeader()
                         .agaraMaterialize()
                 }
             }
             .agaraGlassContainer(spacing: 8)
+            // A measurement running (or finished) while its sheet is closed — tap to reopen it.
+            MeasurementStatusPill()
             if let error = coordinator.syncError {
                 HStack {
                     Text(error).font(AgaraFont.caption)
@@ -378,6 +401,7 @@ struct MainTabView: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: coordinator.isSyncing)
+        .animation(.easeInOut(duration: 0.25), value: MeasurementService.shared.isActive)
         .animation(AgaraMotion.materialize, value: coachEnabled)   // FAB materializes in/out
         .animation(AgaraMotion.materialize, value: reorder.isEditing)
         // Floating Coach chat bubble, bottom-right, hovering above the tab bar. It steps aside while
@@ -401,6 +425,9 @@ struct MainTabView: View {
         }
         // Leaving the tab abandons its edit mode; the tab's own observer persists the order.
         .onChange(of: selected) { _, tab in reorder.end(); Self.sessionTab = tab }
+        // Notification taps: switch to the tab (or push the screen) the deep link names.
+        .onChange(of: deepLinks.pending) { _, _ in followDeepLink() }
+        .onAppear(perform: followDeepLink)
         .onChange(of: coachEnabled) { _, enabled in
             // Coach turned off — dismiss the sheet and clear any pending deep link.
             if !enabled { nav.requestedConversationId = nil; nav.showCoach = false }

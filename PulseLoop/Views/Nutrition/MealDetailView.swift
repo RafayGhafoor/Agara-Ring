@@ -14,7 +14,7 @@ struct MealDetailView: View {
     @State private var dataChange = AgaraDataChange.shared
     @State private var entry: MealEntry?
     @State private var editSheet = false
-    @State private var deleteConfirm = false
+    @State private var confirm: ConfirmAction?
 
     private func reload() {
         entry = NutritionRepository.entry(id: mealId, context: modelContext)
@@ -60,7 +60,7 @@ struct MealDetailView: View {
             if entry != nil {
                 Menu {
                     Button { editSheet = true } label: { Label("Edit", systemImage: "pencil") }
-                    Button(role: .destructive) { deleteConfirm = true } label: { Label("Delete", systemImage: "trash") }
+                    Button(role: .destructive) { confirm = .deleteMeal(name: entry?.name) { NutritionRepository.delete(id: mealId, context: modelContext); dismiss() } } label: { Label("Delete", systemImage: "trash") }
                 } label: {
                     Image(systemName: "ellipsis")
                         .font(AgaraFont.bodyEmphasis)
@@ -79,12 +79,7 @@ struct MealDetailView: View {
                 MealLogSheet(day: entry.date, presetMealType: entry.mealType, editingId: entry.id)
             }
         }
-        .confirmationDialog("Delete this meal?", isPresented: $deleteConfirm, titleVisibility: .visible) {
-            Button("Delete", role: .destructive) {
-                NutritionRepository.delete(id: mealId, context: modelContext)
-                dismiss()
-            }
-        }
+        .confirmAction($confirm)
     }
 
     // MARK: - Sections

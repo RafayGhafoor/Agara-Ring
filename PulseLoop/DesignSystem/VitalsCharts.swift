@@ -98,8 +98,8 @@ enum VitalsAxisFormat {
 // MARK: - ZoneLineChart
 
 /// A reusable line chart whose line is colored by zone (via `colorForValue`) and whose background
-/// carries reference bands. Swift Charts handles axes/scaling/accessibility; a Canvas overlay draws
-/// the multi-colored, gap-broken line so each segment can take its own color.
+/// carries reference bands. Built on `AgaraChart` (scrub/tooltip, empty state, accessibility); a Canvas
+/// overlay draws the multi-colored, gap-broken line so each segment can take its own color.
 struct ZoneLineChart: View {
     let samples: [ChartSample]
     let metric: MetricKind
@@ -120,6 +120,12 @@ struct ZoneLineChart: View {
     /// False draws the readings as dots only — spot readings (SpO₂) are never joined, since a line between
     /// two readings hours apart invents the values in between.
     var drawsLine: Bool = true
+    /// Scrub/tap/hover value marker (`AgaraChart`). Off inside a tappable card, where a tap opens the detail.
+    var interactive: Bool = false
+    /// The tooltip / VoiceOver value text ("72 bpm", "85%").
+    var valueLabel: (Double) -> String = { String(format: "%.0f", $0) }
+    var accessibilityTitle: String = "Chart"
+    var empty = AgaraChartEmpty(minimumPoints: 1)
     /// Injected from the threshold engine: maps a value to the color its segment should take.
     let colorForValue: (Double) -> Color
 
@@ -130,7 +136,15 @@ struct ZoneLineChart: View {
     }
 
     var body: some View {
-        Chart {
+        AgaraChart(
+            points: samples.map { AgaraChartPoint(x: $0.timestamp, y: $0.value) },
+            height: height,
+            interactive: interactive,
+            empty: empty,
+            accessibilityTitle: accessibilityTitle,
+            valueLabel: valueLabel,
+            xLabel: AgaraChartLabels.time(for: range)
+        ) {
             ForEach(referenceBands) { band in
                 RectangleMark(
                     yStart: .value("Band low", band.lower),
@@ -154,25 +168,22 @@ struct ZoneLineChart: View {
                     .opacity(sample.quality == .motionArtifact ? 0.4 : 1)
                 }
             }
+        } overlay: { proxy, geo in
+            Canvas { context, _ in
+                guard drawsLine, let plotAnchor = proxy.plotFrame else { return }
+                let plot = geo[plotAnchor]
+                let maxGap = ChartSampleBuilder.maxGap(for: range)
+                for segment in ChartSampleBuilder.segments(samples, maxGap: maxGap) {
+                    drawSegment(segment, context: &context, plot: plot, proxy: proxy)
+                }
+            }
+            .allowsHitTesting(false)
         }
         .chartYScale(domain: yDomain)
         .modify { chart in
             if let timeDomain { chart.chartXScale(domain: timeDomain) } else { chart }
         }
         .vitalsAxes(showAxes: showAxes, range: range, yTicks: yTicks)
-        .chartOverlay { proxy in
-            GeometryReader { geo in
-                Canvas { context, _ in
-                    guard drawsLine, let plotAnchor = proxy.plotFrame else { return }
-                    let plot = geo[plotAnchor]
-                    let maxGap = ChartSampleBuilder.maxGap(for: range)
-                    for segment in ChartSampleBuilder.segments(samples, maxGap: maxGap) {
-                        drawSegment(segment, context: &context, plot: plot, proxy: proxy)
-                    }
-                }
-            }
-        }
-        .frame(height: height)
     }
 
     /// Stroke one contiguous segment. Each sample-to-sample pair is split at every zone boundary it

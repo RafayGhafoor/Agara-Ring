@@ -59,7 +59,7 @@ struct FirmwareInstallSection: View {
     let version: String
     let onConfirmed: () -> Void
     @State private var controller = FirmwareInstallController.shared
-    @State private var confirming = false
+    @State private var confirm: ConfirmAction?
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { _ in
@@ -70,17 +70,14 @@ struct FirmwareInstallSection: View {
                         .font(AgaraFont.footnote)
                         .foregroundStyle(AgaraColors.textSecondary)
                 }
-                PrimaryButton(title: "Install on ring", systemImage: "arrow.up.circle") { confirming = true }
-                    .disabled(!gates.isEmpty)
-                    .opacity(gates.isEmpty ? 1 : 0.45)
+                PrimaryButton(title: "Install on ring", systemImage: "arrow.up.circle") {
+                    confirm = .installFirmware(version: version, minBattery: controller.minBattery) { onConfirmed() }
+                }
+                .disabled(!gates.isEmpty)
+                .opacity(gates.isEmpty ? 1 : 0.45)
             }
         }
-        .alert(FirmwareInstallText.confirmTitle, isPresented: $confirming) {
-            Button("Install", role: .destructive) { onConfirmed() }
-            Button("Not now", role: .cancel) {}
-        } message: {
-            Text(FirmwareInstallText.confirmBody(version: version, minBattery: controller.minBattery))
-        }
+        .confirmAction($confirm)
     }
 }
 

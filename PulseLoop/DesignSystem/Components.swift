@@ -648,12 +648,7 @@ struct ActivityWorkoutRow: View {
     var body: some View {
         Button { onTap?() } label: {
             HStack(spacing: 12) {
-                Image(systemName: ActivityMeta.icon(session.type))
-                    .font(AgaraFont.title3.weight(.regular))
-                    .foregroundStyle(AgaraColors.accent)
-                    .frame(width: 44, height: 44)
-                    .background(AgaraColors.accentSoft)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                IconTile(systemName: ActivityMeta.icon(session.type), style: .tinted(AgaraColors.accent), size: .large)
                 VStack(alignment: .leading, spacing: 3) {
                     HStack {
                         Text(ActivityMeta.label(session.type))

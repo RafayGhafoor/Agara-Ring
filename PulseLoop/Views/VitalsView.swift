@@ -18,6 +18,9 @@ struct VitalsView: View {
     @State private var sheet: VitalsSheet?
     @State private var features = AgaraFeatureStore.shared
     @State private var dataChange = AgaraDataChange.shared
+    /// The app-scoped measurement engine: a running or finished test reopens instead of the hub.
+    @State private var measurement = MeasurementService.shared
+    @State private var deepLinks = AgaraDeepLinks.shared
     /// Owns the prepared vitals state. Created lazily in `.task` (never in `body`) so a `body`
     /// re-render never triggers DB work — it just reads the already-prepared store.
     @State private var store: VitalsStore?
@@ -84,17 +87,21 @@ struct VitalsView: View {
         .task { await autoMeasureIfRequested() }
         #endif
         .onChange(of: dataChange.token) { _, _ in if isActive { store?.refreshIfNeeded() } }
+        // A measurement notification (or the in-app pill) asks for the Measure sheet.
+        .onChange(of: deepLinks.openMeasureSheet) { _, open in if open { openMeasureFromLink() } }
+        .onAppear { if deepLinks.openMeasureSheet { openMeasureFromLink() } }
         .onChange(of: isActive) { _, active in if active { store?.updateProfile(profile) } }
         .onChange(of: profile?.updatedAt) { _, _ in store?.updateProfile(profile) }
         .sheet(item: $sheet) { sheet in
             Group {
                 switch sheet {
                 case .hub:
-                    MeasureHubSheet(kinds: measureKinds(activeStore), isCharging: ringCharging) { kind in
-                        self.sheet = .measure(kind.sheetKind)
+                    MeasureHubSheet(kinds: measureKinds(activeStore), isCharging: ringCharging,
+                                    runningID: measurement.isRunning ? measurement.spec?.id : nil) { spec in
+                        self.sheet = .measure(spec)
                     }
-                case let .measure(kind):
-                    MeasurementSheet(kind: kind)
+                case let .measure(spec):
+                    MeasurementSheet(spec: spec)
                 }
             }
             // Hand the ring objects to the sheet explicitly. Picking a tile swaps the hub for the
@@ -127,7 +134,7 @@ struct VitalsView: View {
             }
             Spacer(minLength: 8)
             if !kinds.isEmpty {
-                Button { sheet = .hub } label: {
+                Button { openMeasure() } label: {
                     Label("Measure", systemImage: "waveform.path.ecg")
                         .font(AgaraFont.subheadline.weight(.semibold))
                         .foregroundStyle(AgaraColors.onAccent)
@@ -147,13 +154,27 @@ struct VitalsView: View {
 
     /// The tests the hub offers: flags on, and supported by the ring (its own capability packets when
     /// the probe has run, otherwise the family's capability list).
-    private func measureKinds(_ store: VitalsStore) -> [MeasureKind] {
-        MeasureKind.available(capabilities: store.capabilities,
+    private func measureKinds(_ store: VitalsStore) -> [MeasurementSpec] {
+        MeasurementRegistry.available(capabilities: store.capabilities,
                               ring: devices.first?.ringCapabilities,
                               isOn: { features.isOn($0) })
     }
 
     private var ringCharging: Bool { features.isOn(.chargingState) && ble.isCharging }
+
+    /// Measure: straight back to the running or finished test when there is one (resume), else the hub.
+    private func openMeasure() {
+        if let spec = measurement.spec {
+            sheet = .measure(spec)
+        } else {
+            sheet = .hub
+        }
+    }
+
+    private func openMeasureFromLink() {
+        deepLinks.openMeasureSheet = false
+        openMeasure()
+    }
 
     // MARK: - Grid
 
@@ -337,7 +358,7 @@ struct VitalsView: View {
     // MARK: - E2E tooling
 
     #if DEBUG
-    /// Once per process: `-autoMeasure <id>` (a `MeasureKind` id, e.g. `heartRate`) opens the hub, then picks
+    /// Once per process: `-autoMeasure <id>` (a `MeasurementSpec` id, e.g. `heartRate`) opens the hub, then picks
     /// that tile the way a tap does — for destinations XCUITest can't drive (the Mac "Designed for iPad"
     /// build). Pair with `-startTab vitals`. It waits for the ring to connect (up to 60 s), then goes
     /// ahead regardless, so the no-ring / Bluetooth-off path is exercised too.
@@ -353,12 +374,12 @@ struct VitalsView: View {
         E2ETrace.log("autoMeasure \(id): ring state \(ble.state)")
         sheet = .hub
         try? await Task.sleep(for: .seconds(1.5))
-        guard let kind = MeasureKind.all.first(where: { $0.id == id }) else {
+        guard let spec = MeasurementRegistry.spec(id: id) else {
             E2ETrace.log("autoMeasure \(id): unknown id")
             return
         }
         E2ETrace.log("autoMeasure \(id): opening the measurement")
-        sheet = .measure(kind.sheetKind)
+        sheet = .measure(spec)
     }
     #endif
 
@@ -372,7 +393,15 @@ struct VitalsView: View {
 /// The Vitals screen's one sheet slot: the measure hub, or the measurement ring for a chosen test.
 private enum VitalsSheet: Identifiable, Hashable {
     case hub
-    case measure(MeasurementSheet.Kind)
+    case measure(MeasurementSpec)
 
-    var id: Self { self }
+    var id: String {
+        switch self {
+        case .hub: return "hub"
+        case let .measure(spec): return "measure.\(spec.id)"
+        }
+    }
+
+    static func == (lhs: VitalsSheet, rhs: VitalsSheet) -> Bool { lhs.id == rhs.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }

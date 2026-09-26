@@ -29,6 +29,18 @@ final class OnboardingAndTabsTests: AgaraUITestCase {
         if !saveName.isHittable { app.swipeUp() }
         saveName.tap()
 
+        // Syncing: the history comes down day by day; leave-able at any time.
+        waitFor(element("onboarding.syncing"), timeout: 20, "Syncing step missing after pairing")
+        eventually(timeout: 60, "no per-day rows on the Syncing step") { element("sync.day.0").exists }
+        eventually(timeout: 60, "today's row never filled in") {
+            // A real count ("4,210 steps" / "812 HR"), not the "– steps" of an empty or waiting day.
+            element("sync.day.0").label.range(of: #"\d[\d,.]* (steps|HR)"#, options: .regularExpression) != nil
+        }
+        attachScreenshot("onboarding-syncing")
+        let continueButton = app.buttons["onboarding.syncing.continue"].exists
+            ? app.buttons["onboarding.syncing.continue"] : app.buttons["Continue"]
+        waitFor(continueButton, "Syncing step has no Continue").tap()
+
         // Profile: skip it.
         waitFor(app.buttons["Skip"], "profile step missing").tap()
         // Goals: keep the recommended targets.

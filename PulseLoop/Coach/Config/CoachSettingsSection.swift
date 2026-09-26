@@ -19,7 +19,7 @@ struct CoachSettingsSection: View {
     @Query(sort: \CoachMemory.importance, order: .reverse) private var memories: [CoachMemory]
     @State private var store = CoachSettingsStore.shared
     /// Presents the "Enable Coach Check-Ins?" prompt when the coach is first switched on.
-    @State private var askEnableCheckIns = false
+    @State private var confirm: ConfirmAction?
     /// Set when the user opts into check-ins but iOS denies notification permission.
     @State private var checkInPermissionDenied = false
     private let openAIKeyStore = OpenAIKeychainStore()
@@ -125,12 +125,7 @@ struct CoachSettingsSection: View {
         SettingsGroup(header: "AI Coach") {
             FormToggleRow(title: "Enable AI Coach", isOn: masterEnabledBinding)
         }
-        .alert("Enable Coach Check-Ins?", isPresented: $askEnableCheckIns) {
-            Button("Enable") { enableCheckIns() }
-            Button("Not now", role: .cancel) {}
-        } message: {
-            Text("Get a daily check-in from your coach. You can change this anytime in Coach Check-Ins.")
-        }
+        .confirmAction($confirm)
 
         if checkInPermissionDenied {
             Text(AgaraCopy.notificationsDisabled)
@@ -485,7 +480,7 @@ struct CoachSettingsSection: View {
                     CoachNotificationScheduler.shared.scheduleNext()
                 } else {
                     // First time on: ask before enabling check-ins (OS permission only on "Enable").
-                    askEnableCheckIns = true
+                    confirm = .enableCoachCheckIns { enableCheckIns() }
                 }
             }
         )

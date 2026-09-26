@@ -206,7 +206,15 @@ struct ActivityTrendsView: View {
                 color: color,
                 goal: goal,
                 goalLabel: goalLabel,
-                axisLabels: axisLabels(count: values.count, samples: samples)
+                axisLabels: axisLabels(count: values.count, samples: samples),
+                valueLabel: { value in
+                    switch title {
+                    case "Distance": return String(format: "%.2f \(distanceUnit)", value)
+                    case "Calories": return "\(Int(value.rounded()).formatted()) cal"
+                    default: return "\(Int(value.rounded()).formatted()) steps"
+                    }
+                },
+                tooltipLabels: tooltipLabels(samples: samples)
             )
             .frame(height: 96)
             // Same count as Android's "Goal days" stat: tracked days at or over the goal.
@@ -259,6 +267,17 @@ struct ActivityTrendsView: View {
 
     /// Sparse x-axis labels keyed by bar index. Week: every day (M–S). Month: a date roughly every
     /// ~4 days (denser than week starts). Year: 3-letter month for all 12 buckets.
+    /// Each bar's full date for the chart tooltip ("Tue, Sep 23"; a month over the year view).
+    private func tooltipLabels(samples: [MetricSample]) -> [Int: String] {
+        var map: [Int: String] = [:]
+        for (i, sample) in samples.enumerated() {
+            map[i] = period == .twelveMonths
+                ? sample.timestamp.formatted(.dateTime.month(.wide).year())
+                : sample.timestamp.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
+        }
+        return map
+    }
+
     private func axisLabels(count: Int, samples: [MetricSample]) -> [Int: String] {
         let cal = Calendar.current
         switch period {
@@ -308,6 +327,10 @@ private struct TrendBarChart: View {
     var goal: Double?
     var goalLabel: String?
     var axisLabels: [Int: String]
+    /// The tooltip's value text for a bar ("8,432 steps").
+    var valueLabel: (Double) -> String = { "\(Int($0.rounded()))" }
+    /// The tooltip's second line per bar (the bar's day/month); falls back to the sparse axis label.
+    var tooltipLabels: [Int: String] = [:]
 
     private var chartMax: Double {
         let observed = values.max() ?? 0
@@ -331,7 +354,13 @@ private struct TrendBarChart: View {
     private var orderedKeys: [String] { (0..<values.count).map(key) }
 
     var body: some View {
-        Chart {
+        AgaraChart(
+            points: values.enumerated().map { AgaraChartPoint(x: key($0.offset), y: $0.element) },
+            empty: AgaraChartEmpty(text: "No data for this period", minimumPoints: 1, minHeight: 60),
+            accessibilityTitle: goalLabel.map { "Trend, goal \($0)" } ?? "Trend",
+            valueLabel: valueLabel,
+            xLabel: { k in Int(k).flatMap { tooltipLabels[$0] ?? axisLabels[$0] } ?? "" }
+        ) {
             ForEach(Array(values.enumerated()), id: \.offset) { index, value in
                 BarMark(
                     x: .value("bar", key(index)),
@@ -364,12 +393,6 @@ private struct TrendBarChart: View {
                         Text(label).font(AgaraFont.micro.weight(.regular)).foregroundStyle(AgaraColors.textMuted)
                     }
                 }
-            }
-        }
-        .overlay(alignment: .center) {
-            if values.isEmpty {
-                Text("No data for this period")
-                    .font(AgaraFont.caption.weight(.regular)).foregroundStyle(AgaraColors.textMuted)
             }
         }
     }

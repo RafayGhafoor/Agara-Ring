@@ -120,6 +120,8 @@ struct AgaraApp: App {
         let client = RingBLEClient(startManager: !runningTests && !useVirtualRing)
         let coordinator = RingSyncCoordinator(client: client, context: container.mainContext)
         client.onConnected = { [weak coordinator] in coordinator?.runStartupSequence() }
+        // The measurement engine runs tests on the live ring, app-scoped (survives the sheet and tab switches).
+        MeasurementService.shared.attach(client: client, coordinator: coordinator, context: container.mainContext)
         // Ring firmware install (stage 4, debug + `firmwareInstall`): gates read the live client + coordinator.
         FirmwareInstallController.shared.attach(client: client, coordinator: coordinator)
         #if DEBUG
@@ -192,6 +194,10 @@ struct AgaraApp: App {
         // `-firmwareAutoInstall YES` (debug): download + install once the gates pass (headless verification).
         FirmwareInstallController.shared.startAutoInstallIfRequested()
 
+        // The one notification layer: categories + app-lifecycle tracking (background-only progress news).
+        AgaraNotifications.shared.start()
+        // Per-day sync progress (onboarding Syncing step, header bar, background sync notification).
+        SyncProgress.shared.start()
         // Daily check-in notifications: route taps + register the background wake.
         UNUserNotificationCenter.current().delegate = notificationDelegate
         let ctx = container.mainContext

@@ -74,24 +74,7 @@ struct SettingsRow: View {
     var body: some View {
         Button(action: item.action) {
             HStack(spacing: 14) {
-                Image(systemName: item.icon)
-                    .font(AgaraFont.callout.weight(.semibold))
-                    .foregroundStyle(AgaraColors.textPrimary)
-                    .frame(width: 34, height: 34)
-                    // Neutral "white glass" tile (iOS Settings look): a light translucent
-                    // fill with a top sheen — not glassEffect, which can't nest inside the
-                    // glass section card. White glyph, no colour tint.
-                    .background(
-                        LinearGradient(
-                            colors: [AgaraColors.textPrimary.opacity(0.16), AgaraColors.textPrimary.opacity(0.07)],
-                            startPoint: .top, endPoint: .bottom
-                        ),
-                        in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .strokeBorder(AgaraColors.textPrimary.opacity(0.18), lineWidth: 0.5)
-                    )
+                IconTile(systemName: item.icon, style: .neutral, size: .medium)
 
                 Text(item.title)
                     .font(AgaraFont.body)

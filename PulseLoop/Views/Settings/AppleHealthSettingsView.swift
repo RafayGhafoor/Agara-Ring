@@ -15,7 +15,7 @@ struct AppleHealthSettingsView: View {
     /// First-enable backfill choice ("all history" vs "new only" vs cancel).
     @State private var showBackfillDialog = false
     /// Confirmation before deleting Agara Ring's samples out of Apple Health.
-    @State private var showRemoveAlert = false
+    @State private var confirm: ConfirmAction?
     /// Set when authorization was refused — surfaces the "Open Health" hint row.
     @State private var accessDenied = false
 
@@ -57,14 +57,7 @@ struct AppleHealthSettingsView: View {
         } message: {
             Text("Choose how much of your ring history to copy into Apple Health.")
         }
-        .alert("Remove \(AgaraCopy.appName) data from Apple Health?", isPresented: $showRemoveAlert) {
-            Button("Remove", role: .destructive) {
-                Task { await service.removeAllExportedData(context: modelContext) }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This deletes only the samples \(AgaraCopy.appName) wrote. Data from other apps is untouched.")
-        }
+        .confirmAction($confirm)
     }
 
     // MARK: - Sections
@@ -134,7 +127,7 @@ struct AppleHealthSettingsView: View {
     @ViewBuilder private var dangerGroup: some View {
         SettingsGroup(footer: "Deletes only the samples \(AgaraCopy.appName) wrote to Apple Health.") {
             Button {
-                showRemoveAlert = true
+                confirm = .removeAppleHealthData { Task { await service.removeAllExportedData(context: modelContext) } }
             } label: {
                 HStack {
                     Text("Remove \(AgaraCopy.appName) data from Apple Health")

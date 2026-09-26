@@ -20,7 +20,7 @@ struct NutritionView: View {
     @State private var logSheet: LogSheetRequest?
     @State private var analysisSheet: AnalysisRequest?
     /// Meal picked for deletion from a row's context menu — confirmed first (Android matches).
-    @State private var pendingDelete: MealEntry?
+    @State private var confirm: ConfirmAction?
 
     private struct LogSheetRequest: Identifiable {
         let id = UUID()
@@ -109,18 +109,7 @@ struct NutritionView: View {
         .sheet(item: $analysisSheet) { request in
             MealAnalysisSheet(day: selectedDay, startWithCamera: request.startWithCamera)
         }
-        .alert(
-            "Delete this meal?",
-            isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
-            presenting: pendingDelete
-        ) { entry in
-            Button("Delete", role: .destructive) {
-                NutritionRepository.delete(id: entry.id, context: modelContext)
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: { entry in
-            Text("\(entry.name) is removed from your food log.")
-        }
+        .confirmAction($confirm)
     }
 
     /// Quick log actions: compact method-picker capsules (AI photo / describe gated on
@@ -251,7 +240,7 @@ struct NutritionView: View {
                                 Label("Edit", systemImage: "pencil")
                             }
                             Button(role: .destructive) {
-                                pendingDelete = entry
+                                confirm = .deleteMeal(name: entry.name) { [id = entry.id] in NutritionRepository.delete(id: id, context: modelContext) }
                             } label: {
                                 Label("Delete", systemImage: "trash")
                             }

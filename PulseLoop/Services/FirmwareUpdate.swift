@@ -266,6 +266,16 @@ final class FirmwareUpdateChecker {
             let release = try FirmwareUpdateLogic.parseVersion3(data)
             saveCache(Cache(deviceNumber: identity.deviceNumber, release: release))
             apply(release: release, for: identity)
+            // The automatic daily check can finish while the app is backgrounded: say so once per version
+            // (firmware category; the id is per version, so the same release never notifies twice).
+            if let latestRelease {
+                await AgaraNotifications.shared.post(AgaraNotification(
+                    id: "agara.firmware.\(latestRelease.version)", category: .firmware,
+                    title: "Ring update available",
+                    body: "Firmware \(latestRelease.version) is ready for your ring. Open Wearable to update.",
+                    deepLink: .wearable, throttle: 7 * 24 * 3600
+                ))
+            }
         } catch {
             status = .error("Couldn't check for updates")
         }

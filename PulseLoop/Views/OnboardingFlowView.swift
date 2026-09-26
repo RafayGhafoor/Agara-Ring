@@ -32,6 +32,8 @@ struct OnboardingFlowView: View {
                         connected: advanceAfterConnection,
                         skipped: { push(.profile) }
                     )
+                case .syncing:
+                    OnboardingSyncingView(next: { push(.profile) })
                 case .profile:
                     OnboardingProfileView(next: { push(.goals) })
                 case .goals:
@@ -61,10 +63,10 @@ struct OnboardingFlowView: View {
     }
 
     /// Called once the pairing screen's "Name your ring" step is saved or skipped. The connected
-    /// confirmation was already on screen during that step, so there is nothing left to linger on.
+    /// confirmation was already on screen during that step; next is the Syncing step (history coming down).
     private func advanceAfterConnection() {
         guard step == .ring else { return }
-        push(.profile)
+        push(.syncing)
     }
 
     private func finish() {

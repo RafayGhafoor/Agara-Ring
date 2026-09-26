@@ -10,7 +10,8 @@ struct WearableSettingsView: View {
     @Binding var path: NavigationPath
     @State private var features = AgaraFeatureStore.shared
     @State private var showsRename = false
-    @State private var confirmsForget = false
+    /// Disconnect / Forget awaiting confirmation (`ConfirmAction`, the one confirmation component).
+    @State private var confirm: ConfirmAction?
     @State private var firmwareChecker = FirmwareUpdateChecker.shared
 
     /// The firmware-update lookup key, from the ring's persisted `a1` identity (nil until a connect saw it).
@@ -153,9 +154,11 @@ struct WearableSettingsView: View {
                             }
                         }
                     }
-                    SecondaryButton(title: "Disconnect", systemImage: "xmark") { ble.disconnect() }
+                    SecondaryButton(title: "Disconnect", systemImage: "xmark") {
+                        confirm = .disconnectRing { [ble] in ble.disconnect() }
+                    }
                     // Forget unbinds the ring: the one destructive action here (Android matches).
-                    DestructiveButton(title: "Forget ring", systemImage: "trash") { confirmsForget = true }
+                    DestructiveButton(title: "Forget ring", systemImage: "trash") { confirm = .forgetRing { [ble] in ble.forget() } }
                 } else {
                     SettingsGroup(header: "No ring connected") {
                         if ble.hasLastKnownRing && devices.first != nil { nameRow }
@@ -166,7 +169,7 @@ struct WearableSettingsView: View {
                     }
                     if ble.hasLastKnownRing && ble.state != .reconnecting {
                         SecondaryButton(title: "Reconnect last ring", systemImage: "arrow.clockwise") { ble.connectLastKnown() }
-                        DestructiveButton(title: "Forget ring", systemImage: "trash") { confirmsForget = true }
+                        DestructiveButton(title: "Forget ring", systemImage: "trash") { confirm = .forgetRing { [ble] in ble.forget() } }
                     }
                 }
             }
@@ -174,13 +177,8 @@ struct WearableSettingsView: View {
         }
         .background(AgaraColors.background)
         .pageChrome("Wearable")
-        // Same copy as Android's confirmation (audit batch A #24).
-        .alert("Forget this ring?", isPresented: $confirmsForget) {
-            Button("Forget", role: .destructive) { ble.forget() }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("The ring is unbound and removed from the app. Your stored history stays. You can pair it again later.")
-        }
+        // Same copy as Android's confirmation (audit batch A #24) — now in `ConfirmAction.forgetRing`.
+        .confirmAction($confirm)
         .sheet(isPresented: $showsRename) {
             RenameRingSheet(
                 initialText: RingNickname.prefill(identifier: ble.deviceIdentifier, row: devices.first),
@@ -219,23 +217,26 @@ private struct BatteryHistorySection: View {
                 .fixedSize()
             }
             FormField {
-                if samples.count >= 2 {
-                    ZoneLineChart(
-                        samples: samples,
-                        metric: .heartRate,          // axis styling only; battery uses its own domain + colors
-                        yDomain: 0...100,
-                        range: range,
-                        showAxes: true,
-                        height: 160,
-                        colorForValue: color(for:)
-                    )
-                } else {
-                    Text("Not enough data yet — battery history builds up as your ring reports its level.")
-                        .font(AgaraFont.face(13))
-                        .foregroundStyle(AgaraColors.textMuted)
-                        .frame(maxWidth: .infinity, minHeight: 120, alignment: .center)
-                        .multilineTextAlignment(.center)
-                }
+                // The shared chart (`AgaraChart` via `ZoneLineChart`): tap, hover or press-and-drag shows the
+                // level at that time — the battery chart was the one graph without a value marker.
+                ZoneLineChart(
+                    samples: samples,
+                    metric: .heartRate,          // axis styling only; battery uses its own domain + colors
+                    yDomain: 0...100,
+                    range: range,
+                    showAxes: true,
+                    height: 160,
+                    yTicks: [0, 25, 50, 75, 100],
+                    interactive: true,
+                    valueLabel: { "\(Int($0.rounded()))%" },
+                    accessibilityTitle: "Battery history",
+                    empty: AgaraChartEmpty(
+                        text: "Not enough data yet — battery history builds up as your ring reports its level.",
+                        minimumPoints: 2
+                    ),
+                    colorForValue: color(for:)
+                )
+                .accessibilityIdentifier("battery.chart")
             }
         }
         .onAppear(perform: reload)

@@ -141,17 +141,17 @@ final class MeasureHubModelTests: XCTestCase {
     private func caps(_ list: [WearableCapability]) -> Set<WearableCapability> { Set(list) }
 
     func testHubOrderAndIdsMatchTheSpec() {
-        XCTAssertEqual(MeasureKind.all.map(\.id), ["heartRate", "spo2", "bloodPressure", "stress", "glucose", "bloodComponents"])
+        XCTAssertEqual(MeasurementRegistry.all.map(\.id), ["heartRate", "spo2", "bloodPressure", "stress", "glucose", "bloodComponents"])
     }
 
     func testStaticCapabilityFallbackWhenNoProbeData() {
         let all = VeepooCoordinator().capabilities
         let defaultsOnly: (AgaraFeature) -> Bool = { $0.defaultOn }
-        XCTAssertEqual(MeasureKind.available(capabilities: all, ring: nil, isOn: defaultsOnly).map(\.id),
+        XCTAssertEqual(MeasurementRegistry.available(capabilities: all, ring: nil, isOn: defaultsOnly).map(\.id),
                        ["heartRate", "spo2", "bloodPressure", "stress"], "glucose/lipids are off by default")
         let everything: (AgaraFeature) -> Bool = { _ in true }
-        XCTAssertEqual(MeasureKind.available(capabilities: all, ring: nil, isOn: everything).count, 6)
-        XCTAssertEqual(MeasureKind.available(capabilities: caps([.manualHeartRate]), ring: nil, isOn: everything).map(\.id),
+        XCTAssertEqual(MeasurementRegistry.available(capabilities: all, ring: nil, isOn: everything).count, 6)
+        XCTAssertEqual(MeasurementRegistry.available(capabilities: caps([.manualHeartRate]), ring: nil, isOn: everything).map(\.id),
                        ["heartRate"])
     }
 
@@ -163,19 +163,19 @@ final class MeasureHubModelTests: XCTestCase {
         ring.bloodGlucose = true
         let all = VeepooCoordinator().capabilities
         let everything: (AgaraFeature) -> Bool = { _ in true }
-        XCTAssertEqual(MeasureKind.available(capabilities: all, ring: ring, isOn: everything).map(\.id),
+        XCTAssertEqual(MeasurementRegistry.available(capabilities: all, ring: ring, isOn: everything).map(\.id),
                        ["heartRate", "spo2", "glucose"])
         // Probe flag off → back to the static list, whatever the packets said.
         let probeOff: (AgaraFeature) -> Bool = { $0 != .capabilityProbe }
-        XCTAssertEqual(MeasureKind.available(capabilities: all, ring: ring, isOn: probeOff).count, 6)
+        XCTAssertEqual(MeasurementRegistry.available(capabilities: all, ring: ring, isOn: probeOff).count, 6)
     }
 
     func testLipidsNeedBothFlags() {
         let all = VeepooCoordinator().capabilities
         let lipidsOnly: (AgaraFeature) -> Bool = { $0 == .measureLipids }
-        XCTAssertFalse(MeasureKind.available(capabilities: all, ring: nil, isOn: lipidsOnly).contains { $0.id == "bloodComponents" })
+        XCTAssertFalse(MeasurementRegistry.available(capabilities: all, ring: nil, isOn: lipidsOnly).contains { $0.id == "bloodComponents" })
         let both: (AgaraFeature) -> Bool = { $0 == .measureLipids || $0 == .bloodComponents }
-        XCTAssertTrue(MeasureKind.available(capabilities: all, ring: nil, isOn: both).contains { $0.id == "bloodComponents" })
+        XCTAssertTrue(MeasurementRegistry.available(capabilities: all, ring: nil, isOn: both).contains { $0.id == "bloodComponents" })
     }
 
     // MARK: Charging glyph

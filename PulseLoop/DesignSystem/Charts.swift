@@ -23,298 +23,6 @@ enum SleepStageColors {
     }
 }
 
-// MARK: - HR line (Vitals)
-
-struct HRLineChart: View {
-    let samples: [MetricSample]
-    var height: CGFloat = 150
-
-    var body: some View {
-        let values = samples.map(\.value)
-        // Scale to a physiological band, not to the series: filling the height with the data's own
-        // extent puts the *lowest* reading on the floor, so an overnight 68 drew along the bottom and
-        // read as flat/dead. Clamped, so a reading outside the band is still plotted.
-        let band = 45.0...115.0
-        let lo = min(band.lowerBound, values.min() ?? band.lowerBound) - 2
-        let hi = max(band.upperBound, values.max() ?? band.upperBound) + 2
-        Chart {
-            ForEach(samples) { sample in
-                LineMark(
-                    x: .value("Time", sample.timestamp),
-                    y: .value("bpm", sample.value)
-                )
-                .interpolationMethod(.monotone)
-                .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
-                .foregroundStyle(AgaraColors.heartRate)
-            }
-        }
-        .chartYScale(domain: lo...hi)
-        .chartXAxis(.hidden)
-        .chartYAxis(.hidden)
-        .chartValueMarker(samples, x: \.timestamp, y: \.value, yLabel: { "\(Int($0)) bpm" })
-        .frame(height: height)
-    }
-}
-
-// MARK: - Stress gauge (Vitals, the ring)
-
-/// Radial gauge showing the latest stress score on a zoned arc:
-/// relaxed (0–29) · normal (30–59) · medium (60–79) · high (80–100).
-struct StressGaugeChart: View {
-    let value: Double          // 0...100
-    var height: CGFloat = 160
-
-    private let zones: [(upper: Double, color: Color, label: String)] = [
-        (29, AgaraColors.success, "Relaxed"),
-        (59, AgaraColors.info, "Normal"),
-        (79, AgaraColors.warning, "Medium"),
-        (100, AgaraColors.danger, "High"),
-    ]
-
-    private var zone: (upper: Double, color: Color, label: String) {
-        zones.first { value <= $0.upper } ?? zones[zones.count - 1]
-    }
-
-    var body: some View {
-        let fraction = max(0, min(1, value / 100))
-        ZStack {
-            // Background track
-            Circle()
-                .trim(from: 0, to: 0.75)
-                .stroke(AgaraColors.elevated, style: StrokeStyle(lineWidth: 14, lineCap: .round))
-                .rotationEffect(.degrees(135))
-            // Value arc
-            Circle()
-                .trim(from: 0, to: 0.75 * fraction)
-                .stroke(zone.color, style: StrokeStyle(lineWidth: 14, lineCap: .round))
-                .rotationEffect(.degrees(135))
-            VStack(spacing: 2) {
-                Text("\(Int(value))")
-                    .font(AgaraFont.largeTitle).monospacedDigit()
-                    .foregroundStyle(AgaraColors.textPrimary)
-                Text(zone.label.uppercased())
-                    .font(AgaraFont.micro.weight(.semibold)).tracking(1.2)
-                    .foregroundStyle(zone.color)
-            }
-        }
-        .frame(height: height)
-        .frame(maxWidth: .infinity)
-    }
-}
-
-// MARK: - HRV trend band (Vitals, the ring)
-
-/// HRV trend line with a shaded baseline band around the mean, so a glance shows whether recent
-/// values sit above or below the user's typical range.
-struct HRVTrendBandChart: View {
-    let samples: [MetricSample]   // value in ms
-    var height: CGFloat = 150
-
-    var body: some View {
-        let values = samples.map(\.value)
-        let mean = values.isEmpty ? 0 : values.reduce(0, +) / Double(values.count)
-        // Same reasoning as the HR chart: a resting HRV sits low, and a series-scaled axis pinned it
-        // to the floor. 15–80 ms is the band the metric actually occupies.
-        let band = 15.0...80.0
-        let lo = min(band.lowerBound, values.min() ?? band.lowerBound) - 2
-        let hi = max(band.upperBound, values.max() ?? band.upperBound) + 2
-        let bandHalf = max(6, mean * 0.12)   // ±12% baseline band
-
-        Chart {
-            // Baseline band spans the full time domain of the series.
-            if let start = samples.first?.timestamp, let end = samples.last?.timestamp {
-                RectangleMark(
-                    xStart: .value("Start", start),
-                    xEnd: .value("End", end),
-                    yStart: .value("lo", mean - bandHalf),
-                    yEnd: .value("hi", mean + bandHalf)
-                )
-                .foregroundStyle(AgaraColors.hrv.opacity(0.12))
-            }
-
-            RuleMark(y: .value("mean", mean))
-                .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                .foregroundStyle(AgaraColors.hrv.opacity(0.4))
-
-            ForEach(samples) { sample in
-                LineMark(x: .value("Time", sample.timestamp), y: .value("ms", sample.value))
-                    .interpolationMethod(.monotone)
-                    .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
-                    .foregroundStyle(AgaraColors.hrv)
-            }
-        }
-        .chartYScale(domain: lo...hi)
-        .chartXAxis(.hidden)
-        .chartYAxis(.hidden)
-        .chartValueMarker(samples, x: \.timestamp, y: \.value, yLabel: { "\(Int($0)) ms" })
-        .frame(height: height)
-    }
-}
-
-// MARK: - Temperature range (Vitals, the ring)
-
-/// Skin-temperature trend as a filled range around the series, emphasizing daily min/max swing.
-struct TemperatureRangeChart: View {
-    let samples: [MetricSample]   // value in °C
-    var height: CGFloat = 150
-
-    var body: some View {
-        let values = samples.map(\.value)
-        let lo = (values.min() ?? 30) - 0.5
-        let hi = (values.max() ?? 38) + 0.5
-
-        Chart {
-            ForEach(samples) { sample in
-                AreaMark(
-                    x: .value("Time", sample.timestamp),
-                    yStart: .value("lo", lo),
-                    yEnd: .value("temp", sample.value)
-                )
-                .interpolationMethod(.monotone)
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [AgaraColors.temperature.opacity(0.28), AgaraColors.temperature.opacity(0.02)],
-                        startPoint: .top, endPoint: .bottom
-                    )
-                )
-                LineMark(x: .value("Time", sample.timestamp), y: .value("temp", sample.value))
-                    .interpolationMethod(.monotone)
-                    .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
-                    .foregroundStyle(AgaraColors.temperature)
-            }
-        }
-        .chartYScale(domain: lo...hi)
-        .chartXAxis(.hidden)
-        .chartYAxis(.hidden)
-        .chartValueMarker(samples, x: \.timestamp, y: \.value, yLabel: { String(format: "%.1f °C", $0) })
-        .frame(height: height)
-    }
-}
-
-// MARK: - SpO2 dots (Vitals)
-
-struct SpO2DotsChart: View {
-    let samples: [MetricSample]
-    var height: CGFloat = 150
-
-    var body: some View {
-        Chart {
-            ForEach(samples) { sample in
-                LineMark(x: .value("Time", sample.timestamp), y: .value("spo2", sample.value))
-                    .interpolationMethod(.monotone)
-                    .lineStyle(StrokeStyle(lineWidth: 1))
-                    .foregroundStyle(AgaraColors.spo2.opacity(0.25))
-                PointMark(x: .value("Time", sample.timestamp), y: .value("spo2", sample.value))
-                    .symbolSize(34)
-                    .foregroundStyle(AgaraColors.spo2)
-            }
-        }
-        .chartYScale(domain: 90...100)
-        .chartXAxis(.hidden)
-        .chartYAxis(.hidden)
-        .chartValueMarker(samples, x: \.timestamp, y: \.value, yLabel: { "\(Int($0)) %" })
-        .frame(height: height)
-    }
-}
-
-// MARK: - Step bars (Activity)
-
-struct StepBarsChart: View {
-    let values: [Double]
-    var labels: [String] = []
-    var goal: Double?
-    var todayIndex: Int?
-    var height: CGFloat = 160
-
-    var body: some View {
-        Chart {
-            ForEach(Array(values.enumerated()), id: \.offset) { index, value in
-                BarMark(
-                    x: .value("label", labels.indices.contains(index) ? labels[index] : "\(index)"),
-                    y: .value("steps", value),
-                    width: .automatic
-                )
-                .clipShape(UnevenRoundedRectangle(topLeadingRadius: 6, topTrailingRadius: 6))
-                .foregroundStyle(AgaraColors.steps.opacity(todayIndex == index ? 1 : 0.55))
-            }
-            if let goal {
-                RuleMark(y: .value("goal", goal))
-                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                    .foregroundStyle(AgaraColors.textMuted.opacity(0.6))
-            }
-        }
-        .chartYAxis(.hidden)
-        .chartXAxis {
-            AxisMarks { _ in
-                AxisValueLabel().font(AgaraFont.micro.weight(.regular)).foregroundStyle(AgaraColors.textMuted)
-            }
-        }
-        .chartValueMarker(
-            values.enumerated().map {
-                (labels.indices.contains($0.offset) ? labels[$0.offset] : "\($0.offset)", $0.element)
-            },
-            yLabel: { "\(Int($0)) steps" }
-        )
-        .frame(height: height)
-    }
-}
-
-// MARK: - Distance line (Activity)
-
-struct DistanceLineChart: View {
-    let values: [Double]
-    var height: CGFloat = 150
-
-    var body: some View {
-        let hi = (values.max() ?? 1) + 0.5
-        Chart {
-            ForEach(Array(values.enumerated()), id: \.offset) { index, value in
-                LineMark(x: .value("i", index), y: .value("km", value))
-                    .interpolationMethod(.monotone)
-                    .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
-                    .foregroundStyle(AgaraColors.distance)
-            }
-        }
-        .chartYScale(domain: 0...max(hi, 0.5))
-        .chartXAxis(.hidden)
-        .chartYAxis(.hidden)
-        .chartValueMarker(values, xLabel: { "Day \($0 + 1)" }, yLabel: { String(format: "%.2f km", $0) })
-        .frame(height: height)
-    }
-}
-
-// MARK: - Calories area (Activity)
-
-struct CaloriesAreaChart: View {
-    let values: [Double]
-    var height: CGFloat = 150
-
-    var body: some View {
-        let hi = (values.max() ?? 0) + 50
-        Chart {
-            ForEach(Array(values.enumerated()), id: \.offset) { index, value in
-                AreaMark(x: .value("i", index), y: .value("kcal", value))
-                    .interpolationMethod(.monotone)
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [AgaraColors.calories.opacity(0.45), AgaraColors.calories.opacity(0)],
-                            startPoint: .top, endPoint: .bottom
-                        )
-                    )
-                LineMark(x: .value("i", index), y: .value("kcal", value))
-                    .interpolationMethod(.monotone)
-                    .lineStyle(StrokeStyle(lineWidth: 2))
-                    .foregroundStyle(AgaraColors.calories)
-            }
-        }
-        .chartYScale(domain: 0...max(hi, 50))
-        .chartXAxis(.hidden)
-        .chartYAxis(.hidden)
-        .chartValueMarker(values, xLabel: { "Day \($0 + 1)" }, yLabel: { "\(Int($0)) kcal" })
-        .frame(height: height)
-    }
-}
-
 // MARK: - Elevation profile (workout summary)
 
 /// Altitude over the course of a route. X is point index (route progression),
@@ -327,7 +35,14 @@ struct ElevationAreaChart: View {
     var body: some View {
         let lo = (altitudes.min() ?? 0) - 2
         let hi = (altitudes.max() ?? 0) + 2
-        Chart {
+        AgaraChart(
+            points: altitudes.enumerated().map { AgaraChartPoint(x: $0.offset, y: $0.element) },
+            height: height,
+            empty: AgaraChartEmpty(text: "No elevation recorded.", minimumPoints: 2),
+            accessibilityTitle: "Elevation profile",
+            valueLabel: { "\(Int($0)) m" },
+            xLabel: { "Point \($0 + 1)" }
+        ) {
             ForEach(Array(altitudes.enumerated()), id: \.offset) { index, value in
                 AreaMark(x: .value("i", index), y: .value("m", value))
                     .interpolationMethod(.monotone)
@@ -346,8 +61,6 @@ struct ElevationAreaChart: View {
         .chartYScale(domain: lo...max(hi, lo + 1))
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)
-        .chartValueMarker(altitudes, xLabel: { "Point \($0 + 1)" }, yLabel: { "\(Int($0)) m" })
-        .frame(height: height)
     }
 }
 
@@ -370,7 +83,7 @@ struct SleepDurationHistogramChart: View {
     let bars: [SleepBar]
     var goalMin: Int?
     var slim: Bool = false
-    /// Called with the tapped bar's index when the caller wants the chart to be interactive.
+    /// Called with the tapped bar's index (through `AgaraChart`'s tap) — the Sleep screen opens that night.
     var onSelect: ((Int) -> Void)? = nil
     var barWidth: CGFloat? = nil
     var weekBars: Bool = false
@@ -390,7 +103,23 @@ struct SleepDurationHistogramChart: View {
         let showKeys: [String] = stride(from: 0, to: bars.count, by: interval).map { "\($0):\(bars[$0].label)" }
         let w: MarkDimension = weekBars ? .ratio(0.7) : (barWidth.map { .fixed($0) } ?? (slim ? .fixed(7) : .automatic))
         let r: CGFloat = (slim || weekBars) ? 3 : 6
-        Chart {
+        // Scrub/tooltip points: the tracked bars only (a placeholder has no value to show).
+        let points: [AgaraChartPoint<String>] = indexed.compactMap { index, bar in
+            guard bar.present, let duration = bar.durationMin else { return nil }
+            return AgaraChartPoint(x: "\(index):\(bar.label)", y: Double(duration),
+                                   valueText: SleepFormat.duration(duration), detailText: bar.label)
+        }
+        AgaraChart(
+            points: points,
+            height: height,
+            empty: AgaraChartEmpty(text: "No sleep recorded in this period.", minimumPoints: 0),
+            accessibilityTitle: "Sleep duration chart",
+            valueLabel: { SleepFormat.duration(Int($0)) },
+            xLabel: { key in key.split(separator: ":").last.map(String.init) ?? key },
+            onSelect: onSelect.map { select in
+                { key in if let index = Int(key.split(separator: ":").first ?? "") { select(index) } }
+            }
+        ) {
             ForEach(indexed, id: \.0) { index, bar in
                 let key = "\(index):\(bar.label)"
                 if bar.present, let duration = bar.durationMin {
@@ -438,7 +167,6 @@ struct SleepDurationHistogramChart: View {
         .chartPlotStyle { plot in
             plot.padding(.horizontal, weekBars ? 0 : 4)
         }
-        .frame(height: height)
         .padding(8)
         .agaraGlass(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
