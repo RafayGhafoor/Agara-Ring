@@ -81,7 +81,7 @@ enum AgaraFeature: String, CaseIterable {
     case measureLipids = "measure_lipids"
     /// On-demand blood-glucose test (89 01, standard mode) in the measure hub.
     case measureGlucose = "measure_glucose"
-    /// The ring's automatic-measurement schedule (b3) — read and show; editing comes later.
+    /// Auto-measure schedule screen (read b3 + write b3 01 per metric, ack + read-back). Built on both apps 2026-09-26; emulator E2E on both; real-ring write check pending.
     case autoMeasureSettings = "auto_measure_settings"
     /// Send height, weight, age, sex and step/sleep goals to the ring (a3).
     case profileSync = "profile_sync"
@@ -135,7 +135,7 @@ enum AgaraFeature: String, CaseIterable {
         case .bloodComponents: return false
         case .measureLipids: return false
         case .measureGlucose: return false
-        case .autoMeasureSettings: return false
+        case .autoMeasureSettings: return true
         case .profileSync: return false
         case .firmwareCheck: return false
         case .firmwareDownload: return false
