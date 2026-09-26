@@ -118,7 +118,7 @@ final class MeasurementServiceTests: XCTestCase {
         let titles = recorder.posted.map(\.content.title)
         XCTAssertEqual(titles.first, AgaraCopy.notificationMeasuringTitle)
         XCTAssertEqual(titles.last, AgaraCopy.notificationMeasuredTitle)
-        XCTAssertEqual(recorder.posted.last?.content.body, "Blood Oxygen: 97 %")
+        XCTAssertEqual(recorder.posted.last?.content.body, "Blood oxygen: 97 %")
         // Progress and result share one id, so the result replaces "Measuring…".
         XCTAssertEqual(Set(recorder.posted.map(\.identifier)), [AgaraNotification.measurementId])
         XCTAssertEqual(AgaraNotifications.deepLink(from: recorder.posted.last!.content.userInfo), .measure)

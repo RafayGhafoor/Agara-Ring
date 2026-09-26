@@ -6,16 +6,18 @@ import SwiftUI
 /// the clock, the ring — and adding a sixth metric is a matter of answering these questions once,
 /// rather than threading a new case through the middle of the state machine.
 extension MeasurementSheet.Kind {
+    /// Sentence case, like Android's `MeasurementSpec.title` — the one source for the Measure tile, the sheet,
+    /// the status pill and the notification (polish spec item 2).
     var title: String {
         switch self {
-        case .hr: return "Heart Rate"
-        case .spo2: return "Blood Oxygen"
-        case .hrv: return "Heart Rate Variability"
-        case .bloodPressure: return "Blood Pressure"
+        case .hr: return "Heart rate"
+        case .spo2: return "Blood oxygen"
+        case .hrv: return "Heart rate variability"
+        case .bloodPressure: return "Blood pressure"
         case .vitals: return "Vitals"
         case .stress: return "Stress"
-        case .glucose: return "Blood Glucose"
-        case .bloodComponents: return "Blood Components"
+        case .glucose: return "Blood glucose"
+        case .bloodComponents: return "Blood components"
         }
     }
 

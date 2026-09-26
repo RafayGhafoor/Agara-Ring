@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// About (consistency framework phase 5): a hero (logo, product name, tagline), the real version from the bundle
-/// ("1.0.0 (1)" — tap it 7× to unlock Developer), the brand description, an icon row for the social links and a
+/// About (consistency framework phase 5): a hero (the AGARA wordmark, product name, tagline), the real version from the bundle
+/// ("1.0.0 (1)" — tap it 7× to unlock Developer), the brand description, an icon row for the social links (tinted squares with captions) and a
 /// contact row (email, phone), then the licences as small secondary text behind a "Licences" row and a small
 /// upstream credit. All copy and links come from `docs/strings/brand.yaml` (`AgaraCopy`); an empty link hides
 /// its icon.
@@ -99,12 +99,21 @@ struct AboutSettingsView: View {
                     }
                 }
                 if !Self.socialLinks.isEmpty {
-                    HStack(spacing: 18) {
+                    // Accent-soft rounded squares with the accent glyph and a caption (polish spec item 1).
+                    HStack(alignment: .top, spacing: 22) {
                         ForEach(Self.socialLinks) { link in
                             Link(destination: link.url) {
-                                IconTile(systemName: link.systemImage, style: .neutral, size: .large)
+                                VStack(spacing: 6) {
+                                    IconTile(systemName: link.systemImage, style: .accent, size: .hero)
+                                    Text(link.label)
+                                        .font(AgaraFont.caption)
+                                        .foregroundStyle(AgaraColors.textSecondary)
+                                }
                             }
+                            .buttonStyle(.plain)
+                            .accessibilityElement(children: .ignore)
                             .accessibilityLabel(link.label)
+                            .accessibilityAddTraits(.isLink)
                             .accessibilityIdentifier("about.social.\(link.id)")
                         }
                     }
@@ -178,12 +187,15 @@ struct AboutSettingsView: View {
 
     private var hero: some View {
         VStack(spacing: 10) {
-            Image("agara-logo")
+            // The same wordmark as the app header (dark type on light themes, white on dark ones), like Android.
+            Image(ThemeStore.current.isLight ? "agara-wordmark-dark" : "agara-wordmark")
                 .resizable()
                 .scaledToFit()
-                .frame(width: 88, height: 88)
-                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .frame(height: 22)
+                .padding(.top, 28)
+                .padding(.bottom, 30)
                 .accessibilityHidden(true)
+                .accessibilityIdentifier("about.wordmark")
             Text(AgaraCopy.aboutProductName)
                 .font(AgaraFont.title2.weight(.bold))
                 .foregroundStyle(AgaraColors.textPrimary)

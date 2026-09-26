@@ -69,6 +69,8 @@ final class ConsistencyPhase456Tests: XCTestCase {
         XCTAssertEqual(AutoMeasure.intervals(for: hr), [30, 60, 90, 120, 150, 180, 210, 240])
         XCTAssertTrue(AutoMeasure.isShortest(30, for: hr))
         XCTAssertFalse(AutoMeasure.isShortest(60, for: hr))
+        XCTAssertEqual(AutoMeasure.optionLabel(minutes: 30, for: hr), "30 min · most battery", "polish spec item 3")
+        XCTAssertEqual(AutoMeasure.optionLabel(minutes: 60, for: hr), "1 h")
         let spo2 = entries.first { $0.type == 4 }!
         XCTAssertEqual(AutoMeasure.intervals(for: spo2), [60, 120, 180, 240])
         let lorenz = entries.first { $0.type == 6 }!

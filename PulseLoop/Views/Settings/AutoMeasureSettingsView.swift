@@ -70,9 +70,6 @@ private struct AutoMeasureRow: View {
         case nil: break
         }
         if locked { return "Set by the ring; it can't be changed here." }
-        if entry.enabled && AutoMeasure.isShortest(entry.intervalMinutes, for: entry) {
-            return "The shortest interval uses the most ring battery."
-        }
         return nil
     }
 
@@ -105,10 +102,11 @@ private struct AutoMeasureRow: View {
                                     next.intervalMinutes = minutes
                                     onChange(next)
                                 } label: {
+                                    let option = AutoMeasure.optionLabel(minutes: minutes, for: entry)
                                     if minutes == entry.intervalMinutes {
-                                        Label(AutoMeasure.label(minutes: minutes), systemImage: "checkmark")
+                                        Label(option, systemImage: "checkmark")
                                     } else {
-                                        Text(AutoMeasure.label(minutes: minutes))
+                                        Text(option)
                                     }
                                 }
                             }

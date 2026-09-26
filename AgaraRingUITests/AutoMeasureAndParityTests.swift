@@ -41,9 +41,11 @@ final class AutoMeasureAndParityTests: AgaraUITestCase {
         eventually(timeout: 20, "HR not at the captured 30 min (\(menu.value as? String ?? "-"))") {
             (menu.value as? String) == "30 min"
         }
-        XCTAssertTrue(text(containing: "shortest interval").exists, "30 min is the shortest → battery warning")
+        // Polish spec item 3: the intro explains the battery trade-off once; no row repeats it.
+        XCTAssertTrue(text(containing: "Shorter intervals use more ring battery").exists, "intro paragraph missing")
+        XCTAssertFalse(text(containing: "shortest interval").exists, "no per-row battery warning")
         XCTAssertTrue(element("autoMeasure.locked.6").exists, "the heart-rhythm scatter is read-only")
-        attachScreenshot("auto-measure-before")
+        attachScreenshot("polish-auto-measure")
 
         pickInterval("1 h")
         eventually(timeout: 20, "the ring never confirmed (state \(state(0)))") {
@@ -62,7 +64,8 @@ final class AutoMeasureAndParityTests: AgaraUITestCase {
             (again.value as? String) == "1 h"
         }
 
-        pickInterval("30 min")
+        // The shortest option names its cost in the picker.
+        pickInterval("30 min · most battery")
         eventually(timeout: 20, "restore to 30 min not confirmed") { state(0) == "idle" && (again.value as? String) == "30 min" }
     }
 
@@ -94,7 +97,11 @@ final class AutoMeasureAndParityTests: AgaraUITestCase {
                    "about.contact.email", "about.contact.phone", "about.licences"] {
             XCTAssertTrue(element(id).exists, "\(id) missing")
         }
-        attachScreenshot("about")
+        XCTAssertTrue(element("about.wordmark").exists || element("about.hero").exists)
+        for caption in ["Website", "Instagram", "Telegram"] where element("about.social.\(caption.lowercased())").exists {
+            XCTAssertEqual(element("about.social.\(caption.lowercased())").label, caption, "social link needs its caption/label")
+        }
+        attachScreenshot("polish-about")
         app.buttons["Back"].firstMatch.tap()
 
         openSettingsRow("User Profile")
@@ -113,10 +120,24 @@ final class AutoMeasureAndParityTests: AgaraUITestCase {
         for label in ["Find ring", "Disconnect", "Forget ring"] {
             XCTAssertTrue(app.buttons[label].exists, "\(label) missing from Ring actions")
         }
+        // Polish spec item 4: ring card (with Sync now) → Ring actions → Ring details.
+        let card = element("wearable.ringCard")
+        waitFor(card, "ring card missing")
+        let sync = app.buttons["wearable.syncNow"]
+        let find = app.buttons["Find ring"]
+        let details = text(containing: "RING DETAILS")
+        XCTAssertTrue(sync.exists && details.exists, "Sync now / Ring details missing")
+        XCTAssertLessThan(card.frame.minY, sync.frame.minY, "Sync now sits under the ring card header")
+        XCTAssertLessThan(sync.frame.minY, find.frame.minY, "ring card comes before Ring actions")
+        XCTAssertLessThan(find.frame.minY, details.frame.minY, "Ring actions come before Ring details")
+        attachScreenshot("polish-wearable")
         attachScreenshot("wearable-ring-actions")
         let alerts = element("wearable.batteryAlerts")
         scrollTo(alerts)
         XCTAssertTrue(alerts.exists, "low-battery alert should live on Wearable")
+        let history = text(containing: "BATTERY HISTORY")
+        scrollTo(history)
+        XCTAssertLessThan(alerts.frame.minY, history.frame.minY, "Low-battery alert comes before Battery history")
         XCTAssertFalse(text(containing: "Live heart rate").exists, "live HR toggle is behind live_hr_toggle")
         attachScreenshot("wearable-actions")
     }

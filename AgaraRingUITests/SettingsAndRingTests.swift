@@ -112,12 +112,16 @@ final class SettingsAndRingTests: AgaraUITestCase {
         try launch()
         waitForConnected()
         openWearable()
-        waitFor(app.staticTexts["Connected ring"].exists ? app.staticTexts["Connected ring"] : text(containing: "CONNECTED RING"))
-        for label in ["Device", "Battery", "Firmware", "Last synced"] {
+        // Polish spec item 4: the ring card (name, status, battery, Sync now) leads, then Ring details.
+        waitFor(element("wearable.ringCard"), "ring card missing")
+        XCTAssertTrue(app.buttons["wearable.syncNow"].exists, "Sync now belongs to the ring card")
+        for label in ["RING DETAILS", "Model", "Firmware", "Last synced"] {
             XCTAssertTrue(text(containing: label).waitForExistence(timeout: 20), "\(label) row missing")
         }
-        eventually(timeout: 20, "battery level not shown") {
-            app.staticTexts.matching(NSPredicate(format: "label MATCHES %@", #"\d+%"#)).firstMatch.exists
+        // The battery lives on the ring card, which reads as one accessibility element ("… Battery 92%").
+        let card = element("wearable.ringCard")
+        eventually(timeout: 20, "battery level not shown (\(card.label))") {
+            card.label.range(of: #"Battery \d+%"#, options: .regularExpression) != nil
         }
         attachScreenshot("wearable")
     }
@@ -170,7 +174,7 @@ final class SettingsAndRingTests: AgaraUITestCase {
         attachScreenshot("disconnected")
         let reconnect = app.buttons["Reconnect last ring"]
         waitFor(reconnect, "no Reconnect action").tap()
-        waitFor(text(containing: "Connected ring"), timeout: 30, "did not reconnect")
+        waitFor(element("wearable.ringCard"), timeout: 30, "did not reconnect")
         back()
         waitForConnected()
     }

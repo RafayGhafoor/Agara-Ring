@@ -31,6 +31,15 @@ final class ConsistencyTests: AgaraUITestCase {
         openTab("Vitals")
         waitFor(app.buttons["vitals.measure"], timeout: 30).tap()
         waitFor(app.buttons["measure.tile.heartRate"])
+        // Polish spec item 2: sentence-case labels from the MeasurementSpec title; tiles in a row share one height.
+        XCTAssertTrue(app.buttons["measure.tile.heartRate"].label.hasPrefix("Heart rate,"),
+                      "tile label should be sentence case (\(app.buttons["measure.tile.heartRate"].label))")
+        let components = app.buttons["measure.tile.bloodComponents"]
+        let stress = app.buttons["measure.tile.stress"]
+        if components.exists && stress.exists {
+            XCTAssertEqual(components.frame.height, stress.frame.height, accuracy: 1, "a two-line label must not grow its tile")
+        }
+        attachScreenshot("polish-measure-hub")
         attachScreenshot("measure-hub-icon-tiles")
         app.buttons["measure.tile.heartRate"].tap()
         waitFor(element("measurement.status"), "measurement sheet did not open")
@@ -85,7 +94,7 @@ final class ConsistencyTests: AgaraUITestCase {
         waitFor(disconnectAlert, timeout: 5, "Disconnect did not ask first")
         attachScreenshot("confirm-disconnect")
         disconnectAlert.buttons["Cancel"].tap()
-        XCTAssertTrue(text(containing: "Connected ring").waitForExistence(timeout: 5), "Cancel must keep the ring connected")
+        XCTAssertTrue(element("wearable.ringCard").waitForExistence(timeout: 5), "Cancel must keep the ring connected")
 
         let forget = app.buttons["Forget ring"]
         scrollTo(forget)
@@ -95,7 +104,7 @@ final class ConsistencyTests: AgaraUITestCase {
         XCTAssertTrue(forgetAlert.buttons["Forget"].exists)
         attachScreenshot("confirm-forget")
         forgetAlert.buttons["Cancel"].tap()
-        XCTAssertTrue(text(containing: "Connected ring").waitForExistence(timeout: 5), "Cancel must keep the ring")
+        XCTAssertTrue(element("wearable.ringCard").waitForExistence(timeout: 5), "Cancel must keep the ring")
     }
 
     // MARK: - AgaraChart (phase 1)

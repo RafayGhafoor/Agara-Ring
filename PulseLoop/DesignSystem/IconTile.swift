@@ -16,12 +16,15 @@ struct IconTile: View {
         case medium
         /// 44 pt — Measure tiles, list rows, cards.
         case large
+        /// 56 pt — hero spots (About's social links). Android's `IconTileSize.LARGE`.
+        case hero
 
         var box: CGFloat {
             switch self {
             case .small: return 28
             case .medium: return 34
             case .large: return 44
+            case .hero: return 56
             }
         }
 
@@ -33,13 +36,17 @@ struct IconTile: View {
             case .small: return 9
             case .medium: return 12
             case .large: return 14
+            case .hero: return 18
             }
         }
     }
 
     enum Style {
-        /// Metric-coloured glyph on a soft wash of the same colour (Measure tiles, workout rows).
-        case tinted(Color)
+        /// Metric-coloured glyph on a soft wash of the same colour (Measure tiles, workout rows). The wash
+        /// opacity matches Android's `backgroundAlpha` (0.14 by default; the Measure tiles use 0.18).
+        case tinted(Color, backgroundOpacity: Double = 0.14)
+        /// Accent glyph on the palette's `accentSoft` (About's social links).
+        case accent
         /// Neutral glass tile with a white glyph (settings rows — the iOS Settings look).
         case neutral
     }
@@ -66,7 +73,8 @@ struct IconTile: View {
 
     private var glyphColor: Color {
         switch style {
-        case .tinted(let tint): return tint
+        case .tinted(let tint, _): return tint
+        case .accent: return AgaraColors.accent
         case .neutral: return AgaraColors.textPrimary
         }
     }
@@ -74,10 +82,14 @@ struct IconTile: View {
     @ViewBuilder
     private var background: some View {
         switch (style, shape) {
-        case (.tinted(let tint), .circle):
-            Circle().fill(tint.opacity(0.14))
-        case (.tinted(let tint), .rounded):
-            RoundedRectangle(cornerRadius: size.cornerRadius, style: .continuous).fill(tint.opacity(0.14))
+        case (.tinted(let tint, let opacity), .circle):
+            Circle().fill(tint.opacity(opacity))
+        case (.tinted(let tint, let opacity), .rounded):
+            RoundedRectangle(cornerRadius: size.cornerRadius, style: .continuous).fill(tint.opacity(opacity))
+        case (.accent, .circle):
+            Circle().fill(AgaraColors.accentSoft)
+        case (.accent, .rounded):
+            RoundedRectangle(cornerRadius: size.cornerRadius, style: .continuous).fill(AgaraColors.accentSoft)
         case (.neutral, _):
             // A light translucent fill with a top sheen — not `glassEffect`, which can't nest inside a glass card.
             let tile = RoundedRectangle(cornerRadius: size.cornerRadius, style: .continuous)

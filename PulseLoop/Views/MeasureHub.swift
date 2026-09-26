@@ -84,24 +84,31 @@ private struct MeasureTile: View {
     private var isChargingHint: String { "Unavailable while the ring charges or another measurement runs." }
 
     var body: some View {
+        let shape = RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous)
         Button(action: action) {
-            VStack(spacing: 8) {
-                // The shared tile: every glyph fitted into the same box (blood pressure used to look taller).
-                IconTile(systemName: kind.symbolName, style: .tinted(kind.tint), size: .large, shape: .circle)
+            // Same recipe as Android's `MeasureTile`: glyph box pinned to the top, two lines reserved for the title
+            // (so "Blood components" wrapping never moves its icon), the duration on the last line.
+            VStack(spacing: 6) {
+                IconTile(systemName: kind.symbolName, style: .tinted(kind.tint, backgroundOpacity: 0.18),
+                         size: .large, shape: .circle)
                 Text(kind.title)
                     .font(AgaraFont.footnote.weight(.semibold))
                     .foregroundStyle(AgaraColors.textPrimary)
                     .multilineTextAlignment(.center)
-                    .lineLimit(2)
+                    .lineLimit(2, reservesSpace: true)
                     .minimumScaleFactor(0.8)
+                Spacer(minLength: 0)
                 Text(running ? "Measuring…" : kind.durationText)
                     .font(AgaraFont.caption)
                     .foregroundStyle(running ? kind.tint : AgaraColors.textMuted)
             }
-            .frame(maxWidth: .infinity, minHeight: 118)
-            .padding(.vertical, 6)
-            .contentShape(RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous))
-            .agaraGlass(RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous), interactive: enabled)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, minHeight: 124, alignment: .top)
+            // Tinted wash + hairline in the metric colour at Android's alphas (0.10 / 0.22).
+            .background(kind.tint.opacity(0.10), in: shape)
+            .overlay(shape.strokeBorder(kind.tint.opacity(0.22), lineWidth: 1))
+            .contentShape(shape)
         }
         .buttonStyle(.plain)
         .disabled(!enabled)

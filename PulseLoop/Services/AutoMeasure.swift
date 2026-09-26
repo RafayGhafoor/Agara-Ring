@@ -37,10 +37,16 @@ enum AutoMeasure {
         !entry.intervalModifiable || entry.stepMinutes <= 0
     }
 
-    /// The shortest interval drains the ring battery fastest — the screen warns on it.
+    /// The shortest interval drains the ring battery fastest — its picker option says so.
     static func isShortest(_ minutes: Int, for entry: AutoMeasureEntry) -> Bool {
         guard let first = intervals(for: entry).first else { return false }
         return minutes <= first
+    }
+
+    /// A picker option: the plain label, with " · most battery" on the shortest interval (polish spec item 3 —
+    /// the screen's intro explains the trade-off once, so no row repeats a warning). Same wording as Android.
+    static func optionLabel(minutes: Int, for entry: AutoMeasureEntry) -> String {
+        isShortest(minutes, for: entry) ? label(minutes: minutes) + " · most battery" : label(minutes: minutes)
     }
 
     /// "30 min" / "1 h" / "1 h 30 min".

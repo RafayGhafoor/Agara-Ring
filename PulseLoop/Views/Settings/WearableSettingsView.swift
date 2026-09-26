@@ -2,8 +2,8 @@ import SwiftUI
 import SwiftData
 import UserNotifications
 
-/// Wearable detail screen: connection state and the ring actions (sync / find / disconnect / forget /
-/// pair). Relocated from the old flat `SettingsView` Ring section.
+/// Wearable detail screen: the ring card (status, battery, Sync now), the ring actions (find / disconnect /
+/// forget / pair), the ring details, auto-measure, battery alerts and history — Android's order. Relocated from the old flat `SettingsView` Ring section.
 struct WearableSettingsView: View {
     @Environment(RingBLEClient.self) private var ble
     @Environment(RingSyncCoordinator.self) private var coordinator
@@ -87,6 +87,61 @@ struct WearableSettingsView: View {
         return Self.relativeFormatter.localizedString(for: date, relativeTo: Date())
     }
 
+    /// "Connected · synced 2 min ago", or the charging line ("Charging · 64 % · Full in ~20 min") on the charger.
+    private var statusLine: String {
+        if charging { return ChargeEstimator.statusLine(percent: batteryPercent, estimate: ble.chargeEstimate) }
+        guard let date = coordinator.lastSyncAt else { return "Connected" }
+        let ago = Date().timeIntervalSince(date) < 60 ? "just now" : Self.relativeFormatter.localizedString(for: date, relativeTo: Date())
+        return "Connected · synced \(ago)"
+    }
+
+    /// The ring card (polish spec item 4, mirrors Android's): glyph, name, status, battery, then Sync now.
+    private var ringCard: some View {
+        SettingsGroup {
+            VStack(spacing: 16) {
+                HStack(spacing: 14) {
+                    RingBatteryGlyph(percent: batteryPercent, dotColor: AgaraColors.success, size: 52, charging: charging)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(ringName)
+                            .font(AgaraFont.title3.weight(.semibold))
+                            .foregroundStyle(AgaraColors.textPrimary)
+                            .lineLimit(1)
+                        HStack(spacing: 4) {
+                            Text(statusLine)
+                                .font(AgaraFont.footnote)
+                                .foregroundStyle(AgaraColors.success)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.75)
+                            if charging, case .fullIn? = ble.chargeEstimate { HelpTip(AgaraHelp.chargingEstimate) }
+                        }
+                    }
+                    Spacer(minLength: 8)
+                    Text(batteryPercent.map { "\($0)%" } ?? "--")
+                        .font(AgaraFont.title3.weight(.semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(charging ? AgaraColors.success
+                                         : batteryPercent.map { BatteryTier(percent: $0).color } ?? AgaraColors.textMuted)
+                        .accessibilityLabel("Battery \(batteryPercent.map { "\($0)%" } ?? "unknown")")
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("wearable.ringCard")
+                Button { coordinator.syncNow() } label: {
+                    Label("Sync now", systemImage: "arrow.triangle.2.circlepath")
+                        .font(AgaraFont.callout.weight(.semibold))
+                        .foregroundStyle(AgaraColors.textPrimary)
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                        .background(AgaraColors.textPrimary.opacity(0.06), in: Capsule())
+                        .overlay(Capsule().strokeBorder(AgaraColors.textPrimary.opacity(0.14), lineWidth: 1))
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("wearable.syncNow")
+            }
+            .padding(16)
+        }
+    }
+
     /// Find ring · Disconnect · Forget in one group (consistency plan B). Disconnect and Forget ask first
     /// (`ConfirmAction`, copy from `brand.yaml`); Forget is the one destructive row.
     private var ringActions: some View {
@@ -141,27 +196,13 @@ struct WearableSettingsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 if ble.state == .connected {
-                    SettingsGroup(header: "Connected ring") {
+                    // Polish spec item 4 (same order as Android): ring card → Ring actions → Ring details →
+                    // Auto-measure → Low-battery alert → Battery history.
+                    ringCard
+                    ringActions
+                    SettingsGroup(header: "Ring details") {
                         nameRow
-                        FormValueRow(title: "Device") { Text(wearableDisplayName).foregroundStyle(AgaraColors.textMuted) }
-                        FormValueRow(title: "Battery") {
-                            if charging {
-                                HStack(spacing: 6) {
-                                    RingBatteryGlyph(percent: batteryPercent, dotColor: nil, size: 22, charging: true)
-                                        .accessibilityHidden(true)
-                                    Text(ChargeEstimator.statusLine(percent: batteryPercent, estimate: ble.chargeEstimate))
-                                        .foregroundStyle(AgaraColors.success)
-                                        .lineLimit(1)
-                                        .minimumScaleFactor(0.75)
-                                    if case .fullIn? = ble.chargeEstimate {
-                                        HelpTip(AgaraHelp.chargingEstimate)
-                                    }
-                                }
-                                .accessibilityElement(children: .combine)
-                            } else {
-                                Text(batteryPercent.map { "\($0)%" } ?? "--").foregroundStyle(AgaraColors.textMuted)
-                            }
-                        }
+                        FormValueRow(title: "Model") { Text(wearableDisplayName).foregroundStyle(AgaraColors.textMuted) }
                         if features.isOn(.firmwareCheck), let firmware = devices.first?.firmwareVersion, !firmware.isEmpty {
                             FirmwareRow(installed: firmware, identity: firmwareIdentity, checker: firmwareChecker)
                         } else if features.isOn(.capabilityProbe), let firmware = devices.first?.firmwareVersion, !firmware.isEmpty {
@@ -169,8 +210,6 @@ struct WearableSettingsView: View {
                         }
                         FormValueRow(title: "Last synced") { Text(lastSyncedLabel).foregroundStyle(AgaraColors.textMuted) }
                     }
-                    ringActions
-                    SecondaryButton(title: "Sync now", systemImage: "arrow.triangle.2.circlepath") { coordinator.syncNow() }
                     if features.isOn(.autoMeasureSettings), !(devices.first?.autoMeasureSchedule.isEmpty ?? true) {
                         SettingsGroup(footer: "How often the ring measures on its own.") {
                             Button { path.append(AppRoute.settingsAutoMeasure) } label: {
@@ -179,8 +218,8 @@ struct WearableSettingsView: View {
                             .buttonStyle(.plain)
                         }
                     }
-                    BatteryHistorySection()
                     RingBatteryAlertToggle()
+                    BatteryHistorySection()
                     // Continuous HR streaming is optional (battery); flag `live_hr_toggle` (iOS only today).
                     if features.isOn(.liveHrToggle), ble.activeDeviceType == .veepoo {
                         SettingsGroup(
