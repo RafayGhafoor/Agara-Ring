@@ -45,6 +45,8 @@ enum AgaraConfig {
         static let findSmoothingS: Int = 2
         static let findTrendWindowS: Int = 4
         static let findTrendThresholdDb: Int = 3
+        static let findBandHysteresisDb: Int = 3
+        static let findHapticHoldMs: Int = 1000
     }
     enum Emulator {
         static let defaultPort: Int = 9909
