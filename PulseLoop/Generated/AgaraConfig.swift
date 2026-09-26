@@ -93,6 +93,34 @@ enum AgaraFeature: String, CaseIterable {
     case firmwareInstall = "firmware_install"
     /// Demo-data rows in Settings (seed/clear demo data). Off in release; debug builds can turn it on via the override (2026-09-26).
     case demoData = "demo_data"
+    /// AI Coach (tab/floating button, cards, check-ins). Was Android AgaraFeatureFlags.COACH (off); iOS showed it.
+    case coach = "coach"
+    /// Coach conversation history (iOS only today; port to Android).
+    case coachHistory = "coach_history"
+    /// Coach check-ins midday slot + anomaly heads-ups (iOS only today).
+    case coachCheckinExtras = "coach_checkin_extras"
+    /// Physiology settings screen. The glucose unit moves to Profile so it stays reachable when this is off.
+    case physiology = "physiology"
+    /// Nutrition (log, barcode, meal photo analysis, Today tile, Activity card). Was Android NUTRITION (off).
+    case nutrition = "nutrition"
+    /// Strava connect + workout upload button. Was Android STRAVA (off).
+    case strava = "strava"
+    /// Agara Cloud sign-in/sync. Was Android AGARA_CLOUD (off); needs a domain + pinning + verified server rules first.
+    case agaraCloud = "agara_cloud"
+    /// Heart-rate zones editor (iOS only today; Android uses automatic zones).
+    case hrZonesEditor = "hr_zones_editor"
+    /// Workout capture preferences screen (iOS only today).
+    case activityTrackingSettings = "activity_tracking_settings"
+    /// Today/Vitals chart resolution setting (iOS only today).
+    case chartResolutionSetting = "chart_resolution_setting"
+    /// Live heart-rate toggle on the Wearable screen (iOS only today).
+    case liveHrToggle = "live_hr_toggle"
+    /// Workout share card (iOS only today).
+    case shareCard = "share_card"
+    /// Recover a workout left running (iOS only today).
+    case staleWorkoutRecovery = "stale_workout_recovery"
+    /// Activity Trends Year range + distance/calories trends (iOS only today; Android has a Steps detail).
+    case activityTrendsYear = "activity_trends_year"
 
     /// The shipped default for each flag.
     var defaultOn: Bool {
@@ -113,6 +141,20 @@ enum AgaraFeature: String, CaseIterable {
         case .firmwareDownload: return false
         case .firmwareInstall: return false
         case .demoData: return false
+        case .coach: return false
+        case .coachHistory: return false
+        case .coachCheckinExtras: return false
+        case .physiology: return false
+        case .nutrition: return false
+        case .strava: return false
+        case .agaraCloud: return false
+        case .hrZonesEditor: return false
+        case .activityTrackingSettings: return false
+        case .chartResolutionSetting: return false
+        case .liveHrToggle: return false
+        case .shareCard: return false
+        case .staleWorkoutRecovery: return false
+        case .activityTrendsYear: return false
         }
     }
 }
