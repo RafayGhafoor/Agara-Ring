@@ -251,6 +251,10 @@ final class RingBLEClient: NSObject {
     func startScanning(mode: ScanMode) {
         #if DEBUG
         // E2E: a deferred virtual ring (`-virtualRingOnPair YES`) "is found" by the scan and connects.
+        // Pairing it is a fresh start, like `connect(to:)` for a real ring: full history download.
+        if mode == .pairing, VirtualRingLink.configuredPort != nil {
+            SyncPlanStore.shared.reset(ring: Self.virtualHistoryRingID)
+        }
         if VirtualRingLink.shared.attachDeferredIfNeeded() {
             lastError = nil
             state = .scanning
@@ -345,6 +349,8 @@ final class RingBLEClient: NSObject {
             lastError = "Ring no longer available; scan again."
             return
         }
+        // A pairing is a fresh start: this ring's next pass downloads every day in full (`SyncPlan`).
+        SyncPlanStore.shared.reset(ring: id.uuidString)
         // Use the matched device type from discovery if we have it.
         let discoveredRing = discovered.first { $0.id == id }
         beginConnect(
@@ -423,6 +429,7 @@ final class RingBLEClient: NSObject {
         UserDefaults.standard.removeObject(forKey: Self.lastDeviceTypeKey)
         UserDefaults.standard.removeObject(forKey: Self.lastWearableModelKey)
         UserDefaults.standard.removeObject(forKey: Self.lastCapabilitiesKey)   // a new ring must not inherit the old one's claims
+        SyncPlanStore.shared.resetAll()   // a later pairing starts with a full history download
         activeDeviceType = nil
         activeWearableModelID = nil
         activeCapabilities = []
@@ -779,6 +786,18 @@ extension RingBLEClient: RingCommandWriter {
         #endif
         return deviceIdentifier
     }
+    var historyRingID: String? {
+        #if DEBUG
+        if virtualFrameSink != nil { return Self.virtualHistoryRingID }
+        #endif
+        return deviceIdentifier
+    }
+    #if DEBUG
+    /// The emulator socket's ledger identity: one per port, since each emulator serves its own data.
+    static var virtualHistoryRingID: String {
+        "\(SleepSource.virtualTransport):\(VirtualRingLink.configuredPort.map(String.init) ?? "?")"
+    }
+    #endif
     /// Drivers / sync engines enqueue logical commands through this seam; framing is applied in
     /// `enqueueWrite`.
     func enqueue(_ command: Data) {

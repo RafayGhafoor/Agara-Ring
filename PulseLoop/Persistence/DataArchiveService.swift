@@ -381,6 +381,7 @@ enum DataArchiveService {
         try deleteAll(CachedFoodProduct.self, context)
         try deleteAll(MeasurementDeletion.self, context)
         ReadingDeletion.invalidate()
+        SyncPlanStore.shared.resetAll()   // nothing is stored any more: the next pass downloads every day
     }
 
     private static func deleteAll<T: PersistentModel>(_ type: T.Type, _ context: ModelContext) throws {

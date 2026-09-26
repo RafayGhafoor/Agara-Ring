@@ -86,16 +86,18 @@ enum CoachContextBuilder {
             peakHrToday: summary.peakHeartRateToday
         )
 
-        let sleep = summary.sleep.map { s -> CoachContextPacket.SleepContext in
-            CoachContextPacket.SleepContext(
+        let sleep = summary.sleepDay.map { day -> CoachContextPacket.SleepContext in
+            let s = day.main
+            return CoachContextPacket.SleepContext(
                 date: localDate(s.session.date),
-                totalMin: s.session.totalMinutes,
+                totalMin: day.totalMinutes,
                 deepMin: s.deepMinutes,
                 lightMin: s.lightMinutes,
                 awakeMin: s.awakeMinutes,
                 score: s.session.score,
                 confidence: "medium",
-                decoderNote: DataQualityAnalyzer.sleepDecoderNote
+                decoderNote: DataQualityAnalyzer.sleepDecoderNote,
+                napMin: day.naps.isEmpty ? nil : day.napMinutes
             )
         }
 

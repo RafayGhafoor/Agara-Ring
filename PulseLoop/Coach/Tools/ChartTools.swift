@@ -74,7 +74,11 @@ enum ChartTools {
     }
 
     private static func sleepStagePoints(start: String, end: String, context: ModelContext) -> [CoachChartPoint] {
-        guard let session = CoachDataAccess.sleepSessions(start: start, end: end, context: context).last else { return [] }
+        // The last day's main sleep (`SleepDayRule`), not whichever session happens to be last (a nap).
+        let sessions = CoachDataAccess.sleepSessions(start: start, end: end, context: context)
+        guard let lastDay = sessions.last?.date,
+              let session = SleepDayRule.split(sessions.filter { Calendar.current.isDate($0.date, inSameDayAs: lastDay) },
+                                               minutes: { $0.totalMinutes }, start: { $0.startAt })?.main else { return [] }
         return SleepRepository.blocks(sessionId: session.id, context: context)
             .sorted { $0.startMinute < $1.startMinute }
             .map { CoachChartPoint(x: String($0.startMinute), y: Double($0.durationMinutes), series: $0.stage.rawValue) }

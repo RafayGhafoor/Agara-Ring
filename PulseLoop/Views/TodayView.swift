@@ -255,7 +255,7 @@ struct TodayView: View {
                 }
             }
         case .sleep:
-            SleepTileView(sleep: store.summary.sleep) { selectedTab = .sleep }
+            SleepTileView(day: store.summary.sleepDay) { selectedTab = .sleep }
         case .heartRate: chartTile(store, .heartRate, physiology)
         case .spo2: chartTile(store, .spo2, physiology, showPoints: true)
         case .hrv: chartTile(store, .hrv, physiology)
@@ -402,7 +402,7 @@ enum TodayInsights {
         let hrStr = today.latestHeartRate.map { "\(Int($0.value)) bpm" } ?? "—"
         let summaryText = today.sleep == nil
             ? "You're at \(steps.formatted()) steps. Sync after waking to add recovery context."
-            : "You're at \(steps.formatted()) steps, \(SleepFormat.duration(today.sleep!.session.totalMinutes)) of sleep, and your latest reading is \(hrStr)."
+            : "You're at \(steps.formatted()) steps, \(SleepFormat.duration(today.sleepDay!.totalMinutes)) of sleep, and your latest reading is \(hrStr)."
 
         let stepsTone: ChipTone = stepsDelta > 5 ? .up : stepsDelta < -5 ? .down : .neutral
         let hrTone: ChipTone = today.latestHeartRate == nil ? .warn : (today.latestHeartRate!.value < 100 ? .neutral : .warn)

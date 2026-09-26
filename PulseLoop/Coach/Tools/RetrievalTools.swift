@@ -52,7 +52,10 @@ enum RetrievalTools {
             let row = CoachDataAccess.activityRow(on: day, context: ctx.modelContext)
             let hr = CoachDataAccess.measurements(kind: .heartRate, start: day, end: day, context: ctx.modelContext).map(\.value)
             let spo2 = CoachDataAccess.measurements(kind: .spo2, start: day, end: day, context: ctx.modelContext).map(\.value)
-            let sleep = CoachDataAccess.sleepSessions(start: day, end: day, context: ctx.modelContext).first
+            // `SleepDayRule`: the day's main sleep (longest session) with the naps added to its total.
+            let sleepSplit = SleepDayRule.split(CoachDataAccess.sleepSessions(start: day, end: day, context: ctx.modelContext),
+                                                minutes: { $0.totalMinutes }, start: { $0.startAt })
+            let sleep = sleepSplit?.main
 
             var result: [String: Any] = ["date": day, "data_available": (row != nil || !hr.isEmpty || sleep != nil)]
             if let row {
@@ -64,9 +67,10 @@ enum RetrievalTools {
             }
             result["hr"] = encodeStats(CoachDataAccess.stats(hr))
             result["spo2"] = encodeStats(CoachDataAccess.stats(spo2))
-            if let sleep {
+            if let sleep, let naps = sleepSplit?.naps {
+                let napMin = naps.reduce(0) { $0 + max(0, $1.totalMinutes) }
                 result["sleep"] = [
-                    "total_min": sleep.totalMinutes, "score": sleep.score as Any,
+                    "total_min": max(0, sleep.totalMinutes) + napMin, "nap_min": napMin, "score": sleep.score as Any,
                     "confidence": "medium", "note": "experimental decoder (no REM)",
                 ]
             }

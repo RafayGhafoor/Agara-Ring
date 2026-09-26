@@ -328,6 +328,7 @@ enum SeedData {
 
     @MainActor
     static func clearAll(_ context: ModelContext) {
+        SyncPlanStore.shared.resetAll()   // the history ledger must not claim days that are gone
         deleteAll(Device.self, context)
         deleteAll(ActivityDaily.self, context)
         deleteAll(Measurement.self, context)

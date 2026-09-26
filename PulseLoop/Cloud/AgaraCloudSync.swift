@@ -231,13 +231,19 @@ final class AgaraCloudSync {
     /// Aggregate the sleeping-day's stage blocks into the durations the cloud record carries. Only the
     /// displayed sessions count (the paired ring's night, `SleepSourcePolicy`), and `quality` is the stored
     /// score — the one the Sleep tab shows (D1). It used to be 0 on iOS because nothing wrote `score`.
+    ///
+    /// `SleepDayRule` (same as Android): the night window and score are the **main sleep's** (the longest session —
+    /// this used to take the earliest one); the stage minutes are summed over the main sleep **and its naps**, so
+    /// the record's total carries the naps too.
     static func sleepSummary(for day: Date, context: ModelContext) -> (startAt: Date, endAt: Date, deep: Int, light: Int, awake: Int, other: Int, quality: Int)? {
         let calendar = Calendar.current
         let sessions = SleepRepository.sessions(context: context)
             .filter { calendar.isDate($0.date, inSameDayAs: day) }
-        guard let session = sessions.min(by: { $0.startAt < $1.startAt }) else { return nil }
+        guard let split = SleepDayRule.split(sessions, minutes: { $0.totalMinutes }, start: { $0.startAt }) else { return nil }
+        let session = split.main
+        let ids = Set(sessions.map(\.id))
         let blocks = (try? context.fetch(FetchDescriptor<SleepStageBlock>()))?
-            .filter { $0.sessionId == session.id } ?? []
+            .filter { ids.contains($0.sessionId) } ?? []
         var deep = 0, light = 0, awake = 0, other = 0
         for block in blocks {
             switch block.stage {

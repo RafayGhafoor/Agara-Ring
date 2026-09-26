@@ -11,6 +11,11 @@ protocol RingCommandWriter: AnyObject {
     /// source's revisions from another source's night. The peripheral UUID on BLE; the debug socket
     /// transport reports `SleepSource.virtualTransport`. Defaults to `deviceIdentifier`.
     var connectionSource: String? { get }
+    /// The identity the history `SyncPlan` ledger is kept under (which days of *this* ring are already
+    /// stored). The peripheral UUID on BLE; the emulator socket adds its port, so two emulators with different
+    /// data never share a ledger. Nil = no identity, and every pass downloads every day. Defaults to
+    /// `connectionSource`.
+    var historyRingID: String? { get }
     func enqueue(_ command: Data)
     /// Completes when the GATT write is acknowledged (or accepted by the without-response buffer).
     func enqueueTracked(_ command: Data, completion: @escaping @MainActor (Result<Void, Error>) -> Void)
@@ -21,6 +26,7 @@ protocol RingCommandWriter: AnyObject {
 extension RingCommandWriter {
     var deviceIdentifier: String? { nil }
     var connectionSource: String? { deviceIdentifier }
+    var historyRingID: String? { connectionSource }
     func enqueueTracked(_ command: Data, completion: @escaping @MainActor (Result<Void, Error>) -> Void) {
         enqueue(command)
         completion(.success(()))

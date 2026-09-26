@@ -126,9 +126,12 @@ struct WidgetSleepPayload: Codable {
         var label: String
     }
 
+    /// The day's asleep total (main sleep + naps, `SleepDayRule`).
     var durationText: String
     var score: Int
     var segments: [Segment]
+    /// "+ nap 40 m" when the day had naps. Optional so snapshots written before it still decode.
+    var napText: String? = nil
 }
 
 // MARK: - Vitals metric (chart / gauge / BP tiles)

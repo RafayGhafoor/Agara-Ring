@@ -91,6 +91,7 @@ struct CoachContextPacket: Encodable {
 
     struct SleepContext: Encodable {
         var date: String
+        /// The day's asleep total (`SleepDayRule`: main sleep + naps); the stage minutes are the main sleep's.
         var totalMin: Int
         var deepMin: Int
         var lightMin: Int
@@ -98,6 +99,8 @@ struct CoachContextPacket: Encodable {
         var score: Int?
         var confidence: String
         var decoderNote: String
+        /// Minutes of the day's naps (included in `totalMin`); nil when there were none.
+        var napMin: Int? = nil
     }
 
     struct WorkoutContext: Encodable {

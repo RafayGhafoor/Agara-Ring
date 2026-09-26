@@ -228,25 +228,39 @@ struct NutritionTileView: View {
 
 // MARK: - Sleep tile (duration + stage distribution bar + score)
 
-/// A single stacked bar of proportional deep/light/REM/awake segments (sleep-page colors), the total
-/// sleep duration above it, and the sleep score below. No percentages or per-segment labels — the
-/// bar reads distribution at a glance.
+/// A single stacked bar of proportional deep/light/REM/awake segments (sleep-page colors), the day's
+/// asleep total above it (main sleep + naps, `SleepDayRule`, with a "+ nap 40 m" line when there was one),
+/// and the main sleep's score below. No percentages or per-segment labels — the bar reads distribution at
+/// a glance.
 struct SleepTileView: View {
-    let sleep: SleepSummary?
+    let day: SleepDay?
     var onTap: () -> Void
 
     var body: some View {
         TodayTile(label: "Sleep", color: AgaraColors.sleep, onTap: onTap) {
-            if let sleep {
+            if let day {
+                let sleep = day.main
                 let stages = SleepStageDistribution(sleep)
                 let score = SleepScore.calculate(sleep).score
                 VStack(alignment: .leading, spacing: 10) {
-                    Text(SleepFormat.duration(sleep.session.totalMinutes))
-                        .font(AgaraFont.greeting)
-                        .monospacedDigit()
-                        .foregroundStyle(AgaraColors.textPrimary)
-                        .minimumScaleFactor(0.7)
-                        .lineLimit(1)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(SleepFormat.duration(day.totalMinutes))
+                            .font(AgaraFont.greeting)
+                            .monospacedDigit()
+                            .foregroundStyle(AgaraColors.textPrimary)
+                            .minimumScaleFactor(0.7)
+                            .lineLimit(1)
+                            .accessibilityIdentifier("today.sleep.total")
+                        if let nap = day.napCaption {
+                            Text(nap)
+                                .font(AgaraFont.caption)
+                                .monospacedDigit()
+                                .foregroundStyle(AgaraColors.textMuted)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                                .accessibilityIdentifier("today.sleep.nap")
+                        }
+                    }
                     SleepStageBar(segments: stages.segments)
                         .frame(height: 24)
                     HStack(alignment: .firstTextBaseline, spacing: 5) {

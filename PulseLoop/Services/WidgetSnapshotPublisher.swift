@@ -159,7 +159,7 @@ final class WidgetSnapshotPublisher {
             generatedAt: Date(),
             dayStart: Calendar.current.startOfDay(for: Date()),
             activity: activityPayload(summary, units: units),
-            sleep: sleepPayload(summary.sleep),
+            sleep: sleepPayload(summary.sleepDay),
             metrics: metrics,
             nutrition: nutritionPayload(summary)
         )
@@ -228,15 +228,18 @@ final class WidgetSnapshotPublisher {
     }
 
     /// Replicates `SleepTileView`'s derivations (stage distribution, score, duration formatting).
-    private func sleepPayload(_ sleep: SleepSummary?) -> WidgetSleepPayload? {
-        guard let sleep else { return nil }
+    /// The day's total (`SleepDayRule`) and nap line; stages and score from the main sleep.
+    private func sleepPayload(_ day: SleepDay?) -> WidgetSleepPayload? {
+        guard let day else { return nil }
+        let sleep = day.main
         let stages = SleepStageDistribution(sleep)
         return WidgetSleepPayload(
-            durationText: SleepFormat.duration(sleep.session.totalMinutes),
+            durationText: SleepFormat.duration(day.totalMinutes),
             score: SleepScore.calculate(sleep).score,
             segments: stages.segments.map {
                 WidgetSleepPayload.Segment(minutes: $0.minutes, colorHex: Self.hexString($0.color), label: $0.label)
-            }
+            },
+            napText: day.napCaption
         )
     }
 

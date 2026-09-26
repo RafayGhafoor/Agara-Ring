@@ -251,12 +251,21 @@ struct WidgetSleepContent: View {
     var body: some View {
         if let payload, !rolledOver {
             VStack(alignment: .leading, spacing: 10) {
-                Text(payload.durationText)
-                    .font(AgaraFont.face(30, .semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(AgaraColors.textPrimary)
-                    .minimumScaleFactor(0.7)
-                    .lineLimit(1)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(payload.durationText)
+                        .font(AgaraFont.face(30, .semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(AgaraColors.textPrimary)
+                        .minimumScaleFactor(0.7)
+                        .lineLimit(1)
+                    if let nap = payload.napText {
+                        Text(nap)
+                            .font(AgaraFont.face(12, .medium))
+                            .monospacedDigit()
+                            .foregroundStyle(AgaraColors.textMuted)
+                            .lineLimit(1)
+                    }
+                }
                 SleepStageBar(segments: payload.segments.map {
                     SleepStageSegment(minutes: $0.minutes, color: Color(hex: $0.colorHex), label: $0.label)
                 })

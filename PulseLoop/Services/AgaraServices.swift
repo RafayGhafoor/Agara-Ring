@@ -37,7 +37,8 @@ enum MetricsService {
         let calibration = calibrationState(device: device, activityRows: activityRows, isDemo: isDemo, context: context)
         let hrFreshness = freshness(lastUpdatedAt: latestHR?.timestamp, isDemo: isDemo)
         let spo2Freshness = freshness(lastUpdatedAt: latestSpO2?.timestamp, isDemo: isDemo)
-        let sleep = SleepService.latestSleep(context: context)
+        let sleepDay = SleepService.latestSleepDay(context: context)
+        let sleep = sleepDay?.main
         let goals = goalsSummary(context: context)
         let profileValues = MetricsProfileValues(profile: ProfileRepository.profile(context: context))
         let trends = TrendsSummary(
@@ -74,7 +75,7 @@ enum MetricsService {
             latestSpO2: valueIsFresh(spo2Freshness) ? latestSpO2 : nil,
             restingHeartRateEstimate: restingHeartRate(samples: hrSamples),
             peakHeartRateToday: hrSamples.map(\.value).max(),
-            sleep: sleep,
+            sleepDay: sleepDay,
             batteryPercent: device?.batteryPercent ?? 0,
             deviceState: device?.state ?? .idle,
             trends: trends,
@@ -676,24 +677,39 @@ extension Calendar {
 
 @MainActor
 enum SleepService {
+    /// The main sleep of the latest sleep day (`latestSleepDay`).
     static func latestSleep(context: ModelContext) -> SleepSummary? {
-        guard let session = SleepRepository.latestSession(context: context) else { return nil }
-        // Gate on *today* so the Today screen only shows a recent night; a session more than a
-        // day old (with nothing newer) is hidden rather than shown as if it were last night.
-        let staleCutoff = Calendar.current.date(byAdding: .day, value: -1, to: Calendar.current.startOfDay(for: Date())) ?? Date()
-        guard Calendar.current.startOfDay(for: session.date) >= staleCutoff else { return nil }
-        return summary(for: session, includeStages: true, context: context)
+        latestSleepDay(context: context)?.main
     }
-    
+
+    /// "Last night": the waking day of the newest session, by `SleepDayRule` (main sleep = the longest, naps
+    /// add to the total). Gated on *today* so Today only shows a recent night; a day more than a day old (with
+    /// nothing newer) is hidden rather than shown as if it were last night.
+    static func latestSleepDay(context: ModelContext, now: Date = Date()) -> SleepDay? {
+        let calendar = Calendar.current
+        let sessions = SleepRepository.sessions(context: context)
+        guard let latest = sessions.max(by: { $0.startAt < $1.startAt }) else { return nil }
+        let staleCutoff = calendar.date(byAdding: .day, value: -1, to: calendar.startOfDay(for: now)) ?? now
+        guard calendar.startOfDay(for: latest.date) >= staleCutoff else { return nil }
+        return sleepDay(sessions.filter { calendar.isDate($0.date, inSameDayAs: latest.date) }, context: context)
+    }
+
+    /// The sleep day stored under `date` (its waking day), by `SleepDayRule`.
+    static func sleepDay(for date: Date, context: ModelContext) -> SleepDay? {
+        let calendar = Calendar.current
+        let sessions = SleepRepository.sessions(context: context).filter { calendar.isDate($0.date, inSameDayAs: date) }
+        return sleepDay(sessions, context: context)
+    }
+
+    private static func sleepDay(_ sessions: [SleepSession], context: ModelContext) -> SleepDay? {
+        guard !sessions.isEmpty else { return nil }
+        let blocks = SleepRepository.blocks(sessionIds: sessions.map(\.id), context: context)
+        return SleepDay(sessions: sessions.map { summary(session: $0, blocks: blocks[$0.id] ?? []) })
+    }
+
+    /// The main sleep of `date` (`SleepDayRule`) — single-session callers show the night, not a nap.
     static func sleepForDate(_ date: Date, context: ModelContext) -> SleepSummary? {
-        let start = Calendar.current.startOfDay(for: date)
-        // A day can now hold several sessions (night + naps). Surface the main sleep —
-        // the longest — so single-session callers (Today card) show the night, not a nap.
-        let session = SleepRepository.sessions(context: context)
-            .filter { Calendar.current.isDate($0.date, inSameDayAs: start) }
-            .max { $0.totalMinutes < $1.totalMinutes }
-        guard let session else { return nil }
-        return summary(for: session, includeStages: true, context: context)
+        sleepDay(for: date, context: context)?.main
     }
     
     static func sleepRange(_ range: SleepRangeKey, context: ModelContext, now: Date = Date()) -> SleepRangeSummary {

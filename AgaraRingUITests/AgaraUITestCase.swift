@@ -12,6 +12,8 @@ import XCTest
 /// | `E2E_OTA_PORT`    | ring on firmware 00.12.07 that is offered 00.12.09             |
 /// | `E2E_OTA_HTTP`    | that emulator's fake vendor version server                     |
 /// | `E2E_CHG_PORT`    | ring sitting on its charger (`--charging`)                     |
+/// | `E2E_NAP_PORT`    | ring with a night + a 40-min nap per day (`--sleep-sessions 2`) |
+/// | `E2E_NAP_LOG`     | that emulator's log file (the DF requests it served)           |
 ///
 /// A variable that isn't set skips the tests that need that emulator, rather than failing them.
 class AgaraUITestCase: XCTestCase {

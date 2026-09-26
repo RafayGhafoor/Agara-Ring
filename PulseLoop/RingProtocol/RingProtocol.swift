@@ -26,6 +26,9 @@ struct SyncDayProgress: Equatable, Sendable {
     let day: Int
     let totalDays: Int
     var counts: SyncDayCounts?
+    /// The pass's day offsets in order (`SyncPlan`) — day 0 plus the past days not yet complete. Nil means
+    /// `0..<totalDays`.
+    var days: [Int]? = nil
 }
 
 enum RingDecodedEvent: Sendable {

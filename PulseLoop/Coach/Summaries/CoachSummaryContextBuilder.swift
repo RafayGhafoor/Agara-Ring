@@ -56,27 +56,30 @@ enum CoachSummaryContextBuilder {
     static func sleepDay(context: ModelContext, now: Date = Date(),
                          environment: CoachContextPacket.EnvironmentContext? = nil) -> Built? {
         let range = SleepService.sleepRange(.day, context: context, now: now)
-        guard let night = SleepInsights.validSessions(range.sessions).last else { return nil }
+        // `SleepDayRule`: the main sleep is the day's longest session (a nap after the night used to be `.last`);
+        // naps count toward the total.
+        guard let day = SleepDay(sessions: SleepInsights.validSessions(range.sessions)) else { return nil }
+        let night = day.main
         let score = SleepScore.calculate(night)
         let activitySteps = MetricsRepository.latestActivity(context: context)?.steps
         let memories = CoachContextBuilder.build(context: context, now: now).memories
 
         struct Packet: Encodable {
-            let date: String, totalMin: Int, deepMin: Int, lightMin: Int, awakeMin: Int
+            let date: String, totalMin: Int, napMin: Int?, deepMin: Int, lightMin: Int, awakeMin: Int
             let score: Int, scoreLabel: String, awakePct: Int?, deepPct: Int, activitySteps: Int?
             let memories: [CoachContextPacket.MemoryContext]
             let environment: CoachContextPacket.EnvironmentContext?
         }
         let p = Packet(
             date: CoachDataAccess.localDateString(night.session.date),
-            totalMin: night.session.totalMinutes, deepMin: night.deepMinutes,
+            totalMin: day.totalMinutes, napMin: day.naps.isEmpty ? nil : day.napMinutes, deepMin: night.deepMinutes,
             lightMin: night.lightMinutes, awakeMin: night.awakeMinutes,
             score: score.score, scoreLabel: score.label.rawValue, awakePct: score.awakePct,
             deepPct: score.deepPct, activitySteps: activitySteps, memories: memories,
             environment: environment
         )
         let sig = signature([
-            String(night.session.totalMinutes), String(night.deepMinutes),
+            String(day.totalMinutes), String(night.deepMinutes),
             String(night.lightMinutes), String(night.awakeMinutes), String(score.score),
         ])
         let coach = SleepInsights.dayCoach(night, score: score.score, awakePct: score.awakePct,

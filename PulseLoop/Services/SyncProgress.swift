@@ -82,7 +82,7 @@ final class SyncProgress {
 
     func apply(_ progress: SyncDayProgress) {
         if progress.counts == nil, progress.day == 0 || !isSyncing {
-            beginPass(totalDays: progress.totalDays)
+            beginPass(days: progress.days ?? Array(0..<max(0, progress.totalDays)))
         }
         guard let index = rows.firstIndex(where: { $0.day == progress.day }) else { return }
         if let counts = progress.counts {
@@ -94,10 +94,12 @@ final class SyncProgress {
         }
     }
 
-    private func beginPass(totalDays: Int) {
+    /// A pass over `days` (its `SyncPlan`: day 0 plus the past days not yet stored) — a normal refresh is
+    /// just today, so the header reads "Day 1 of 1".
+    private func beginPass(days: [Int]) {
         let today = calendar.startOfDay(for: now())
-        self.totalDays = totalDays
-        rows = (0..<max(0, totalDays)).map { day in
+        self.totalDays = days.count
+        rows = days.map { day in
             DayRow(day: day, date: calendar.date(byAdding: .day, value: -day, to: today) ?? today,
                    status: .pending, counts: SyncDayCounts())
         }

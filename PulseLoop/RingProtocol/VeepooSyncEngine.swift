@@ -14,9 +14,10 @@ import Foundation
 ///
 /// ## The day loop
 ///
-/// For each day 0…`historyDays`-1: write E0 `<day>` and wait until the sleep transfer completes —
-/// either its last-page marker (`E0 00 <sessions>`) or its no-data marker (`E0 ?? 00`) — then write
-/// `DF 01 00 <day>` (position 1 of that day — `DF <posLo> <posHi> <day>`) and wait for the `DF FF FF` end marker, then move on. Both completions were
+/// For each day of the pass's `SyncPlan` (day 0, then every past day not yet complete for this ring): write
+/// E0 `<day>` and wait until the sleep transfer completes — either its last-page marker (`E0 00 <sessions>`)
+/// or its no-data marker (`E0 ?? 00`) — then write `DF <posLo> <posHi> <day>` (position 1 for a whole day,
+/// `last stored + 1` to resume today) and wait for the `DF FF FF` end marker, then move on. Both completions were
 /// observed on hardware: days 0–2 returned sleep, days 3–6 replied no-data immediately, and the DF
 /// transfers for days 1–6 completed empty. A ring that goes silent mid-transfer stalls at that day —
 /// the buffered frames stay put and the next connect re-runs the loop (`connectionDidStart` clears
@@ -41,6 +42,19 @@ final class VeepooSyncEngine: RingSyncEngine {
     private var sleepFrames: [Int: [Int: Data]] = [:]
     /// day → record index (BE16) → part → raw frame, for the DF daily records.
     private var dailyFrames: [Int: [Int: [Int: Data]]] = [:]
+    /// The pass's plan (`SyncPlan`): which days, from which record. `planIndex` is the day in flight.
+    private var plan: [SyncPlan.Day] = []
+    private var planIndex = 0
+    /// The ring and the day the pass started on — the ledger keys (a pass that crosses midnight keeps its dates).
+    private var passRing: String?
+    private var passToday = Date()
+    /// The current day's DF header record count (`total_blocks`) and the record numbers received intact.
+    private var dayTotalBlocks: Int?
+    private var dayRecords: Set<Int> = []
+    /// The per-ring, per-date ledger the plan reads and each finished day updates. Injectable for tests.
+    var syncPlanStore: SyncPlanStore = .shared
+    /// The clock the plan's dates come from. Injectable for tests.
+    var now: () -> Date = Date.init
     /// Live poll timer: refreshes today's totals (D8) and battery (A0) every 30 s, the same rolling
     /// read the python live client (`tools/veepoo_live.py`) performs — but at a cadence the UI can
     /// swallow, with the ~1 Hz FEA1 stream (driver) covering the between-poll movement.
@@ -112,6 +126,10 @@ final class VeepooSyncEngine: RingSyncEngine {
         dailyComplete = false
         sleepFrames.removeAll()
         dailyFrames.removeAll()
+        plan = []
+        planIndex = 0
+        dayTotalBlocks = nil
+        dayRecords = []
         liveStreamStarted = false
         spotTestActive = false
         historyFinished = false
@@ -172,11 +190,37 @@ final class VeepooSyncEngine: RingSyncEngine {
         if isFeatureOn(.autoMeasureSettings) {
             writer?.enqueue(VeepooEncoder.autoMeasureRead())
         }
+        beginPass()
+        startPolling()
+    }
+
+    /// Plan the pass (`SyncPlan`) and ask for its first day — always day 0.
+    private func beginPass() {
+        passRing = writer?.historyRingID
+        passToday = now()
+        let ledger = passRing.map { syncPlanStore.ledger(ring: $0) }
+        plan = SyncPlan.make(historyDays: historyDays, today: passToday, calendar: decoder.calendar, ledger: ledger).days
+        planIndex = 0
+        currentDay = plan.first?.offset ?? 0
+        sleepComplete = false
+        dailyComplete = false
+        sleepFrames.removeAll()
+        dailyFrames.removeAll()
+        dayTotalBlocks = nil
+        dayRecords = []
+        #if DEBUG
+        E2ETrace.log("history plan: " + plan.map { "day \($0.offset) from \($0.position)" }.joined(separator: ", ")
+                     + " of \(historyDays) (ring \(passRing ?? "none"))")
+        #endif
         historyInFlight = true
         lastProgressTick = pollTick
-        beginHistoryDay(0)
-        requestHistory(VeepooEncoder.sleepHistory(dayOffset: 0))
-        startPolling()
+        beginHistoryDay(currentDay)
+        requestHistory(VeepooEncoder.sleepHistory(dayOffset: currentDay))
+    }
+
+    /// The DF position the current day is asked from.
+    private var currentPosition: Int {
+        plan.indices.contains(planIndex) ? plan[planIndex].position : 1
     }
 
     // MARK: Live polling (D8 / A0)
@@ -221,7 +265,7 @@ final class VeepooSyncEngine: RingSyncEngine {
         if !sleepComplete {
             completeSleepTransfer()
         } else if !dailyComplete {
-            completeDailyTransfer()
+            completeDailyTransfer(endMarker: false)
         }
     }
 
@@ -274,7 +318,7 @@ final class VeepooSyncEngine: RingSyncEngine {
         sleepComplete = true
         lastProgressTick = pollTick
         emitSleepSummary()
-        requestHistory(VeepooEncoder.dailyHistory(dayOffset: currentDay))
+        requestHistory(VeepooEncoder.dailyHistory(dayOffset: currentDay, position: currentPosition))
     }
 
     /// Send the day loop's next request — or hold it while a spot HR test runs (`spotHeartRateActive`).
@@ -327,7 +371,7 @@ final class VeepooSyncEngine: RingSyncEngine {
         // request's transfer) arriving during the sleep phase used to complete the day without its
         // records ever being asked for; on 2026-09-25 that skipped days 1–6 in 0.6 s (Android capture).
         if data[1] == 0xFF, data[2] == 0xFF {
-            if sleepComplete, !dailyComplete { completeDailyTransfer() }
+            if sleepComplete, !dailyComplete { completeDailyTransfer(endMarker: true) }
             return
         }
         guard data.count >= 4 else { return }
@@ -335,16 +379,24 @@ final class VeepooSyncEngine: RingSyncEngine {
         // offset — this matters for full 288-record days. Do not regress.
         let recordIndex = (Int(data[1]) << 8) | Int(data[2])
         let part = Int(data[3])
+        // Part 00 is the record header; bytes 4–5 (LE) are the day's record count (`total_blocks`).
+        if part == 0, data.count >= 6 {
+            let total = Int(data[4]) | (Int(data[5]) << 8)
+            dayTotalBlocks = max(dayTotalBlocks ?? 0, total)
+        }
         dailyFrames[currentDay, default: [:]][recordIndex, default: [:]][part] = data
     }
 
-    private func completeDailyTransfer() {
+    private func completeDailyTransfer(endMarker: Bool) {
         dailyComplete = true
         lastProgressTick = pollTick
         emitDailyRecords()
-        writer?.emit(.historyDayProgress(SyncDayProgress(day: currentDay, totalDays: historyDays, counts: dayCounts)))
-        currentDay += 1
-        if currentDay < historyDays {
+        recordDayInLedger(endMarker: endMarker)
+        writer?.emit(.historyDayProgress(SyncDayProgress(day: currentDay, totalDays: plan.count, counts: dayCounts,
+                                                         days: plan.map(\.offset))))
+        planIndex += 1
+        if planIndex < plan.count {
+            currentDay = plan[planIndex].offset
             // Reset the per-day phases before asking for the next day. Without this, `sleepComplete`
             // stays true from the previous day, so that day's sleep completion marker (or its no-data
             // marker) is ignored and the loop only advances via the 30 s stall watchdog — the whole
@@ -354,6 +406,8 @@ final class VeepooSyncEngine: RingSyncEngine {
             dailyComplete = false
             sleepFrames.removeAll()
             dailyFrames.removeAll()
+            dayTotalBlocks = nil
+            dayRecords = []
             beginHistoryDay(currentDay)
             requestHistory(VeepooEncoder.sleepHistory(dayOffset: currentDay))
         } else {
@@ -377,6 +431,8 @@ final class VeepooSyncEngine: RingSyncEngine {
             case .checksumMismatch: corrupt += 1; continue
             }
             guard let record = decoder.dailyRecord(payload: payload) else { continue }
+            // The SDK's record number (LE of bytes 1–2) — what a resume position counts in.
+            dayRecords.insert((index >> 8) | ((index & 0xFF) << 8))
             dayCounts.steps += record.steps
             dayCounts.heartRate += record.heartRates.filter { $0 > 0 }.count
             dayCounts.spo2 += record.oxygen.filter { $0 > 0 }.count
@@ -621,26 +677,34 @@ final class VeepooSyncEngine: RingSyncEngine {
         // A pass already in flight is not restarted: re-sending `E0 00` mid-transfer makes the ring serve
         // day 0 again, and that transfer's end marker lands in the middle of the new pass.
         guard authenticated, !historyInFlight, !FirmwareUpdateHold.active else { return }
-        currentDay = 0
-        sleepComplete = false
-        dailyComplete = false
-        sleepFrames.removeAll()
-        dailyFrames.removeAll()
         // Stop the live stream for the pass — but not under a spot HR test, whose samples ride the same
         // stream: the pass starts paused instead and the test's own stop ends the stream.
         if liveStreamStarted, !spotHeartRateActive {
             liveStreamStarted = false
             writer?.enqueue(VeepooEncoder.heartRateStop())
         }
-        historyInFlight = true
-        lastProgressTick = pollTick
-        beginHistoryDay(0)
-        requestHistory(VeepooEncoder.sleepHistory(dayOffset: 0))
+        beginPass()
     }
 
     /// Reset the day's counts and say the day started (`SyncProgress` shows it as "syncing").
     private func beginHistoryDay(_ day: Int) {
         dayCounts = SyncDayCounts()
-        writer?.emit(.historyDayProgress(SyncDayProgress(day: day, totalDays: historyDays)))
+        writer?.emit(.historyDayProgress(SyncDayProgress(day: day, totalDays: plan.count, days: plan.map(\.offset))))
+    }
+
+    /// Remember what this day brought down (`SyncPlan.record`), so a closed past day is skipped next time and
+    /// today resumes after the unbroken run of stored records. Nothing is kept for a link without an identity.
+    private func recordDayInLedger(endMarker: Bool) {
+        guard let ring = passRing else { return }
+        let date = SyncPlan.dateKey(offset: currentDay, today: passToday, calendar: decoder.calendar)
+        let state = SyncPlan.record(syncPlanStore.state(ring: ring, date: date), offset: currentDay,
+                                    position: currentPosition, records: dayRecords,
+                                    totalBlocks: dayTotalBlocks, endMarker: endMarker)
+        syncPlanStore.set(state, ring: ring, date: date, today: passToday, calendar: decoder.calendar)
+        #if DEBUG
+        E2ETrace.log("history day \(currentDay) (\(date)) from \(currentPosition): \(dayRecords.count) records, "
+                     + "total \(dayTotalBlocks.map(String.init) ?? "-"), stored through \(state.storedThrough), "
+                     + (state.complete ? "complete" : "open"))
+        #endif
     }
 }

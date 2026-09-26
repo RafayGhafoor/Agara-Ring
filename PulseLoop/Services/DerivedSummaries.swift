@@ -177,6 +177,57 @@ struct SleepSummary {
     }
 }
 
+/// The one sleep-day rule (owner feedback 2026-09-26; AGENTS.md Rule 10), identical on Android: of a waking
+/// day's sessions the **main sleep is the longest** (usually the night; ties go to the earlier start), and every
+/// other session is a **nap** whose minutes add to the day's asleep total. Today, the widgets, the coach and the
+/// cloud upload all read "last night's sleep" through this rule, so none of them shows the first session or the
+/// last one by accident.
+enum SleepDayRule {
+    /// Split a day's sessions into the main sleep and its naps (chronological). Nil for no sessions.
+    static func split<T>(_ sessions: [T], minutes: (T) -> Int, start: (T) -> Date) -> (main: T, naps: [T])? {
+        let ordered = sessions.sorted { start($0) < start($1) }
+        guard var mainIndex = ordered.indices.first else { return nil }
+        for index in ordered.indices where minutes(ordered[index]) > minutes(ordered[mainIndex]) {
+            mainIndex = index
+        }
+        var naps = ordered
+        let main = naps.remove(at: mainIndex)
+        return (main, naps)
+    }
+
+    /// "+ nap 40 m", "+ 2 naps 1h 10m" — the Today tile's nap line (same strings as Android's `SleepDay.napCaption`).
+    static func napCaption(count: Int, minutes: Int) -> String? {
+        guard count > 0, minutes > 0 else { return nil }
+        let duration = minutes < 60 ? "\(minutes) m" : "\(minutes / 60)h \(minutes % 60)m"
+        return count == 1 ? "+ nap \(duration)" : "+ \(count) naps \(duration)"
+    }
+}
+
+/// One waking day's sleep by `SleepDayRule`: the main sleep (stages, score, bounds) plus the naps, whose minutes
+/// count toward `totalMinutes`.
+struct SleepDay {
+    let main: SleepSummary
+    let naps: [SleepSummary]
+
+    init(main: SleepSummary, naps: [SleepSummary] = []) {
+        self.main = main
+        self.naps = naps
+    }
+
+    /// Nil for no sessions.
+    init?(sessions: [SleepSummary]) {
+        guard let split = SleepDayRule.split(sessions, minutes: { $0.session.totalMinutes },
+                                             start: { $0.session.startAt }) else { return nil }
+        self.init(main: split.main, naps: split.naps)
+    }
+
+    var date: Date { main.session.date }
+    var napMinutes: Int { naps.reduce(0) { $0 + max(0, $1.session.totalMinutes) } }
+    /// The day's asleep total: the main sleep plus every nap.
+    var totalMinutes: Int { max(0, main.session.totalMinutes) + napMinutes }
+    var napCaption: String? { SleepDayRule.napCaption(count: naps.count, minutes: napMinutes) }
+}
+
 struct SleepRangeSummary {
     let range: SleepRangeKey
     let start: Date
@@ -277,7 +328,8 @@ struct TodaySummary {
     var latestSpO2: LatestReading?
     var restingHeartRateEstimate: Double?
     var peakHeartRateToday: Double?
-    var sleep: SleepSummary?
+    /// Last night's sleep day (`SleepDayRule`): the main sleep plus the day's naps.
+    var sleepDay: SleepDay?
     var batteryPercent: Int?
     var deviceState: RingConnectionState
     var trends: TrendsSummary
@@ -289,4 +341,6 @@ struct TodaySummary {
     var nutrition: NutritionDayTotals? = nil
 
     var sevenDaySteps: [DailyMetricPoint] { trends.steps7d }
+    /// The main sleep of `sleepDay` — stages, score and bounds come from it.
+    var sleep: SleepSummary? { sleepDay?.main }
 }
