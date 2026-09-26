@@ -91,6 +91,8 @@ enum AgaraFeature: String, CaseIterable {
     case firmwareDownload = "firmware_download"
     /// Flash firmware to the ring (Bluetrum AB-OTA on F003). Built on Android (2026-09-25; emulator suite + one real ring 00.12.07→00.12.09); iOS pending. Debug-only override.
     case firmwareInstall = "firmware_install"
+    /// Demo-data rows in Settings (seed/clear demo data). Off in release; debug builds can turn it on via the override (2026-09-26).
+    case demoData = "demo_data"
 
     /// The shipped default for each flag.
     var defaultOn: Bool {
@@ -110,6 +112,7 @@ enum AgaraFeature: String, CaseIterable {
         case .firmwareCheck: return false
         case .firmwareDownload: return false
         case .firmwareInstall: return false
+        case .demoData: return false
         }
     }
 }
