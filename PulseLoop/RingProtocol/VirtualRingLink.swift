@@ -249,6 +249,26 @@ final class VirtualRingLink {
         })
     }
 
+    // MARK: Signal strength (Find ring)
+
+    /// Receives the emulator's `RSSI <dBm>` replies (the socket has no radio; the emulator scripts the signal with
+    /// `--rssi` / `--rssi-walk`). Set by `VirtualRingSignalSource`.
+    var onRSSI: ((Int) -> Void)?
+
+    /// Ask the emulator for the current signal strength with a plain `RSSI` line. No-op while the link is down — the
+    /// silence is what makes the screen go "Out of range", like a real ring walking out of reach.
+    func requestRSSI() {
+        guard isAttached, let connection else { return }
+        connection.send(content: Data("RSSI\n".utf8), completion: .contentProcessed { _ in })
+    }
+
+    /// `RSSI -63` → -63; nil for anything else.
+    static func parseRSSI(_ line: String) -> Int? {
+        let parts = line.split(separator: " ")
+        guard parts.count == 2, parts[0] == "RSSI" else { return nil }
+        return Int(parts[1])
+    }
+
     // MARK: Internals
 
     /// A callback from the connection of `generation`; ignored when a newer `attach` replaced it.
@@ -347,6 +367,10 @@ final class VirtualRingLink {
 
     private func deliver(line: Data) {
         guard let text = String(data: line, encoding: .utf8) else { return }
+        if let dbm = Self.parseRSSI(text) {
+            onRSSI?(dbm)
+            return
+        }
         let parts = text.split(separator: " ")
         guard parts.count == 3, parts[0] == "N" else { return }
         guard let bytes = Self.hexBytes(String(parts[2])) else {

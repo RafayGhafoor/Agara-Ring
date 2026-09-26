@@ -295,6 +295,7 @@ final class RingBLEClient: NSObject {
                                         options: [CBCentralManagerScanOptionAllowDuplicatesKey: false])
         case .stop:
             state = .idle
+            resumeProximityScanIfNeeded()
         }
     }
 
@@ -310,6 +311,52 @@ final class RingBLEClient: NSObject {
         scanTimeoutTask = nil
         central?.stopScan()
         if state == .scanning { state = .idle }
+        resumeProximityScanIfNeeded()
+    }
+
+    // MARK: Signal strength (Find ring, `RingSignalSource`)
+
+    /// Receives every signal-strength reading while Find ring is open: the connected link's RSSI
+    /// (`readLinkRSSI` → `peripheral(_:didReadRSSI:error:)`) and, while disconnected, the known ring's advertisements.
+    @ObservationIgnored private var signalListener: ((Int) -> Void)?
+    /// The ring the proximity scan looks for (nil: no proximity scan).
+    @ObservationIgnored private var proximityScanTarget: UUID?
+
+    func setSignalListener(_ listener: ((Int) -> Void)?) { signalListener = listener }
+
+    /// Ask CoreBluetooth for the connected link's RSSI; false when there is no connected peripheral.
+    @discardableResult
+    func readLinkRSSI() -> Bool {
+        guard state == .connected, let peripheral, peripheral.state == .connected else { return false }
+        peripheral.readRSSI()
+        return true
+    }
+
+    /// Scan for the known ring's advertisements (FEE7-filtered, duplicates on, so every advertisement carries a fresh
+    /// RSSI). Leaves `state` alone — it runs beside the client's reconnect logic. No-op when already scanning for it.
+    func startProximityScan() {
+        guard isBluetoothReady, let target = lastKnownIdentifier ?? peripheral?.identifier else { return }
+        guard proximityScanTarget != target else { return }
+        proximityScanTarget = target
+        if state != .scanning { applyProximityScan() }
+    }
+
+    func stopProximityScan() {
+        guard proximityScanTarget != nil else { return }
+        proximityScanTarget = nil
+        if state != .scanning { central?.stopScan() }
+    }
+
+    var isProximityScanning: Bool { proximityScanTarget != nil }
+
+    private func applyProximityScan() {
+        central?.scanForPeripherals(withServices: [Self.ringAdvertisedService],
+                                    options: [CBCentralManagerScanOptionAllowDuplicatesKey: true])
+    }
+
+    /// A pairing/reconnect scan ended (it replaced the proximity scan's parameters): put the proximity scan back.
+    private func resumeProximityScanIfNeeded() {
+        if proximityScanTarget != nil, state != .scanning { applyProximityScan() }
     }
 
     // MARK: Reconnect backoff
@@ -1105,6 +1152,11 @@ extension RingBLEClient: CBCentralManagerDelegate {
         rssi RSSI: NSNumber
     ) {
         MainActor.assumeIsolated {
+            // Find ring: the known ring's advertisement strength while the link is down.
+            if let target = proximityScanTarget, peripheral.identifier == target {
+                signalListener?(RSSI.intValue)
+                if state != .scanning { return }
+            }
             // Reconnect scan: the known ring showed up — connect to it and stop looking.
             if scanMode == .reconnect, state == .scanning, peripheral.identifier == lastKnownIdentifier {
                 stopScanning()
@@ -1384,6 +1436,14 @@ extension RingBLEClient: CBPeripheralDelegate {
             writeInFlight = false
             completion?(error.map { .failure($0) } ?? .success(()))
             pumpWrites()
+        }
+    }
+
+    /// The connected link's signal strength (`readLinkRSSI`), for Find ring.
+    nonisolated func peripheral(_ peripheral: CBPeripheral, didReadRSSI RSSI: NSNumber, error: Error?) {
+        MainActor.assumeIsolated {
+            guard error == nil, self.peripheral?.identifier == peripheral.identifier else { return }
+            signalListener?(RSSI.intValue)
         }
     }
 

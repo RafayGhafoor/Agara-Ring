@@ -14,6 +14,8 @@ import XCTest
 /// | `E2E_CHG_PORT`    | ring sitting on its charger (`--charging`)                     |
 /// | `E2E_NAP_PORT`    | ring with a night + a 40-min nap per day (`--sleep-sessions 2`) |
 /// | `E2E_NAP_LOG`     | that emulator's log file (the DF requests it served)           |
+/// | `E2E_FIND_PORT`   | ring whose signal walks far → near (`--rssi-walk far-to-near:20`) |
+/// | `E2E_FIND_LOG`    | that emulator's log file (the find-device frames it received)  |
 ///
 /// A variable that isn't set skips the tests that need that emulator, rather than failing them.
 class AgaraUITestCase: XCTestCase {
@@ -22,6 +24,7 @@ class AgaraUITestCase: XCTestCase {
         "capability_probe", "measure_stress", "charging_state", "find_ring", "vitals_respiration",
         "vitals_met", "vitals_cardiac_load", "blood_components", "measure_lipids", "measure_glucose",
         "auto_measure_settings", "profile_sync", "firmware_check", "firmware_download", "firmware_install",
+        "find_ring_proximity",
     ].map { "\($0)=on" }.joined(separator: ",")
 
     var app: XCUIApplication!
@@ -51,6 +54,34 @@ class AgaraUITestCase: XCTestCase {
             throw XCTSkip("\(key) not set — run through tools/e2e_ios.sh (TEST_RUNNER_\(key)=<port>)")
         }
         return value
+    }
+
+    // MARK: - Emulator logs
+
+    /// The path of an emulator log the runner hands in (e.g. `E2E_FIND_LOG`), or skip.
+    func emulatorLogPath(_ key: String) throws -> String {
+        guard let path = ProcessInfo.processInfo.environment[key], !path.isEmpty else {
+            throw XCTSkip("\(key) not set — run through tools/e2e_ios.sh")
+        }
+        return path
+    }
+
+    /// The log's text from byte `offset` on (pass `emulatorLogSize` taken earlier to see only what happened since).
+    func emulatorLog(_ path: String, from offset: Int = 0) -> String {
+        guard let data = FileManager.default.contents(atPath: path), data.count > offset else { return "" }
+        return String(decoding: data.dropFirst(offset), as: UTF8.self)
+    }
+
+    func emulatorLogSize(_ path: String) -> Int { FileManager.default.contents(atPath: path)?.count ?? 0 }
+
+    /// Open Wearable › Ring actions › Find ring (the proximity screen) and wait for it.
+    func openFindRing(file: StaticString = #filePath, line: UInt = #line) {
+        waitFor(app.buttons["ringChip"], file: file, line: line).tap()
+        waitFor(app.staticTexts["Wearable"], "Wearable screen missing", file: file, line: line)
+        let find = app.buttons["Find ring"]
+        scrollTo(find)
+        waitFor(find, "Find ring missing (flag find_ring_proximity)", file: file, line: line).tap()
+        waitFor(app.staticTexts["findRing.band"], timeout: 10, "Find ring screen did not open", file: file, line: line)
     }
 
     // MARK: - Launch

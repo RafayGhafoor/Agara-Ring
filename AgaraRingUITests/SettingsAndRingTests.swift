@@ -146,18 +146,28 @@ final class SettingsAndRingTests: AgaraUITestCase {
         eventually(timeout: 10, "chip does not use the new name") { app.buttons["ringChip"].label.contains("E2E Ring") }
     }
 
+    /// Find ring's vibrate: Wearable › Find ring opens the proximity screen; "Make it vibrate" sends `b5 0a` and
+    /// "Stop" `b5 0b`, read from the find emulator's log (`E2E_FIND_LOG`). The band walk is `FindRingTests`.
     func testFindRing() throws {
-        try launch()
+        let log = try emulatorLogPath("E2E_FIND_LOG")
+        try launch(portKey: "E2E_FIND_PORT")
         waitForConnected()
-        openWearable()
-        let find = app.buttons["Find ring"]
-        scrollTo(find)
-        waitFor(find, "Find ring missing (flag / capability)").tap()
-        // While the ring vibrates the button turns into Stop; it reverts by itself after ~10 s.
-        let stop = app.buttons["Stop"]
+        let since = emulatorLogSize(log)
+        openFindRing()
+        let vibrate = app.buttons["findRing.vibrate"]
+        waitFor(vibrate, "Make it vibrate missing (flag / capability)").tap()
+        eventually(timeout: 10, "emulator never received b5 0a") {
+            let text = emulatorLog(log, from: since)
+            return text.contains("find device: vibrating") && text.contains("b50a")
+        }
+        let stop = app.buttons["findRing.stop"]
         waitFor(stop, timeout: 5, "Find ring did not start")
         stop.tap()
-        waitFor(find, timeout: 15, "Find ring did not stop")
+        eventually(timeout: 10, "emulator never received b5 0b") {
+            let text = emulatorLog(log, from: since)
+            return text.contains("find device: stopped") && text.contains("b50b")
+        }
+        waitFor(vibrate, timeout: 5, "Find ring did not stop")
     }
 
     func testDisconnectAndReconnect() throws {

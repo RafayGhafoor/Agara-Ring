@@ -14,6 +14,8 @@ struct WearableSettingsView: View {
     /// Disconnect / Forget awaiting confirmation (`ConfirmAction`, the one confirmation component).
     @State private var confirm: ConfirmAction?
     @State private var firmwareChecker = FirmwareUpdateChecker.shared
+    /// Find ring's proximity screen is up (flag `find_ring_proximity`).
+    @State private var showsFindRing = false
 
     /// The firmware-update lookup key, from the ring's persisted `a1` identity (nil until a connect saw it).
     private var firmwareIdentity: FirmwareIdentity? {
@@ -146,7 +148,12 @@ struct WearableSettingsView: View {
     /// (`ConfirmAction`, copy from `brand.yaml`); Forget is the one destructive row.
     private var ringActions: some View {
         SettingsGroup(header: "Ring actions") {
-            if canFindRing {
+            if features.isOn(.findRingProximity) {
+                // The proximity screen; it vibrates the ring only on its own "Make it vibrate" button.
+                Button { showsFindRing = true } label: { ringActionLabel("Find ring", systemImage: "dot.radiowaves.left.and.right") }
+                    .buttonStyle(.plain)
+                    .accessibilityHint(AgaraCopy.findRingHint)
+            } else if canFindRing {
                 // The ring vibrates for up to 10 s; tap again to stop it sooner.
                 if coordinator.isFindingRing {
                     Button { coordinator.stopFindingRing() } label: { ringActionLabel("Stop", systemImage: "stop.fill") }
@@ -250,6 +257,11 @@ struct WearableSettingsView: View {
         .pageChrome("Wearable")
         // Same copy as Android's confirmation (audit batch A #24) — now in `ConfirmAction.forgetRing`.
         .confirmAction($confirm)
+        .fullScreenCover(isPresented: $showsFindRing) {
+            FindRingView(canVibrate: canFindRing)
+                .environment(ble)
+                .environment(coordinator)
+        }
         .sheet(isPresented: $showsRename) {
             RenameRingSheet(
                 initialText: RingNickname.prefill(identifier: ble.deviceIdentifier, row: devices.first),
