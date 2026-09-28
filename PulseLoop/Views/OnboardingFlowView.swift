@@ -248,7 +248,7 @@ struct OnboardingWelcomeView: View {
     }
 
     private func logo(size: CGFloat) -> some View {
-        Image(ThemeStore.current.isLight ? "agara-wordmark-dark" : "agara-wordmark")
+        Image("agara-badge")
             .resizable()
             .scaledToFit()
             .frame(width: size, height: size)
