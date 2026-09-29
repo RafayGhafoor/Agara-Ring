@@ -6,6 +6,7 @@
 	<array>
 		<string>com.pulseloop.coach.refresh</string>
 		<string>com.pulseloop.coach.process</string>
+		<string>com.agara.ring.cloudsync</string>
 	</array>
 	<key>CFBundleDisplayName</key>
 	<string>Agara Ring</string>
@@ -18,6 +19,7 @@
 	<array>
 		<string>location</string>
 		<string>bluetooth-central</string>
+		<string>fetch</string>
 	</array>
 </dict>
 </plist>

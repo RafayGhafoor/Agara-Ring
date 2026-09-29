@@ -217,6 +217,8 @@ struct AgaraApp: App {
         // Daily check-in notifications: route taps + register the background wake.
         UNUserNotificationCenter.current().delegate = notificationDelegate
         let ctx = container.mainContext
+        // Agara Cloud background refresh (release 1.1): registered before launch finishes, like the coach's tasks.
+        AgaraCloud.registerBackgroundTask()
         CoachNotificationScheduler.shared.register { syncBudget in
             CoachNotificationService(modelContext: ctx, coordinator: coordinator, syncWaitTimeout: syncBudget)
         }
@@ -243,6 +245,7 @@ struct AgaraApp: App {
             // Flush any batched-but-unsaved ring writes before the app suspends so a mid-sync
             // batch isn't lost.
             if phase != .active { persistence.flush() }
+            if phase == .background, !Self.isRunningUnitTests { AgaraCloud.shared.scheduleBackgroundRefresh() }
             // Republish the widget snapshot at scene edges: leaving-active captures the freshest
             // flushed data before suspension; becoming-active catches Settings edits (goals, units,
             // visibility) that change tiles without bumping the sync token. No-ops when unchanged.

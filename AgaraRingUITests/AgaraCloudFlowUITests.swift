@@ -51,7 +51,7 @@ final class AgaraCloudFlowUITests: AgaraUITestCase {
 
         // 4. The fake backend marks the address verified 3 s after the mail; the auto-poll moves on and the first sync runs.
         waitFor(element("cloud.syncNow"), timeout: 40, "did not reach the signed-in screen after verification")
-        eventually(timeout: 40, "the first sync did not finish") { element("cloud.lastSync").label != "Never" }
+        eventually(timeout: 40, "the first sync did not finish") { element("cloud.lastSync").label != "Not yet" }
         eventually(timeout: 20, "3 of 3 blocks not uploaded") { self.element("cloud.counts").label.contains("3 / 3") }
         XCTAssertTrue(anyElement(labelContains: "reader@example.com").exists)
         attachScreenshot("cloud-4-synced")

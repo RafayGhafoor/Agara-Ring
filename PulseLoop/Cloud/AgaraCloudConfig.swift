@@ -10,6 +10,8 @@ nonisolated struct AgaraCloudConfig: Sendable, Equatable {
     var syncIntervalMinutes: Int
     var retryBackoffSeconds: [Int]
     var verifyPollSeconds: Int
+    /// Opening the app syncs only when the last successful sync is older than this (catalog `cloud_sync_open_min_gap_minutes`).
+    var syncOpenMinGapMinutes = AgaraConfig.Cloud.syncOpenMinGapMinutes
 
     /// Identity Toolkit and Secure Token hosts. Overridable only so tests can pin them; production uses Google's.
     var identityToolkitBase = URL(string: "https://identitytoolkit.googleapis.com")!

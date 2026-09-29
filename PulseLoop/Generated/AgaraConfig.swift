@@ -6,17 +6,14 @@ import Foundation
 /// Regenerate with `python3 tools/gen_shared.py` (add `--check` in CI).
 enum AgaraConfig {
     enum Cloud {
-        static let baseUrl: String = "https://pb.213-136-82-93.sslip.io"
-        static let healthDaysCollection: String = "health_days"
-        static let measurementsCollection: String = "measurements"
-        static let pushDays: Int = 90
-        static let pushMaxMeasurements: Int = 5000
         static let v2BaseUrl: String = "https://api.agaralife.com"
-        static let firebaseApiKey: String = ""
-        static let firebaseProjectId: String = ""
-        static let syncIntervalMinutes: Int = 60
+        static let firebaseApiKey: String = "AIzaSyAOXtPXDpaDFMSBhY7Ya6Ch3lrhEaYxv1c"
+        static let firebaseProjectId: String = "agara-ring-app"
+        static let syncIntervalMinutes: Int = 120
         static let syncRetryBackoffSeconds: String = "30,120,600,1800"
         static let verifyPollSeconds: Int = 5
+        static let resendCooldownSeconds: Int = 60
+        static let syncOpenMinGapMinutes: Int = 5
     }
     enum Ring {
         static let historyWindowDays: Int = 8

@@ -117,9 +117,14 @@ final class PermissionDeclarationsTests: XCTestCase {
         #endif
     }
 
-    func testBackgroundModesAreExactlyLocationAndBluetoothCentral() {
+    /// `fetch` is deliberate (release 1.1): Agara Cloud's background sync of the user's data to their Agara account runs as a
+    /// `BGAppRefreshTask` (`com.agara.ring.cloudsync`). Nothing else may be added without a matching feature and review note.
+    func testBackgroundModesAreExactlyLocationBluetoothCentralAndFetch() {
         let modes = (Bundle.main.infoDictionary?["UIBackgroundModes"] as? [String]) ?? []
-        XCTAssertEqual(Set(modes), ["location", "bluetooth-central"])
+        XCTAssertEqual(Set(modes), ["location", "bluetooth-central", "fetch"])
+        let ids = Set((Bundle.main.infoDictionary?["BGTaskSchedulerPermittedIdentifiers"] as? [String]) ?? [])
+        XCTAssertTrue(ids.contains("com.agara.ring.cloudsync"))
+        XCTAssertEqual(AgaraCloud.backgroundTaskIdentifier, "com.agara.ring.cloudsync")
     }
 
     // MARK: - Request sites

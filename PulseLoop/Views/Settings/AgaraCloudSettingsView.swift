@@ -45,7 +45,7 @@ private struct CloudConsentView: View {
         VStack(alignment: .leading, spacing: 18) {
             StatusCopy(title: AgaraCloudCopy.consentTitle, body: AgaraCloudCopy.consentIntro)
                 .accessibilityIdentifier("cloud.consent")
-            SettingsGroup(header: AgaraCloudCopy.consentWhatTitle) {
+            SettingsGroup(header: AgaraCloudCopy.consentWhatTitle, footer: AgaraCloudCopy.consentNotUploaded) {
                 ForEach(AgaraCloudCopy.consentWhat, id: \.self) { line in
                     Text(line).font(AgaraFont.subheadline).foregroundStyle(AgaraColors.textPrimary)
                         .frame(maxWidth: .infinity, alignment: .leading)

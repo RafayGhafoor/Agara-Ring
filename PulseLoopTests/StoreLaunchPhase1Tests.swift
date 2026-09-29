@@ -167,9 +167,10 @@ final class StoreLaunchPhase1Tests: XCTestCase {
         XCTAssertEqual(byCategory["NSPrivacyAccessedAPICategorySystemBootTime"], ["35F9.1"])
     }
 
-    func testBackgroundModesAreBluetoothAndLocationOnly() {
+    func testBackgroundModesAreBluetoothLocationAndFetchOnly() {
+        // `fetch` returned deliberately with Agara Cloud's background sync (see PermissionDeclarationsTests).
         let modes = Bundle.main.object(forInfoDictionaryKey: "UIBackgroundModes") as? [String] ?? []
-        XCTAssertEqual(Set(modes), ["bluetooth-central", "location"])
+        XCTAssertEqual(Set(modes), ["bluetooth-central", "location", "fetch"])
     }
 
     func testAllThreeTargetsShareTheAgaraAppGroup() {

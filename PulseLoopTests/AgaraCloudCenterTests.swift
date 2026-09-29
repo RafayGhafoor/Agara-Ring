@@ -325,14 +325,15 @@ final class AgaraCloudCenterTests: XCTestCase {
         }
     }
 
-    func testForegroundKicksRespectTheInterval() async throws {
+    func testForegroundKicksRespectTheOpenGap() async throws {
         try addData()
         try await signInReady()
         let sent = backend.syncRequestCount
-        center.kick(reason: .foreground)              // just synced: inside syncIntervalMinutes
+        center.kick(reason: .foreground)              // just synced: inside syncOpenMinGapMinutes
         await center.waitForIdle()
         XCTAssertEqual(backend.syncRequestCount, sent)
         backend.state.lastAttempt = CloudDevice.now.addingTimeInterval(-7200)
+        backend.state.lastSync = CloudDevice.now.addingTimeInterval(-7200)
         try addData(days: 3)
         center.kick(reason: .foreground)
         await center.waitForIdle()

@@ -1,105 +1,107 @@
 import Foundation
 
-/// Native copy of the Agara Cloud screens (release 1.1). Written here for now; the lead moves the shared sentences into
-/// `docs/strings/brand.yaml` (they are listed in the 1.1 hand-off report) so both apps say the same thing.
+/// Thin adapter over the shared catalog (`docs/strings/brand.yaml` `cloud_*` keys -> `AgaraCopy.cloud…`), so both apps say
+/// the same thing (Rule 5). Placeholders `{email}` `{seconds}` `{date}` `{code}` are filled here with plain replacement.
+/// Only `cancel` and `metricName` are native.
 enum AgaraCloudCopy {
+    private static func fill(_ template: String, _ values: [String: String]) -> String {
+        values.reduce(template) { $0.replacingOccurrences(of: "{\($1.key)}", with: $1.value) }
+    }
+
     // Settings row / intro
-    static let title = "Agara Cloud"
-    static let notConfiguredTitle = "Agara Cloud is not available yet"
-    static let notConfiguredBody = "This build is not connected to an Agara Cloud server. Everything else in the app works as usual, and your data stays on this phone."
-    static let introBody = "Optional. Back up your ring data to a private Agara account and pull it onto another phone. The app works fully without an account."
+    static let title = AgaraCopy.cloudTitle
+    static let notConfiguredTitle = AgaraCopy.cloudNotConfiguredTitle
+    static let notConfiguredBody = AgaraCopy.cloudNotConfiguredBody
+    static let introBody = AgaraCopy.cloudIntro
 
     // Consent (Apple 5.1.1(v) / 5.1.3)
-    static let consentTitle = "Before you turn on Agara Cloud"
-    static let consentIntro = "Agara Cloud is optional. Nothing leaves this phone until you agree and sign in."
-    static let consentWhatTitle = "What is uploaded"
-    static let consentWhat = [
-        "Your ring readings: heart rate, SpO2, stress, HRV, temperature and the other measurements your ring records.",
-        "Your daily steps, distance and calories.",
-        "Your sleep: each night's times, stages and score.",
-    ]
-    static let consentWhereTitle = "Where it goes"
-    static let consentWhere = "To Agara's servers, over an encrypted connection, tied to the account you create. This is health data. It is used only to back up and sync your data, and is not sold or shared."
-    static let consentDeleteTitle = "How to delete it"
-    static let consentDelete = "Settings › Agara Cloud › Delete account erases your cloud copy for good. Your data on this phone stays. You can also stop syncing any time by signing out."
-    static let consentAgree = "I agree, continue"
-    static let consentDecline = "Not now"
+    static let consentTitle = AgaraCopy.cloudConsentTitle
+    static let consentIntro = AgaraCopy.cloudConsentIntro
+    static let consentWhatTitle = AgaraCopy.cloudConsentWhatTitle
+    static let consentWhat = [AgaraCopy.cloudConsentWhatReadings, AgaraCopy.cloudConsentWhatDaily, AgaraCopy.cloudConsentWhatSleep]
+    static let consentNotUploaded = AgaraCopy.cloudConsentNotUploaded
+    static let consentWhereTitle = AgaraCopy.cloudConsentWhereTitle
+    static let consentWhere = AgaraCopy.cloudConsentWhere
+    static let consentDeleteTitle = AgaraCopy.cloudConsentDeleteTitle
+    static let consentDelete = AgaraCopy.cloudConsentDelete
+    static let consentAgree = AgaraCopy.cloudConsentAgree
+    static let consentDecline = AgaraCopy.cloudConsentDecline
 
     // Account forms
-    static let signUp = "Create account"
-    static let signIn = "Sign in"
-    static let email = "Email"
-    static let password = "Password"
-    static let forgotPassword = "Forgot password?"
-    static let resetSent = "If an account exists for that address, a reset link is on its way."
-    static let passwordHint = "8 to 128 characters."
+    static let signUp = AgaraCopy.cloudSignUp
+    static let signIn = AgaraCopy.cloudSignIn
+    static let email = AgaraCopy.cloudEmail
+    static let password = AgaraCopy.cloudPassword
+    static let forgotPassword = AgaraCopy.cloudForgotPassword
+    static let resetSent = AgaraCopy.cloudResetSent
+    static let passwordHint = AgaraCopy.cloudPasswordRule
 
     // Verify
-    static let verifyTitle = "Verify your email"
-    static func verifyBody(_ email: String) -> String { "We sent a link to \(email). Open it, then come back here. Sync starts as soon as your address is verified." }
-    static let verifyCheck = "I've verified"
-    static let verifyResend = "Resend email"
-    static func verifyResendIn(_ seconds: Int) -> String { "Resend in \(seconds)s" }
-    static let verifyStillWaiting = "Not verified yet. Check your inbox (and spam)."
-    static func graceBanner(_ date: String) -> String { "Unverified accounts stop working with the cloud after \(date)." }
-    static let graceOver = "The verification window has ended. Verify your email to use Agara Cloud."
+    static let verifyTitle = AgaraCopy.cloudVerifyTitle
+    static func verifyBody(_ email: String) -> String { fill(AgaraCopy.cloudVerifyBody, ["email": email]) }
+    static let verifyCheck = AgaraCopy.cloudVerifyCheck
+    static let verifyResend = AgaraCopy.cloudVerifyResend
+    static func verifyResendIn(_ seconds: Int) -> String { fill(AgaraCopy.cloudVerifyResendIn, ["seconds": String(seconds)]) }
+    static let verifyStillWaiting = AgaraCopy.cloudVerifyStillWaiting
+    static func graceBanner(_ date: String) -> String { fill(AgaraCopy.cloudVerifyGrace, ["date": date]) }
+    static let graceOver = AgaraCopy.cloudVerifyBlocked
 
     // Signed in
-    static func signedInAs(_ email: String) -> String { "Signed in as \(email)" }
-    static let syncNow = "Sync now"
-    static let syncing = "Syncing…"
-    static let lastSync = "Last sync"
-    static let never = "Never"
-    static let blocksSynced = "Uploaded"
-    static let signOut = "Sign out"
-    static let deleteAccount = "Delete account"
-    static let deleteAccountTitle = "Delete your Agara Cloud account?"
-    static let deleteAccountConfirm = "Delete account"
-    static let cancel = "Cancel"
-    static let deleteAccountBody = "This permanently deletes your account and everything stored in the cloud. It can't be undone. The data on this phone stays."
-    static let deleteAllDataCloudNote = "You are signed in to Agara Cloud. This also signs you out on this phone, but does not delete your cloud account or cloud data. To delete those, use Settings › Agara Cloud › Delete account first."
-    static let reauthTitle = "Enter your password"
-    static let reauthBody = "For your security, confirm your password to delete the account."
-    static let reauthConfirm = "Continue"
+    static func signedInAs(_ email: String) -> String { fill(AgaraCopy.cloudSignedInAs, ["email": email]) }
+    static let syncNow = AgaraCopy.cloudSyncNow
+    static let syncing = AgaraCopy.cloudSyncing
+    static let lastSync = AgaraCopy.cloudLastSync
+    static let never = AgaraCopy.cloudNever
+    static let blocksSynced = AgaraCopy.cloudUploaded
+    static let signOut = AgaraCopy.cloudSignOut
+    static let deleteAccount = AgaraCopy.cloudDeleteAccount
+    static let deleteAccountTitle = AgaraCopy.cloudDeleteTitle
+    static let deleteAccountConfirm = AgaraCopy.cloudDeleteConfirm
+    static let cancel = "Cancel"   // generic system-style label: native
+    static let deleteAccountBody = AgaraCopy.cloudDeleteBody
+    static let deleteAllDataCloudNote = AgaraCopy.cloudDeleteAllDataNote
+    static let reauthTitle = AgaraCopy.cloudReauthTitle
+    static let reauthBody = AgaraCopy.cloudReauthBody
+    static let reauthConfirm = AgaraCopy.cloudReauthConfirm
 
     // Privacy screen
-    static let privacyFooterSignedIn = "You are signed in to Agara Cloud, so your readings, sleep and activity are also stored in your Agara account. Delete account in Settings › Agara Cloud removes that copy."
-    static let privacyStoredSignedIn = "On this phone and in Agara Cloud"
+    static let privacyFooterSignedIn = AgaraCopy.cloudPrivacyFooterSignedIn
+    static let privacyStoredSignedIn = AgaraCopy.cloudPrivacyStoredSignedIn
 
     // Errors (Firebase Auth and the server), in plain language
     static func authError(_ error: AgaraAuthError) -> String {
         switch error {
-        case .emailExists: return "We couldn't create that account. If you already have one, try signing in."
-        case .invalidCredentials: return "The email or password is not right."   // same words for an unknown address and a wrong password
-        case .tooManyAttempts: return "Too many attempts. Wait a few minutes and try again."
-        case .weakPassword: return "Use a password of 8 to 128 characters."
-        case .invalidEmail: return "Enter a valid email address."
-        case .userDisabled: return "This account has been disabled."
-        case .sessionExpired: return "Your sign-in expired. Please sign in again."
-        case .recentLoginRequired: return "For your security, enter your password again to continue."
-        case .notSignedIn: return "You are not signed in."
-        case .notConfigured: return "Agara Cloud is not available in this build."
-        case .network: return "No connection. Check your internet and try again."
-        case .server: return "Something went wrong on the server. Please try again later."
+        case .emailExists: return AgaraCopy.cloudErrorEmailExists   // never says whether the address is registered
+        case .invalidCredentials: return AgaraCopy.cloudErrorInvalidCredentials   // same words for an unknown address and a wrong password
+        case .tooManyAttempts: return AgaraCopy.cloudErrorTooManyAttempts
+        case .weakPassword: return AgaraCopy.cloudPasswordRule
+        case .invalidEmail: return AgaraCopy.cloudEmailInvalid
+        case .userDisabled: return AgaraCopy.cloudErrorUserDisabled
+        case .sessionExpired: return AgaraCopy.cloudErrorSessionExpired
+        case .recentLoginRequired: return AgaraCopy.cloudErrorRecentLogin
+        case .notSignedIn: return AgaraCopy.cloudErrorNotSignedIn
+        case .notConfigured: return AgaraCopy.cloudErrorNotConfigured
+        case .network: return AgaraCopy.cloudFailureOffline
+        case .server: return AgaraCopy.cloudErrorServer
         }
     }
-    static let requestTimedOut = "The request timed out. Try again."
-    static let accountDeletedElsewhere = "This account was deleted. Your data on this phone is untouched."
-    static let serverRateLimited = "Too many requests. Try again in a moment."
-    static let serverUnavailable = "The Agara Cloud server is unavailable. Try again later."
-    static func serverRefused(_ code: String) -> String { "The server refused the request (\(code))." }
+    static let requestTimedOut = AgaraCopy.cloudErrorTimeout
+    static let accountDeletedElsewhere = AgaraCopy.cloudFailureAccountDeleted
+    static let serverRateLimited = AgaraCopy.cloudFailureRateLimited
+    static let serverUnavailable = AgaraCopy.cloudFailureServerUnavailable
+    static func serverRefused(_ code: String) -> String { fill(AgaraCopy.cloudErrorServerRefused, ["code": code]) }
 
     // Status lines
     static func failure(_ failure: AgaraCloud.Failure) -> String {
         switch failure {
-        case .offline: return "You're offline. Sync will retry when a connection is back."
-        case .rateLimited: return "The server asked us to slow down. Retrying shortly."
-        case .serverUnavailable: return "The Agara Cloud server is unavailable. Retrying shortly."
-        case .emailNotVerified: return "Verify your email to keep syncing."
-        case .accountDeleted: return "This account was deleted. Your data on this phone is untouched."
-        case .sessionExpired: return "Your sign-in expired. Please sign in again."
-        case .updateRequired: return "Update Agara Ring to keep syncing."
-        case .sampleData: return "Sync is paused while sample data is shown."
+        case .offline: return AgaraCopy.cloudFailureOffline
+        case .rateLimited: return AgaraCopy.cloudFailureRateLimited
+        case .serverUnavailable: return AgaraCopy.cloudFailureServerUnavailable
+        case .emailNotVerified: return AgaraCopy.cloudVerifyBlocked
+        case .accountDeleted: return AgaraCopy.cloudFailureAccountDeleted
+        case .sessionExpired: return AgaraCopy.cloudErrorSessionExpired
+        case .updateRequired: return AgaraCopy.cloudFailureUpdateRequired
+        case .sampleData: return AgaraCopy.cloudFailureSampleData
         case let .other(message): return message
         }
     }

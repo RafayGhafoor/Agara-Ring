@@ -3,6 +3,7 @@ import SwiftData
 import Observation
 import OSLog
 import UIKit
+import BackgroundTasks
 
 /// Agara Cloud as the app sees it (release 1.1): one observable owner of the account, the consent, the sync engine, the
 /// retry ladder and the schedule. The Settings › Agara Cloud screens read it; the app calls `kick` on foreground.
@@ -98,6 +99,7 @@ final class AgaraCloud {
     private var syncTask: Task<Void, Never>?
     private var retryTask: Task<Void, Never>?
     private var scheduleTask: Task<Void, Never>?
+    private var ringSyncTask: Task<Void, Never>?
     private var retryAttempt = 0
     private var resetTask: Task<Void, Never>?
     private static let log = Logger(subsystem: "com.agara.ring", category: "agara-cloud")
@@ -108,7 +110,7 @@ final class AgaraCloud {
          state: AgaraCloudState = AgaraCloudState(),
          now: @escaping () -> Date = { AppClock.now },
          sleep: @escaping @Sendable (TimeInterval) async throws -> Void = { try await Task.sleep(nanoseconds: UInt64($0 * 1_000_000_000)) },
-         resendCooldown: TimeInterval = 60,
+         resendCooldown: TimeInterval = TimeInterval(AgaraConfig.Cloud.resendCooldownSeconds),
          isEnabled: @escaping @MainActor () -> Bool = { AgaraFeatureStore.isOn(.agaraCloud) },
          limits: AgaraSyncLimits? = nil,
          progress: ((CloudSyncProgress) -> Void)? = nil) {
@@ -139,7 +141,7 @@ final class AgaraCloud {
         self.container = container
         engine = nil
         refresh()
-        if schedule { startSchedule() }
+        if schedule { startSchedule(); startRingSyncTrigger() }
     }
 
     // MARK: Phase
@@ -154,6 +156,7 @@ final class AgaraCloud {
         else if let session { phase = session.emailVerified ? .ready : .needsVerification }
         else { phase = .signedOut }
         if phase == .needsVerification, state.unverifiedSince == nil { state.unverifiedSince = now() }
+        scheduleBackgroundRefresh()
     }
 
     // MARK: Consent
@@ -316,13 +319,17 @@ final class AgaraCloud {
 
     // MARK: Sync
 
-    enum Reason { case manual, foreground, timer, signedIn, retry }
+    enum Reason { case manual, foreground, timer, signedIn, retry, ringSync }
 
     /// Start a sync unless one is running or the state forbids it. Fire and forget.
     func kick(reason: Reason) {
         guard isEnabled(), canSync, container != nil, syncTask == nil else { return }
-        if reason == .foreground || reason == .timer, let last = state.lastAttempt,
-           now().timeIntervalSince(last) < Double(config.syncIntervalMinutes) * 60, status != .failed(.offline) { return }
+        // Foreground entry syncs only when the last successful sync is older than the open gap (Sync now ignores it);
+        // the timer waits a full interval since the last attempt.
+        if reason == .foreground,
+           !AgaraCloudSchedule.shouldSyncOnOpen(lastSync: state.lastSync, now: now(), minGapMinutes: config.syncOpenMinGapMinutes) { return }
+        if reason == .timer, let last = state.lastAttempt,
+           now().timeIntervalSince(last) < Double(syncIntervalMinutes()) * 60, status != .failed(.offline) { return }
         syncTask = Task { [weak self] in await self?.runSync(reason: reason) }
     }
 
@@ -369,6 +376,7 @@ final class AgaraCloud {
             await handle(error, reason: reason, engine: engine, retriedAfterVerify: retriedAfterVerify)
         }
         SyncProgress.shared.endCloud()
+        scheduleBackgroundRefresh()
     }
 
     private func updateCounts(_ engine: AgaraSyncEngine) async {
@@ -487,7 +495,7 @@ final class AgaraCloud {
     /// iOS decides when to wake an app, and the coach already holds the app's BGTask identifiers).
     private func startSchedule() {
         scheduleTask?.cancel()
-        let interval = TimeInterval(max(1, config.syncIntervalMinutes) * 60)
+        let interval = TimeInterval(max(1, syncIntervalMinutes()) * 60)
         scheduleTask = Task { [weak self, sleep] in
             while !Task.isCancelled {
                 do { try await sleep(interval) } catch { return }
@@ -502,6 +510,110 @@ final class AgaraCloud {
         retryTask?.cancel(); retryTask = nil
         nextRetryAt = nil
         retryAttempt = 0
+    }
+
+
+    // MARK: Background refresh (release 1.1)
+
+    /// The ONE place the sync interval is read (foreground timer, background refresh): today the catalog default
+    /// (`cloud_sync_interval_minutes`, 120); a future user setting overrides it here.
+    func syncIntervalMinutes() -> Int { config.syncIntervalMinutes }
+
+    /// `BGAppRefreshTask` identifier; also listed in Info.plist `BGTaskSchedulerPermittedIdentifiers` (with the `fetch`
+    /// background mode). iOS runs it opportunistically (typically a few times a day) - Android's WorkManager is periodic.
+    nonisolated static let backgroundTaskIdentifier = "com.agara.ring.cloudsync"
+    /// Submitting a request for an identifier that was not registered traps, and registration is skipped under XCTest.
+    private static var backgroundRegistered = false
+
+    /// Call once at launch (before the app finishes launching), like the coach's tasks.
+    static func registerBackgroundTask() {
+        backgroundRegistered = true
+        let handler: @Sendable (BGTask) -> Void = { task in
+            guard let refresh = task as? BGAppRefreshTask else { task.setTaskCompleted(success: false); return }
+            Task { @MainActor in AgaraCloud.shared.runBackgroundRefresh(refresh) }
+        }
+        BGTaskScheduler.shared.register(forTaskWithIdentifier: backgroundTaskIdentifier, using: nil, launchHandler: handler)
+    }
+
+    private var scheduleInput: AgaraCloudSchedule.Input {
+        let blocked: Bool
+        switch status {
+        case .failed(.emailNotVerified), .failed(.updateRequired): blocked = true
+        default: blocked = false
+        }
+        return AgaraCloudSchedule.Input(
+            consent: config.isConfigured && state.hasConsent, signedIn: isSignedIn, verified: phase == .ready,
+            graceEndsAt: graceEndsAt, blocked: blocked, now: now(), lastSync: state.lastSync,
+            intervalMinutes: syncIntervalMinutes(), retryNextAt: nextRetryAt)
+    }
+
+    /// Submit (or cancel) the app-refresh request per `AgaraCloudSchedule.decide`. Called after every sync, on backgrounding
+    /// and whenever the account state changes.
+    func scheduleBackgroundRefresh() {
+        guard Self.backgroundRegistered else { return }
+        guard isEnabled() else { BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Self.backgroundTaskIdentifier); return }
+        switch AgaraCloudSchedule.decide(scheduleInput) {
+        case .cancel:
+            BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Self.backgroundTaskIdentifier)
+        case let .schedule(delay):
+            let request = BGAppRefreshTaskRequest(identifier: Self.backgroundTaskIdentifier)
+            request.earliestBeginDate = now().addingTimeInterval(TimeInterval(delay))
+            try? BGTaskScheduler.shared.submit(request)
+        }
+    }
+
+    /// The background wake: one sync, re-scheduled first so a crash or expiry never ends the chain. Never runs without
+    /// consent and a verified (or in-grace) account; sample data is refused by the engine.
+    private func runBackgroundRefresh(_ task: BGAppRefreshTask) {
+        scheduleBackgroundRefresh()
+        guard isEnabled(), canSync, container != nil, AgaraCloudSchedule.decide(scheduleInput) != .cancel else {
+            task.setTaskCompleted(success: true)
+            return
+        }
+        let work = Task { @MainActor [weak self] in
+            await self?.runBackgroundPass()
+            let ok = self.map { if case .failed = $0.status { return false } else { return true } } ?? false
+            task.setTaskCompleted(success: ok)
+        }
+        // On expiry, cancel the sync (it ends as CancellationError -> idle) and let the task above complete the BGTask.
+        task.expirationHandler = { work.cancel() }
+    }
+
+    /// One pass that honours cancellation of the calling task (the BG expiration handler).
+    private func runBackgroundPass() async {
+        if syncTask == nil {
+            syncTask = Task { [weak self] in await self?.runSync(reason: .timer) }
+        }
+        guard let running = syncTask else { return }
+        await withTaskCancellationHandler {
+            await running.value
+        } onCancel: {
+            running.cancel()
+        }
+    }
+
+    /// A ring sync just finished: send the new data now. Wrapped in a background task so it can finish when the app was
+    /// only woken by the ring link. Skipped while a retry is pending (the ladder owns the timing) or a sync is running.
+    func syncAfterRingSync() {
+        guard isEnabled(), canSync, container != nil, syncTask == nil else { return }
+        if let at = nextRetryAt, now() < at { return }
+        let guardTask = BackgroundTaskGuard(name: "cloud.afterRingSync")
+        syncTask = Task { [weak self] in
+            await self?.runSync(reason: .ringSync)
+            guardTask.end()
+        }
+        guardTask.onExpire = { [weak self] in self?.syncTask?.cancel() }
+    }
+
+    private func startRingSyncTrigger() {
+        ringSyncTask?.cancel()
+        ringSyncTask = Task { [weak self] in
+            let stream = await AgaraEventBus.shared.stream()
+            for await event in stream {
+                guard case let .syncProgress(stage) = event, stage == "done" else { continue }
+                self?.syncAfterRingSync()
+            }
+        }
     }
 
     // MARK: Auth plumbing
@@ -526,4 +638,23 @@ protocol AgaraCloudBackendInfo {
     var config: AgaraCloudConfig { get }
     var sessionStore: AgaraAuthSessionStore { get }
     var state: AgaraCloudState { get }
+}
+
+/// `UIApplication.beginBackgroundTask` around one piece of work; ends exactly once.
+@MainActor
+final class BackgroundTaskGuard {
+    private var id: UIBackgroundTaskIdentifier = .invalid
+    var onExpire: (() -> Void)?
+
+    init(name: String) {
+        id = UIApplication.shared.beginBackgroundTask(withName: name) { [weak self] in
+            MainActor.assumeIsolated { self?.onExpire?(); self?.end() }
+        }
+    }
+
+    func end() {
+        guard id != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(id)
+        id = .invalid
+    }
 }
