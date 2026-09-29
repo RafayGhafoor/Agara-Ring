@@ -1,6 +1,8 @@
 #!/bin/sh
 # iPad layout capture (store launch phase 1d): runs IPadLayoutCaptureTests on an iPad simulator and uprights the
 # landscape PNGs (XCUIScreen returns the portrait framebuffer, so landscape shots come back rotated 90 degrees).
+# NOTE: iPad is not shipped in the first version (the app targets iPhone only), so on an iPad simulator the app runs in
+# compatibility mode and the test skips. To capture again, set TARGETED_DEVICE_FAMILY = "1,2" for the app target locally.
 # usage: scripts/ipad_layout_capture.sh "iPad Pro 13-inch (M5)"   (or "iPad mini (A17 Pro)")
 set -e
 DEVICE="${1:-iPad Pro 13-inch (M5)}"

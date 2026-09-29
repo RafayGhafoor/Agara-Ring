@@ -256,6 +256,13 @@ struct VeepooDecoder {
         return (veepooUInt16BE(bytes, 4), version, version + "." + String(format: "%02x", testByte))
     }
 
+    /// The ring's identity from an `a1` reply, as the 16-hex AGB sensor id (docs/ring/storage-format.md §4): the MAC is
+    /// bytes 12…17 **reversed** — the BLE-address order Android's `VeepooDecoder.ringMac` returns — hashed with the
+    /// `agara.sensor.v1|ring|` prefix. Nil for a refusal (status byte 0), a short frame or an all-zero field.
+    func ringSensorId(frame: Data) -> String? {
+        AGB.ringMac(fromA1: [UInt8](frame)).flatMap { AGB.sensorId(ringMac: $0) }
+    }
+
     /// The `a3` profile ack: `a3 01` ok, `a3 00` refused.
     func profileAck(frame: Data) -> Bool? {
         guard frame.count >= 2, frame[frame.startIndex] == 0xA3 else { return nil }

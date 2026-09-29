@@ -357,14 +357,9 @@ struct MetricDetailView: View {
         case .month: start = Calendar.current.date(byAdding: .day, value: -30, to: now) ?? now
         }
         let cal = CalibrationStore.shared.settings
+        // Through the one reader: hot rows plus readings that already live in sealed blocks (a 30-day window reaches them).
         func rows(_ kind: MeasurementKind) -> [PulseLoop.Measurement] {
-            let raw = kind.rawValue
-            var d = FetchDescriptor<PulseLoop.Measurement>(
-                predicate: #Predicate { $0.kindRaw == raw && $0.timestamp >= start },
-                sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
-            )
-            d.fetchLimit = 2_000
-            return (try? modelContext.fetch(d)) ?? []
+            MetricsRepository.measurements(kind: kind, start: start, end: .distantFuture, limit: 2_000, context: modelContext)
         }
         if metric == .bloodPressure {
             let dia = Dictionary(rows(.bloodPressureDiastolic).map { ($0.timestamp, $0) }, uniquingKeysWith: { a, _ in a })

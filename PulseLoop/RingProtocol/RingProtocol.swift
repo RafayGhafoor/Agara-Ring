@@ -63,6 +63,9 @@ enum RingDecodedEvent: Sendable {
     /// Firmware version string parsed from the ring's `a1` reply. `deviceNumber` and `testVersion` (the
     /// firmware-update lookup key, e.g. 2526 / "00.12.09.00") ride along when the frame carries them.
     case firmware(version: String, deviceNumber: Int? = nil, testVersion: String? = nil)
+    /// The ring's own identity from its `a1` reply (MAC, bytes 12…17 reversed), already hashed to the 16-hex sensor id
+    /// of AGB v1 §4 — the MAC itself never leaves the decoder. Stamps the `sensorId` of rows measured on this link.
+    case ringIdentity(sensorId: String)
     /// Ring bind/unbind handshake frame (0x4B): `action`/`state` per the protocol state machine.
     case bind(action: UInt8, state: UInt8)
     /// The device's own capability bitmap, already mapped onto `WearableCapability` (the protocol's `02 01`; see
@@ -138,6 +141,7 @@ enum RingDecodedEvent: Sendable {
         case .battery: return "battery"
         case .status: return "status"
         case .firmware: return "firmware"
+        case .ringIdentity: return "ring_identity"
         case .bind: return "bind"
         case .supportFunctions: return "support_functions"
         case .chipScheme: return "chip_scheme"
@@ -197,6 +201,8 @@ enum RingDecodedEvent: Sendable {
         case let .firmware(version, deviceNumber, testVersion):
             guard let deviceNumber, let testVersion else { return #"{"firmware":"\#(version)"}"# }
             return #"{"firmware":"\#(version)","device_number":\#(deviceNumber),"test_version":"\#(testVersion)"}"#
+        case let .ringIdentity(sensorId):
+            return #"{"sensor_id":"\#(sensorId)"}"#
         case let .bind(action, state):
             return #"{"bind_action":\#(action),"bind_state":\#(state)}"#
         case let .supportFunctions(capabilities):

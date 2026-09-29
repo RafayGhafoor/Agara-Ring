@@ -47,6 +47,39 @@ final class PermissionDeclarationsTests: XCTestCase {
         return result
     }
 
+    // MARK: - Device family (owner, 2026-09-29: iPhone only for the first version)
+
+    /// The app and both extensions build for iPhone only (`TARGETED_DEVICE_FAMILY = 1`), in every configuration, and
+    /// the app is portrait-only on iPhone with no iPad orientation keys. The iPad layout code stays (reusable);
+    /// only the shipping target changes. To run the iPad layout capture again, set the family to "1,2" locally.
+    func testAppAndExtensionsAreIPhoneOnlyInEveryConfiguration() throws {
+        let text = try String(contentsOf: projectFile, encoding: .utf8)
+        var checked = Set<String>()
+        for block in text.components(separatedBy: "isa = XCBuildConfiguration;").dropFirst() {
+            guard let idRange = block.range(of: #"PRODUCT_BUNDLE_IDENTIFIER = com\.agara\.ring(\.LiveActivity|\.Widgets)?;"#, options: .regularExpression),
+                  let nameRange = block.range(of: #"name = (Debug|Release);"#, options: .regularExpression) else { continue }
+            let target = String(block[idRange]), config = String(block[nameRange])
+            XCTAssertTrue(block.contains("TARGETED_DEVICE_FAMILY = 1;"), "\(target) \(config) must target iPhone only")
+            XCTAssertFalse(block.contains("TARGETED_DEVICE_FAMILY = \"1,2\""), "\(target) \(config) still targets iPad")
+            XCTAssertTrue(block.contains("SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;"), "\(target) \(config)")
+            XCTAssertFalse(block.contains("UISupportedInterfaceOrientations_iPad"), "\(target) \(config): no iPad orientation keys")
+            if block.contains("INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone") {
+                XCTAssertTrue(block.contains(#"INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait";"#),
+                              "\(target) \(config): iPhone is portrait-only")
+            }
+            checked.insert("\(target) \(config)")
+        }
+        XCTAssertEqual(checked.count, 6, "app + LiveActivity + Widgets, Debug and Release: \(checked)")
+    }
+
+    /// The built product (the unit-test host is the app) declares iPhone and portrait only.
+    func testBuiltInfoPlistDeclaresIPhoneOnlyPortrait() throws {
+        let info = try XCTUnwrap(Bundle.main.infoDictionary)
+        XCTAssertEqual(info["UIDeviceFamily"] as? [Int], [1], "UIDeviceFamily must be [1]")
+        XCTAssertEqual(info["UISupportedInterfaceOrientations"] as? [String], ["UIInterfaceOrientationPortrait"])
+        XCTAssertNil(info["UISupportedInterfaceOrientations~ipad"], "no iPad-only orientation key")
+    }
+
     func testReleaseDeclaresOnlyStringsWithAReachableFeature() throws {
         let keys = try appTargetUsageKeys()
         let release = try XCTUnwrap(keys["Release"], "app target Release configuration not found")

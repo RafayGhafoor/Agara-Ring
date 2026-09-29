@@ -12,6 +12,8 @@ import UniformTypeIdentifiers
 /// Privacy (unpair/reset) keeps its own screen, `PrivacySettingsView`.
 struct DataExportSettingsView: View {
     @Environment(\.modelContext) private var modelContext
+    /// The navigation stack, to open Storage.
+    @Binding var path: NavigationPath
     @State private var diagnosticsURL: URL?
     /// Mirrors `RawPacketCapture.userOptedIn` so the toggle re-renders; the defaults key is the truth.
     @State private var captureRawPackets = RawPacketCapture.userOptedIn
@@ -121,15 +123,29 @@ struct DataExportSettingsView: View {
                     }
                 }
 
+                if features.isOn(.storageSettings) {
+                    SettingsGroup(
+                        header: "Storage",
+                        footer: "What the app keeps on this phone, your storage limit, and Bluetooth diagnostics."
+                    ) {
+                        actionRow("Storage", systemImage: "internaldrive") { path.append(AppRoute.settingsStorage) }
+                            .accessibilityIdentifier("openStorage")
+                    }
+                }
+
                 SettingsGroup(
                     header: "Diagnostics",
-                    footer: "A local snapshot for troubleshooting — nothing leaves the device unless you share it. "
-                        + "Bluetooth capture stores the raw packets exchanged with your ring (which encode your "
-                        + "health readings) and includes them in exports; leave it off unless support asked for it."
+                    footer: features.isOn(.storageSettings)
+                        ? "A local snapshot for troubleshooting — nothing leaves the device unless you share it. "
+                            + "Bluetooth capture and Clear raw data are in Storage."
+                        : "A local snapshot for troubleshooting — nothing leaves the device unless you share it. "
+                            + "Bluetooth capture stores the raw packets exchanged with your ring (which encode your "
+                            + "health readings) and includes them in exports; leave it off unless support asked for it."
                 ) {
                     actionRow("Export diagnostics", systemImage: "square.and.arrow.up") {
                         diagnosticsURL = DiagnosticsExporter.exportFile(context: modelContext)
                     }
+                    if !features.isOn(.storageSettings) {
                     HStack(spacing: 12) {
                         Image(systemName: "dot.radiowaves.left.and.right")
                             .font(AgaraFont.body)
@@ -152,6 +168,7 @@ struct DataExportSettingsView: View {
                     .frame(minHeight: 50)
                     actionRow("Clear captured packets", systemImage: "trash") {
                         ask(ClearAction.capturedPackets)
+                    }
                     }
                 }
 

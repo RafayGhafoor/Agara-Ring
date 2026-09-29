@@ -18,6 +18,7 @@ enum AppRoute: Hashable {
     case settingsWearable
     case settingsAutoMeasure
     case settingsDataExport
+    case settingsStorage
     case settingsActivityTracking
     case settingsGoals
     case settingsVitals

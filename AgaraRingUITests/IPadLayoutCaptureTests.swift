@@ -4,6 +4,12 @@ import XCTest
 /// the disclaimer in portrait and landscape and writes PNGs to `captures/ipad-layout/<device>-<orientation>-<screen>.png`
 /// (git-ignored). Runs on the sample data set ("Explore without ring"), so it needs no emulator. Skips on iPhone.
 /// Windowed / split-view widths can't be driven from XCUITest; those are reported as unverified.
+///
+/// **iPad is not shipped in the first version** (owner, 2026-09-29): the app targets iPhone only, so on an iPad
+/// simulator the app runs in compatibility mode (idiom `.phone`) and this test skips itself. It is not part of any
+/// default run (the unit suite is `PulseLoopTests`; this lives in the UI scheme). To capture the iPad layout again,
+/// set `TARGETED_DEVICE_FAMILY = "1,2"` (and the iPad orientation keys) for the app target locally, then run
+/// `scripts/ipad_layout_capture.sh "iPad Pro 13-inch (M5)"`.
 final class IPadLayoutCaptureTests: XCTestCase {
     private var app: XCUIApplication!
     private let outDir = ProcessInfo.processInfo.environment["IPAD_SHOT_DIR"]

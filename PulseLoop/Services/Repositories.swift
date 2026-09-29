@@ -48,12 +48,17 @@ enum MetricsRepository {
         return activityRows(context: context).first { Calendar.current.isDate($0.date, inSameDayAs: start) }
     }
     
+    /// Every reading (one kind, or all), oldest first. For one kind this is the whole history: the hot rows plus the
+    /// sealed blocks (`MeasurementSeries`). Blocks yield detached `Measurement`s (not inserted in any context).
     @MainActor
     static func measurements(kind: MeasurementKind? = nil, context: ModelContext) -> [Measurement] {
         let descriptor = FetchDescriptor<Measurement>(sortBy: [SortDescriptor(\.timestamp)])
         let rows = (try? context.fetch(descriptor)) ?? []
         guard let kind else { return rows }
-        return rows.filter { $0.kind == kind }
+        let hot = rows.filter { $0.kind == kind }
+        let sealed = MeasurementSeries.points(metric: kind.rawValue, from: Date(timeIntervalSince1970: 0), to: .distantFuture, context: context)
+        guard !sealed.isEmpty else { return hot }
+        return (sealed.map(MeasurementSeries.detached) + hot).sorted { $0.timestamp < $1.timestamp }
     }
     
     @MainActor
@@ -64,7 +69,12 @@ enum MetricsRepository {
             sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
         )
         descriptor.fetchLimit = 1
-        return try? context.fetch(descriptor).first
+        let row = try? context.fetch(descriptor).first
+        // A hot row newer than the seal boundary is always the newest; otherwise a sealed block may hold a later one.
+        if let row, BlockStore.utcDay(ms: BlockStore.ms(row.timestamp)) >= BlockStore.sealBoundary(now: Date()) { return row }
+        guard let sealed = MeasurementSeries.latest(metric: raw, context: context) else { return row }
+        if let row, BlockStore.ms(row.timestamp) >= sealed.ts { return row }
+        return MeasurementSeries.detached(sealed)
     }
 
     /// Measurements of one kind within `[start, end]`, newest-first, capped at `limit`. Database
@@ -77,7 +87,12 @@ enum MetricsRepository {
             sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
         )
         descriptor.fetchLimit = limit
-        return (try? context.fetch(descriptor)) ?? []
+        let rows = (try? context.fetch(descriptor)) ?? []
+        // Only a window that reaches below the hot window can involve sealed blocks.
+        guard BlockStore.utcDay(ms: BlockStore.ms(start)) < BlockStore.sealBoundary(now: Date()) else { return rows }
+        let sealed = MeasurementSeries.points(metric: raw, from: start, to: end, context: context)
+        guard !sealed.isEmpty else { return rows }
+        return Array((rows + sealed.map(MeasurementSeries.detached)).sorted { $0.timestamp > $1.timestamp }.prefix(limit))
     }
 
     /// Battery-history readings within `[start, end]`, oldest-first for a left-to-right chart axis,
@@ -110,7 +125,9 @@ enum MetricsRepository {
     static func oldestMeasurementTimestamp(context: ModelContext) -> Date? {
         var descriptor = FetchDescriptor<Measurement>(sortBy: [SortDescriptor(\.timestamp, order: .forward)])
         descriptor.fetchLimit = 1
-        return try? context.fetch(descriptor).first?.timestamp
+        let row = (try? context.fetch(descriptor).first)?.timestamp
+        guard let sealed = MeasurementSeries.oldestTimestamp(context: context) else { return row }
+        return row.map { min($0, sealed) } ?? sealed
     }
 
     /// Whether any mock measurement exists (demo-mode detection). `fetchLimit: 1` predicated probe.
@@ -495,6 +512,8 @@ enum NutritionRepository {
             return existing
         }
         let fresh = product.asCachedProduct()
+        // Below `storage_critical_disk_free_mb` the caches pause (the lookup still works, it just isn't remembered).
+        guard !StorageGuard.isCriticalDisk else { return fresh }
         context.insert(fresh)
         try? context.save()
         // Prune only when actually over the cap (cheap count probe) — the old
@@ -536,8 +555,8 @@ enum DebugRepository {
         decodedJSON: String? = nil,
         confidence: DecodeConfidence = .unknown,
         context: ModelContext
-    ) -> RawPacketRow {
-        let row = RawPacketRow(
+    ) -> RawPacketRecord {
+        let row = RawPacketRecord(
             timestamp: timestamp,
             direction: direction,
             commandId: commandId,
@@ -551,8 +570,8 @@ enum DebugRepository {
     }
     
     @MainActor
-    static func queryPackets(filter: DebugPacketFilter, context: ModelContext) -> [RawPacketRow] {
-        let descriptor = FetchDescriptor<RawPacketRow>(sortBy: [SortDescriptor(\.timestamp, order: .reverse)])
+    static func queryPackets(filter: DebugPacketFilter, context: ModelContext) -> [RawPacketRecord] {
+        let descriptor = FetchDescriptor<RawPacketRecord>(sortBy: [SortDescriptor(\.timestamp, order: .reverse)])
         let rows = (try? context.fetch(descriptor)) ?? []
         return rows.filter { row in
             if let direction = filter.direction, row.direction != direction { return false }
@@ -563,36 +582,33 @@ enum DebugRepository {
     }
     
     @MainActor
-    static func queryPackets(context: ModelContext) -> [RawPacketRow] {
+    static func queryPackets(context: ModelContext) -> [RawPacketRecord] {
         queryPackets(filter: DebugPacketFilter(), context: context)
     }
 
-    /// How long the audit tables (`DerivedUpdateRow`, `WearableLog`) keep rows. Both are diagnostics that
-    /// nothing reads back past a few days, and both grew without bound (audit batch B).
-    static let auditRetentionDays = 7
+    /// How long the audit tables (`DerivedUpdateRow`, `WearableLog`) keep rows (catalog `storage_audit_retention_days`).
+    /// Both are diagnostics that nothing reads back past a few days, and both grew without bound (audit batch B).
+    static let auditRetentionDays = AgaraConfig.Storage.auditRetentionDays
 
     /// Delete audit rows older than `auditRetentionDays` in two batch deletes (no fetch), then save.
-    /// Run once per launch.
+    /// Run once per launch (and by every maintenance pass).
     @MainActor
     static func pruneAuditTables(now: Date = Date(), context: ModelContext) {
-        let cutoff = now.addingTimeInterval(-Double(auditRetentionDays) * 86_400)
-        try? context.delete(model: DerivedUpdateRow.self, where: #Predicate { $0.timestamp < cutoff })
-        try? context.delete(model: WearableLog.self, where: #Predicate { $0.timestamp < cutoff })
+        StorageMaintenance.pruneAuditTables(now: now, days: auditRetentionDays, context: context)
         try? context.save()
     }
 
-    /// Cap the raw-packet debug table to its most recent `maxRows` rows, deleting older ones.
-    /// `RawPacketRow` is a byte trace (DEBUG builds always; release only under the Privacy & Data
-    /// capture opt-in) that otherwise grows without bound (one row per BLE packet); this keeps it a
-    /// rolling window so it can't bloat the store or slow the Debug feed. `maxRows: 0` is the
-    /// "clear captured packets" action. Does NOT save — the caller batches the save with its own
-    /// writes.
+    /// Cap the raw-packet debug table to its most recent `maxRows` rows, deleting older ones. `maxRows: 0` is the
+    /// "clear captured packets" action. Does NOT save — the caller batches the save with its own writes.
     @MainActor
     static func pruneRawPackets(maxRows: Int, context: ModelContext) {
-        var descriptor = FetchDescriptor<RawPacketRow>(sortBy: [SortDescriptor(\.timestamp, order: .reverse)])
-        descriptor.fetchOffset = maxRows          // skip the rows we want to keep…
-        let stale = (try? context.fetch(descriptor)) ?? []   // …delete everything older
-        guard !stale.isEmpty else { return }
-        for row in stale { context.delete(row) }
+        StorageMaintenance.pruneRawPackets(maxRows: maxRows, context: context)
+    }
+
+    /// The rolling window both apps keep (catalog `storage_raw_packets_window_hours` / `_max_rows`). Does NOT save.
+    @MainActor
+    static func pruneRawPacketWindow(now: Date = Date(), hours: Int = AgaraConfig.Storage.rawPacketsWindowHours,
+                                     maxRows: Int = AgaraConfig.Storage.rawPacketsMaxRows, context: ModelContext) {
+        StorageMaintenance.pruneRawPacketWindow(now: now, hours: hours, maxRows: maxRows, context: context)
     }
 }

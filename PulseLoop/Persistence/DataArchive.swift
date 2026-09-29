@@ -394,7 +394,9 @@ nonisolated struct ArchiveMeasurement: Codable, Sendable {
     }
 
     @MainActor func insert(into context: ModelContext) {
-        let m = PulseLoop.Measurement(kind: .heartRate, value: value, unit: unit, timestamp: timestamp)
+        // Imported rows predate any known link: they get the unknown sensor id, never this phone's ring.
+        let m = PulseLoop.Measurement(kind: .heartRate, value: value, unit: unit, timestamp: timestamp,
+                                      sensorId: AgaraConfig.Storage.sensorUnknownId)
         m.id = id
         m.kindRaw = ArchiveInterop.importKind(kindRaw)
         m.sourceRaw = sourceRaw
@@ -512,8 +514,8 @@ nonisolated struct ArchiveRawPacket: Codable, Sendable {
     var confidenceRaw: String
     var createdAt: Date
 
-    @MainActor init(_ m: RawPacketRow) {
-        id = m.id.uuidString
+    @MainActor init(_ m: RawPacketRecord) {
+        id = UUID().uuidString
         timestamp = m.timestamp
         directionRaw = m.directionRaw
         commandId = m.commandId
@@ -521,15 +523,13 @@ nonisolated struct ArchiveRawPacket: Codable, Sendable {
         decodedKind = m.decodedKind
         decodedJSON = m.decodedJSON
         confidenceRaw = m.confidenceRaw
-        createdAt = m.createdAt
+        createdAt = m.timestamp
     }
 
     @MainActor func insert(into context: ModelContext) {
-        let m = RawPacketRow(timestamp: timestamp, direction: .incoming, commandId: commandId, hexPayload: hexPayload, decodedKind: decodedKind, decodedJSON: decodedJSON)
-        m.id = ArchiveInterop.uuid(id)
+        let m = RawPacketRecord(timestamp: timestamp, direction: .incoming, commandId: commandId, hexPayload: hexPayload, decodedKind: decodedKind, decodedJSON: decodedJSON)
         m.directionRaw = directionRaw
         m.confidenceRaw = confidenceRaw
-        m.createdAt = createdAt
         context.insert(m)
     }
 }

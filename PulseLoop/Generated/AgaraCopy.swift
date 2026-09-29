@@ -98,7 +98,7 @@ enum AgaraCopy {
 
 /// Help text for ⓘ popovers, tooltips and one-time hints. Same strings as Android `AgaraHelp`.
 enum AgaraHelp {
-    static let hintMeasure = "Tap Measure to take a reading now — pick heart rate, blood oxygen, blood pressure and more."
+    static let hintMeasure = "Tap Measure to take a reading now — pick heart rate, blood oxygen and more."
     static let hintRingChip = "Your ring — the arc is its battery. Tap for ring settings, find ring and firmware."
     static let ringChip = "Ring status and battery. Tap for ring settings."
     static let settingsGear = "Settings"

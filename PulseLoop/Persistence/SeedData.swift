@@ -173,7 +173,7 @@ enum SeedData {
             body: "Your sleep is synced and activity is trending above baseline. Keep today's effort steady unless your HR stays elevated."
         ))
         
-        context.insert(RawPacketRow(
+        context.insert(RawPacketRecord(
             direction: .incoming,
             commandId: 0x03,
             hexPayload: "03112233447e240000a51a000064010000000000",
@@ -181,7 +181,7 @@ enum SeedData {
             decodedJSON: #"{"steps":9342}"#,
             confidence: .known
         ))
-        context.insert(RawPacketRow(direction: .outgoing, commandId: 0x0c, hexPayload: "0c00000000000000000000000000000000000000", decodedKind: "status_command", confidence: .known))
+        context.insert(RawPacketRecord(direction: .outgoing, commandId: 0x0c, hexPayload: "0c00000000000000000000000000000000000000", decodedKind: "status_command", confidence: .known))
         context.insert(DerivedUpdateRow(kind: "seed", entityType: "database", entityId: "demo", payloadJSON: #"{"source":"SeedData"}"#))
         }
 
@@ -335,6 +335,9 @@ enum SeedData {
         deleteAll(SleepSession.self, context)
         deleteAll(SleepStageBlock.self, context)
         deleteAll(RawPacketRow.self, context)
+        deleteAll(RawPacketRecord.self, context)
+        deleteAll(MeasurementBlock.self, context)
+        deleteAll(BlockSync.self, context)
         deleteAll(DerivedUpdateRow.self, context)
         if !keepingProfile {
             deleteAll(UserProfile.self, context)

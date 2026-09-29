@@ -153,7 +153,7 @@ struct RootAppView: View {
                 // headless). Names: about, dataExport, privacy, wearable, autoMeasure, profile.
                 if let raw = DebugLaunch.string("openRoute") {
                     let routes: [String: AppRoute] = [
-                        "about": .settingsAbout, "dataExport": .settingsDataExport, "privacy": .settingsPrivacyData,
+                        "about": .settingsAbout, "dataExport": .settingsDataExport, "storage": .settingsStorage, "privacy": .settingsPrivacyData,
                         "wearable": .settingsWearable, "autoMeasure": .settingsAutoMeasure, "profile": .settingsProfile,
                     ]
                     if let route = routes[raw] { path.append(route) }
@@ -213,7 +213,9 @@ struct RootAppView: View {
                 case .settingsAutoMeasure:
                     AutoMeasureSettingsView()
                 case .settingsDataExport:
-                    DataExportSettingsView()
+                    DataExportSettingsView(path: $path)
+                case .settingsStorage:
+                    StorageSettingsView()
                 case .settingsActivityTracking:
                     WorkoutSettingsView()
                 case .settingsGoals:

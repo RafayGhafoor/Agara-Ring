@@ -36,6 +36,7 @@ enum AppDataWipe {
         }
 
         // 6. In-memory singletons cache their settings; reassigning re-persists fresh defaults into the emptied domain.
+        SensorIdentity.shared.reset()
         MetricPrefsStore.shared.settings = .default
         CoachSettingsStore.shared.settings = .default
         CalibrationStore.shared.settings = .default

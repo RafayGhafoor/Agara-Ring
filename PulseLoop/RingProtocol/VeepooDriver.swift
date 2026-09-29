@@ -117,6 +117,7 @@ final class VeepooDriver: WearableDriver {
             if let info = decoder.firmware(frame: data) {
                 events.append(.firmware(version: info.version, deviceNumber: info.deviceNumber, testVersion: info.testVersion))
             }
+            if let sensorId = decoder.ringSensorId(frame: data) { events.append(.ringIdentity(sensorId: sensorId)) }
             return events
         case VeepooOpcode.deviceInfo.rawValue:
             guard let percent = decoder.battery(frame: data) else { return [] }

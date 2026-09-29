@@ -14,6 +14,8 @@ enum RawPacketCapture {
 
     /// Whether the persistence subscriber should store packets right now.
     static var isEnabled: Bool {
+        // Below `storage_low_disk_free_mb` of free space capture stops (the diagnostics are the first thing to give up).
+        if StorageGuard.isLowDisk { return false }
         #if DEBUG
         return true
         #else

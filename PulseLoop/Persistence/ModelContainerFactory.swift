@@ -10,7 +10,10 @@ enum ModelContainerFactory {
             BatterySample.self,
             SleepSession.self,
             SleepStageBlock.self,
-            RawPacketRow.self,
+            RawPacketRow.self,          // legacy (hex text); converted into RawPacketRecord, removed one release later
+            RawPacketRecord.self,
+            MeasurementBlock.self,
+            BlockSync.self,
             DerivedUpdateRow.self,
             UserProfile.self,
             UserGoal.self,

@@ -250,11 +250,15 @@ final class MeasureHubProtocolTests: XCTestCase {
         XCTAssertEqual(info?.version, "00.12.09")
         XCTAssertEqual(info?.testVersion, "00.12.09.00")
         let events = ingest(driver(), "a100000609de00120900000114401e1c42410000")
-        XCTAssertEqual(events.map(\.kind), ["command_ack", "firmware"])
+        // The reply also carries the ring's own address (bytes 12…17, reversed): it becomes the AGB sensor id, hashed in the decoder.
+        XCTAssertEqual(events.map(\.kind), ["command_ack", "firmware", "ring_identity"])
         guard case let .firmware(version, deviceNumber, testVersion) = events[1] else { return XCTFail() }
         XCTAssertEqual(version, "00.12.09")
         XCTAssertEqual(deviceNumber, 2526)
         XCTAssertEqual(testVersion, "00.12.09.00")
+        guard case let .ringIdentity(sensorId) = events[2] else { return XCTFail() }
+        XCTAssertEqual(sensorId, AGB.sensorId(ringMac: "41:42:1C:1E:40:14"))
+        XCTAssertEqual(sensorId.count, AgaraConfig.Storage.sensorIdHexChars)
     }
 
     // MARK: §3/§6 Stress, glucose, blood components (SDK layout — no capture yet)

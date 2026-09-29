@@ -333,12 +333,24 @@ enum MetricsService {
         let sliceWidth = bucketWidth / Double(plan.slices)
         var out: [MetricSample] = []
         out.reserveCapacity(plan.buckets)
+        // Days before the seal boundary may live in blocks (`MeasurementSeries`); for those the bucket mean comes from the
+        // block summary columns (whole days, no decoding) plus the edge days (decoded and clipped) — the exact mean of the
+        // bucket's points, where the row path below samples. Rows still present (not yet compacted) keep the row path.
+        let hasSealed = MeasurementSeries.hasBlocks(metric: raw, context: context)
         for bucket in 0..<plan.buckets {
             let bucketStart = start.addingTimeInterval(Double(bucket) * bucketWidth)
             var sum = 0.0
             var count = 0
             var first: Date?
             var last: Date?
+            if hasSealed {
+                let stats = MeasurementSeries.stats(metric: raw, fromMs: BlockStore.ms(bucketStart),
+                                                    toMs: BlockStore.ms(bucketStart.addingTimeInterval(bucketWidth)), context: context)
+                if stats.count > 0, let f = stats.firstTs, let l = stats.lastTs {
+                    sum = stats.sum; count = stats.count
+                    first = BlockStore.date(ms: f); last = BlockStore.date(ms: l)
+                }
+            }
             for slice in 0..<plan.slices {
                 let lo = bucketStart.addingTimeInterval(Double(slice) * sliceWidth)
                 let hi = lo.addingTimeInterval(sliceWidth)
@@ -350,8 +362,8 @@ enum MetricsService {
                 for row in (try? context.fetch(descriptor)) ?? [] where row.value.isFinite {
                     sum += row.value
                     count += 1
-                    if first == nil { first = row.timestamp }
-                    last = row.timestamp
+                    first = min(first ?? row.timestamp, row.timestamp)
+                    last = max(last ?? row.timestamp, row.timestamp)
                 }
             }
             guard count > 0, let first, let last else { continue }

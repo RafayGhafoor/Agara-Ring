@@ -45,9 +45,40 @@ enum ReadingDeletion {
     /// Delete `rows` (expanded to whole readings), tombstoning the history ones, and save. Returns rows removed.
     @discardableResult
     static func delete(_ rows: [Measurement], context: ModelContext, now: Date = Date()) -> Int {
+        // Readings older than the hot window live in blocks; the reader hands them out as detached rows (no context).
+        // Those are removed from their block (re-encoded without the point, a revision bump) and tombstoned by
+        // (metric, ts, source); a history reading also gets the usual `history:` key so a re-sync can't restore it.
+        let detached = rows.filter { $0.modelContext == nil }
+        let attached = rows.filter { $0.modelContext != nil }
+        var deletedFromBlocks = 0
+        if !detached.isEmpty {
+            var refs = detached.map { BlockStore.PointRef(metric: $0.kindRaw, sourceRaw: $0.sourceRaw, sensorId: $0.sensorId, ts: BlockStore.ms($0.timestamp)) }
+            for row in detached {   // a blood-pressure reading is two series with one timestamp
+                if row.kind == .bloodPressureSystolic || row.kind == .bloodPressureDiastolic {
+                    let other = row.kind == .bloodPressureSystolic ? MeasurementKind.bloodPressureDiastolic : .bloodPressureSystolic
+                    refs.append(BlockStore.PointRef(metric: other.rawValue, sourceRaw: row.sourceRaw, sensorId: row.sensorId, ts: BlockStore.ms(row.timestamp)))
+                }
+            }
+            var keys = loadCache(context)
+            let removed = BlockStore.removePoints(refs, now: now, context: context)
+            for ref in removed {
+                let when = BlockStore.date(ms: ref.ts)
+                let blockKey = "block:\(ref.metric):\(AGB.sourceKey(ref.sourceRaw) ?? ref.sourceRaw):\(ref.ts)"
+                var pending = [blockKey]
+                if ref.sourceRaw == MeasurementSource.history.rawValue { pending.append(historyKey(kindRaw: ref.metric, timestamp: when)) }
+                for key in pending where !keys.contains(key) {
+                    context.insert(MeasurementDeletion(measurementId: key, kindRaw: ref.metric, timestamp: when, deletedAt: now))
+                    keys.insert(key)
+                }
+            }
+            cache = keys
+            deletedFromBlocks = removed.count
+            try? context.save()
+            AgaraDataChange.shared.notify()
+        }
         var byId: [UUID: Measurement] = [:]
-        for row in rows { for r in readingRows(for: row, context: context) { byId[r.id] = r } }
-        guard !byId.isEmpty else { return 0 }
+        for row in attached { for r in readingRows(for: row, context: context) { byId[r.id] = r } }
+        guard !byId.isEmpty else { return deletedFromBlocks }
         var keys = loadCache(context)
         for row in byId.values {
             if row.sourceRaw == MeasurementSource.history.rawValue {
@@ -67,7 +98,7 @@ enum ReadingDeletion {
         cache = keys
         try? context.save()
         AgaraDataChange.shared.notify()
-        return byId.count
+        return byId.count + deletedFromBlocks
     }
 
     /// A history sample for (kind, timestamp) the user deleted — the persistence gate.

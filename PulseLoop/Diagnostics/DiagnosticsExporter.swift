@@ -5,7 +5,7 @@ import UIKit
 #endif
 
 /// Builds a shareable diagnostics bundle (JSON): app/OS/device info + the recent `WearableLog`
-/// timeline. Raw BLE packets (`RawPacketRow`) ride along only while `RawPacketCapture.isEnabled` —
+/// timeline. Raw BLE packets (`RawPacketRecord`) ride along only while `RawPacketCapture.isEnabled` —
 /// always in DEBUG builds, and in release only under the user's explicit Privacy & Data opt-in
 /// (the remote-tester workflow for rings nobody on the project has in hand).
 @MainActor
@@ -86,7 +86,7 @@ enum DiagnosticsExporter {
     }
 
     private static func recentPackets(context: ModelContext, limit: Int) -> [[String: Any]] {
-        var descriptor = FetchDescriptor<RawPacketRow>(sortBy: [SortDescriptor(\.timestamp, order: .reverse)])
+        var descriptor = FetchDescriptor<RawPacketRecord>(sortBy: [SortDescriptor(\.timestamp, order: .reverse)])
         descriptor.fetchLimit = limit
         let packets = (try? context.fetch(descriptor)) ?? []
         return packets.map { p in

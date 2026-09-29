@@ -46,7 +46,7 @@ final class DataArchiveTests: XCTestCase {
         }
         check(Device.self); check(ActivityDaily.self); check(PulseLoop.Measurement.self)
         check(BatterySample.self); check(SleepSession.self); check(SleepStageBlock.self)
-        check(RawPacketRow.self); check(DerivedUpdateRow.self); check(UserProfile.self)
+        check(RawPacketRecord.self); check(DerivedUpdateRow.self); check(UserProfile.self)
         check(UserGoal.self); check(DeviceMeasurementConfig.self); check(ActivitySession.self)
         check(ActivitySample.self); check(ActivityBucketSample.self); check(ActivityGpsPoint.self)
         check(ActivityEvent.self); check(ActivitySensorPollEvent.self); check(CoachConversation.self)
@@ -148,7 +148,7 @@ final class DataArchiveTests: XCTestCase {
         }
         assertEmpty(Device.self); assertEmpty(ActivityDaily.self); assertEmpty(PulseLoop.Measurement.self)
         assertEmpty(BatterySample.self); assertEmpty(SleepSession.self); assertEmpty(SleepStageBlock.self)
-        assertEmpty(RawPacketRow.self); assertEmpty(DerivedUpdateRow.self); assertEmpty(UserProfile.self)
+        assertEmpty(RawPacketRecord.self); assertEmpty(DerivedUpdateRow.self); assertEmpty(UserProfile.self)
         assertEmpty(UserGoal.self); assertEmpty(DeviceMeasurementConfig.self); assertEmpty(ActivitySession.self)
         assertEmpty(ActivitySample.self); assertEmpty(ActivityBucketSample.self); assertEmpty(ActivityGpsPoint.self)
         assertEmpty(ActivityEvent.self); assertEmpty(ActivitySensorPollEvent.self); assertEmpty(CoachConversation.self)
@@ -331,7 +331,7 @@ final class DataArchiveTests: XCTestCase {
 
     func testRawPacketsAreOptIn() async throws {
         let context = try TestSupport.makeContext()
-        context.insert(RawPacketRow(timestamp: Date(), direction: .incoming, commandId: 0xDF, hexPayload: "df00"))
+        context.insert(RawPacketRecord(timestamp: Date(), direction: .incoming, commandId: 0xDF, hexPayload: "df00"))
         try context.save()
         let dir = try makeTempDirectory()
         func json(_ include: Bool) async throws -> [String: Any] {
@@ -468,9 +468,9 @@ final class DataArchiveTests: XCTestCase {
         XCTAssertEqual(measurements.map(\.kindRaw), ["hr", "spo2"], "Android enum names map to iOS kinds")
         XCTAssertEqual(measurements.first?.value, 72)
         XCTAssertEqual(measurements.first?.timestamp, t0.addingTimeInterval(-3600))
-        let packet = try XCTUnwrap(try context.fetch(FetchDescriptor<RawPacketRow>()).first)
-        XCTAssertEqual(measurements.first?.rawPacketId, packet.id, "integer raw-packet id maps consistently")
-        XCTAssertEqual(packet.id, ArchiveInterop.uuid("42"))
+        // Raw packets are byte rows without an id now (`RawPacketRecord`); the measurement keeps the mapped link id.
+        XCTAssertNotNil(try context.fetch(FetchDescriptor<RawPacketRecord>()).first)
+        XCTAssertEqual(measurements.first?.rawPacketId, ArchiveInterop.uuid("42"), "integer raw-packet id maps consistently")
 
         let daily = try XCTUnwrap(try context.fetch(FetchDescriptor<ActivityDaily>()).first)
         XCTAssertEqual(daily.steps, 8421)

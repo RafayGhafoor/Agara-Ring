@@ -163,6 +163,13 @@ extension ConfirmAction {
                       confirmLabel: "Load", perform: perform)
     }
 
+    /// Settings › Data & Export › Storage › Diagnostics › Clear raw data. Copy from `brand.yaml` (both apps): it says the raw
+    /// trace feeds the sleep repair, so clearing it removes the ability to re-derive past nights from it.
+    static func clearRawData(_ perform: @escaping () -> Void) -> ConfirmAction {
+        ConfirmAction(key: "clearRawData", title: AgaraCopy.confirmClearRawDataTitle, message: AgaraCopy.confirmClearRawDataBody,
+                      confirmLabel: "Clear", perform: perform)
+    }
+
     static func clearDemo(_ perform: @escaping () -> Void) -> ConfirmAction {
         ConfirmAction(key: "clearDemo", title: AgaraCopy.confirmClearDemoTitle, message: AgaraCopy.confirmClearDemoBody,
                       confirmLabel: "Clear", perform: perform)

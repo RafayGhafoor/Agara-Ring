@@ -225,6 +225,9 @@ enum RingEventBridge {
             return [.firmwareVersion(version),
                     .firmwareIdentity(deviceNumber: deviceNumber, version: version, testVersion: testVersion)]
 
+        case let .ringIdentity(sensorId):
+            return [.ringIdentified(sensorId: sensorId)]
+
         case let .chargingState(isCharging):
             return [.chargingState(isCharging)]
 

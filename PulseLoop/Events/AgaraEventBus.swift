@@ -50,6 +50,9 @@ enum AgaraEvent: Sendable {
     /// The ring's device number and test version from the `a1` reply — the firmware-update lookup key
     /// (`FirmwareUpdateChecker`). Persisted on the Device row next to `firmwareVersion`.
     case firmwareIdentity(deviceNumber: Int, version: String, testVersion: String)
+    /// The connected ring's sensor id (AGB v1 §4) from its `a1` reply; stamped on every row measured on this link.
+    /// Not persisted: it is re-published on every connect, which always sends `a1` first.
+    case ringIdentified(sensorId: String)
     /// The ring is (not) on its charger. A live condition — not persisted (`RingBLEClient.isCharging`).
     case chargingState(Bool)
     /// The ring's decoded capability packets; persisted on the Device row.
@@ -110,11 +113,10 @@ final class EventPersistenceSubscriber {
     private let context: ModelContext
     private var task: Task<Void, Never>?
 
-    /// Rolling cap for the raw-packet trace, and how often we prune (every Nth insert, so we don't
-    /// pay a fetch on every packet during a sync burst). DEBUG builds always capture; release
-    /// builds only when the user opts in (see `RawPacketCapture`).
-    private let rawPacketCap = 2_000
-    private let rawPacketPruneInterval = 200
+    /// Rolling window for the raw-packet trace (catalog: `storage_raw_packets_window_hours` and `_max_rows`, the same
+    /// on both apps), and how often we prune (every Nth insert, so we don't pay a fetch on every packet during a sync
+    /// burst). DEBUG builds always capture; release builds only when the user opts in (see `RawPacketCapture`).
+    private let rawPacketPruneInterval = 500
     private var rawPacketInsertsSincePrune = 0
 
     /// Coalesced-save state. During a sync the ring streams hundreds of events; saving per event
@@ -247,6 +249,9 @@ final class EventPersistenceSubscriber {
         }
         switch event {
         case let .deviceStateChanged(state, address):
+            // Rows written before a connection's `a1` reply belong to no known ring (AGB v1 §13): drop the last
+            // link's identity the moment the link is gone or changing.
+            if state != .connected { SensorIdentity.shared.setRing(sensorId: nil) }
             let device = MetricsService.fetchDevices(context).first ?? Device()
             device.state = state
             device.bleAddressHint = address ?? device.bleAddressHint
@@ -271,6 +276,7 @@ final class EventPersistenceSubscriber {
             adoptDeviceName(advertised: advertisedName, deviceType: deviceType, on: device)
             context.insert(device)
         case .deviceForgotten:
+            SensorIdentity.shared.setRing(sensorId: nil)
             guard let device = MetricsService.fetchDevices(context).first else { break }
             device.wearableModelID = nil
             device.advertisedName = nil
@@ -308,10 +314,10 @@ final class EventPersistenceSubscriber {
             // off by default and clearable).
             guard RawPacketCapture.isEnabled else { noopWrite = true; return }
             context.insert(
-                RawPacketRow(
+                RawPacketRecord(
                     direction: direction,
                     commandId: Int(data.first ?? 0),
-                    hexPayload: data.hexString,
+                    payload: data,
                     decodedKind: decoded.kind,
                     decodedJSON: decoded.debugJSON,
                     confidence: decoded.confidence
@@ -322,7 +328,7 @@ final class EventPersistenceSubscriber {
             rawPacketInsertsSincePrune += 1
             if rawPacketInsertsSincePrune >= rawPacketPruneInterval {
                 rawPacketInsertsSincePrune = 0
-                DebugRepository.pruneRawPackets(maxRows: rawPacketCap, context: context)
+                DebugRepository.pruneRawPacketWindow(context: context)
             }
         case let .derivedUpdate(kind, entityType, entityId, payloadJSON):
             context.insert(DerivedUpdateRow(kind: kind, entityType: entityType, entityId: entityId, payloadJSON: payloadJSON))
@@ -386,6 +392,9 @@ final class EventPersistenceSubscriber {
             persistMeasurement(kind: .bloodSugar, value: mgdl, timestamp: timestamp, source: .live, kindLabel: "blood_sugar_sample")
         case let .firmwareVersion(version):
             persistFirmwareVersion(version)
+        case let .ringIdentified(sensorId):
+            SensorIdentity.shared.setRing(sensorId: sensorId)
+            noopWrite = true
         case let .firmwareIdentity(deviceNumber, _, testVersion):
             if let device = DeviceRepository.current(context: context) {
                 if device.deviceNumber != deviceNumber { device.deviceNumber = deviceNumber }

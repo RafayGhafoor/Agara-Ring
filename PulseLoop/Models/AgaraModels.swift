@@ -271,6 +271,11 @@ final class Measurement {
     var rawPacketId: UUID?
     // The hash modifier makes an upgraded store migrate, which is what creates the new index there.
     @Attribute(hashModifier: "idx-2026-09") var createdAt: Date
+    /// The device that measured (AGB v1 §4/§11): 16 lowercase hex characters — the ring's identity from its `a1`
+    /// reply, the per-install id for phone-sourced rows, or `sensorUnknownId` (rows written before this column
+    /// existed, or before a connection's `a1` reply). The declaration default is what a lightweight migration
+    /// backfills into existing rows. The compactor cannot form a block key without it.
+    var sensorId: String = AgaraConfig.Storage.sensorUnknownId
     
     init(
         id: UUID = UUID(),
@@ -281,8 +286,10 @@ final class Measurement {
         source: MeasurementSource = .ring,
         confidence: DecodeConfidence = .known,
         activitySessionId: UUID? = nil,
-        rawPacketId: UUID? = nil
+        rawPacketId: UUID? = nil,
+        sensorId: String? = nil
     ) {
+        self.sensorId = sensorId ?? SensorIdentity.shared.sensorId(forSource: source.rawValue)
         self.id = id
         self.kindRaw = kind.rawValue
         self.value = value

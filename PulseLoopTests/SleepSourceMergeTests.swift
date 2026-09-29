@@ -318,7 +318,7 @@ final class SleepSourceMergeTests: XCTestCase {
 
     private func storeRawTransfer(_ pages: [String], at timestamp: Date, into context: ModelContext) {
         for (index, hex) in pages.enumerated() {
-            context.insert(RawPacketRow(timestamp: timestamp.addingTimeInterval(Double(index) * 0.05),
+            context.insert(RawPacketRecord(timestamp: timestamp.addingTimeInterval(Double(index) * 0.05),
                                         direction: .incoming, commandId: 0xE0, hexPayload: hex))
         }
     }

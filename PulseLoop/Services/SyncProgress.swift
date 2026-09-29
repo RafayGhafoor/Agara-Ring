@@ -45,6 +45,27 @@ final class SyncProgress {
         return perDay * Double(max(0, totalDays - daysDone))
     }
 
+    // MARK: Background jobs on the same model (storage "Optimize now")
+
+    /// A non-ring job (compaction, cleanup) reported through the same observable model, so every surface that shows sync
+    /// progress can show it (the Storage screen's progress row). Independent of `isSyncing`, which stays the ring's.
+    struct Job: Equatable {
+        var title: String
+        var detail: String
+        var fraction: Double
+    }
+
+    private(set) var job: Job?
+
+    func beginJob(title: String, detail: String = "") { job = Job(title: title, detail: detail, fraction: 0) }
+    func updateJob(fraction: Double, detail: String) {
+        guard var current = job else { return }
+        current.fraction = min(1, max(current.fraction, fraction))   // never runs backwards
+        current.detail = detail
+        job = current
+    }
+    func endJob() { job = nil }
+
     var calendar = Calendar.current
     var now: () -> Date = Date.init
     let notifications: AgaraNotifications

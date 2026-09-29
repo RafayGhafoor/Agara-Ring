@@ -11,6 +11,8 @@ nonisolated enum DataArchiveError: LocalizedError, Sendable {
     case operationInProgress
     /// The store holds only the labelled sample set ("Explore without ring"); exporting it would pass it off as data.
     case sampleDataLoaded
+    /// The phone is out of room: below `storage_critical_disk_free_mb`, or less than twice the inflated archive is free.
+    case insufficientStorage
 
     var errorDescription: String? {
         switch self {
@@ -24,6 +26,8 @@ nonisolated enum DataArchiveError: LocalizedError, Sendable {
             return "Another export or import is already running. Wait for it to finish and try again."
         case .sampleDataLoaded:
             return "This phone only holds sample data. Pair your ring, or clear the sample data, before exporting."
+        case .insufficientStorage:
+            return "There isn't enough free space on this phone to import this backup. Free up some space and try again."
         }
     }
 }
@@ -144,7 +148,13 @@ enum DataArchiveService {
             counts.append((tableName, n))
         }
         try await table("devices", "devices", Device.self) { ArchiveDevice($0) }
-        try await table("measurements", "measurements", PulseLoop.Measurement.self) { ArchiveMeasurement($0) }
+        // Hot rows, then the readings that live in sealed blocks (decoded back to rows: the export format is still v1, one
+        // JSON object per reading — Export v2, a zip of blocks, is a later phase). Nothing compacted is left out of a backup.
+        try sink.write(Data(",\"measurements\":[".utf8))
+        let hotRows = try await streamRows(PulseLoop.Measurement.self, context, sink) { ArchiveMeasurement($0) }
+        let sealedRows = try await streamSealedMeasurements(context, sink, leadingComma: hotRows > 0)
+        try sink.write(Data("]".utf8))
+        counts.append(("measurements", hotRows + sealedRows))
         try await table("activityDaily", "activity_daily", ActivityDaily.self) { ArchiveActivityDaily($0) }
         try await table("activityBuckets", "activity_buckets", ActivityBucketSample.self) { ArchiveActivityBucketSample($0) }
         try await table("batterySamples", "battery_samples", BatterySample.self) { ArchiveBatterySample($0) }
@@ -166,7 +176,7 @@ enum DataArchiveService {
         try await table("coachToolCalls", "coach_tool_calls", CoachToolCall.self) { ArchiveCoachToolCall($0) }
         try await table("userProfiles", "user_profiles", UserProfile.self) { ArchiveUserProfile($0) }
         try await table("userGoals", "user_goals", UserGoal.self) { ArchiveUserGoal($0) }
-        try await table("rawPackets", "raw_packets", RawPacketRow.self, skip: !includeRawPackets) { ArchiveRawPacket($0) }
+        try await table("rawPackets", "raw_packets", RawPacketRecord.self, skip: !includeRawPackets) { ArchiveRawPacket($0) }
         try await table("derivedUpdates", "derived_updates", DerivedUpdateRow.self) { ArchiveDerivedUpdate($0) }
         try await table("coachSummaries", "coach_summaries", CoachSummary.self) { ArchiveCoachSummary($0) }
         try await table("wearableLogs", "wearable_logs", WearableLog.self) { ArchiveWearableLog($0) }
@@ -239,6 +249,42 @@ enum DataArchiveService {
         return written
     }
 
+    /// Every reading held in a sealed, readable block whose day no longer has rows, as `ArchiveMeasurement` JSON. One block at a
+    /// time is decoded on the main actor and encoded off-main. Ids are stable (derived from block key + timestamp), so two
+    /// exports of the same data agree. A skipped/quarantined block contributes nothing (its bytes stay in the store).
+    private static func streamSealedMeasurements(_ context: ModelContext, _ sink: ArchiveSink, leadingComma: Bool) async throws -> Int {
+        if context.hasChanges { try context.save() }
+        var descriptor = FetchDescriptor<MeasurementBlock>(predicate: #Predicate { $0.sealed == true && $0.state == 0 },
+                                                           sortBy: [SortDescriptor(\.utcDay), SortDescriptor(\.blockKey)])
+        descriptor.includePendingChanges = false
+        let blocks = try context.fetch(descriptor)
+        var written = 0
+        for block in blocks {
+            let key = BlockStore.Key(metric: block.metric, sourceRaw: BlockStore.rawSource(forKeySource: block.source),
+                                     sensorId: block.sensorId, day: Int64(block.utcDay))
+            if BlockStore.hasRows(for: key, context: context) { continue }   // rows win (interrupted seal); they were exported above
+            let dtos: [ArchiveMeasurement] = MeasurementSeries.points(of: block, context: context).map { point in
+                let m = MeasurementSeries.detached(point)
+                m.id = ArchiveInterop.uuid("\(block.blockKey):\(point.ts)")
+                m.createdAt = point.date
+                return ArchiveMeasurement(m)
+            }
+            guard !dtos.isEmpty else { continue }
+            let comma = leadingComma || written > 0
+            try await Task.detached(priority: .userInitiated) {
+                let encoder = ArchiveCoding.makeEncoder()
+                var buffer = Data()
+                for (i, dto) in dtos.enumerated() {
+                    if comma || i > 0 { buffer.append(0x2C) }
+                    buffer.append(try encoder.encode(dto))
+                }
+                try sink.write(buffer)
+            }.value
+            written += dtos.count
+        }
+        return written
+    }
+
     private static func collectAttachments(from directory: URL) -> [ArchiveAttachment] {
         // Skip hidden files (.DS_Store & co.) — the import validator rejects dot-file names, so
         // exporting one would make the whole archive un-importable.
@@ -281,6 +327,12 @@ enum DataArchiveService {
             }
         } else {
             data = fileData
+        }
+
+        // 0b. Room to work: never below the critical threshold, and at least twice the inflated archive.
+        StorageGuard.refresh()
+        guard !StorageGuard.isCriticalDisk, StorageGuard.freeBytes >= Int64(data.count) * 2 else {
+            throw DataArchiveError.insufficientStorage
         }
 
         // 1. Cheap version probe first, so a newer-format file gets a clear error instead of a
@@ -346,7 +398,7 @@ enum DataArchiveService {
         }
         return has(Device.self) || has(ActivityDaily.self) || has(PulseLoop.Measurement.self)
             || has(BatterySample.self) || has(SleepSession.self) || has(SleepStageBlock.self)
-            || has(RawPacketRow.self) || has(DerivedUpdateRow.self) || has(UserProfile.self)
+            || has(RawPacketRecord.self) || has(DerivedUpdateRow.self) || has(UserProfile.self)
             || has(UserGoal.self) || has(DeviceMeasurementConfig.self) || has(ActivitySession.self)
             || has(ActivitySample.self) || has(ActivityBucketSample.self) || has(ActivityGpsPoint.self)
             || has(ActivityEvent.self) || has(ActivitySensorPollEvent.self) || has(CoachConversation.self)
@@ -366,6 +418,9 @@ enum DataArchiveService {
         try deleteAll(SleepSession.self, context)
         try deleteAll(SleepStageBlock.self, context)
         try deleteAll(RawPacketRow.self, context)
+        try deleteAll(RawPacketRecord.self, context)
+        try deleteAll(MeasurementBlock.self, context)
+        try deleteAll(BlockSync.self, context)
         try deleteAll(DerivedUpdateRow.self, context)
         try deleteAll(UserProfile.self, context)
         try deleteAll(UserGoal.self, context)

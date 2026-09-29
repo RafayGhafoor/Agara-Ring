@@ -3,7 +3,7 @@ import XCTest
 /// Default-flag mode (the shipped release configuration): blood pressure and blood sugar are off by flag
 /// (`vitals_bp`, `vitals_glucose`, `measure_bp`, `measure_glucose`), so no card, tile, setting or text for them
 /// may appear anywhere. The other UI tests run with `AgaraUITestCase.allFeatures`, which turns them on.
-/// Store launch phase 1, item 1 — the same check runs on an iPad destination (see the e2e command in the report).
+/// Store launch phase 1, item 1 — iPhone destinations only now (the app no longer targets iPad; owner, 2026-09-29).
 final class DefaultFlagsTests: AgaraUITestCase {
 
     private let bannedLabels = ["Blood pressure", "Blood sugar", "Blood glucose", "Glucose", "Hypertension", "mmHg", "mg/dL"]
@@ -45,7 +45,7 @@ final class DefaultFlagsTests: AgaraUITestCase {
         }
     }
 
-    /// Sample data needs no emulator, so this always runs (also on an iPad simulator).
+    /// Sample data needs no emulator, so this always runs.
     func testDefaultFlagsShowNoBloodPressureOrSugarWithSampleData() {
         app.launchArguments = ["-noCoachMarks", "YES", "-acceptDisclaimer", "YES", "-sampleData", "YES",
                                "-features", "", "-AppleLanguages", "(en)"]

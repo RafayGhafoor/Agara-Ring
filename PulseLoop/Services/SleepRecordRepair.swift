@@ -12,7 +12,7 @@ import SwiftData
 /// rule — so each night ends up as its latest version, with no stale runs. Days without overlap are left
 /// alone, as is everything already source-stamped.
 ///
-/// Limits (recorded, not hidden): the trace is a rolling window of `EventPersistenceSubscriber.rawPacketCap`
+/// Limits (recorded, not hidden): the trace is a rolling window of `storage_raw_packets_window_hours` and `_max_rows`
 /// rows and is only kept in DEBUG builds or when the user enabled capture, so on most installs there is
 /// nothing to replay and the repair does nothing. Raw rows carry no link identity, so re-applied records stay
 /// unsourced (as the blocks they replace were), and two sources' legacy records on one night resolve as
@@ -90,12 +90,19 @@ enum SleepRecordRepair {
             return (0, 0, 0)
         }
         let incoming = PacketDirection.incoming.rawValue
-        let descriptor = FetchDescriptor<RawPacketRow>(
+        let descriptor = FetchDescriptor<RawPacketRecord>(
+            predicate: #Predicate { $0.commandId == 0xE0 && $0.directionRaw == incoming },
+            sortBy: [SortDescriptor(\.timestamp)]
+        )
+        // Traces captured before the BLOB model live in the legacy hex rows until maintenance converts them.
+        let legacy = FetchDescriptor<RawPacketRow>(
             predicate: #Predicate { $0.commandId == 0xE0 && $0.directionRaw == incoming },
             sortBy: [SortDescriptor(\.timestamp)]
         )
         let rows = (try? context.fetch(descriptor)) ?? []
-        let found = records(from: rows.map { ($0.timestamp, $0.hexPayload) }, calendar: calendar)
+        let oldRows = (try? context.fetch(legacy)) ?? []
+        let found = records(from: (rows.map { ($0.timestamp, $0.hexPayload) } + oldRows.map { ($0.timestamp, $0.hexPayload) }),
+                            calendar: calendar)
         var applied = 0
         for record in found where days.contains(calendar.wakingDay(forSleepStart: record.start)) {
             SleepService.applySleepRecord(start: record.start, stages: record.stages, source: nil, context: context)

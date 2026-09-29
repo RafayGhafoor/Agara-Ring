@@ -169,6 +169,11 @@ struct AgaraApp: App {
         // components directly with their own fixtures; the app host just needs to launch cleanly.
         guard !runningTests else { return }
 
+        // Storage: the background maintenance owner (daily compaction, cleanup, "Optimize now") and the disk-space verdict
+        // that raw capture, caches and import consult. Nothing runs until the first delayed pass below.
+        StorageGuard.refresh()
+        StorageCenter.shared.attach(container: container)
+
         // Learn/refresh the resting-HR baseline that personalizes the auto HR zones (throttled
         // internally, so this is a cheap no-op most launches).
         RestingHRBaselineService.refreshIfStale(context: container.mainContext)
@@ -218,6 +223,12 @@ struct AgaraApp: App {
                 .environment(coordinator)
                 .environment(gpsRecorder)
                 .environment(liveWorkout)
+                .task {
+                    // Off the launch path: the routine pass waits until the ring sync has had its head start.
+                    guard !Self.isRunningUnitTests else { return }
+                    try? await Task.sleep(nanoseconds: 45_000_000_000)
+                    StorageCenter.shared.runIfDue()
+                }
         }
         .modelContainer(container)
         .onChange(of: scenePhase) { _, phase in
@@ -233,6 +244,10 @@ struct AgaraApp: App {
                 stravaSyncPublisher.kick()
             }
             guard phase == .active else { return }
+            if !Self.isRunningUnitTests {
+                StorageGuard.refresh()
+                StorageCenter.shared.runIfDue()
+            }
             // Refresh the learned resting-HR baseline on foreground (6h-throttled no-op usually).
             if !Self.isRunningUnitTests {
                 RestingHRBaselineService.refreshIfStale(context: container.mainContext)
