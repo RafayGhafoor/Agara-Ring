@@ -32,10 +32,7 @@ struct VitalsResultsView: View {
             tiles.append(.init(name: "Blood Oxygen", value: "\(spo2)", unit: "%",
                                icon: "drop.fill", tint: AgaraColors.spo2))
         }
-        if let fatigue = v.fatigue {
-            tiles.append(.init(name: "Fatigue", value: "\(fatigue)", unit: "",
-                               icon: "battery.25", tint: AgaraColors.warning))
-        }
+        // No fatigue tile: the Agara ring declares no fatigue capability (`a7` 1.7 = 0).
         if let stress = v.stress {
             tiles.append(.init(name: "Stress", value: "\(stress)", unit: "",
                                icon: "bolt.fill", tint: AgaraColors.stress))

@@ -126,6 +126,21 @@ final class AgaraNotifications {
         return true
     }
 
+    /// The current notification permission, without asking. `.notDetermined` means the app has never asked.
+    func authorizationStatus() async -> UNAuthorizationStatus {
+        await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+    }
+
+    /// Whether posting would actually show something. Never prompts: background alerts (battery) use this so
+    /// the system dialog can only ever appear where the user was told why (onboarding sync, the Settings toggle,
+    /// starting a measurement).
+    func isAuthorizedToPost() async -> Bool {
+        switch await authorizationStatus() {
+        case .authorized, .provisional, .ephemeral: return true
+        default: return false
+        }
+    }
+
     /// Ask for permission once, at a moment the user started something that reports back (a measurement,
     /// a sync they're watching). Returns whether notifications are allowed. Never prompts in E2E runs against
     /// the emulator — a system alert over the app would block the UI tests.

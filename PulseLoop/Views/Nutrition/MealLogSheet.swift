@@ -112,15 +112,17 @@ struct MealLogSheet: View {
                     .frame(height: 46)
                     .agaraGlass(Capsule())
 
-                    Button { showScanner = true } label: {
-                        Image(systemName: "barcode.viewfinder")
-                            .font(AgaraFont.title3.weight(.regular))
-                            .foregroundStyle(AgaraColors.textPrimary)
-                            .frame(width: 46, height: 46)
-                            .agaraGlass(Circle(), interactive: true)
+                    if CameraSupport.barcodeScanningAvailable {   // camera compiled out of the store build
+                        Button { showScanner = true } label: {
+                            Image(systemName: "barcode.viewfinder")
+                                .font(AgaraFont.title3.weight(.regular))
+                                .foregroundStyle(AgaraColors.textPrimary)
+                                .frame(width: 46, height: 46)
+                                .agaraGlass(Circle(), interactive: true)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Scan barcode")
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Scan barcode")
                 }
 
                 if let searchError {

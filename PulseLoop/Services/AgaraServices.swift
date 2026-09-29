@@ -189,14 +189,17 @@ enum MetricsService {
     /// The current device's capabilities, used to gate metric UI. Falls back to the ring base set
     /// for legacy rows that predate capability stamping (empty `capabilitiesRaw`), so existing users
     /// keep seeing HR / SpO₂ / steps / sleep / battery.
+    /// The Agara (TK20) ring's capability set — the single catalog entry (`VeepooCoordinator`).
+    static var tk20Capabilities: Set<WearableCapability> { VeepooCoordinator().capabilities }
+
     static func deviceCapabilities(_ context: ModelContext) -> Set<WearableCapability> {
         let caps = fetchDevices(context).first?.capabilities ?? []
-        // "Explore without ring": no device row exists, so the sample set declares the sensors it has data for
-        // (never BP / blood sugar — those are behind flags and not in the sample set).
+        // "Explore without ring": no device row exists, so the sample set is exactly what the Agara (TK20) ring
+        // declares — derived from its coordinator, never hand-copied, so sample mode can't show a metric the real
+        // ring lacks (fatigue, skin temperature, ...). BP / glucose / blood components are in that set but stay
+        // hidden by their feature flags (`MetricKey.requiredFeature`).
         if caps.isEmpty, fetchDevices(context).isEmpty, SampleDataStore.isActiveNow {
-            // The manual-test capabilities let the Measure tab open (it then says "Connect your ring").
-            return [.heartRate, .spo2, .steps, .sleep, .battery, .remSleep, .stress, .hrv, .temperature, .fatigue,
-                    .manualHeartRate, .manualSpo2, .manualStress]
+            return tk20Capabilities
         }
         if caps.isEmpty {
             return [.heartRate, .spo2, .steps, .sleep, .battery]

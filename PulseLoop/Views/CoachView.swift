@@ -257,7 +257,7 @@ struct CoachView: View {
                 if imageInputEnabled {
                     Button {
                         composerFocused = false
-                        if UIImagePickerController.cameraAvailable { showCamera = true }
+                        if CameraSupport.isAvailable { showCamera = true }
                         else { showPhotosPicker = true }
                     } label: {
                         Image(systemName: "camera")

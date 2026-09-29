@@ -89,7 +89,7 @@ struct AppleHealthSettingsView: View {
     @ViewBuilder private var dataTypesGroup: some View {
         SettingsGroup(
             header: "Data types",
-            footer: "Stress and fatigue don't have an Apple Health equivalent yet, so they aren't synced."
+            footer: "Stress doesn't have an Apple Health equivalent yet, so it isn't synced."
         ) {
             FormToggleRow(title: "Heart rate", isOn: prefBinding(\.syncHeartRate))
             FormToggleRow(title: "Blood oxygen", isOn: prefBinding(\.syncSpO2))

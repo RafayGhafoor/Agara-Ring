@@ -34,8 +34,10 @@ final class StoreLaunchPhase1Tests: XCTestCase {
         let rows = try context.fetch(FetchDescriptor<PulseLoop.Measurement>())
         XCTAssertFalse(rows.isEmpty)
         let forbidden: Set<MeasurementKind> = [.bloodPressureSystolic, .bloodPressureDiastolic, .bloodSugar,
-                                               .totalCholesterol, .triglycerides, .hdl, .ldl, .uricAcid]
-        XCTAssertTrue(rows.allSatisfy { !forbidden.contains($0.kind) }, "no BP / sugar / lipids in the sample set")
+                                               .totalCholesterol, .triglycerides, .hdl, .ldl, .uricAcid,
+                                               .fatigue, .temperature]
+        XCTAssertTrue(rows.allSatisfy { !forbidden.contains($0.kind) },
+                      "no BP / sugar / lipids, and nothing the TK20 ring lacks (fatigue, skin temperature), in the sample set")
         XCTAssertTrue(rows.allSatisfy { $0.sourceRaw == MeasurementSource.mock.rawValue }, "every sample reading is tagged mock (never exported)")
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<Device>()), 0, "no fake connected ring")
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<MealEntry>()), 0)
@@ -176,8 +178,9 @@ final class StoreLaunchPhase1Tests: XCTestCase {
     }
 
     func testMacIsNotOfferedAndUsageStringsNoLongerNameTheCoachOnly() {
-        let camera = Bundle.main.object(forInfoDictionaryKey: "NSCameraUsageDescription") as? String ?? ""
-        XCTAssertTrue(camera.localizedCaseInsensitiveContains("barcode"))
+        // Owner decision 2026-09-29: no camera use in the store build, so no camera purpose string
+        // (the camera code is compiled out; see `CameraSupport` and `PermissionDeclarationsTests`).
+        XCTAssertNil(Bundle.main.object(forInfoDictionaryKey: "NSCameraUsageDescription"))
         let health = Bundle.main.object(forInfoDictionaryKey: "NSHealthUpdateUsageDescription") as? String ?? ""
         XCTAssertFalse(health.localizedCaseInsensitiveContains("temperature"), "skin temperature is no longer written")
         XCTAssertNil(Bundle.main.object(forInfoDictionaryKey: "NSLocationAlwaysAndWhenInUseUsageDescription"))

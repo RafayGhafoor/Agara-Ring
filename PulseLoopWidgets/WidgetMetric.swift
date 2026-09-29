@@ -17,10 +17,12 @@ enum WidgetMetric: String, CaseIterable, AppEnum {
     case glucose
 
     /// Blood pressure and blood sugar are not offered while `vitals_bp` / `vitals_glucose` are off (the store
-    /// release, owner 2026-09-29). The widget extension does not compile the feature catalog, so the choice list
-    /// omits them here; the cases stay so a future configuration keeps decoding. Re-add them with the flags.
+    /// release, owner 2026-09-29). Skin temperature and fatigue are not offered at all: the Agara (TK20) ring
+    /// declares neither (`a7` 3.7 / 1.7 = 0), and the widget extension has no device capabilities to gate on.
+    /// The extension does not compile the feature catalog, so the choice list omits them here; the cases stay so
+    /// a saved configuration keeps decoding. Re-add them with the flags / a ring that supports them.
     static var allCases: [WidgetMetric] {
-        [.activity, .nutrition, .sleep, .heartRate, .spo2, .hrv, .temperature, .stress, .fatigue]
+        [.activity, .nutrition, .sleep, .heartRate, .spo2, .hrv, .stress]
     }
 
     static let typeDisplayRepresentation: TypeDisplayRepresentation = "Metric"

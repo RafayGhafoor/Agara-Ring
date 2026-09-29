@@ -91,13 +91,11 @@ final class HealthSyncService {
         return set
     }
 
-    /// Read access covers the share set plus the profile characteristics the import button reads.
-    private var readTypes: Set<HKObjectType> {
-        var set = Set<HKObjectType>()
-        shareTypes.forEach { set.insert($0) }
-        set.formUnion(profileReadTypes)
-        return set
-    }
+    /// Read types the export authorization asks for: none. The export only writes (and deletes what it wrote,
+    /// which needs share access alone). The four profile characteristics are read only by the Profile
+    /// screen's "Import from Apple Health" button, which asks for them itself
+    /// (`requestProfileReadAuthorization`) at the moment the user taps it.
+    var readTypes: Set<HKObjectType> { [] }
 
     // MARK: - Export entry points
 

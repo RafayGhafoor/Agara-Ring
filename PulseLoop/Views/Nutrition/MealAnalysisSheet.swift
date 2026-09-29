@@ -101,7 +101,7 @@ struct MealAnalysisSheet: View {
     /// Presenting `UIImagePickerController` with `.camera` where no camera exists raises an
     /// exception (Mac "Designed for iPad", simulator) — fall back to the photo library there.
     private func openCamera() {
-        switch CameraPicker.route(cameraAvailable: UIImagePickerController.cameraAvailable) {
+        switch CameraPicker.route(cameraAvailable: CameraSupport.isAvailable) {
         case .camera: showCamera = true
         case .library: showLibrary = true
         }
@@ -129,7 +129,7 @@ struct MealAnalysisSheet: View {
                     }
             } else {
                 HStack(spacing: 12) {
-                    photoButton("camera", "Camera") { openCamera() }
+                    if CameraSupport.isAvailable { photoButton("camera", "Camera") { openCamera() } }
                     PhotosPicker(selection: $photosItem, matching: .images) {
                         photoLabel("photo.on.rectangle", "Library")
                     }

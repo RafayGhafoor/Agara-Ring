@@ -51,17 +51,14 @@ enum SeedData {
 
         // Demo meals for today + yesterday (dormant until the nutrition feature is enabled).
         seedDemoMeals(context, calendar: calendar, now: now)
-        // Advertise the full sensor suite so the demo surfaces every vital (stress/HRV/BP/fatigue/
-        // glucose/temperature are capability-gated and stay hidden otherwise).
+        // Advertise exactly what the Agara (TK20) ring declares — never more (fatigue, skin temperature, ...
+        // are not on the ring). BP / glucose stay hidden by their feature flags.
         context.insert(Device(
             advertisedName: "SMART_RING",
             bleAddressHint: "41:42:2e:c7:5b:6a",
             batteryPercent: 82,
             state: .connected,
-            capabilities: [
-                .heartRate, .spo2, .steps, .sleep, .battery, .remSleep,
-                .stress, .hrv, .temperature, .bloodPressure, .bloodSugar, .fatigue
-            ]
+            capabilities: MetricsService.tk20Capabilities
         ))
         }
 
@@ -274,12 +271,6 @@ enum SeedData {
                 add(.stress, Swift.max(3, Swift.min(99, v.rounded())), ts)
             }
 
-            // Fatigue — 1 reading/day (evening). Fresh→High fatigue (≥75 red on a couple of days).
-            let fatTs = calendar.date(bySettingHour: 21, minute: 0, second: 0, of: dayStart) ?? dayStart
-            var fatigue = 40 + sin(phase * 0.4) * 22
-            if day == -3 || day == -12 { fatigue = 80 }     // High fatigue (red)
-            add(.fatigue, Swift.max(5, Swift.min(98, fatigue.rounded())), fatTs)
-
             // HRV — 1 reading/day (overnight). ~55±18 so the 30-day baseline (mean±sd) forms and some
             // days fall below/above it (amber/green bands).
             let hrvTs = calendar.date(bySettingHour: 4, minute: 0, second: 0, of: dayStart) ?? dayStart
@@ -305,14 +296,6 @@ enum SeedData {
             if day == -5 { glucose = 138 }                  // High (red)
             if day == -20 { glucose = 112 }                 // Elevated (amber)
             if includeBPAndGlucose && AgaraFeatureStore.isOn(.vitalsGlucose) { add(.bloodSugar, glucose.rounded(), gluTs) }
-
-            // Temperature — skin temp, 1 reading/day. Typical 33–35.5 with a warm spike (≥36 amber) and
-            // a cool dip (<31 blue).
-            let tempTs = calendar.date(bySettingHour: 3, minute: 0, second: 0, of: dayStart) ?? dayStart
-            var temp = 34.0 + sin(phase * 0.5) * 1.2
-            if day == -7 { temp = 37.1 }                    // Warm
-            if day == -22 { temp = 30.4 }                   // Cool
-            add(.temperature, (temp * 10).rounded() / 10, tempTs)
         }
     }
 

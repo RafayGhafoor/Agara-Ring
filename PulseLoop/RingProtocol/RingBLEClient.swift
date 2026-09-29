@@ -123,7 +123,14 @@ final class RingBLEClient: NSObject {
     var onConnected: (@MainActor () -> Void)?
 
     // MARK: CoreBluetooth
-    private var central: CBCentralManager!
+    /// Created lazily (see `startManagerIfNeeded`): building a `CBCentralManager` is what makes iOS show the
+    /// Bluetooth permission prompt, so it must not exist before the user pairs (or already has a ring).
+    private var central: CBCentralManager?
+    /// False under XCTest and the virtual-ring socket link, where CoreBluetooth must never start.
+    private let managerAllowed: Bool
+    /// A pairing/reconnect scan asked for before Bluetooth reported its first state (the very first scan
+    /// creates the manager); it starts on `poweredOn`.
+    @ObservationIgnored private var pendingScanMode: ScanMode?
     private var peripheral: CBPeripheral?
     /// Strong references to scanned peripherals, keyed by identifier. Required because
     /// `connect(_:)` needs the actual `CBPeripheral` object — `retrievePeripherals` returns
@@ -212,20 +219,42 @@ final class RingBLEClient: NSObject {
         self.init(startManager: true)
     }
 
-    /// `startManager: false` skips creating the `CBCentralManager`, used by the app host under
-    /// XCTest where CoreBluetooth's XPC service is unavailable (headless CI simulator) and would
-    /// otherwise log "XPC connection invalid" and hang. No BLE method is called in that mode.
+    /// Whether the Bluetooth manager (and with it the system permission prompt) should be brought up as
+    /// the app launches: only when a ring is already paired — it must reconnect, and iOS state restoration
+    /// needs the manager alive. A fresh install waits until the user reaches pairing. Pure, for tests.
+    nonisolated static func shouldStartManagerAtLaunch(allowed: Bool, hasPairedRing: Bool) -> Bool {
+        allowed && hasPairedRing
+    }
+
+    /// `startManager: false` never creates the `CBCentralManager`, used by the app host under XCTest where
+    /// CoreBluetooth's XPC service is unavailable (headless CI simulator) and would otherwise log "XPC
+    /// connection invalid" and hang. No BLE method is called in that mode. With `true` the manager is
+    /// created now only if a ring is already paired; otherwise on the first `startScanning`.
     init(startManager: Bool) {
+        managerAllowed = startManager
         super.init()
-        if startManager {
-            // State restoration: if iOS kills the app mid-workout, a BLE event (e.g. the ring's HR
-            // stream notifying) relaunches us and `willRestoreState` re-adopts the connection.
-            central = CBCentralManager(
-                delegate: self,
-                queue: nil,
-                options: [CBCentralManagerOptionRestoreIdentifierKey: "pulseloop.ring.central"] // install-bound: state-restoration id
-            )
+        if Self.shouldStartManagerAtLaunch(allowed: startManager, hasPairedRing: lastKnownIdentifier != nil) {
+            startManagerIfNeeded()
         }
+    }
+
+    /// True once the `CBCentralManager` exists, i.e. the Bluetooth permission has been (or is being) asked.
+    var isBluetoothStarted: Bool { central != nil }
+
+    /// Create the manager (this presents the system Bluetooth prompt the first time). Idempotent.
+    /// Returns false when this client is not allowed to touch CoreBluetooth (tests, virtual ring).
+    @discardableResult
+    private func startManagerIfNeeded() -> Bool {
+        guard managerAllowed else { return false }
+        if central != nil { return true }
+        // State restoration: if iOS kills the app mid-workout, a BLE event (e.g. the ring's HR
+        // stream notifying) relaunches us and `willRestoreState` re-adopts the connection.
+        central = CBCentralManager(
+            delegate: self,
+            queue: nil,
+            options: [CBCentralManagerOptionRestoreIdentifierKey: "pulseloop.ring.central"] // install-bound: state-restoration id
+        )
+        return true
     }
 
     // MARK: - Public API
@@ -261,10 +290,18 @@ final class RingBLEClient: NSObject {
             return
         }
         #endif
+        // First scan of a fresh install: this creates the manager (and shows the system prompt); the scan
+        // itself starts when Bluetooth reports `poweredOn`.
+        if central == nil, startManagerIfNeeded() {
+            pendingScanMode = mode
+            lastError = nil
+            return
+        }
         guard isBluetoothReady else {
             lastError = "Bluetooth is not powered on."
             return
         }
+        pendingScanMode = nil
         discovered = []
         discoveredPeripherals = [:]
         lastError = nil
@@ -307,6 +344,7 @@ final class RingBLEClient: NSObject {
     }
 
     func stopScanning() {
+        pendingScanMode = nil
         scanTimeoutTask?.cancel()
         scanTimeoutTask = nil
         central?.stopScan()
@@ -1119,7 +1157,11 @@ extension RingBLEClient: CBCentralManagerDelegate {
             bluetoothAvailability = BluetoothAvailability(central.state)
             switch central.state {
             case .poweredOn:
-                if let restored = peripheral, state != .connected {
+                if let pending = pendingScanMode {
+                    // The user asked to scan before the first Bluetooth state arrived.
+                    pendingScanMode = nil
+                    startScanning(mode: pending)
+                } else if let restored = peripheral, state != .connected {
                     // Adopted in willRestoreState — resume from wherever the link actually is.
                     if restored.state == .connected {
                         state = .connecting

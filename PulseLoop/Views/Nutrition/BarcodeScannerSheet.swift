@@ -1,7 +1,10 @@
 import SwiftUI
+#if AGARA_CAMERA
 import Vision
 import VisionKit
+#endif
 
+#if AGARA_CAMERA
 /// Barcode scanner for packaged-food lookup, wrapping VisionKit's `DataScannerViewController`
 /// (EAN/UPC symbologies — what Open Food Facts is keyed on). Calls `onScan` once with the
 /// first recognized code. Falls back to a message when scanning isn't supported (Simulator,
@@ -87,3 +90,10 @@ private struct BarcodeScannerRepresentable: UIViewControllerRepresentable {
         }
     }
 }
+#else
+/// Camera compiled out (see `CameraSupport`): the scan button is hidden, so this is never presented.
+struct BarcodeScannerSheet: View {
+    let onScan: (String) -> Void
+    var body: some View { EmptyView() }
+}
+#endif

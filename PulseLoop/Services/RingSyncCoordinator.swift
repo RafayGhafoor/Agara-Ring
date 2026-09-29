@@ -483,9 +483,9 @@ final class RingSyncCoordinator {
             runStartupSequence()
         } else if client.hasLastKnownRing {
             client.connectLastKnown()
-        } else {
-            client.startScanning()
         }
+        // No paired ring: nothing to recover. A scan here would create the Bluetooth manager and raise the
+        // system permission prompt from a pull-to-refresh; scanning belongs to the pairing screen.
         try? await Task.sleep(nanoseconds: 1_200_000_000)
     }
 

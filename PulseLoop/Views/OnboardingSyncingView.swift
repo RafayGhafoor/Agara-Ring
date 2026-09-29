@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 
 /// Onboarding → Syncing (consistency plan B): right after pairing, the ring's history comes down day by day.
 /// One row per day (Today, Yesterday, …) fills in live with what arrived — steps, heart rate, SpO₂, HRV,
@@ -8,6 +9,8 @@ import SwiftUI
 struct OnboardingSyncingView: View {
     let next: () -> Void
     @State private var progress = SyncProgress.shared
+    /// Nil until read; the opt-in row shows only while the app has never asked.
+    @State private var notificationStatus: UNAuthorizationStatus?
 
     var body: some View {
         ScrollView {
@@ -21,6 +24,7 @@ struct OnboardingSyncingView: View {
                         .foregroundStyle(AgaraColors.textMuted)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                if notificationStatus == .notDetermined { notificationsOptIn }
                 VStack(spacing: 0) {
                     ForEach(progress.rows) { row in
                         dayRow(row)
@@ -54,6 +58,31 @@ struct OnboardingSyncingView: View {
             }
         }
         .accessibilityIdentifier("onboarding.syncing")
+        .task { notificationStatus = await AgaraNotifications.shared.authorizationStatus() }
+    }
+
+    /// The only place the app offers notifications up front, and only as a tap: a one-line reason, then the
+    /// system prompt if the user agrees. Nothing is asked at launch, and a user who skips this is still asked
+    /// (with context) when they start a measurement or switch on ring battery alerts.
+    private var notificationsOptIn: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "bell.badge").foregroundStyle(AgaraColors.accent)
+            Text("Get a notification when a sync finishes or your ring battery is low.")
+                .font(AgaraFont.caption)
+                .foregroundStyle(AgaraColors.textSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Button("Allow") {
+                Task {
+                    _ = await AgaraNotifications.shared.requestAuthorizationIfUndetermined()
+                    notificationStatus = await AgaraNotifications.shared.authorizationStatus()
+                }
+            }
+            .font(AgaraFont.subheadline.weight(.semibold))
+            .foregroundStyle(AgaraColors.accent)
+            .accessibilityIdentifier("onboarding.syncing.allowNotifications")
+        }
+        .padding(14)
+        .agaraGlass(RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous))
     }
 
     private var done: Bool { !progress.isSyncing && !progress.rows.isEmpty }

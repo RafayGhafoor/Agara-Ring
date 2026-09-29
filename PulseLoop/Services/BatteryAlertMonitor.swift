@@ -140,10 +140,12 @@ final class BatteryAlertMonitor {
 
     // MARK: - Delivery
 
-    /// Deliver a battery alert. No LLM / coach coupling — a plain local notification. Requests
-    /// permission once if undetermined and proceeds only if granted; silently skips when denied.
+    /// Deliver a battery alert. No LLM / coach coupling — a plain local notification. Never asks for
+    /// permission (the alert fires in the background, at a moment the user didn't choose): permission is asked
+    /// where the user is told why — the onboarding sync step's opt-in, or the Wearable battery toggle. Silently
+    /// skips when not authorized.
     static func deliver(_ alert: BatteryAlertKind) async {
-        guard await AgaraNotifications.shared.requestAuthorizationIfUndetermined() else { return }
+        guard await AgaraNotifications.shared.isAuthorizedToPost() else { return }
         let title: String, body: String
         switch alert {
         case let .low(percent):

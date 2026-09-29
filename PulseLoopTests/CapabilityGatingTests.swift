@@ -134,4 +134,67 @@ final class CapabilityGatingTests: XCTestCase {
         let iconSystemName = "circle"
         func makeDriver(writer: RingCommandWriter) -> WearableDriver { VeepooDriver(writer: writer) }
     }
+
+    // MARK: Nothing the ring doesn't support (owner rule, 2026-09-29)
+
+    /// Sample mode ("Explore without ring") has no device row; its capabilities must be exactly the TK20
+    /// catalog's, so it can never show a metric the real ring lacks.
+    func testSampleModeCapabilitiesAreExactlyTheTK20Catalog() throws {
+        UserDefaults.standard.set(true, forKey: SampleDataStore.activeKey)
+        defer { UserDefaults.standard.removeObject(forKey: SampleDataStore.activeKey) }
+        let context = try TestSupport.makeContext()
+        XCTAssertEqual(MetricsService.deviceCapabilities(context), agara)
+        XCTAssertEqual(MetricsService.deviceCapabilities(context), VeepooCoordinator().capabilities)
+        for extra: WearableCapability in [.temperature, .fatigue, .manualHrv, .combinedVitalsMeasurement] {
+            XCTAssertFalse(MetricsService.deviceCapabilities(context).contains(extra), extra.rawValue)
+        }
+    }
+
+    /// The debug demo seed (`SeedData.seedDemo`) also advertises the TK20 set and no more.
+    func testDemoSeedDeviceAdvertisesExactlyTheTK20Set() throws {
+        let context = try TestSupport.makeContext()
+        SeedData.seedDemo(context, completeOnboarding: true)
+        let device = try XCTUnwrap(try context.fetch(FetchDescriptor<Device>()).first)
+        XCTAssertEqual(device.capabilities, agara)
+        let kinds = Set(try context.fetch(FetchDescriptor<PulseLoop.Measurement>()).map(\.kind))
+        XCTAssertFalse(kinds.contains(.fatigue))
+        XCTAssertFalse(kinds.contains(.temperature))
+    }
+
+    /// A TK20-capability device shows no fatigue / skin-temperature card (Today or Vitals), and none of the
+    /// flag-gated metrics at their default flags.
+    func testTK20DeviceShowsNoFatigueTemperatureOrFlaggedCards() throws {
+        let store = AgaraFeatureStore.shared
+        let flags: [AgaraFeature] = [.vitalsBp, .vitalsGlucose, .vitalsRespiration, .vitalsMet, .vitalsCardiacLoad, .bloodComponents]
+        let saved = flags.map { store.override(for: $0) }
+        defer { for (f, v) in zip(flags, saved) { store.setOverride(f, v) } }
+        for f in flags { store.setOverride(f, nil); XCTAssertFalse(f.defaultOn, "\(f)") }
+
+        let context = try TestSupport.makeContext()
+        context.insert(UserProfile(name: "Rae", onboardingCompleted: true, baselineCompleted: true))
+        context.insert(Device(deviceType: .veepoo, capabilities: agara))
+        try context.save()
+
+        let hidden: [MetricKey] = [.fatigue, .temperature, .bloodPressureSystolic, .bloodPressureDiastolic, .bloodSugar,
+                                   .respiratoryRate, .met, .cardiacLoad, .bloodComponents]
+        let today = TodayStore(modelContext: context)
+        let vitals = VitalsStore(modelContext: context)
+        for metric in hidden {
+            XCTAssertFalse(MetricsService.isVisible(metric, context: context), "vitals \(metric.rawValue)")
+            XCTAssertFalse(MetricsService.isVisible(metric, context: context, scope: .today), "today \(metric.rawValue)")
+            XCTAssertFalse(today.visibleMetrics.contains(metric), "today store \(metric.rawValue)")
+            XCTAssertFalse(vitals.visibleMetrics.contains(metric), "vitals store \(metric.rawValue)")
+        }
+        for metric: MetricKey in [.heartRate, .spo2, .hrv, .stress] {
+            XCTAssertTrue(vitals.visibleMetrics.contains(metric), metric.rawValue)
+        }
+    }
+
+    /// The measure sweep result sheet never offers a fatigue tile.
+    func testVitalsResultTilesNeverIncludeFatigue() {
+        var reading = RingSyncCoordinator.VitalsReading()
+        reading.heartRate = 70
+        reading.fatigue = 40
+        XCTAssertFalse(VitalsResultsView.tiles(for: reading).contains { $0.name == "Fatigue" })
+    }
 }

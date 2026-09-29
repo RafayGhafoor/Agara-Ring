@@ -726,10 +726,8 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Agara Ring connects to your ring over Bluetooth to sync steps, sleep and vitals.";
-				INFOPLIST_KEY_NSBluetoothPeripheralUsageDescription = "Agara Ring connects to your ring to sync activity, heart rate, SpO2 and sleep.";
-				INFOPLIST_KEY_NSCameraUsageDescription = "Agara Ring uses the camera to scan food barcodes and to attach photos in the features you turn on.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Save share cards and images from Agara Ring to your photo library.";
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "Agara Ring reads your Health profile (age, sex, height, weight) and the samples it previously saved, to fill in your profile and avoid duplicates.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Agara Ring reads your age, sex, height and weight from Apple Health, only when you tap Import in your profile.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Agara Ring writes your ring's heart rate, blood oxygen, sleep, activity and workouts to Apple Health, only for the data types you enable.";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Agara Ring connects to the AI model server you run on your own network, so coaching can happen without sending your health data to a cloud provider.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Agara Ring records your route during outdoor workouts.";
@@ -773,10 +771,7 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Agara Ring connects to your ring over Bluetooth to sync steps, sleep and vitals.";
-				INFOPLIST_KEY_NSBluetoothPeripheralUsageDescription = "Agara Ring connects to your ring to sync activity, heart rate, SpO2 and sleep.";
-				INFOPLIST_KEY_NSCameraUsageDescription = "Agara Ring uses the camera to scan food barcodes and to attach photos in the features you turn on.";
-				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Save share cards and images from Agara Ring to your photo library.";
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "Agara Ring reads your Health profile (age, sex, height, weight) and the samples it previously saved, to fill in your profile and avoid duplicates.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Agara Ring reads your age, sex, height and weight from Apple Health, only when you tap Import in your profile.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Agara Ring writes your ring's heart rate, blood oxygen, sleep, activity and workouts to Apple Health, only for the data types you enable.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Agara Ring records your route during outdoor workouts.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;

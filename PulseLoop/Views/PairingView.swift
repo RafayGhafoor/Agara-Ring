@@ -95,7 +95,13 @@ struct PairingView: View {
         return matches.isEmpty ? ble.discovered : matches
     }
 
-    private var canUseBluetoothUI: Bool { ble.isBluetoothReady || forcePairingUIForTesting }
+    /// Bluetooth is known to be unusable (off / not allowed / unsupported). Before the first scan the manager
+    /// doesn't exist yet — the system permission prompt comes from the "Connect my ring" tap, not from
+    /// opening this screen — so "not started" and "waiting for the first state" are not blocked.
+    private var bluetoothBlocked: Bool {
+        ble.isBluetoothStarted && !ble.isBluetoothReady && ble.bluetoothAvailability != .unknown
+    }
+    private var canUseBluetoothUI: Bool { !bluetoothBlocked || forcePairingUIForTesting }
     private var showsActionFooter: Bool {
         if isNaming { return true }
         guard ble.state != .connected else { return false }
@@ -218,7 +224,7 @@ struct PairingView: View {
 
                 if isNaming || ble.state == .connected {
                     connectedCard
-                } else if !ble.isBluetoothReady && !forcePairingUIForTesting {
+                } else if bluetoothBlocked && !forcePairingUIForTesting {
                     bluetoothOffCard
                 } else {
                     carousel(s: 1)
