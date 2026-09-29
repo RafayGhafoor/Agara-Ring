@@ -63,7 +63,7 @@ final class HealthSyncService {
     /// body temperature are never requested (store launch: nothing the ring only estimates reaches Health).
     static func quantityWriteIdentifiers(nutritionActive: Bool) -> [HKQuantityTypeIdentifier] {
         var identifiers: [HKQuantityTypeIdentifier] = [
-            .heartRate, .oxygenSaturation, .heartRateVariabilitySDNN,
+            .heartRate, .oxygenSaturation,   // HRV is not requested while its export is held (`exportsHRV`)
             .stepCount, .activeEnergyBurned, .distanceWalkingRunning, .distanceCycling
         ]
         // Dietary types join the share set only once the nutrition feature is enabled, so users
@@ -175,12 +175,19 @@ final class HealthSyncService {
         #endif
     }
 
+    /// HRV is held back from Apple Health: the ring's HRV derivation is known to be wrong (learnings.md, "current HRV
+    /// card is wrong"; B7 is RR intervals). Same hold as Android's Health Connect export. Flip when the derivation is fixed.
+    static let exportsHRV = false
+
     private var enabledVitalKinds: [MeasurementKind] {
-        let prefs = prefsStore.prefs
+        Self.exportableVitalKinds(prefs: prefsStore.prefs)
+    }
+
+    static func exportableVitalKinds(prefs: AppleHealthPrefs) -> [MeasurementKind] {
         var kinds: [MeasurementKind] = []
         if prefs.syncHeartRate { kinds.append(.heartRate) }
         if prefs.syncSpO2 { kinds.append(.spo2) }
-        if prefs.syncHRV { kinds.append(.hrv) }
+        if exportsHRV && prefs.syncHRV { kinds.append(.hrv) }
         return kinds
     }
 

@@ -68,9 +68,18 @@ final class HealthSyncTests: XCTestCase {
         }
     }
 
+    func testHRVExportIsHeldEvenWhenThePrefIsOn() {
+        var prefs = AppleHealthPrefs()
+        prefs.syncHRV = true
+        XCTAssertFalse(HealthSyncService.exportsHRV)
+        XCTAssertFalse(HealthSyncService.exportableVitalKinds(prefs: prefs).contains(.hrv))
+        XCTAssertTrue(HealthSyncService.exportableVitalKinds(prefs: prefs).contains(.heartRate))
+    }
+
     func testHealthAuthorizationRequestsNoBloodPressureGlucoseOrBodyTemperature() {
         let ids = Set(HealthSyncService.quantityWriteIdentifiers(nutritionActive: true).map(\.rawValue))
         XCTAssertFalse(ids.contains(HKQuantityTypeIdentifier.bodyTemperature.rawValue))
+        XCTAssertFalse(ids.contains(HKQuantityTypeIdentifier.heartRateVariabilitySDNN.rawValue), "HRV export is held")
         XCTAssertFalse(ids.contains(HKQuantityTypeIdentifier.bloodPressureSystolic.rawValue))
         XCTAssertFalse(ids.contains(HKQuantityTypeIdentifier.bloodPressureDiastolic.rawValue))
         XCTAssertFalse(ids.contains(HKQuantityTypeIdentifier.bloodGlucose.rawValue))

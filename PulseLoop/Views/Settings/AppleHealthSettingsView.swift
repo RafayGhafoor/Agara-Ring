@@ -93,7 +93,6 @@ struct AppleHealthSettingsView: View {
         ) {
             FormToggleRow(title: "Heart rate", isOn: prefBinding(\.syncHeartRate))
             FormToggleRow(title: "Blood oxygen", isOn: prefBinding(\.syncSpO2))
-            FormToggleRow(title: "Heart rate variability", isOn: prefBinding(\.syncHRV))
             FormToggleRow(title: "Sleep", isOn: prefBinding(\.syncSleep))
             FormToggleRow(title: "Steps & activity", isOn: prefBinding(\.syncActivity))
         }

@@ -53,9 +53,10 @@ struct SampleChip: View {
 /// `.sampleChip()` overlays the chip on a card's top-trailing corner while sample data is loaded.
 private struct SampleChipModifier: ViewModifier {
     @State private var store = SampleDataStore.shared
+    var alignment: Alignment = .topTrailing
 
     func body(content: Content) -> some View {
-        content.overlay(alignment: .topTrailing) {
+        content.overlay(alignment: alignment) {
             if store.isActive {
                 SampleChip().padding(10).allowsHitTesting(false)
             }
@@ -65,7 +66,7 @@ private struct SampleChipModifier: ViewModifier {
 
 extension View {
     /// Marks a card that shows a value or chart as sample data (only while `SampleDataStore.isActive`).
-    func sampleChip() -> some View { modifier(SampleChipModifier()) }
+    func sampleChip(_ alignment: Alignment = .topTrailing) -> some View { modifier(SampleChipModifier(alignment: alignment)) }
 }
 
 /// Inline variant for card headers that already lay out chips (`VitalCard`, `TodayTile`).

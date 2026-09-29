@@ -194,7 +194,9 @@ enum MetricsService {
         // "Explore without ring": no device row exists, so the sample set declares the sensors it has data for
         // (never BP / blood sugar — those are behind flags and not in the sample set).
         if caps.isEmpty, fetchDevices(context).isEmpty, SampleDataStore.isActiveNow {
-            return [.heartRate, .spo2, .steps, .sleep, .battery, .remSleep, .stress, .hrv, .temperature, .fatigue]
+            // The manual-test capabilities let the Measure tab open (it then says "Connect your ring").
+            return [.heartRate, .spo2, .steps, .sleep, .battery, .remSleep, .stress, .hrv, .temperature, .fatigue,
+                    .manualHeartRate, .manualSpo2, .manualStress]
         }
         if caps.isEmpty {
             return [.heartRate, .spo2, .steps, .sleep, .battery]

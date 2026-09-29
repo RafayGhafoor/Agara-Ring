@@ -547,7 +547,7 @@ private struct VisualizationCard<Content: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .agaraGlass(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .sampleChip()
+        .sampleChip(.bottomTrailing)
     }
 
     private func legendItem(_ label: String, _ color: Color) -> some View {

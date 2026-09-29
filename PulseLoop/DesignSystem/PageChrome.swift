@@ -88,6 +88,7 @@ extension View {
             PageHeader(title: title) { EmptyView() }
             self
         }
+        .readableColumn()
         .toolbar(.hidden, for: .navigationBar)
         .enablesBackSwipe()
     }
@@ -99,6 +100,7 @@ extension View {
             PageHeader(title: title, trailing: trailing)
             self
         }
+        .readableColumn()
         .toolbar(.hidden, for: .navigationBar)
         .enablesBackSwipe()
     }

@@ -3,6 +3,32 @@ import SwiftUI
 /// Shared bottom-chrome geometry. The floating tab bar, the coach FAB, and the reorder Done bar all
 /// have to clear each other, and on iOS 26 the tab bar is Apple's (system-sized) rather than ours —
 /// so the clearances are tuned by eye and belong in one place instead of being re-typed per screen.
+import SwiftUI
+
+extension AgaraLayout {
+    /// Widest a single-column screen (Vitals, Activity, Sleep, Settings and every settings page) gets on a regular-width
+    /// iPad: a phone layout stretched across a 13" screen reads badly, so the column is capped and centred. A compact
+    /// width (iPhone, or an iPad in a narrow split-view/Stage Manager window) is untouched.
+    static let readableColumnWidth: CGFloat = 780
+}
+
+private struct ReadableColumn: ViewModifier {
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    func body(content: Content) -> some View {
+        if sizeClass == .regular {
+            content.frame(maxWidth: AgaraLayout.readableColumnWidth).frame(maxWidth: .infinity)
+                .background(AgaraColors.background.ignoresSafeArea())
+        } else {
+            content
+        }
+    }
+}
+
+extension View {
+    /// Caps a single-column screen at `AgaraLayout.readableColumnWidth` in regular width (iPad).
+    func readableColumn() -> some View { modifier(ReadableColumn()) }
+}
+
 enum AgaraLayout {
     /// Where a floating control sits above the tab bar. The coach FAB and the reorder Done bar share
     /// this baseline, so the bar can run full width once the FAB is hidden.

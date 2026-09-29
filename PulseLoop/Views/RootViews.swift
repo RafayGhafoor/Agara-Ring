@@ -67,6 +67,7 @@ struct RootAppView: View {
                     let profile = UserProfile(name: "", onboardingCompleted: true, baselineCompleted: true)
                     modelContext.insert(profile)
                     try? modelContext.save()
+                    SampleDataStore.shared.forgetForTooling()
                     SampleDataStore.shared.markExploring()
                     SampleDataStore.shared.activateIfExploring(context: modelContext)
                 }
@@ -242,7 +243,7 @@ struct RootAppView: View {
                 case let .mealDetail(id):
                     MealDetailView(mealId: id, path: $path)
                 case .pairing:
-                    PairingView(onConnected: { path.removeLast() })
+                    PairingView(onConnected: { path.removeLast() }).readableColumn()
                 case .debug:
                     #if DEBUG
                     DebugView()
@@ -344,11 +345,12 @@ struct MainTabView: View {
     private func tabDestination(_ tab: MainTab) -> some View {
         switch tab {
         case .today:    TodayView(path: $path, selectedTab: $selected, isActive: selected == .today)
-        case .vitals:   VitalsView(path: $path, isActive: selected == .vitals)
-        case .activity: ActivityView(path: $path)
-        case .sleep:    SleepView()
+        // Single-column screens are capped and centred on a regular-width iPad (`readableColumn`).
+        case .vitals:   VitalsView(path: $path, isActive: selected == .vitals).readableColumn()
+        case .activity: ActivityView(path: $path).readableColumn()
+        case .sleep:    SleepView().readableColumn()
         case .coach:    CoachView()
-        case .settings: SettingsView(path: $path)
+        case .settings: SettingsView(path: $path).readableColumn()
         }
     }
 

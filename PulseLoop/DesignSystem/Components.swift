@@ -681,7 +681,7 @@ struct ActivityWorkoutRow: View {
             }
             .padding(16)
             .agaraGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .sampleChip()
+            .sampleChip(.bottomTrailing)
         }
         .buttonStyle(.plain)
         .disabled(onTap == nil)

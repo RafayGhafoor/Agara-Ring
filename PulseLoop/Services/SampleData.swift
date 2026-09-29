@@ -45,6 +45,9 @@ final class SampleDataStore {
 
     // MARK: Load / clear
 
+    /// Test tooling (`-sampleData YES`): forget any earlier load so the set is seeded again from scratch.
+    func forgetForTooling() { setActive(false); clearExploring() }
+
     /// Load the sample set once onboarding is done. No-op when a ring is already paired or it is already loaded.
     func activateIfExploring(context: ModelContext) {
         guard wantsSampleData else { return }

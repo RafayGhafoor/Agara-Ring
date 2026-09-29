@@ -6,6 +6,15 @@ struct TodayView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(RingSyncCoordinator.self) private var coordinator
     @Environment(\.zoomNamespace) private var zoomNS
+    @Environment(\.horizontalSizeClass) private var sizeClass
+
+    /// Two tile columns on a phone (and any compact-width window); as many as fit (>= 300 pt each) on a regular-width
+    /// iPad, so landscape and the 13" screen use their width instead of stretching two tiles.
+    private var tileColumns: [GridItem] {
+        sizeClass == .regular
+            ? [GridItem(.adaptive(minimum: 300, maximum: 560), spacing: 12)]
+            : [GridItem(.flexible()), GridItem(.flexible())]
+    }
     @Query(filter: #Predicate<CoachSummary> { $0.kind == "today" }, sort: \CoachSummary.updatedAt, order: .reverse)
     private var todaySummaries: [CoachSummary]
     @Query private var profiles: [UserProfile]
@@ -97,7 +106,7 @@ struct TodayView: View {
                     HeroInsightCardView(title: hero.title, summary: hero.summary, chips: hero.chips)
                 }
 
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                LazyVGrid(columns: tileColumns, spacing: 12) {
                     tiles(activeStore)
                 }
 
