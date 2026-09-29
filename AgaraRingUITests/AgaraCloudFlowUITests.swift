@@ -86,4 +86,42 @@ final class AgaraCloudFlowUITests: AgaraUITestCase {
         openCloudRow()
         waitFor(element("cloud.notConfigured"), "not-configured card missing")
     }
+
+    /// REAL Firebase + STAGING (release 1.1 device test). Runs only when the runner has credentials:
+    ///   TEST_RUNNER_AGARA_E2E_EMAIL / TEST_RUNNER_AGARA_E2E_PASSWORD, staging tunnel on 127.0.0.1:18091
+    ///   (`scripts/phone_cloud_e2e.py prepare` + `seed`). Signs in, waits for the first sync to pull, then deletes the account.
+    func testStagingSignInPullAndDeleteAccount() throws {
+        let env = ProcessInfo.processInfo.environment
+        guard let mail = env["AGARA_E2E_EMAIL"], let pass = env["AGARA_E2E_PASSWORD"] else {
+            throw XCTSkip("no staging credentials in the environment")
+        }
+        launchCloud(extra: ["-cloudBaseUrl", "http://127.0.0.1:18091"])
+        openCloudRow()
+        if !element("cloud.syncNow").waitForExistence(timeout: 5) {   // a session from an earlier run stays signed in
+            let agree = element("cloud.consent.agree")
+            scrollTo(agree)
+            waitFor(agree).tap()
+            let mode = element("cloud.mode")
+            if mode.exists { let si = mode.buttons["Sign in"]; if si.exists { si.tap() } }
+            let email = waitFor(element("cloud.email"), "email field missing")
+            email.tap(); email.typeText(mail)
+            let password = waitFor(element("cloud.password"))
+            password.tap(); password.typeText(pass)
+            let submit = element("cloud.submit")
+            scrollTo(submit)
+            waitFor(submit).tap()
+        }
+        waitFor(element("cloud.syncNow"), timeout: 60, "did not reach the signed-in screen")
+        eventually(timeout: 60, "the first sync did not finish") { element("cloud.lastSync").label != "Not yet" }
+        NSLog("AGARA_E2E lastSync=\(element("cloud.lastSync").label) counts=\(element("cloud.counts").exists ? element("cloud.counts").label : "-")")
+        attachScreenshot("staging-1-synced")
+        let del = element("cloud.deleteAccount")
+        eventually(timeout: 30, "delete button never became tappable") { self.scrollTo(del); return del.exists && del.isHittable }
+        del.tap()
+        let alert = app.alerts.firstMatch
+        waitFor(alert, "delete confirmation missing")
+        alert.buttons["Delete account"].tap()
+        waitFor(element("cloud.consent"), timeout: 60, "did not return to the consent screen after deleting the account")
+        attachScreenshot("staging-2-deleted")
+    }
 }
