@@ -66,6 +66,37 @@ final class SyncProgress {
     }
     func endJob() { job = nil }
 
+    // MARK: Agara Cloud on the same model (release 1.1)
+
+    /// One metric's share of a cloud sync: blocks accepted by the server of the blocks that were behind when the run began.
+    struct CloudMetricRow: Identifiable, Equatable {
+        let metric: String
+        var done: Int
+        var total: Int
+        var id: String { metric }
+        var fraction: Double { total > 0 ? min(1, Double(done) / Double(total)) : 1 }
+    }
+
+    /// A cloud sync is running (upload of the blocks behind the server, then the pull).
+    private(set) var cloudActive = false
+    private(set) var cloudStage: CloudSyncProgress.Stage = .preparing
+    /// Per-metric rows, largest first (stable order for the list).
+    private(set) var cloudRows: [CloudMetricRow] = []
+
+    var cloudFraction: Double {
+        let total = cloudRows.reduce(0) { $0 + $1.total }
+        return total > 0 ? Double(cloudRows.reduce(0) { $0 + $1.done }) / Double(total) : (cloudActive ? 0 : 1)
+    }
+
+    func updateCloud(_ progress: CloudSyncProgress) {
+        cloudActive = progress.stage != .finished
+        cloudStage = progress.stage
+        cloudRows = progress.total.map { CloudMetricRow(metric: $0.key, done: progress.done[$0.key] ?? 0, total: $0.value) }
+            .sorted { $0.total != $1.total ? $0.total > $1.total : $0.metric < $1.metric }
+    }
+
+    func endCloud() { cloudActive = false; cloudStage = .finished }
+
     var calendar = Calendar.current
     var now: () -> Date = Date.init
     let notifications: AgaraNotifications

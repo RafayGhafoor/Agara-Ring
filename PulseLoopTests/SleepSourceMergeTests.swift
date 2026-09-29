@@ -279,7 +279,7 @@ final class SleepSourceMergeTests: XCTestCase {
         // Android's inputs (asleep minutes, deep = DEEP + REM, awake share of the 650-min span) — the same
         // 64 Android's `SleepSourceMergeTest` pins for ring B's night (audit batch B).
         XCTAssertEqual(displayed, 64)
-        XCTAssertEqual(AgaraCloudSync.sleepSummary(for: night, context: context)?.quality, displayed,
+        XCTAssertEqual(AgaraCloudDays.sleepSummary(for: night, context: context)?.quality, displayed,
                        "the cloud `quality` is the displayed score, not 0")
         // Every stored row carries its own displayed score, emulator rows included.
         for row in SleepRepository.allSessions(context: context) {

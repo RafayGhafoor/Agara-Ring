@@ -178,6 +178,10 @@ struct AgaraApp: App {
         StorageGuard.refresh()
         StorageCenter.shared.attach(container: container)
 
+        // Agara Cloud (release 1.1): the account, consent and sync engine. Nothing syncs until the user has consented and
+        // signed in with a verified address; the flag `agara_cloud` gates the UI.
+        AgaraCloud.shared.attach(container: container)
+
         // Learn/refresh the resting-HR baseline that personalizes the auto HR zones (throttled
         // internally, so this is a cheap no-op most launches).
         RestingHRBaselineService.refreshIfStale(context: container.mainContext)
@@ -251,6 +255,7 @@ struct AgaraApp: App {
             if !Self.isRunningUnitTests {
                 StorageGuard.refresh()
                 StorageCenter.shared.runIfDue()
+                if AgaraFeatureStore.isOn(.agaraCloud) { AgaraCloud.shared.kick(reason: .foreground) }
             }
             // Refresh the learned resting-HR baseline on foreground (6h-throttled no-op usually).
             if !Self.isRunningUnitTests {

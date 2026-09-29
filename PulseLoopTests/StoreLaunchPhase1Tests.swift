@@ -148,7 +148,7 @@ final class StoreLaunchPhase1Tests: XCTestCase {
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<ActivityDaily>()), 0)
         XCTAssertFalse(UserDefaults.standard.bool(forKey: SampleDataStore.activeKey))
         XCTAssertFalse(SampleDataStore.shared.isActive)
-        XCTAssertFalse(AgaraCloudClient.shared.isSignedIn)
+        XCTAssertFalse(AgaraCloud.shared.isSignedIn)
         XCTAssertFalse(WellnessDisclaimer.isAccepted(), "a wiped install shows the disclaimer again")
         XCTAssertEqual(ConfirmAction.deleteAllData {}.title, AgaraCopy.deleteAllDataTitle)
     }

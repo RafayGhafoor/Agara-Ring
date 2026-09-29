@@ -20,7 +20,7 @@ enum AppDataWipe {
         try? MiniMaxKeychainStore().deleteKey()
         try? LocalLLMKeychainStore().deleteKey()
         try? StravaKeychainTokenStore().delete()
-        AgaraCloudClient.shared.signOut()
+        AgaraCloud.shared.wipeLocalAccount()
 
         // 3. Widget snapshot (App Group container) and its shared defaults.
         if let url = AgaraWidgetStore.fileURL { try? FileManager.default.removeItem(at: url) }

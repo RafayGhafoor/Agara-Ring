@@ -9,13 +9,14 @@ struct PrivacySettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(RingBLEClient.self) private var ble
     @State private var sampleData = SampleDataStore.shared
+    @State private var cloud = AgaraCloud.shared
     /// The destructive action awaiting confirmation — `ConfirmAction`.
     @State private var confirm: ConfirmAction?
 
     /// Copy from brand.yaml (both apps): unpair = Forget; both resets use the reset-app-data copy.
     private func ask(_ action: ResetAction) {
         switch action {
-        case .deleteAll: confirm = .deleteAllData { perform(action) }
+        case .deleteAll: confirm = .deleteAllData(cloudSignedIn: cloud.isSignedIn) { perform(action) }
         case .unpairRing: confirm = .forgetRing { perform(action) }
         case .resetAppData, .unpairAndReset: confirm = .resetAppData(confirmLabel: action.confirmLabel) { perform(action) }
         }
@@ -71,9 +72,10 @@ struct PrivacySettingsView: View {
                     footer: "Health data syncs from your ring straight to this phone and is stored only here. "
                         + "Nothing is uploaded unless you turn on a connection yourself (Apple Health, cloud backup). "
                         + "Export or import a copy in Data & Export."
+                        + (cloud.isSignedIn ? "\n\n" + AgaraCloudCopy.privacyFooterSignedIn : "")
                 ) {
                     FormValueRow(title: "Stored") {
-                        Text("On this phone").foregroundStyle(AgaraColors.textMuted)
+                        Text(cloud.isSignedIn ? AgaraCloudCopy.privacyStoredSignedIn : "On this phone").foregroundStyle(AgaraColors.textMuted)
                     }
                 }
                 if sampleData.isActive {

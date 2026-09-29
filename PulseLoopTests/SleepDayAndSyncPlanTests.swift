@@ -89,7 +89,7 @@ final class SleepDayAndSyncPlanTests: XCTestCase {
         // A short 01:00 wake-up doze, then the real sleep 02:00 → 09:00 — both on today's waking day.
         TestSupport.insertSleep(nightStart: at(1), stages: Array(repeating: .light, count: 30), into: context)
         let main = TestSupport.insertSleep(nightStart: at(2), stages: Array(repeating: .deep, count: 420), into: context)
-        let summary = try XCTUnwrap(AgaraCloudSync.sleepSummary(for: TestSupport.day(0), context: context))
+        let summary = try XCTUnwrap(AgaraCloudDays.sleepSummary(for: TestSupport.day(0), context: context))
         XCTAssertEqual(summary.startAt, main.startAt)
         XCTAssertEqual(summary.endAt, main.endAt)
         XCTAssertEqual(summary.deep, 420)

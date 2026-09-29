@@ -121,6 +121,12 @@ extension ConfirmAction {
         )
     }
 
+    /// Settings › Agara Cloud › Delete account: erases the cloud copy for good; the data on this phone stays.
+    static func deleteCloudAccount(_ perform: @escaping () -> Void) -> ConfirmAction {
+        ConfirmAction(key: "deleteCloudAccount", title: AgaraCloudCopy.deleteAccountTitle, message: AgaraCloudCopy.deleteAccountBody,
+                      confirmLabel: AgaraCloudCopy.deleteAccountConfirm, perform: perform)
+    }
+
     static func removeAppleHealthData(_ perform: @escaping () -> Void) -> ConfirmAction {
         ConfirmAction(
             key: "removeAppleHealthData",
@@ -176,8 +182,11 @@ extension ConfirmAction {
     }
 
     /// Settings › Privacy › Delete all my data: a full local wipe including sign-ins and API keys. Copy from `brand.yaml`.
-    static func deleteAllData(_ perform: @escaping () -> Void) -> ConfirmAction {
-        ConfirmAction(key: "deleteAllData", title: AgaraCopy.deleteAllDataTitle, message: AgaraCopy.deleteAllDataBody,
+    /// Signed in to Agara Cloud, the wipe also signs out and clears the tokens, and the message says the cloud copy is a
+    /// separate action (Settings › Agara Cloud › Delete account).
+    static func deleteAllData(cloudSignedIn: Bool = false, _ perform: @escaping () -> Void) -> ConfirmAction {
+        ConfirmAction(key: "deleteAllData", title: AgaraCopy.deleteAllDataTitle,
+                      message: AgaraCopy.deleteAllDataBody + (cloudSignedIn ? "\n\n" + AgaraCloudCopy.deleteAllDataCloudNote : ""),
                       confirmLabel: "Delete everything", perform: perform)
     }
 
