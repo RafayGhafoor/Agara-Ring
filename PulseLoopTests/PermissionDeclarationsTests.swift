@@ -56,7 +56,7 @@ final class PermissionDeclarationsTests: XCTestCase {
         let text = try String(contentsOf: projectFile, encoding: .utf8)
         var checked = Set<String>()
         for block in text.components(separatedBy: "isa = XCBuildConfiguration;").dropFirst() {
-            guard let idRange = block.range(of: #"PRODUCT_BUNDLE_IDENTIFIER = com\.agara\.ring(\.LiveActivity|\.Widgets)?;"#, options: .regularExpression),
+            guard let idRange = block.range(of: #"PRODUCT_BUNDLE_IDENTIFIER = com\.agara\.ring(\.RingLiveActivity|\.RingWidgets)?;"#, options: .regularExpression),
                   let nameRange = block.range(of: #"name = (Debug|Release);"#, options: .regularExpression) else { continue }
             let target = String(block[idRange]), config = String(block[nameRange])
             XCTAssertTrue(block.contains("TARGETED_DEVICE_FAMILY = 1;"), "\(target) \(config) must target iPhone only")
