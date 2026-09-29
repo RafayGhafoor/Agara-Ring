@@ -6,7 +6,7 @@ import Foundation
 /// Regenerate with `python3 tools/gen_shared.py` (add `--check` in CI).
 enum AgaraConfig {
     enum Cloud {
-        static let v2BaseUrl: String = "https://api.agaralife.com"
+        static let v2BaseUrl: String = "https://api.agaraheart.app"
         static let firebaseApiKey: String = "AIzaSyAOXtPXDpaDFMSBhY7Ya6Ch3lrhEaYxv1c"
         static let firebaseProjectId: String = "agara-ring-app"
         static let syncIntervalMinutes: Int = 120
