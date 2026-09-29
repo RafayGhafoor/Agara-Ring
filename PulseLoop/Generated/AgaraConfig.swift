@@ -90,8 +90,14 @@ enum AgaraFeature: String, CaseIterable {
     case bloodComponents = "blood_components"
     /// On-demand blood-components test (8a 01) in the measure hub. Requires blood_components.
     case measureLipids = "measure_lipids"
-    /// On-demand blood-glucose test (89 01, standard mode) in the measure hub.
+    /// On-demand blood-glucose test (89 01, standard mode) in the measure hub. Requires vitals_glucose.
     case measureGlucose = "measure_glucose"
+    /// On-demand blood-pressure test in the measure hub. Off for the store release (owner, 2026-09-29) — optical BP estimates are a medical-accuracy review risk (Apple 1.4.1, Play Health Content). Requires vitals_bp.
+    case measureBp = "measure_bp"
+    /// Everything blood-pressure — Vitals card and detail, zones, Today/insight mentions, manual entry, auto-measure row, Health export. Off for the store release (owner, 2026-09-29). The zone wording ("Stage 1/2 hypertension … seek care") MUST be rewritten to non-diagnostic language before this is ever turned on.
+    case vitalsBp = "vitals_bp"
+    /// Everything blood-sugar — Vitals card and detail, insights, glucose unit setting, calibration, Health export. Off for the store release (owner, 2026-09-29): the ring has no glucose sensor, values are profile-derived estimates.
+    case vitalsGlucose = "vitals_glucose"
     /// Auto-measure schedule screen (read b3 + write b3 01 per metric, ack + read-back). Built on both apps 2026-09-26; emulator E2E on both; real-ring write check pending.
     case autoMeasureSettings = "auto_measure_settings"
     /// Send height, weight, age, sex and step/sleep goals to the ring (a3).
@@ -148,6 +154,9 @@ enum AgaraFeature: String, CaseIterable {
         case .bloodComponents: return false
         case .measureLipids: return false
         case .measureGlucose: return false
+        case .measureBp: return false
+        case .vitalsBp: return false
+        case .vitalsGlucose: return false
         case .autoMeasureSettings: return true
         case .profileSync: return false
         case .firmwareCheck: return false
