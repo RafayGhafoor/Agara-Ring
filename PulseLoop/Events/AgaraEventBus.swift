@@ -238,6 +238,13 @@ final class EventPersistenceSubscriber {
     // This is an exhaustive event router; each enum case is independent rather than branching logic.
     // swiftlint:disable:next cyclomatic_complexity
     private func applyPersist(_ event: AgaraEvent) {
+        // A real ring: the labelled sample set ("Explore without ring") is wiped before anything the ring sends is
+        // written, so the two can never mix.
+        switch event {
+        case .deviceIdentified, .deviceStateChanged(.connected, _):
+            if SampleDataStore.shared.wipeForRealRing(context: context) { noopWrite = false }
+        default: break
+        }
         switch event {
         case let .deviceStateChanged(state, address):
             let device = MetricsService.fetchDevices(context).first ?? Device()

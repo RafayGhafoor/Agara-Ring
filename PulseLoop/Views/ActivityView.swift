@@ -117,6 +117,7 @@ struct ActivityView: View {
                     .frame(maxWidth: .infinity)
                     .frame(height: 68)
                     .agaraGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .sampleChip()
                 }
                 .buttonStyle(.plain)
 
@@ -132,6 +133,7 @@ struct ActivityView: View {
                         }
                         .frame(maxWidth: .infinity).padding(.vertical, 20)
                         .agaraGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .sampleChip()
                     } else {
                         ForEach(todayWorkouts) { session in
                             ActivityWorkoutRow(session: session, units: units) { path.append(AppRoute.activityDetail(session.id)) }
@@ -161,6 +163,7 @@ struct ActivityView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(16)
                     .agaraGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .sampleChip()
                 }
                 .buttonStyle(.plain)
 
@@ -261,6 +264,7 @@ struct DailyActivitySummaryCard: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(16)
             .agaraGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .sampleChip()
         }
         .buttonStyle(.plain)
     }
@@ -518,6 +522,7 @@ struct StepsByHourCard: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .agaraGlass(RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous))
+        .sampleChip()
         .task(id: reloadToken) { reload() }
         .confirmAction($confirm)
     }

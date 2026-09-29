@@ -576,7 +576,7 @@ struct RecordLiveView: View {
                             stats: liveWorkout.stats,
                             paused: paused,
                             permissionDenied: gps.isPermissionDenied,
-                            hasAlwaysAuthorization: gps.hasAlwaysAuthorization
+                            canRecordInBackground: gps.canRecordInBackground
                         )
                     } else if paused {
                         Text("PAUSED")
@@ -878,7 +878,7 @@ private struct LiveRouteMapSection: View {
     let stats: LiveWorkoutStats?
     let paused: Bool
     let permissionDenied: Bool
-    let hasAlwaysAuthorization: Bool
+    let canRecordInBackground: Bool
 
     var body: some View {
         VStack(spacing: 16) {
@@ -903,8 +903,8 @@ private struct LiveRouteMapSection: View {
             if permissionDenied {
                 Text("Location access is denied — enable it in Settings to record your route.")
                     .font(AgaraFont.caption).foregroundStyle(AgaraColors.warning).multilineTextAlignment(.center)
-            } else if !hasAlwaysAuthorization {
-                Text("Route will pause when the screen locks — allow “Always” location in Settings for full background tracking.")
+            } else if !canRecordInBackground {
+                Text("Waiting for location access — allow “While Using the App” to record your route.")
                     .font(AgaraFont.caption).foregroundStyle(AgaraColors.warning).multilineTextAlignment(.center)
             }
         }

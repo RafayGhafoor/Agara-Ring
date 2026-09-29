@@ -44,6 +44,8 @@ struct TodayTile<Content: View>: View {
                         }
                         eyebrow
                     }
+                    Spacer(minLength: 0)
+                    SampleChipInline().fixedSize()
                 }
                 content()
             }

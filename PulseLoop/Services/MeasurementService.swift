@@ -17,8 +17,8 @@ import UIKit
 /// * **Resume:** the sheet is a view of this state, so reopening Measure shows the running (or finished)
 ///   measurement instead of starting a new one. A finished result stays until the user acknowledges it.
 ///
-/// The reading itself is persisted by the coordinator's event subscriber as the ring's samples arrive (demo
-/// readings by `MeasurementDemoData`), so storing never depends on any screen being open.
+/// The reading itself is persisted by the coordinator's event subscriber as the ring's samples arrive, so storing
+/// never depends on any screen being open. With no ring connected nothing is measured or saved (no demo readings).
 /// Mirrors Android's `MeasurementService` (a foreground service there).
 @MainActor
 @Observable
@@ -64,10 +64,8 @@ final class MeasurementService {
     struct Environment {
         var device: () -> MeasurementDevice?
         var isConnected: () -> Bool
-        /// A ring has ever been paired — the "Explore without ring" demo applies only when none has.
+        /// A ring has ever been paired — only used to word the failure ("Connect your ring" vs "reconnect").
         var hasPairedRing: () -> Bool
-        /// Seeds and returns the demo reading ("Explore without ring").
-        var demoReading: (MeasurementSpec) -> MeasurementReading?
         /// Why a test failed, in the user's terms (not connected / charging / refused / not worn / generic).
         var failureMessage: (MeasurementSpec) -> String
         /// Keeps the app running while a test is in flight in the background; returns the "done" call.
@@ -90,9 +88,12 @@ final class MeasurementService {
     /// Before `attach`: no ring, nothing paired, a generic failure.
     private static let detachedEnvironment = Environment(
         device: { nil }, isConnected: { false }, hasPairedRing: { true },
-        demoReading: { _ in nil }, failureMessage: { $0.kind.failureMessage },
+        failureMessage: { $0.kind.failureMessage },
         beginBackgroundWork: { {} }
     )
+
+    /// Shown when a measurement is started with no ring ever paired.
+    static let connectRingMessage = "Connect your ring to take a measurement."
 
     /// Wire the live ring objects (from `AgaraApp`).
     func attach(client: RingBLEClient, coordinator: RingSyncCoordinator, context: ModelContext) {
@@ -100,12 +101,6 @@ final class MeasurementService {
             device: { [weak coordinator] in coordinator },
             isConnected: { [weak client] in client?.state == .connected },
             hasPairedRing: { !MetricsService.fetchDevices(context).isEmpty },
-            demoReading: { spec in
-                let demo = MeasurementDemoData.seed(spec.kind, context: context)
-                return MeasurementReading(value: demo.value, secondary: demo.secondary,
-                                          glucoseMgdl: spec.kind == .glucose ? demo.value.map(Double.init) : nil,
-                                          components: demo.components, vitals: demo.vitals)
-            },
             failureMessage: { [weak client, weak coordinator] spec in
                 guard let client, client.state == .connected else {
                     return "Your ring isn't connected. Reconnect it and try again."
@@ -192,18 +187,10 @@ final class MeasurementService {
         await environment.sleep(hold)
         guard isCurrent(run) else { return }
 
-        // A ring that isn't connected splits two ways: nobody ever paired one ("Explore without ring" — the demo
-        // reading, tagged `source: .mock`), or a paired ring is just not connected — then the user thinks this is
-        // a real measurement, and an invented number would be indefensible: error.
+        // No connected ring (never paired, or paired but not connected): nothing is measured and nothing is saved.
+        // An invented reading would be indefensible (Apple 1.4.1 / 2.1), so the user is told to connect the ring.
         guard environment.isConnected(), let device = environment.device() else {
-            if !environment.hasPairedRing() {
-                beginMeasuring()
-                await environment.sleep(spec.kind == .hr ? 2.2 : 3.0)
-                guard isCurrent(run) else { return }
-                await finish(spec, reading: environment.demoReading(spec), run: run)
-            } else {
-                fail(spec)
-            }
+            fail(spec, message: environment.hasPairedRing() ? nil : Self.connectRingMessage)
             return
         }
 
@@ -237,8 +224,8 @@ final class MeasurementService {
         finishBackgroundWork()
     }
 
-    private func fail(_ spec: MeasurementSpec) {
-        let message = environment.failureMessage(spec)
+    private func fail(_ spec: MeasurementSpec, message override: String? = nil) {
+        let message = override ?? environment.failureMessage(spec)
         errorMessage = message
         stage = .error
         trace("measurement \(spec.title): \(message)")

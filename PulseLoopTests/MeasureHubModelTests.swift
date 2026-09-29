@@ -148,7 +148,7 @@ final class MeasureHubModelTests: XCTestCase {
         let all = VeepooCoordinator().capabilities
         let defaultsOnly: (AgaraFeature) -> Bool = { $0.defaultOn }
         XCTAssertEqual(MeasurementRegistry.available(capabilities: all, ring: nil, isOn: defaultsOnly).map(\.id),
-                       ["heartRate", "spo2", "bloodPressure", "stress"], "glucose/lipids are off by default")
+                       ["heartRate", "spo2", "stress"], "BP, glucose and lipids are off by default (store launch)")
         let everything: (AgaraFeature) -> Bool = { _ in true }
         XCTAssertEqual(MeasurementRegistry.available(capabilities: all, ring: nil, isOn: everything).count, 6)
         XCTAssertEqual(MeasurementRegistry.available(capabilities: caps([.manualHeartRate]), ring: nil, isOn: everything).map(\.id),

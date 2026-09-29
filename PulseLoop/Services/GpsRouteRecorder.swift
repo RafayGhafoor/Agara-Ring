@@ -23,9 +23,9 @@ final class GpsRouteRecorder: NSObject, CLLocationManagerDelegate {
 
     /// Surfaced to the view layer so SwiftUI never needs to import CoreLocation.
     var isPermissionDenied: Bool { authorization == .denied || authorization == .restricted }
-    /// Without Always, iOS silently stops delivering fixes when the screen locks — the live screen
-    /// warns so the user knows the route will have gaps.
-    var hasAlwaysAuthorization: Bool { authorization == .authorizedAlways }
+    /// While In Use is enough: a workout started in the foreground keeps receiving fixes after the screen locks
+    /// (the `location` background mode plus `allowsBackgroundLocationUpdates`). "Always" is never requested.
+    var canRecordInBackground: Bool { authorization == .authorizedWhenInUse || authorization == .authorizedAlways }
 
     private let manager = CLLocationManager()
     private var sessionId: UUID?
@@ -49,15 +49,14 @@ final class GpsRouteRecorder: NSObject, CLLocationManagerDelegate {
         self.profile = .profile(for: activityType)
         lastAccepted = nil
         pointCount = 0
-        // Provisional When-In-Use still records in the foreground; also request Always so the
-        // route keeps recording when the screen locks / the app backgrounds.
+        // When In Use only. A workout started in the foreground keeps recording when the screen locks or the app
+        // backgrounds (background mode + the blue indicator below); "Always" is not requested (store launch).
         manager.requestWhenInUseAuthorization()
-        manager.requestAlwaysAuthorization()
         manager.desiredAccuracy = WorkoutPrefsStore.shared.settings.gpsAccuracy.clValue
         manager.distanceFilter = profile.distanceFilterMeters
         manager.pausesLocationUpdatesAutomatically = false
         manager.activityType = .fitness
-        if manager.authorizationStatus == .authorizedAlways {
+        if manager.authorizationStatus == .authorizedWhenInUse || manager.authorizationStatus == .authorizedAlways {
             manager.allowsBackgroundLocationUpdates = true
             // Blue indicator while recording in background — the honest, Strava-like signal that
             // the route is still being tracked.
@@ -116,11 +115,10 @@ final class GpsRouteRecorder: NSObject, CLLocationManagerDelegate {
         let status = manager.authorizationStatus
         MainActor.assumeIsolated {
             authorization = status
-            // The "Always" grant typically arrives *after* start() (iOS shows the When-In-Use
-            // prompt first, then escalates). Enable background updates the moment we have Always
-            // while a workout is tracking — otherwise location pauses on background, the app
+            // The grant arrives *after* start() (the first-run prompt). Enable background updates the moment
+            // we have it while a workout is tracking — otherwise location pauses on background, the app
             // suspends, and sensor polling freezes.
-            if status == .authorizedAlways, isTracking {
+            if status == .authorizedWhenInUse || status == .authorizedAlways, isTracking {
                 manager.allowsBackgroundLocationUpdates = true
                 manager.showsBackgroundLocationIndicator = true
             }

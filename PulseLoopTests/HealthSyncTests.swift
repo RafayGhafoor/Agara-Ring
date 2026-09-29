@@ -58,12 +58,22 @@ final class HealthSyncTests: XCTestCase {
         XCTAssertFalse(mapping.isPlausible(-5))
     }
 
-    func testTemperaturePlausibilityBounds() throws {
-        let mapping = try XCTUnwrap(HealthKitTypeMappings.quantityMapping(for: .temperature))
-        XCTAssertTrue(mapping.isPlausible(37))
-        XCTAssertFalse(mapping.isPlausible(25), "lower bound is exclusive")
-        XCTAssertFalse(mapping.isPlausible(45), "upper bound is exclusive")
-        XCTAssertFalse(mapping.isPlausible(15), "far below body temperature")
+    /// Store launch: only heart rate, SpO2 and HRV reach Apple Health from the vitals. Finger skin temperature is
+    /// not core body temperature (5.1.3), and BP / glucose / lipids are off by flag and never exported.
+    func testOnlyHeartRateSpO2AndHRVAreExportableVitals() {
+        let exportable: Set<MeasurementKind> = [.heartRate, .spo2, .hrv]
+        for kind in MeasurementKind.allCases {
+            let mapped = HealthKitTypeMappings.quantityMapping(for: kind) != nil
+            XCTAssertEqual(mapped, exportable.contains(kind), "\(kind) export mapping")
+        }
+    }
+
+    func testHealthAuthorizationRequestsNoBloodPressureGlucoseOrBodyTemperature() {
+        let ids = Set(HealthSyncService.quantityWriteIdentifiers(nutritionActive: true).map(\.rawValue))
+        XCTAssertFalse(ids.contains(HKQuantityTypeIdentifier.bodyTemperature.rawValue))
+        XCTAssertFalse(ids.contains(HKQuantityTypeIdentifier.bloodPressureSystolic.rawValue))
+        XCTAssertFalse(ids.contains(HKQuantityTypeIdentifier.bloodPressureDiastolic.rawValue))
+        XCTAssertFalse(ids.contains(HKQuantityTypeIdentifier.bloodGlucose.rawValue))
     }
 
     func testUnsupportedKindsMapToNil() {

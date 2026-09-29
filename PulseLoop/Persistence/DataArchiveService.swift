@@ -9,6 +9,8 @@ nonisolated enum DataArchiveError: LocalizedError, Sendable {
     case invalidFile(details: String?)
     case duplicateKeys(entity: String)
     case operationInProgress
+    /// The store holds only the labelled sample set ("Explore without ring"); exporting it would pass it off as data.
+    case sampleDataLoaded
 
     var errorDescription: String? {
         switch self {
@@ -20,6 +22,8 @@ nonisolated enum DataArchiveError: LocalizedError, Sendable {
             return "This file contains duplicate \(entity) entries and can't be imported."
         case .operationInProgress:
             return "Another export or import is already running. Wait for it to finish and try again."
+        case .sampleDataLoaded:
+            return "This phone only holds sample data. Pair your ring, or clear the sample data, before exporting."
         }
     }
 }
@@ -70,6 +74,7 @@ enum DataArchiveService {
         attachmentsDirectory: URL? = nil,
         includeRawPackets: Bool = false
     ) async throws -> Data {
+        guard !SampleDataStore.isActiveNow else { throw DataArchiveError.sampleDataLoaded }
         try beginExclusiveOperation()
         defer { isBusy = false }
         let sink = ArchiveDataSink()
@@ -94,6 +99,7 @@ enum DataArchiveService {
     /// already shared, and each one holds their whole health history.
     /// Raw BLE packets are included only when `includeRawPackets` is set (Android's "include diagnostics").
     static func exportFile(context: ModelContext, includeRawPackets: Bool = false) async throws -> URL {
+        guard !SampleDataStore.isActiveNow else { throw DataArchiveError.sampleDataLoaded }
         try beginExclusiveOperation()
         defer { isBusy = false }
         let url = try ExportFiles.freshDirectory().appendingPathComponent(exportFileName())

@@ -20,7 +20,7 @@ import SwiftUI
 // MARK: - Storage location
 
 enum AgaraWidgetStore {
-    static let suite = "group.xyz.sakshambhutani.pulseloop2" // install-bound: App Group id (entitlements + provisioning)
+    static let suite = "group.com.agara.ring" // App Group id: same in all three entitlements files (store launch phase 1)
     static let fileName = "widget-snapshot.json"
     /// Shared-defaults key holding the Date of the last background-triggered timeline reload
     /// (foreground reloads are free of the WidgetKit refresh budget; background ones are throttled).

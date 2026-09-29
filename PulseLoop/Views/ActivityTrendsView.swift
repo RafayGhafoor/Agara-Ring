@@ -56,6 +56,7 @@ struct ActivityTrendsView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .agaraGlass(RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous))
+        .sampleChip()
         .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(AgaraColors.borderSubtle, lineWidth: 1))
     }
 
@@ -239,6 +240,7 @@ struct ActivityTrendsView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
         .agaraGlass(RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous))
+        .sampleChip()
     }
 
     // MARK: - Derived values

@@ -41,10 +41,10 @@ enum HealthKitTypeMappings {
             return QuantityMapping(type: type, unit: HKUnit.secondUnit(with: .milli),
                                    convert: { $0 }, isPlausible: { $0 > 0 && $0 < 1000 })
         case .temperature:
-            // Apple's wrist-temperature type is read-only to third parties, so we write body temperature.
-            guard let type = HKQuantityType.quantityType(forIdentifier: .bodyTemperature) else { return nil }
-            return QuantityMapping(type: type, unit: .degreeCelsius(),
-                                   convert: { $0 }, isPlausible: { $0 > 25 && $0 < 45 })
+            // The ring measures *finger skin* temperature. Apple's wrist-temperature type is read-only to
+            // third parties and `bodyTemperature` is core temperature, so writing skin readings there would put
+            // inaccurate data into Health (App Store 5.1.3). Not exported.
+            return nil
         case .stress, .fatigue:
             return nil   // No native HealthKit equivalent.
         case .bloodPressureSystolic, .bloodPressureDiastolic, .bloodSugar:

@@ -59,7 +59,7 @@ struct VitalCard<Content: View>: View {
             Spacer(minLength: 4)
             // "Updated …" lives top-right so it doesn't add a footer row and grow the card height.
             // Suppressed when the ESTIMATED chip is present so the two don't crowd the header.
-            if let footer = footerText, !compact, !model.isEstimated {
+            if let footer = footerText, !compact, !model.isEstimated, !SampleDataStore.shared.isActive {
                 Text(footer)
                     .font(AgaraFont.caption2.weight(.regular))
                     .foregroundStyle(AgaraColors.textMuted)
@@ -69,6 +69,7 @@ struct VitalCard<Content: View>: View {
             if model.isEstimated {
                 estimatedChip
             }
+            SampleChipInline()
         }
     }
 

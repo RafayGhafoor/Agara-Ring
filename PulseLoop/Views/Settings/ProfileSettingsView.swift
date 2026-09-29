@@ -16,7 +16,7 @@ struct ProfileSettingsView: View {
         ScrollView {
             VStack(spacing: 16) {
                 ProfileEditorView(draft: $draft)
-                unitsGroup
+                if AgaraFeatureStore.isOn(.vitalsGlucose) || AgaraFeatureStore.isOn(.bloodComponents) { unitsGroup }
                 appleHealthImport
             }
             .padding()

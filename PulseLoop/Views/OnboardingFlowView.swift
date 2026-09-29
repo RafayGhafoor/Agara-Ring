@@ -25,7 +25,10 @@ struct OnboardingFlowView: View {
                 case .welcome:
                     OnboardingWelcomeView(
                         getStarted: { push(.ring) },
-                        exploreWithoutRing: { push(.profile) }
+                        exploreWithoutRing: {
+                            SampleDataStore.shared.markExploring()   // sample data loads when onboarding finishes
+                            push(.profile)
+                        }
                     )
                 case .ring:
                     OnboardingPairView(
@@ -65,6 +68,7 @@ struct OnboardingFlowView: View {
     /// Called once the pairing screen's "Name your ring" step is saved or skipped. The connected
     /// confirmation was already on screen during that step; next is the Syncing step (history coming down).
     private func advanceAfterConnection() {
+        SampleDataStore.shared.clearExploring()   // a real ring is being paired: no sample data
         guard step == .ring else { return }
         push(.syncing)
     }
@@ -81,6 +85,8 @@ struct OnboardingFlowView: View {
         profile.baselineCompleted = true
         profile.updatedAt = Date()
         try? modelContext.save()
+        // "Explore without ring": load the labelled sample set (banner + chips on every tab) now that a profile exists.
+        SampleDataStore.shared.activateIfExploring(context: modelContext)
         progressStore.clear()
         onFinished()
     }
@@ -165,7 +171,10 @@ struct OnboardingWelcomeView: View {
     private let features = [
         OnboardingItem(icon: "dollarsign.circle.fill", title: "No subscription", detail: "Own your ring data", tint: AgaraColors.success),
         OnboardingItem(icon: "lock.shield.fill", title: "Privacy first", detail: "Stays local unless you sync", tint: AgaraColors.info),
-        OnboardingItem(icon: "sparkles", title: "AI coach", detail: "Learns your baseline", tint: AgaraColors.accent),
+        // The AI coach is off in the store release (flag `coach`), so the tile only claims it when it exists.
+        AgaraFeatureStore.isOn(.coach)
+            ? OnboardingItem(icon: "sparkles", title: "AI coach", detail: "Learns your baseline", tint: AgaraColors.accent)
+            : OnboardingItem(icon: "heart.fill", title: "Apple Health", detail: "Optional export", tint: AgaraColors.accent),
         OnboardingItem(icon: "waveform.path.ecg", title: "Your vitals", detail: "HR, SpO₂, HRV, stress", tint: AgaraColors.heartRate),
         OnboardingItem(icon: "moon.stars.fill", title: "Sleep tracking", detail: "Stages & trends", tint: AgaraColors.sleep),
         OnboardingItem(icon: "figure.run", title: "Workouts", detail: "Live activity tracking", tint: AgaraColors.steps),
@@ -294,6 +303,7 @@ struct OnboardingWelcomeView: View {
                 .font(AgaraFont.subheadline.weight(.semibold))
                 .foregroundStyle(AgaraColors.textSecondary)
                 .frame(height: 44)
+            LegalLinkRow()
         }
     }
 }

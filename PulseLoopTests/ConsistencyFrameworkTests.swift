@@ -71,7 +71,6 @@ final class MeasurementServiceTests: XCTestCase {
             device: { [unowned self] in self.device },
             isConnected: { [unowned self] in self.connected },
             hasPairedRing: { [unowned self] in self.paired },
-            demoReading: { _ in MeasurementReading(value: 64) },
             failureMessage: { [unowned self] spec in
                 self.connected ? spec.kind.failureMessage : "Your ring isn't connected. Reconnect it and try again."
             },
@@ -171,13 +170,18 @@ final class MeasurementServiceTests: XCTestCase {
         XCTAssertEqual(service.errorMessage, "Your ring isn't connected. Reconnect it and try again.")
     }
 
-    func testNeverPairedRunsTheDemoReading() async {
+    /// Store launch (Apple 1.4.1 / 2.1): with no ring ever paired, Measure says "Connect your ring" and saves nothing.
+    func testNeverPairedSaysConnectYourRingAndPersistsNothing() async {
         connected = false
         paired = false
         let service = makeService()
         service.start(spec("heartRate"))
-        await waitUntil { service.stage == .result }
-        XCTAssertEqual(service.reading?.value, 64)
+        await waitUntil { service.stage == .error }
+        XCTAssertNil(service.reading)
+        XCTAssertEqual(service.errorMessage, MeasurementService.connectRingMessage)
+        XCTAssertEqual(device.hrStarted, 0, "the ring is never asked")
+
+        // The service holds no store any more (it used to seed mock readings); with no ring nothing can be saved.
     }
 
     func testBloodPressureWithoutItsDiastolicHalfIsAnError() async {

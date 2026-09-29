@@ -98,7 +98,7 @@ enum MeasurementRegistry {
         },
         MeasurementSpec(id: "bloodPressure", kind: .bloodPressure,
                         seconds: AgaraConfig.Ring.measureTypicalSecondsBloodPressure,
-                        flags: [], capability: .manualBloodPressure, ringSupport: \.bloodPressure) { device in
+                        flags: [.measureBp, .vitalsBp], capability: .manualBloodPressure, ringSupport: \.bloodPressure) { device in
             await device.measureBloodPressure().map { MeasurementReading(value: $0.systolic, secondary: $0.diastolic) }
         },
         MeasurementSpec(id: "stress", kind: .stress, seconds: AgaraConfig.Ring.measureTypicalSecondsStress,
@@ -106,7 +106,7 @@ enum MeasurementRegistry {
             await device.measureStress().map { MeasurementReading(value: $0) }
         },
         MeasurementSpec(id: "glucose", kind: .glucose, seconds: AgaraConfig.Ring.measureTypicalSecondsGlucose,
-                        flags: [.measureGlucose], capability: .manualBloodSugar, ringSupport: \.bloodGlucose) { device in
+                        flags: [.measureGlucose, .vitalsGlucose], capability: .manualBloodSugar, ringSupport: \.bloodGlucose) { device in
             await device.measureGlucose().map { MeasurementReading(value: Int($0.rounded()), glucoseMgdl: $0) }
         },
         MeasurementSpec(id: "bloodComponents", kind: .bloodComponents,

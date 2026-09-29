@@ -164,17 +164,21 @@ struct SettingsView: View {
     private func resourcesRows(_ caps: Set<WearableCapability>) -> [SettingsRowItem] {
         var rows: [SettingsRowItem] = []
         // the ring-only: only the 56ff the ring measures BP / blood sugar, so Calibration hides otherwise.
-        if caps.contains(.bloodPressure) || caps.contains(.bloodSugar) {
+        if (caps.contains(.bloodPressure) && AgaraFeatureStore.isOn(.vitalsBp))
+            || (caps.contains(.bloodSugar) && AgaraFeatureStore.isOn(.vitalsGlucose)) {
             rows.append(SettingsRowItem(icon: "slider.horizontal.3", tint: AgaraColors.bloodPressure, title: "Calibration") {
                 path.append(AppRoute.settingsCalibration)
             })
         }
         // Hidden until unlocked by tapping the version 7× in About (like Android's developer options).
+        // Debug builds only: a release build has no hidden menu (store launch, App Store 2.3.1(a)).
+        #if DEBUG
         if developerUnlocked {
             rows.append(SettingsRowItem(icon: "ladybug", tint: AgaraColors.danger, title: "Developer") {
                 path.append(AppRoute.debug)
             })
         }
+        #endif
         rows.append(SettingsRowItem(icon: "heart.fill", tint: AgaraColors.heartRate, title: "Apple Health") {
             path.append(AppRoute.settingsHealth)
         })

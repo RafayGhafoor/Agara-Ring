@@ -4,7 +4,7 @@ import SwiftData
 import os
 
 /// Exports everything the ring captures into Apple Health, one direction only (Agara Ring → Health):
-///   • Vitals — heart rate, blood oxygen (SpO₂), HRV, skin temperature
+///   • Vitals — heart rate, blood oxygen (SpO₂), HRV
 ///   • Daily activity — steps, active energy, walking/running distance
 ///   • Sleep — per-stage segments (deep / core / REM / awake)
 ///   • Workouts — type, energy, distance, and the recorded GPS route (see `+Workouts`)
@@ -59,21 +59,28 @@ final class HealthSyncService {
         try await store.requestAuthorization(toShare: shareTypes, read: readTypes)
     }
 
-    private var quantityWriteTypes: [HKQuantityType] {
+    /// The quantity types Agara Ring asks to write. Static and internal so a test can assert that BP, glucose and
+    /// body temperature are never requested (store launch: nothing the ring only estimates reaches Health).
+    static func quantityWriteIdentifiers(nutritionActive: Bool) -> [HKQuantityTypeIdentifier] {
         var identifiers: [HKQuantityTypeIdentifier] = [
-            .heartRate, .oxygenSaturation, .heartRateVariabilitySDNN, .bodyTemperature,
+            .heartRate, .oxygenSaturation, .heartRateVariabilitySDNN,
             .stepCount, .activeEnergyBurned, .distanceWalkingRunning, .distanceCycling
         ]
         // Dietary types join the share set only once the nutrition feature is enabled, so users
         // who never opted in never see dietary rows on the Health authorization sheet. Enabling
         // nutrition later re-runs authorization from the settings screen (the only auth path).
-        if NutritionPrefsStore.shared.isActive {
+        if nutritionActive {
             identifiers += [
                 .dietaryEnergyConsumed, .dietaryProtein, .dietaryCarbohydrates,
                 .dietaryFatTotal, .dietaryFiber, .dietarySugar, .dietarySodium
             ]
         }
-        return identifiers.compactMap { HKQuantityType.quantityType(forIdentifier: $0) }
+        return identifiers
+    }
+
+    private var quantityWriteTypes: [HKQuantityType] {
+        Self.quantityWriteIdentifiers(nutritionActive: NutritionPrefsStore.shared.isActive)
+            .compactMap { HKQuantityType.quantityType(forIdentifier: $0) }
     }
 
     private var shareTypes: Set<HKSampleType> {
@@ -147,7 +154,8 @@ final class HealthSyncService {
     /// publisher-scheduled export write the full ring history against a user about to pick "new data only".
     private func shouldExport() -> Bool {
         guard prefsStore.prefs.masterEnabled, prefsStore.prefs.backfillChoice != .notAsked,
-              isAvailable, authState == .authorized, !isRunningUnitTests else { return false }
+              isAvailable, authState == .authorized, !isRunningUnitTests,
+              !SampleDataStore.shared.isActive else { return false }   // sample data never reaches Apple Health
         return true
     }
 
@@ -173,7 +181,6 @@ final class HealthSyncService {
         if prefs.syncHeartRate { kinds.append(.heartRate) }
         if prefs.syncSpO2 { kinds.append(.spo2) }
         if prefs.syncHRV { kinds.append(.hrv) }
-        if prefs.syncTemperature { kinds.append(.temperature) }
         return kinds
     }
 

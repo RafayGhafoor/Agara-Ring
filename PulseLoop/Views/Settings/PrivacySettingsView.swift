@@ -8,12 +8,14 @@ import UIKit
 struct PrivacySettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(RingBLEClient.self) private var ble
+    @State private var sampleData = SampleDataStore.shared
     /// The destructive action awaiting confirmation — `ConfirmAction`.
     @State private var confirm: ConfirmAction?
 
     /// Copy from brand.yaml (both apps): unpair = Forget; both resets use the reset-app-data copy.
     private func ask(_ action: ResetAction) {
         switch action {
+        case .deleteAll: confirm = .deleteAllData { perform(action) }
         case .unpairRing: confirm = .forgetRing { perform(action) }
         case .resetAppData, .unpairAndReset: confirm = .resetAppData(confirmLabel: action.confirmLabel) { perform(action) }
         }
@@ -23,6 +25,8 @@ struct PrivacySettingsView: View {
         case unpairRing
         case resetAppData
         case unpairAndReset
+        /// Delete all my data: unpair, then a complete local wipe (`AppDataWipe`).
+        case deleteAll
 
         var id: Int { hashValue }
 
@@ -31,6 +35,7 @@ struct PrivacySettingsView: View {
             case .unpairRing:     return "Unpair ring?"
             case .resetAppData:   return "Reset app data?"
             case .unpairAndReset: return "Unpair ring & reset app data?"
+            case .deleteAll:      return AgaraCopy.deleteAllDataTitle
             }
         }
 
@@ -42,6 +47,8 @@ struct PrivacySettingsView: View {
                 return "This permanently erases all your data — metrics, sleep, activity, coach history, settings, and saved API keys — and can't be undone."
             case .unpairAndReset:
                 return "This unpairs your ring, then permanently erases all your data — metrics, sleep, activity, coach history, settings, and saved API keys — and can't be undone."
+            case .deleteAll:
+                return AgaraCopy.deleteAllDataBody
             }
         }
 
@@ -51,6 +58,7 @@ struct PrivacySettingsView: View {
             case .unpairRing:     return "Unpair ring"
             case .resetAppData:   return "Reset app data"
             case .unpairAndReset: return "Unpair & reset"
+            case .deleteAll:      return "Delete everything"
             }
         }
     }
@@ -68,6 +76,17 @@ struct PrivacySettingsView: View {
                         Text("On this phone").foregroundStyle(AgaraColors.textMuted)
                     }
                 }
+                if sampleData.isActive {
+                    SettingsGroup(
+                        header: "Sample data",
+                        footer: "You're exploring with sample data. Pairing your ring removes it automatically; you can also clear it now."
+                    ) {
+                        actionRow("Clear sample data", systemImage: "trash", tint: AgaraColors.danger) {
+                            confirm = .clearDemo { sampleData.clear(context: modelContext) }
+                        }
+                        .accessibilityIdentifier("privacy.clearSample")
+                    }
+                }
                 SettingsGroup(
                     header: "App data",
                     footer: "Unpair releases the ring for other apps and keeps your health data. Resetting erases everything on this device and returns the app to onboarding."
@@ -82,6 +101,16 @@ struct PrivacySettingsView: View {
                         ask(ResetAction.unpairAndReset)
                     }
                 }
+                SettingsGroup(
+                    header: "Delete my data",
+                    footer: "Removes everything Agara Ring stores on this phone, including sign-ins and keys, and unpairs your ring. Data already in Apple Health stays there."
+                ) {
+                    actionRow("Delete all my data", systemImage: "trash.fill", tint: AgaraColors.danger) {
+                        ask(ResetAction.deleteAll)
+                    }
+                    .accessibilityIdentifier("privacy.deleteAll")
+                }
+                LegalSettingsGroup()
 
             }
             .padding()
@@ -127,6 +156,9 @@ struct PrivacySettingsView: View {
             // Unbind the ring FIRST so the UNBOND write goes out before the store is wiped.
             ble.forget()
             resetAppData()
+        case .deleteAll:
+            ble.forget()   // same order: the ring is told before the store goes
+            AppDataWipe.eraseEverything(context: modelContext)
         }
     }
 

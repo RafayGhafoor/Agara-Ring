@@ -230,6 +230,7 @@ struct MetricCardButton: View {
             .padding(16)
             .frame(height: 150)
             .agaraGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .sampleChip()
             // Non-tappable tiles should look identical to tappable ones — never dimmed.
             .contentShape(Rectangle())
         }
@@ -459,6 +460,7 @@ struct SleepStageSummaryCardsView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
         .agaraGlass(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .sampleChip()
     }
 }
 
@@ -483,6 +485,7 @@ struct DetailCard<Content: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .agaraGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .sampleChip()
     }
 }
 
@@ -561,6 +564,7 @@ struct ActivitySectionCard<Content: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .agaraGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .sampleChip()
     }
 }
 
@@ -677,6 +681,7 @@ struct ActivityWorkoutRow: View {
             }
             .padding(16)
             .agaraGlass(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .sampleChip()
         }
         .buttonStyle(.plain)
         .disabled(onTap == nil)

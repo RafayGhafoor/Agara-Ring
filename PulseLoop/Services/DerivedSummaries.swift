@@ -62,6 +62,8 @@ enum MetricKey: String, CaseIterable {
         case .respiratoryRate: return .vitalsRespiration
         case .met: return .vitalsMet
         case .cardiacLoad: return .vitalsCardiacLoad
+        case .bloodPressureSystolic, .bloodPressureDiastolic: return .vitalsBp
+        case .bloodSugar: return .vitalsGlucose
         case .bloodComponents, .totalCholesterol, .triglycerides, .hdl, .ldl, .uricAcid: return .bloodComponents
         default: return nil
         }

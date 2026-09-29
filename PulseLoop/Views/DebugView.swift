@@ -1,3 +1,6 @@
+#if DEBUG
+// Developer tooling (raw packet log, feature-flag overrides, component gallery): compiled into debug builds only, so
+// a release build has no hidden menu (App Store 2.3.1(a)). Reached from Settings › Developer (7 taps on the version).
 import SwiftUI
 import SwiftData
 
@@ -139,3 +142,4 @@ struct ComponentGalleryView: View {
         .navigationTitle("Components")
     }
 }
+#endif

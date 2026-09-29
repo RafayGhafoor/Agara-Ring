@@ -115,7 +115,7 @@ final class OnboardingAndTabsTests: AgaraUITestCase {
         eventually(timeout: 60, "no vitals before relaunch") { text(containing: "HEART RATE").exists }
         app.terminate()
 
-        app.launchArguments = ["-virtualRing", "9799", "-noCoachMarks", "YES", "-features", Self.allFeatures,
+        app.launchArguments = ["-virtualRing", "9799", "-noCoachMarks", "YES", "-acceptDisclaimer", "YES", "-features", Self.allFeatures,
                                "-historyWindowDays", "90"]
         app.launch()
         openTab("Vitals")

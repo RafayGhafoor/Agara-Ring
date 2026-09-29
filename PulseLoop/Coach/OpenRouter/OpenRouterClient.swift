@@ -78,7 +78,7 @@ final class OpenRouterClient: ResponsesClient, @unchecked Sendable {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         // Optional attribution headers OpenRouter uses for its app leaderboard.
-        request.setValue(AgaraCopy.projectUrl, forHTTPHeaderField: "HTTP-Referer")
+        request.setValue(AgaraCopy.socialWebsiteUrl, forHTTPHeaderField: "HTTP-Referer")
         request.setValue(AgaraCopy.ringDisplayName, forHTTPHeaderField: "X-Title")
         request.httpBody = bodyData
         request.timeoutInterval = 60

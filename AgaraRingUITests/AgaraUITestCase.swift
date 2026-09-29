@@ -25,6 +25,8 @@ class AgaraUITestCase: XCTestCase {
         "vitals_met", "vitals_cardiac_load", "blood_components", "measure_lipids", "measure_glucose",
         "auto_measure_settings", "profile_sync", "firmware_check", "firmware_download", "firmware_install",
         "find_ring_proximity",
+        // BP and blood sugar are off in the shipped defaults; the e2e run turns them on so the hidden code keeps working.
+        "measure_bp", "vitals_bp", "vitals_glucose",
     ].map { "\($0)=on" }.joined(separator: ",")
 
     var app: XCUIApplication!
@@ -99,6 +101,7 @@ class AgaraUITestCase: XCTestCase {
             "-historyDays", "8",
             "-historyWindowDays", "90",
             "-noCoachMarks", coachMarks ? "NO" : "YES",
+            "-acceptDisclaimer", "YES",   // the one-time wellness disclaimer (debug launch argument)
             // Keep every run on the same, shipped look regardless of what an earlier test chose.
             "-AppleLanguages", "(en)",
         ] + extra
@@ -108,7 +111,7 @@ class AgaraUITestCase: XCTestCase {
 
     /// Launch with no ring transport at all (CoreBluetooth path — unauthorized/unsupported in the sim).
     func launchWithoutRing(extra: [String] = []) {
-        app.launchArguments = ["-noCoachMarks", "YES", "-features", Self.allFeatures] + extra
+        app.launchArguments = ["-noCoachMarks", "YES", "-acceptDisclaimer", "YES", "-features", Self.allFeatures] + extra
         app.launch()
     }
 

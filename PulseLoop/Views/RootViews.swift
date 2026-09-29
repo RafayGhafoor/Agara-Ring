@@ -10,6 +10,8 @@ struct RootAppView: View {
     @Query private var profiles: [UserProfile]
     @State private var path = NavigationPath()
     @State private var didFinishForcedOnboarding = false
+    /// The one-time wellness disclaimer (before onboarding, so before pairing). Persisted; see `WellnessDisclaimer`.
+    @State private var disclaimerAccepted = WellnessDisclaimer.isAccepted() || WellnessDisclaimer.launchArgumentAccepts
     /// The OS light/dark setting. Read here, above `.preferredColorScheme`: in System mode the override is
     /// nil, so this tracks the OS live; in Dark/Light mode it isn't consulted.
     @Environment(\.colorScheme) private var systemScheme
@@ -34,7 +36,12 @@ struct RootAppView: View {
     var body: some View {
         NavigationStack(path: $path) {
             Group {
-                if (!forceOnboardingForTesting || didFinishForcedOnboarding),
+                if !disclaimerAccepted {
+                    WellnessDisclaimerView(onAccept: {
+                        WellnessDisclaimer.accept()
+                        withAnimation(.snappy) { disclaimerAccepted = true }
+                    })
+                } else if (!forceOnboardingForTesting || didFinishForcedOnboarding),
                    profiles.first?.onboardingCompleted == true {
                     MainTabView(path: $path)
                 } else {
@@ -54,6 +61,15 @@ struct RootAppView: View {
                     return
                 }
                 Self.didRunLaunchTasks = true
+                // Test tooling: `-sampleData YES` loads the release "Explore without ring" sample set (banner + chips).
+                if DebugLaunch.bool("sampleData") {
+                    SeedData.clearAll(modelContext)
+                    let profile = UserProfile(name: "", onboardingCompleted: true, baselineCompleted: true)
+                    modelContext.insert(profile)
+                    try? modelContext.save()
+                    SampleDataStore.shared.markExploring()
+                    SampleDataStore.shared.activateIfExploring(context: modelContext)
+                }
                 if DebugLaunch.bool("seedDemo") {
                     SeedData.clearAll(modelContext)
                     SeedData.seedDemo(modelContext, completeOnboarding: true)
@@ -228,9 +244,17 @@ struct RootAppView: View {
                 case .pairing:
                     PairingView(onConnected: { path.removeLast() })
                 case .debug:
+                    #if DEBUG
                     DebugView()
+                    #else
+                    EmptyView()   // no developer menu in release builds
+                    #endif
                 case .componentGallery:
+                    #if DEBUG
                     ComponentGalleryView()
+                    #else
+                    EmptyView()
+                    #endif
                 }
             }
         }
@@ -305,6 +329,7 @@ struct MainTabView: View {
     }
 
     @State private var features = AgaraFeatureStore.shared
+    @State private var sampleData = SampleDataStore.shared
     /// Coach FAB + sheet: flag `coach` and the user's master switch (`CoachGate`).
     private var coachEnabled: Bool { features.isOn(.coach) && coachStore.settings.coachMasterEnabled }
     private var visibleTabs: [MainTab] {
@@ -362,6 +387,10 @@ struct MainTabView: View {
     var body: some View {
         VStack(spacing: 0) {
             AppHeader(path: $path)
+            // "Explore without ring": one persistent banner on every tab; tapping it opens ring pairing.
+            if sampleData.isActive {
+                SampleDataBanner { path.append(AppRoute.pairing) }
+            }
             // Thin sync-progress accent directly under the greeting; only present while the ring
             // is actively syncing. The always-present container lets iOS 26 materialize the
             // bar (glass light-bending in/out) instead of a hard opacity cut.

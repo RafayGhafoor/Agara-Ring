@@ -168,6 +168,12 @@ extension ConfirmAction {
                       confirmLabel: "Clear", perform: perform)
     }
 
+    /// Settings › Privacy › Delete all my data: a full local wipe including sign-ins and API keys. Copy from `brand.yaml`.
+    static func deleteAllData(_ perform: @escaping () -> Void) -> ConfirmAction {
+        ConfirmAction(key: "deleteAllData", title: AgaraCopy.deleteAllDataTitle, message: AgaraCopy.deleteAllDataBody,
+                      confirmLabel: "Delete everything", perform: perform)
+    }
+
     static func replaceAllData(_ perform: @escaping () -> Void) -> ConfirmAction {
         ConfirmAction(
             key: "replaceAllData",

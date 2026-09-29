@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// About (consistency framework phase 5): a hero (the AGARA wordmark, product name, tagline), the real version from the bundle
-/// ("1.0.0 (1)" — tap it 7× to unlock Developer), the brand description, an icon row for the social links (tinted squares with captions) and a
+/// ("1.0.0 (1)"; debug builds only: tap it 7× to unlock Developer), the brand description, an icon row for the social links (tinted squares with captions) and a
 /// contact row (email, phone), then the licences as small secondary text behind a "Licences" row and a small
 /// upstream credit. All copy and links come from `docs/strings/brand.yaml` (`AgaraCopy`); an empty link hides
 /// its icon.
@@ -16,7 +16,7 @@ struct AboutSettingsView: View {
     @State private var showsLicences = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    /// Android-style: 7 quick taps on the version unlock Developer options.
+    /// Android-style: 7 quick taps on the version unlock Developer options (debug builds only).
     private let developerTapThreshold = 7
 
     /// 0…1 progress toward unlock, used to build an accent tint as taps accumulate.
@@ -24,8 +24,6 @@ struct AboutSettingsView: View {
         guard !developerUnlocked else { return 0 }
         return Double(min(versionTapCount, developerTapThreshold - 1)) / Double(developerTapThreshold - 1)
     }
-
-    private let repoURL = URL(string: "https://github.com/saksham2001/PulseLoopiOS")!
 
     /// "1.0.0 (1)", read from the bundle so it can't drift from the shipped build.
     static var appVersionLabel: String {
@@ -81,22 +79,7 @@ struct AboutSettingsView: View {
             VStack(spacing: 22) {
                 hero
                 SettingsGroup(footer: AgaraCopy.aboutDescription) {
-                    Button(action: registerVersionTap) {
-                        FormValueRow(title: "Version") {
-                            Text(Self.appVersionLabel).foregroundStyle(AgaraColors.textMuted)
-                        }
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(VersionRowButtonStyle())
-                    .background(AgaraColors.accent.opacity(tapProgress * 0.18))
-                    .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: versionTapCount)
-                    .accessibilityIdentifier("about.version")
-                    .accessibilityHint("Tap repeatedly to unlock developer options.")
-                    .sensoryFeedback(trigger: versionTapCount) { _, count in
-                        guard count > 0 else { return nil }
-                        if count >= developerTapThreshold { return .success }
-                        return count > 3 ? .impact(weight: .medium) : .impact(weight: .light)
-                    }
+                    versionRow
                 }
                 if !Self.socialLinks.isEmpty {
                     // Accent-soft rounded squares with the accent glyph and a caption (polish spec item 1).
@@ -164,7 +147,7 @@ struct AboutSettingsView: View {
                         }
                     }
                 }
-                linkCard(icon: "arrow.up.right", title: "Built on PulseLoop", subtitle: "GitHub", url: repoURL)
+                LegalSettingsGroup(showsDisclaimer: true)
             }
             .padding()
         }
@@ -210,8 +193,37 @@ struct AboutSettingsView: View {
         .accessibilityIdentifier("about.hero")
     }
 
-    // MARK: - Developer unlock (tap the version 7×, Android-style)
+    // MARK: - Version row (release: plain; debug: tap 7× to unlock Developer, Android-style)
 
+    @ViewBuilder private var versionRow: some View {
+        #if DEBUG
+        Button(action: registerVersionTap) {
+            FormValueRow(title: "Version") {
+                Text(Self.appVersionLabel).foregroundStyle(AgaraColors.textMuted)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(VersionRowButtonStyle())
+        .background(AgaraColors.accent.opacity(tapProgress * 0.18))
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: versionTapCount)
+        .accessibilityIdentifier("about.version")
+        .accessibilityHint("Tap repeatedly to unlock developer options.")
+        .sensoryFeedback(trigger: versionTapCount) { _, count in
+            guard count > 0 else { return nil }
+            if count >= developerTapThreshold { return .success }
+            return count > 3 ? .impact(weight: .medium) : .impact(weight: .light)
+        }
+        #else
+        // Release builds have no hidden developer menu (App Store 2.3.1(a)): the version is just a row.
+        FormValueRow(title: "Version") {
+            Text(Self.appVersionLabel).foregroundStyle(AgaraColors.textMuted)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("about.version")
+        #endif
+    }
+
+    #if DEBUG
     private func registerVersionTap() {
         let now = Date()
         if let last = lastVersionTap, now.timeIntervalSince(last) > 2 { versionTapCount = 0 }
@@ -235,6 +247,8 @@ struct AboutSettingsView: View {
         }
     }
 
+    #endif
+
     private func showToast(_ message: String) {
         toastToken += 1
         let token = toastToken
@@ -243,28 +257,9 @@ struct AboutSettingsView: View {
             if toastToken == token { toast = nil }
         }
     }
-
-    private func linkCard(icon: String, title: String, subtitle: String, url: URL) -> some View {
-        Link(destination: url) {
-            FormField {
-                HStack(spacing: 8) {
-                    // Deliberately understated: this row credits the upstream project and offers a
-                    // community link. It is attribution, not a feature, so it reads as a footnote —
-                    // no icon tile, smaller type, muted tint.
-                    Image(systemName: "arrow.up.right")
-                        .font(AgaraFont.caption2.weight(.semibold))
-                        .foregroundStyle(AgaraColors.textMuted)
-                    Text(title).font(AgaraFont.footnote.weight(.regular)).foregroundStyle(AgaraColors.textSecondary)
-                    Spacer(minLength: 8)
-                    Text(subtitle).font(AgaraFont.caption2.weight(.regular)).foregroundStyle(AgaraColors.textMuted)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-        .buttonStyle(.plain)
-    }
 }
 
+#if DEBUG
 /// Press feedback for the version row: dims briefly while held, marking it as tappable.
 private struct VersionRowButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
@@ -273,3 +268,4 @@ private struct VersionRowButtonStyle: ButtonStyle {
             .animation(.easeInOut(duration: 0.08), value: configuration.isPressed)
     }
 }
+#endif

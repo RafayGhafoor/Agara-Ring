@@ -16,6 +16,13 @@ enum WidgetMetric: String, CaseIterable, AppEnum {
     case bloodPressure
     case glucose
 
+    /// Blood pressure and blood sugar are not offered while `vitals_bp` / `vitals_glucose` are off (the store
+    /// release, owner 2026-09-29). The widget extension does not compile the feature catalog, so the choice list
+    /// omits them here; the cases stay so a future configuration keeps decoding. Re-add them with the flags.
+    static var allCases: [WidgetMetric] {
+        [.activity, .nutrition, .sleep, .heartRate, .spo2, .hrv, .temperature, .stress, .fatigue]
+    }
+
     static let typeDisplayRepresentation: TypeDisplayRepresentation = "Metric"
 
     static let caseDisplayRepresentations: [WidgetMetric: DisplayRepresentation] = [

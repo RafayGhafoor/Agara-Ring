@@ -21,13 +21,18 @@ enum SeedData {
         seedDemo(context, completeOnboarding: true)
     }
     
+    /// Seeds the demo set. `sample: true` is the release-safe "Explore without ring" variant (`SampleDataStore`):
+    /// it keeps the user's own profile and goals, adds no ring device row, meals, coach chat or raw packets, and
+    /// leaves out blood pressure and blood sugar. The default (debug / `demo_data` flag) also seeds those when
+    /// their flags (`vitals_bp`, `vitals_glucose`) are on.
     @MainActor
-    static func seedDemo(_ context: ModelContext, completeOnboarding: Bool = false) {
+    static func seedDemo(_ context: ModelContext, completeOnboarding: Bool = false, sample: Bool = false) {
         let calendar = Calendar.current
         let now = Date()
-        
+
+        if !sample {
         let profile = UserProfile(
-            name: "Saksham",
+            name: "Sample",
             age: 25,
             sex: "not set",
             heightCm: 178,
@@ -58,6 +63,7 @@ enum SeedData {
                 .stress, .hrv, .temperature, .bloodPressure, .bloodSugar, .fatigue
             ]
         ))
+        }
 
         // ~90 days of daily activity so Week/Month/Year range graphs render fully.
         for offset in stride(from: -89, through: 0, by: 1) {
@@ -79,7 +85,7 @@ enum SeedData {
             )
         }
 
-        seedVitals(context, now: now, calendar: calendar)
+        seedVitals(context, now: now, calendar: calendar, includeBPAndGlucose: !sample)
 
         // ~30 nights of sleep with stage blocks + per-night scores.
         for i in 0..<30 {
@@ -161,6 +167,7 @@ enum SeedData {
             }
         }
         
+        if !sample {
         let conversation = CoachConversation(title: "Recovery check")
         context.insert(conversation)
         context.insert(CoachMessage(
@@ -179,7 +186,8 @@ enum SeedData {
         ))
         context.insert(RawPacketRow(direction: .outgoing, commandId: 0x0c, hexPayload: "0c00000000000000000000000000000000000000", decodedKind: "status_command", confidence: .known))
         context.insert(DerivedUpdateRow(kind: "seed", entityType: "database", entityId: "demo", payloadJSON: #"{"source":"SeedData"}"#))
-        
+        }
+
         try? context.save()
     }
 
@@ -230,7 +238,7 @@ enum SeedData {
     /// zone-colored charts show their full color range. HR/SpO₂ are dense over the last 24h (the
     /// dashboard's window); the slow vitals span ~30 days so the detail screen's baseline/trend fills.
     @MainActor
-    private static func seedVitals(_ context: ModelContext, now: Date, calendar: Calendar) {
+    private static func seedVitals(_ context: ModelContext, now: Date, calendar: Calendar, includeBPAndGlucose: Bool) {
         func add(_ kind: MeasurementKind, _ value: Double, _ ts: Date) {
             context.insert(Measurement(kind: kind, value: value, unit: kind.unit, timestamp: ts, source: .mock))
         }
@@ -286,15 +294,17 @@ enum SeedData {
             var dia = 76 + sin(phase * 0.45) * 6
             if day == -2 || day == -15 { sys = 146; dia = 96 }   // Stage 2 (red)
             if day == -9 { sys = 132; dia = 86 }                 // Stage 1
-            add(.bloodPressureSystolic, sys.rounded(), bpTs)
-            add(.bloodPressureDiastolic, dia.rounded(), bpTs)
+            if includeBPAndGlucose && AgaraFeatureStore.isOn(.vitalsBp) {
+                add(.bloodPressureSystolic, sys.rounded(), bpTs)
+                add(.bloodPressureDiastolic, dia.rounded(), bpTs)
+            }
 
             // Glucose — 1 fasting reading/day (morning). Normal→High (≥126 red on a couple of days).
             let gluTs = calendar.date(bySettingHour: 7, minute: 30, second: 0, of: dayStart) ?? dayStart
             var glucose = 92 + sin(phase * 0.5) * 12
             if day == -5 { glucose = 138 }                  // High (red)
             if day == -20 { glucose = 112 }                 // Elevated (amber)
-            add(.bloodSugar, glucose.rounded(), gluTs)
+            if includeBPAndGlucose && AgaraFeatureStore.isOn(.vitalsGlucose) { add(.bloodSugar, glucose.rounded(), gluTs) }
 
             // Temperature — skin temp, 1 reading/day. Typical 33–35.5 with a warm spike (≥36 amber) and
             // a cool dip (<31 blue).
@@ -328,6 +338,13 @@ enum SeedData {
 
     @MainActor
     static func clearAll(_ context: ModelContext) {
+        clearData(context, keepingProfile: false)
+    }
+
+    /// Deletes every data table. `keepingProfile` leaves the `UserProfile` and `UserGoal` rows (the sample-data
+    /// wipe: the profile was typed in by the user during onboarding).
+    @MainActor
+    static func clearData(_ context: ModelContext, keepingProfile: Bool) {
         SyncPlanStore.shared.resetAll()   // the history ledger must not claim days that are gone
         deleteAll(Device.self, context)
         deleteAll(ActivityDaily.self, context)
@@ -336,8 +353,10 @@ enum SeedData {
         deleteAll(SleepStageBlock.self, context)
         deleteAll(RawPacketRow.self, context)
         deleteAll(DerivedUpdateRow.self, context)
-        deleteAll(UserProfile.self, context)
-        deleteAll(UserGoal.self, context)
+        if !keepingProfile {
+            deleteAll(UserProfile.self, context)
+            deleteAll(UserGoal.self, context)
+        }
         deleteAll(ActivitySession.self, context)
         deleteAll(ActivitySample.self, context)
         deleteAll(ActivityBucketSample.self, context)

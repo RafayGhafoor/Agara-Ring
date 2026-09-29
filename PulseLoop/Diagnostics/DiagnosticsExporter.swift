@@ -31,6 +31,7 @@ enum DiagnosticsExporter {
     /// Write the report to a temporary file and return its URL (for a share sheet). Earlier exports and
     /// reports are deleted first (`ExportFiles.freshDirectory`) — they were already shared.
     static func exportFile(context: ModelContext) -> URL? {
+        guard !SampleDataStore.isActiveNow else { return nil }   // nothing real to report while only sample data is loaded
         let json = exportJSON(context: context)
         let stamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
         do {

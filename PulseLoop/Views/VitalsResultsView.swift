@@ -24,7 +24,7 @@ struct VitalsResultsView: View {
             tiles.append(.init(name: "Heart Rate", value: "\(hr)", unit: "bpm",
                                icon: "heart.fill", tint: AgaraColors.heartRate))
         }
-        if let bp = v.bloodPressure {
+        if AgaraFeatureStore.isOn(.vitalsBp), let bp = v.bloodPressure {
             tiles.append(.init(name: "Blood Pressure", value: "\(bp.systolic)/\(bp.diastolic)", unit: "mmHg",
                                icon: "waveform.path.ecg.rectangle.fill", tint: AgaraColors.bloodPressure))
         }
@@ -44,7 +44,7 @@ struct VitalsResultsView: View {
             tiles.append(.init(name: "HRV", value: "\(hrv)", unit: "ms",
                                icon: "waveform.path.ecg", tint: AgaraColors.hrv))
         }
-        if let sugar = v.bloodSugarMgdl {
+        if AgaraFeatureStore.isOn(.vitalsGlucose), let sugar = v.bloodSugarMgdl {
             tiles.append(.init(name: "Blood Sugar", value: "\(Int(sugar.rounded()))", unit: "mg/dL",
                                icon: "drop.fill", tint: AgaraColors.bloodSugar))
         }

@@ -14,10 +14,22 @@ struct AutoMeasureSettingsView: View {
     /// The ring's schedule: this session's latest report, else the one persisted on the device row.
     private var schedule: [AutoMeasureEntry] {
         let live = store.schedule
-        return (live.isEmpty ? (devices.first?.autoMeasureSchedule ?? []) : live).sorted { $0.type < $1.type }
+        let all = live.isEmpty ? (devices.first?.autoMeasureSchedule ?? []) : live
+        // Rows for metrics behind a flag (BP type 1, glucose 2, blood components 8) stay hidden while it is off.
+        return all.filter { Self.isOffered($0.type, isOn: { AgaraFeatureStore.isOn($0) }) }.sorted { $0.type < $1.type }
     }
 
     private var connected: Bool { ble.state == .connected }
+
+    /// Whether the schedule row for a ring type code is shown (flags gate UI, never the ring's data).
+    static func isOffered(_ type: Int, isOn: (AgaraFeature) -> Bool) -> Bool {
+        switch type {
+        case 1: return isOn(.vitalsBp)
+        case 2: return isOn(.vitalsGlucose)
+        case 8: return isOn(.bloodComponents)
+        default: return true
+        }
+    }
 
     var body: some View {
         ScrollView {

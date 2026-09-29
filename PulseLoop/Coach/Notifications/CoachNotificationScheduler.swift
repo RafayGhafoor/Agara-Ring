@@ -25,6 +25,9 @@ final class CoachNotificationScheduler {
     /// scene-phase `scheduleNext()` crashes.
     private var isRegistered = false
 
+    /// The permitted identifiers stay in Info.plist so `register` cannot trap, but the `fetch`/`processing` background
+    /// modes are dropped for the store release (coach flag off): `scheduleNext` is a no-op unless the coach is on, and
+    /// re-enabling the coach means re-adding both modes to Info.plist.
     func register(serviceProvider: @escaping (TimeInterval) -> CoachNotificationService) {
         self.serviceProvider = serviceProvider
         isRegistered = true

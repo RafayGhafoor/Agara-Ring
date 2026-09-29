@@ -191,6 +191,11 @@ enum MetricsService {
     /// keep seeing HR / SpO₂ / steps / sleep / battery.
     static func deviceCapabilities(_ context: ModelContext) -> Set<WearableCapability> {
         let caps = fetchDevices(context).first?.capabilities ?? []
+        // "Explore without ring": no device row exists, so the sample set declares the sensors it has data for
+        // (never BP / blood sugar — those are behind flags and not in the sample set).
+        if caps.isEmpty, fetchDevices(context).isEmpty, SampleDataStore.isActiveNow {
+            return [.heartRate, .spo2, .steps, .sleep, .battery, .remSleep, .stress, .hrv, .temperature, .fatigue]
+        }
         if caps.isEmpty {
             return [.heartRate, .spo2, .steps, .sleep, .battery]
         }

@@ -23,6 +23,7 @@ final class AgaraCloudSync {
     /// Returns the counts pushed. Skipped entirely when nobody is signed in.
     func push(context: ModelContext, days: Int = AgaraConfig.Cloud.pushDays, maxMeasurements: Int = AgaraConfig.Cloud.pushMaxMeasurements) async throws -> (days: Int, measurements: Int) {
         guard client.isSignedIn, let userID = client.userID else { return (0, 0) }
+        guard !SampleDataStore.isActiveNow else { return (0, 0) }   // sample data is never uploaded
 
         var pushedDays = 0
         let existingDays = try await client.list(AgaraConfig.Cloud.healthDaysCollection, filter: "user='\(userID)'")

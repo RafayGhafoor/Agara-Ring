@@ -177,6 +177,7 @@ struct MetricDetailView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .agaraGlass(RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous))
+        .sampleChip()
     }
 
     /// The BP chart's bucket: an hour on a day, 3 h over a week, a day over a month.
@@ -250,6 +251,7 @@ struct MetricDetailView: View {
         .padding(.horizontal, 10)
         .frame(maxWidth: .infinity)
         .agaraGlass(RoundedRectangle(cornerRadius: AgaraShape.radiusCard, style: .continuous))
+        .sampleChip()
     }
 
     private func stat(_ title: String, _ value: String, longest: Int) -> some View {

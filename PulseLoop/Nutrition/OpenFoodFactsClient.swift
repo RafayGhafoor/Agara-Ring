@@ -34,11 +34,11 @@ struct OpenFoodFactsClient: FoodDatabaseClient {
 
     /// OFF-required app identification: AppName/Version (contact).
     ///
-    /// The contact is the project URL rather than a personal address — OFF wants a way to reach the
+    /// The contact is the public website (agaralife.com, not a repo URL) rather than a personal address — OFF wants a way to reach the
     /// app's owner if a client misbehaves, and that should not be one individual's mailbox.
     nonisolated static var userAgent: String {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
-        return "\(AgaraCopy.appName)/\(version) (+\(AgaraCopy.projectUrl))"
+        return "\(AgaraCopy.appName)/\(version) (+\(AgaraCopy.socialWebsiteUrl))"
     }
 
     private static let productFields = [

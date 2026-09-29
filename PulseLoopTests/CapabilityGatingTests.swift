@@ -15,10 +15,52 @@ final class CapabilityGatingTests: XCTestCase {
         context.insert(Device(deviceType: .veepoo, capabilities: agara))
         try context.save()
 
-        for metric: MetricKey in [.heartRate, .spo2, .hrv, .stress,
-                                  .bloodPressureSystolic, .bloodPressureDiastolic, .bloodSugar] {
+        for metric: MetricKey in [.heartRate, .spo2, .hrv, .stress] {
             XCTAssertTrue(MetricsService.supports(metric, context: context), metric.rawValue)
         }
+    }
+
+    /// Store launch (owner, 2026-09-29): blood pressure and blood sugar are off by flag even though the ring
+    /// records them. Nothing shows for them until `vitals_bp` / `vitals_glucose` are on.
+    func testBloodPressureAndGlucoseAreHiddenWhileTheirFlagsAreOff() throws {
+        let store = AgaraFeatureStore.shared
+        let saved = (store.override(for: .vitalsBp), store.override(for: .vitalsGlucose))
+        defer { store.setOverride(.vitalsBp, saved.0); store.setOverride(.vitalsGlucose, saved.1) }
+        store.setOverride(.vitalsBp, nil)
+        store.setOverride(.vitalsGlucose, nil)
+        XCTAssertFalse(AgaraFeature.vitalsBp.defaultOn)
+        XCTAssertFalse(AgaraFeature.vitalsGlucose.defaultOn)
+
+        let context = try TestSupport.makeContext()
+        context.insert(Device(deviceType: .veepoo, capabilities: agara))
+        try context.save()
+        for metric: MetricKey in [.bloodPressureSystolic, .bloodPressureDiastolic, .bloodSugar] {
+            XCTAssertFalse(MetricsService.supports(metric, context: context), metric.rawValue)
+        }
+
+        // The debug override brings the (still-working) hidden code back, so e2e runs keep covering it.
+        store.setOverride(.vitalsBp, true)
+        store.setOverride(.vitalsGlucose, true)
+        for metric: MetricKey in [.bloodPressureSystolic, .bloodPressureDiastolic, .bloodSugar] {
+            XCTAssertTrue(MetricsService.supports(metric, context: context), metric.rawValue)
+        }
+    }
+
+    /// The measure hub offers no BP or glucose tile (or the auto-measure rows) with the flags at their defaults.
+    func testMeasureHubOffersNoBloodPressureOrGlucoseByDefault() {
+        let defaults: (AgaraFeature) -> Bool = { $0.defaultOn }
+        let ring = Set(WearableCapability.allCases)
+        let ids = MeasurementRegistry.available(capabilities: ring, ring: nil, isOn: defaults).map(\.id)
+        XCTAssertFalse(ids.contains("bloodPressure"))
+        XCTAssertFalse(ids.contains("glucose"))
+        XCTAssertTrue(ids.contains("heartRate"))
+        let allOn = MeasurementRegistry.available(capabilities: ring, ring: nil, isOn: { _ in true }).map(\.id)
+        XCTAssertTrue(allOn.contains("bloodPressure"))
+        XCTAssertTrue(allOn.contains("glucose"))
+
+        XCTAssertFalse(AutoMeasureSettingsView.isOffered(1, isOn: defaults), "BP schedule row")
+        XCTAssertFalse(AutoMeasureSettingsView.isOffered(2, isOn: defaults), "glucose schedule row")
+        XCTAssertTrue(AutoMeasureSettingsView.isOffered(0, isOn: defaults), "heart-rate schedule row")
     }
 
     /// The ring records no temperature, no REM staging and no blood-fatigue score, and it measures vitals

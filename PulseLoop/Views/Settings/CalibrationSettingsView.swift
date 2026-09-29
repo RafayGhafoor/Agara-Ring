@@ -35,8 +35,8 @@ struct CalibrationSettingsView: View {
     private var capabilities: Set<WearableCapability> {
         MetricsService.activeCapabilities(context: modelContext, ble: ble)
     }
-    private var supportsBP: Bool { capabilities.contains(.bloodPressure) }
-    private var supportsGlucose: Bool { capabilities.contains(.bloodSugar) }
+    private var supportsBP: Bool { capabilities.contains(.bloodPressure) && AgaraFeatureStore.isOn(.vitalsBp) }
+    private var supportsGlucose: Bool { capabilities.contains(.bloodSugar) && AgaraFeatureStore.isOn(.vitalsGlucose) }
     /// The ring can take a BP reading on demand, so calibration can measure first rather than lean on
     /// whatever reading happens to be stored.
     private var canMeasureBP: Bool {

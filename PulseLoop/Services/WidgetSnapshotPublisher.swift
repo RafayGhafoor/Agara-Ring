@@ -73,6 +73,15 @@ final class WidgetSnapshotPublisher {
 
     func publish(reason: Reason) {
         guard let url = AgaraWidgetStore.fileURL else { return }
+        // Sample data ("Explore without ring") never reaches a widget: drop the snapshot so they show their empty state.
+        if SampleDataStore.shared.isActive {
+            if FileManager.default.fileExists(atPath: url.path) {
+                try? FileManager.default.removeItem(at: url)
+                lastContentHash = nil
+                reloadTimelines(reason: reason)
+            }
+            return
+        }
         if reason == .scenePhase { debounceTask?.cancel() }   // this build covers a pending trailing one
         lastBuildAt = Date()
         var snapshot = buildSnapshot()
@@ -140,6 +149,9 @@ final class WidgetSnapshotPublisher {
 
         var metrics: [String: WidgetMetricPayload] = [:]
         for metric in MetricKind.allCases {
+            // Flagged-off vitals never reach a widget (vitals_bp / vitals_glucose).
+            if metric == .bloodPressure && !AgaraFeatureStore.isOn(.vitalsBp) { continue }
+            if metric == .glucose && !AgaraFeatureStore.isOn(.vitalsGlucose) { continue }
             let model = VitalsCardFactory.card(metric, inputs: inputs, profile: physiology, calibration: calibration)
             // TodayChartTile colors with a baseline only for HRV (mirrored here).
             let baseline = metric == .hrv ? BaselineStats.compute(hrv) : nil
