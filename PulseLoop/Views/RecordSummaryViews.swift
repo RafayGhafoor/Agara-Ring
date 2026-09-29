@@ -189,7 +189,7 @@ struct RecordSummaryView: View {
         session.perceivedEffort = effort
         let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
         session.notes = trimmed.isEmpty ? nil : trimmed
-        session.updatedAt = Date()
+        session.updatedAt = AppClock.now
         try? modelContext.save()
         path.removeLast(path.count)
     }

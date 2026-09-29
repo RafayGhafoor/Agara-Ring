@@ -228,8 +228,8 @@ enum DailyCalorieEstimator {
     /// every packet.
     static func recomputeThrottled(day: Date, context: ModelContext) {
         let dayStart = Calendar.current.startOfDay(for: day)
-        if let last = lastLiveRecomputeAt[dayStart], Date().timeIntervalSince(last) < liveThrottleSeconds { return }
-        lastLiveRecomputeAt[dayStart] = Date()
+        if let last = lastLiveRecomputeAt[dayStart], AppClock.now.timeIntervalSince(last) < liveThrottleSeconds { return }
+        lastLiveRecomputeAt[dayStart] = AppClock.now
         recompute(day: dayStart, context: context)
     }
 
@@ -273,7 +273,7 @@ enum DailyCalorieEstimator {
             hrSamples: hrSamples,
             profile: profile
         ))
-        row.updatedAt = Date()
+        row.updatedAt = AppClock.now
     }
 
     /// Recompute the trailing week — after a profile change (weight/height/age shift every term) or
@@ -281,7 +281,7 @@ enum DailyCalorieEstimator {
     static func recomputeRecentDays(_ days: Int = 7, onlyMissing: Bool = false, context: ModelContext) {
         let calendar = Calendar.current
         for offset in 0..<days {
-            guard let day = calendar.date(byAdding: .day, value: -offset, to: calendar.startOfDay(for: Date())) else { continue }
+            guard let day = calendar.date(byAdding: .day, value: -offset, to: calendar.startOfDay(for: AppClock.now)) else { continue }
             if onlyMissing, MetricsRepository.activity(on: day, context: context)?.estimatedActiveCalories != nil { continue }
             recompute(day: day, context: context)
         }
@@ -304,7 +304,7 @@ extension ActivityDaily {
     /// estimated TOTAL burn — Mifflin-St Jeor BMR accrued over the day's elapsed minutes (so
     /// today's number grows from midnight, market-style) plus the stored net active estimate.
     @MainActor
-    func effectiveCalories(profile: MetricsProfileValues, now: Date = Date()) -> Double? {
+    func effectiveCalories(profile: MetricsProfileValues, now: Date = AppClock.now) -> Double? {
         if let device = deviceReportedCalories { return device }
         guard let active = estimatedActiveCalories else { return nil }
         let calendar = Calendar.current

@@ -29,7 +29,7 @@ struct ActivityView: View {
     }
 
     var body: some View {
-        let todayWorkouts = sessions.filter { $0.status == .finished && Calendar.current.isDateInToday($0.startedAt) }
+        let todayWorkouts = sessions.filter { $0.status == .finished && AppClock.isToday($0.startedAt) }
 
         ScrollView {
             VStack(spacing: 16) {
@@ -201,7 +201,7 @@ struct ActivityView: View {
     }
 
     private func todayWeekIndex() -> Int {
-        let weekday = Calendar.current.component(.weekday, from: Date()) // 1=Sun..7=Sat
+        let weekday = Calendar.current.component(.weekday, from: AppClock.now) // 1=Sun..7=Sat
         let jsDay = weekday - 1
         return (jsDay + 6) % 7
     }
@@ -362,7 +362,7 @@ struct GoalEditorSheet: View {
         goal.workoutsPerWeek = Int(workouts)
         goal.distanceMeters = distance * metersPerUnit
         goal.calories = Int(calories)
-        goal.updatedAt = Date()
+        goal.updatedAt = AppClock.now
         try? modelContext.save()
         dismiss()
     }
@@ -391,8 +391,8 @@ struct WorkoutHistorySheet: View {
     }
 
     private func header(for day: Date) -> String {
-        if Calendar.current.isDateInToday(day) { return "TODAY" }
-        if Calendar.current.isDateInYesterday(day) { return "YESTERDAY" }
+        if AppClock.isToday(day) { return "TODAY" }
+        if AppClock.isYesterday(day) { return "YESTERDAY" }
         return Self.dayHeaderFormatter.string(from: day).uppercased()
     }
 
@@ -533,7 +533,7 @@ struct StepsByHourCard: View {
     }
 
     private func reload() {
-        let today = Calendar.current.startOfDay(for: Date())
+        let today = Calendar.current.startOfDay(for: AppClock.now)
         let rows = (try? modelContext.fetch(FetchDescriptor<ActivityBucketSample>(
             predicate: #Predicate { $0.date == today }
         ))) ?? []

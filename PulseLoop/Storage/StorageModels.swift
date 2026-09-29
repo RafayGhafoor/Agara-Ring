@@ -88,7 +88,7 @@ final class RawPacketRecord {
     var confidenceRaw: String
 
     init(
-        timestamp: Date = Date(),
+        timestamp: Date = AppClock.now,
         direction: PacketDirection,
         commandId: Int,
         payload: Data,
@@ -107,7 +107,7 @@ final class RawPacketRecord {
 
     /// Hex-text convenience (archives, the Debug feed and the sleep repair speak hex).
     convenience init(
-        timestamp: Date = Date(),
+        timestamp: Date = AppClock.now,
         direction: PacketDirection,
         commandId: Int,
         hexPayload: String,

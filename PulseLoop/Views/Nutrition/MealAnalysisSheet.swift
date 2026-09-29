@@ -298,8 +298,8 @@ struct MealAnalysisSheet: View {
 
     private func save() {
         guard let kcal = Double(calories) else { return }
-        let now = Date()
-        let isToday = Calendar.current.isDateInToday(day)
+        let now = AppClock.now
+        let isToday = AppClock.isToday(day)
         let clock = Calendar.current.dateComponents([.hour, .minute], from: now)
         let timestamp = Calendar.current.date(
             bySettingHour: isToday ? (clock.hour ?? 12) : 12,

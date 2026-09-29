@@ -73,7 +73,7 @@ struct TodayView: View {
         }
         let summary = activeStore.summary
         let hero = activeStore.hero
-        let coachSummary = todaySummaries.first { $0.scopeKey == CoachDataAccess.localDateString(Date()) }
+        let coachSummary = todaySummaries.first { $0.scopeKey == CoachDataAccess.localDateString(AppClock.now) }
         return AnyView(ScrollView {
             VStack(spacing: 16) {
                 // Top insight card. When the coach is on it owns this slot (tap → chat);

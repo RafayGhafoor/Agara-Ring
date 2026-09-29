@@ -115,7 +115,7 @@ struct CalibrationSettingsView: View {
         }
         let relative = RelativeDateTimeFormatter()
         relative.unitsStyle = .full
-        return "Last ring reading: \(relative.localizedString(for: bpLastMeasuredAt, relativeTo: Date()))."
+        return "Last ring reading: \(relative.localizedString(for: bpLastMeasuredAt, relativeTo: AppClock.now))."
     }
 
     // MARK: - Blood sugar

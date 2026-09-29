@@ -117,7 +117,7 @@ struct ProfileDraft: Equatable {
         profile.heightCm = heightCm
         profile.weightKg = weightKg
         profile.units = units
-        profile.updatedAt = Date()
+        profile.updatedAt = AppClock.now
     }
 }
 
@@ -158,6 +158,6 @@ struct GoalDraft: Equatable {
         if includeWeeklyWorkouts {
             goal.workoutsPerWeek = Int(workouts)
         }
-        goal.updatedAt = Date()
+        goal.updatedAt = AppClock.now
     }
 }

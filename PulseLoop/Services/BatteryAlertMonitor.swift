@@ -49,7 +49,7 @@ enum BatteryAlertEngine {
 
     /// A calendar-day key (yyyy-MM-dd) so the latch resets each day. Cached formatter — the monitor
     /// evaluates on the sparse battery stream, not per frame, but a shared formatter is still cheaper.
-    static func dateKey(for date: Date = Date()) -> String {
+    static func dateKey(for date: Date = AppClock.now) -> String {
         dateKeyFormatter.string(from: date)
     }
 
@@ -101,7 +101,7 @@ final class BatteryAlertMonitor {
 
     private func handle(_ event: AgaraEvent) {
         guard case let .batteryLevel(percent) = event else { return }
-        handle(percent: percent, now: Date())
+        handle(percent: percent, now: AppClock.now)
     }
 
     /// Run the crossing engine for a fresh sample and deliver an alert when one fires. Separated from

@@ -329,8 +329,8 @@ enum RetrievalTools {
             description: "Detect statistical outliers in steps and resting heart rate over the last ~14 days.",
             parameters: JSONSchema.empty, argsType: NoArgs.self
         ) { _, ctx in
-            let end = CoachDataAccess.localDateString(Date())
-            let start = CoachDataAccess.localDateString(Calendar.current.date(byAdding: .day, value: -14, to: Date()) ?? Date())
+            let end = CoachDataAccess.localDateString(AppClock.now)
+            let start = CoachDataAccess.localDateString(Calendar.current.date(byAdding: .day, value: -14, to: AppClock.now) ?? AppClock.now)
             let steps = CoachDataAccess.dailySeries(metric: .steps, start: start, end: end, context: ctx.modelContext)
             let hr = CoachDataAccess.dailySeries(metric: .hr, start: start, end: end, context: ctx.modelContext)
             return .object([

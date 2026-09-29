@@ -55,7 +55,7 @@ final class WidgetSnapshotPublisher {
                 guard let self else { return }
                 self.observeDataChange()
                 self.debounceTask?.cancel()
-                let wait = Self.dataChangeDelay(lastBuildAt: self.lastBuildAt, now: Date())
+                let wait = Self.dataChangeDelay(lastBuildAt: self.lastBuildAt, now: AppClock.now)
                 self.debounceTask = Task { [weak self] in
                     try? await Task.sleep(for: .seconds(max(Self.debounceSeconds, wait)))
                     guard !Task.isCancelled else { return }
@@ -83,7 +83,7 @@ final class WidgetSnapshotPublisher {
             return
         }
         if reason == .scenePhase { debounceTask?.cancel() }   // this build covers a pending trailing one
-        lastBuildAt = Date()
+        lastBuildAt = AppClock.now
         var snapshot = buildSnapshot()
 
         // Content comparison with a fixed timestamp: an unchanged snapshot skips write + reload
@@ -114,10 +114,10 @@ final class WidgetSnapshotPublisher {
         if reason == .dataChange && !foreground {
             let defaults = UserDefaults(suiteName: AgaraWidgetStore.suite)
             if let last = defaults?.object(forKey: AgaraWidgetStore.lastBackgroundReloadKey) as? Date,
-               Date().timeIntervalSince(last) < Self.backgroundReloadMinInterval {
+               AppClock.now.timeIntervalSince(last) < Self.backgroundReloadMinInterval {
                 return
             }
-            defaults?.set(Date(), forKey: AgaraWidgetStore.lastBackgroundReloadKey)
+            defaults?.set(AppClock.now, forKey: AgaraWidgetStore.lastBackgroundReloadKey)
         }
         WidgetCenter.shared.reloadAllTimelines()
     }
@@ -168,8 +168,8 @@ final class WidgetSnapshotPublisher {
         }
 
         return WidgetSnapshot(
-            generatedAt: Date(),
-            dayStart: Calendar.current.startOfDay(for: Date()),
+            generatedAt: AppClock.now,
+            dayStart: Calendar.current.startOfDay(for: AppClock.now),
             activity: activityPayload(summary, units: units),
             sleep: sleepPayload(summary.sleepDay),
             metrics: metrics,

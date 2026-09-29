@@ -28,7 +28,7 @@ enum SeedData {
     @MainActor
     static func seedDemo(_ context: ModelContext, completeOnboarding: Bool = false, sample: Bool = false) {
         let calendar = Calendar.current
-        let now = Date()
+        let now = AppClock.now
 
         if !sample {
         let profile = UserProfile(
@@ -127,8 +127,13 @@ enum SeedData {
             }
         }
 
+        // Sample mode carries exactly one workout: the 45-minute walk with a GPS route (`SampleWorkout`, the hero
+        // scenario's walk, identical on Android). The debug demo set below has several, on real-world coordinates.
+        if sample {
+            SampleWorkout.insert(into: context, now: now, creditActiveMinutes: false, calendar: calendar)
+        }
         // Several finished workouts across recent days (one today).
-        let workouts: [SeedWorkout] = [
+        let workouts: [SeedWorkout] = sample ? [] : [
             SeedWorkout(offset: 0,   type: "run",   minutes: 38, distance: 6100,  calories: 330, origin: (40.4443, -79.9436)),  // CMU / Pittsburgh
             SeedWorkout(offset: -1,  type: "walk",  minutes: 52, distance: 4200,  calories: 210, origin: (40.4406, -79.9959)),
             SeedWorkout(offset: -3,  type: "cycle", minutes: 64, distance: 18400, calories: 460, origin: (40.4612, -79.9249)),

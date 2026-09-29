@@ -14,8 +14,8 @@ enum MetricsService {
         // "any mock activity OR any mock measurement" semantics.
         let isDemo = activityRows.contains { $0.source == "mock" } || MetricsRepository.hasMockMeasurement(context: context)
         let today = activityRows.sorted { $0.date < $1.date }.last
-        let anchorDate = today?.date ?? calendar.startOfDay(for: Date())
-        let alignedRows = alignedWeekActivity(rows: activityRows, anchor: isDemo ? anchorDate : Date())
+        let anchorDate = today?.date ?? calendar.startOfDay(for: AppClock.now)
+        let alignedRows = alignedWeekActivity(rows: activityRows, anchor: isDemo ? anchorDate : AppClock.now)
         // 24h HR/SpO₂ samples come through the SAME `rangeSamples` path Vitals uses — including its
         // per-kind demo detection and 24h windowing — so Today and Vitals never disagree on the range,
         // resting/peak, or graph. (Global `isDemo` above is per-summary; HR/SpO₂ windowing must be
@@ -64,7 +64,7 @@ enum MetricsService {
         // TOTAL burn (BMR accrued over elapsed minutes + net active estimate). Days with neither
         // stay nil and render "—". The goal ring keeps measuring the active-energy portion.
         return TodaySummary(
-            date: today?.date ?? calendar.startOfDay(for: Date()),
+            date: today?.date ?? calendar.startOfDay(for: AppClock.now),
             steps: today?.steps,
             calories: today?.effectiveCalories(profile: profileValues),
             activeCalories: today?.effectiveActiveCalories,
@@ -86,7 +86,7 @@ enum MetricsService {
             // Consumed nutrition rides the summary only when the feature is on; nil otherwise so
             // every consumer (tiles, cards, widgets, coach) inherits the master-toggle gate.
             nutrition: NutritionPrefsStore.shared.isActive
-                ? NutritionRepository.dayTotals(on: Date(), context: context)
+                ? NutritionRepository.dayTotals(on: AppClock.now, context: context)
                 : nil
         )
     }
@@ -278,7 +278,7 @@ enum MetricsService {
             kind: kind,
             value: value,
             unit: kind.unit,
-            timestamp: Date(),
+            timestamp: AppClock.now,
             source: .mock,
             context: context
         )
@@ -298,9 +298,9 @@ enum MetricsService {
         } else if let plan = SampledRange.plan(for: range) {
             // Long windows: the old "newest 5000 rows" covered only the last ~3.5 days of per-minute ring
             // history, so the 7-day, 30-day and 12-month charts all showed the same few days.
-            return sampledAverages(kind: kind, start: cutoff(for: range), end: Date(), plan: plan, context: context)
+            return sampledAverages(kind: kind, start: cutoff(for: range), end: AppClock.now, plan: plan, context: context)
         } else {
-            rows = MetricsRepository.measurements(kind: kind, start: cutoff(for: range), end: Date(), limit: 5000, context: context)
+            rows = MetricsRepository.measurements(kind: kind, start: cutoff(for: range), end: AppClock.now, limit: 5000, context: context)
         }
         return samplesSinceCutoff(rows: rows, range: range, includeAll: isDemo)
     }
@@ -379,10 +379,10 @@ enum MetricsService {
     private static func cutoff(for range: MetricRange) -> Date {
         let cal = Calendar.current
         switch range {
-        case .twentyFourHours: return cal.date(byAdding: .hour, value: -24, to: Date()) ?? Date()
-        case .sevenDays:       return cal.date(byAdding: .day, value: -7, to: Date()) ?? Date()
-        case .thirtyDays:      return cal.date(byAdding: .day, value: -30, to: Date()) ?? Date()
-        case .twelveMonths:    return cal.date(byAdding: .day, value: -365, to: Date()) ?? Date()
+        case .twentyFourHours: return cal.date(byAdding: .hour, value: -24, to: AppClock.now) ?? AppClock.now
+        case .sevenDays:       return cal.date(byAdding: .day, value: -7, to: AppClock.now) ?? AppClock.now
+        case .thirtyDays:      return cal.date(byAdding: .day, value: -30, to: AppClock.now) ?? AppClock.now
+        case .twelveMonths:    return cal.date(byAdding: .day, value: -365, to: AppClock.now) ?? AppClock.now
         }
     }
     
@@ -431,7 +431,7 @@ enum MetricsService {
         case .twelveMonths:
             days = 365
         }
-        let cutoff = Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? Date()
+        let cutoff = Calendar.current.date(byAdding: .day, value: -days, to: AppClock.now) ?? AppClock.now
         return rows.filter { $0.date >= Calendar.current.startOfDay(for: cutoff) }
     }
     
@@ -443,13 +443,13 @@ enum MetricsService {
             let cutoff: Date
             switch range {
             case .twentyFourHours:
-                cutoff = Calendar.current.date(byAdding: .hour, value: -24, to: Date()) ?? Date()
+                cutoff = Calendar.current.date(byAdding: .hour, value: -24, to: AppClock.now) ?? AppClock.now
             case .sevenDays:
-                cutoff = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
+                cutoff = Calendar.current.date(byAdding: .day, value: -7, to: AppClock.now) ?? AppClock.now
             case .thirtyDays:
-                cutoff = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+                cutoff = Calendar.current.date(byAdding: .day, value: -30, to: AppClock.now) ?? AppClock.now
             case .twelveMonths:
-                cutoff = Calendar.current.date(byAdding: .day, value: -365, to: Date()) ?? Date()
+                cutoff = Calendar.current.date(byAdding: .day, value: -365, to: AppClock.now) ?? AppClock.now
             }
             filtered = rows.filter { $0.timestamp >= cutoff }
         }
@@ -486,7 +486,7 @@ enum MetricsService {
         let started = candidates.min()
         let day: Int
         if let started {
-            let elapsed = Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: started), to: Calendar.current.startOfDay(for: Date())).day ?? 0
+            let elapsed = Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: started), to: Calendar.current.startOfDay(for: AppClock.now)).day ?? 0
             day = max(1, min(calibrationDays, elapsed + 1))
         } else {
             day = 1
@@ -503,7 +503,7 @@ enum MetricsService {
     private static func freshness(lastUpdatedAt: Date?, isDemo: Bool) -> DataFreshness {
         if isDemo { return .demo }
         guard let lastUpdatedAt else { return .missing }
-        return Calendar.current.isDateInToday(lastUpdatedAt) ? .syncedToday : .stale
+        return AppClock.isToday(lastUpdatedAt) ? .syncedToday : .stale
     }
     
     private static func valueIsFresh(_ freshness: DataFreshness) -> Bool {
@@ -707,7 +707,7 @@ enum SleepService {
     /// "Last night": the waking day of the newest session, by `SleepDayRule` (main sleep = the longest, naps
     /// add to the total). Gated on *today* so Today only shows a recent night; a day more than a day old (with
     /// nothing newer) is hidden rather than shown as if it were last night.
-    static func latestSleepDay(context: ModelContext, now: Date = Date()) -> SleepDay? {
+    static func latestSleepDay(context: ModelContext, now: Date = AppClock.now) -> SleepDay? {
         let calendar = Calendar.current
         let sessions = SleepRepository.sessions(context: context)
         guard let latest = sessions.max(by: { $0.startAt < $1.startAt }) else { return nil }
@@ -734,7 +734,7 @@ enum SleepService {
         sleepDay(for: date, context: context)?.main
     }
     
-    static func sleepRange(_ range: SleepRangeKey, context: ModelContext, now: Date = Date()) -> SleepRangeSummary {
+    static func sleepRange(_ range: SleepRangeKey, context: ModelContext, now: Date = AppClock.now) -> SleepRangeSummary {
         let expected = expectedNights(for: range)
         // Day view is "last night" — anchored on the current reference night, not
         // the latest recorded one. If nothing was captured we want to show the
@@ -763,7 +763,7 @@ enum SleepService {
     /// to show the night that is currently in progress / just ended — i.e.
     /// yesterday's date. From 4 AM onwards we flip to today; if no session
     /// landed under today's key by then, the view shows "no sleep last night".
-    static func dayReferenceNight(now: Date = Date(), calendar: Calendar = .current) -> Date {
+    static func dayReferenceNight(now: Date = AppClock.now, calendar: Calendar = .current) -> Date {
         let startOfToday = calendar.startOfDay(for: now)
         let hour = calendar.component(.hour, from: now)
         if hour < 4 {
@@ -806,7 +806,7 @@ enum SleepService {
         if let latest = SleepRepository.latestSession(context: context) {
             return Calendar.current.startOfDay(for: latest.date)
         }
-        return Calendar.current.startOfDay(for: Date())
+        return Calendar.current.startOfDay(for: AppClock.now)
     }
 
     /// One-time repair of sleep sessions that were split across midnight (or duplicated) by the old
@@ -830,7 +830,7 @@ enum SleepService {
             let targetDate = calendar.wakingDay(forSleepStart: session.startAt)
             if calendar.startOfDay(for: session.date) != targetDate {
                 session.date = targetDate
-                session.updatedAt = Date()
+                session.updatedAt = AppClock.now
             }
         }
 
@@ -914,7 +914,7 @@ enum ActivityService {
         if row.source != update.source { row.source = update.source; changed = true }
         guard changed else { return (row, false) }
         row.syncedAt = update.syncedAt
-        row.updatedAt = Date()
+        row.updatedAt = AppClock.now
         return (row, true)
     }
 
@@ -942,7 +942,7 @@ enum ActivityService {
     /// day. This is the GadgetBridge model and fixes daily totals drifting upward across repeated syncs.
     /// Calories are intentionally not summed (the ring's calorie field is unverified).
     @discardableResult
-    static func applyActivityBucket(date timestamp: Date, steps: Int, distanceMeters: Double, syncedAt: Date = Date(), context: ModelContext) -> ActivityDaily {
+    static func applyActivityBucket(date timestamp: Date, steps: Int, distanceMeters: Double, syncedAt: Date = AppClock.now, context: ModelContext) -> ActivityDaily {
         let dayStart = Calendar.current.startOfDay(for: timestamp)
         let epoch = Int(timestamp.timeIntervalSince1970)
         // A bucket the user deleted stays deleted (tombstone, `ActivityBucketDeletion`).
@@ -961,12 +961,12 @@ enum ActivityService {
         let unchanged: Bool
         if let pending = pendingBuckets[epoch] {
             unchanged = pending.steps == steps && pending.distanceMeters == distanceMeters
-            if !unchanged { pending.steps = steps; pending.distanceMeters = distanceMeters; pending.updatedAt = Date() }
+            if !unchanged { pending.steps = steps; pending.distanceMeters = distanceMeters; pending.updatedAt = AppClock.now }
         } else if let existing = (try? context.fetch(FetchDescriptor<ActivityBucketSample>(
             predicate: #Predicate { $0.startEpoch == epoch }
         )))?.first {
             unchanged = existing.steps == steps && existing.distanceMeters == distanceMeters
-            if !unchanged { existing.steps = steps; existing.distanceMeters = distanceMeters; existing.updatedAt = Date() }
+            if !unchanged { existing.steps = steps; existing.distanceMeters = distanceMeters; existing.updatedAt = AppClock.now }
         } else {
             let sample = ActivityBucketSample(timestamp: timestamp, steps: steps, distanceMeters: distanceMeters, source: ringHistorySource)
             context.insert(sample)
@@ -998,7 +998,7 @@ enum ActivityService {
         // log can lag the live cumulative update, and within a day cumulative counters only legitimately
         // increase. Keep the higher of each and don't clobber the live `source`. Past days always take the
         // exact bucket-sum assignment (they're fully synced and authoritative).
-        if Calendar.current.isDate(dayStart, inSameDayAs: Date()),
+        if Calendar.current.isDate(dayStart, inSameDayAs: AppClock.now),
            row.steps > totalSteps || row.distanceMeters > totalDistance {
             row.steps = max(row.steps, totalSteps)
             row.distanceMeters = max(row.distanceMeters, totalDistance)
@@ -1008,7 +1008,7 @@ enum ActivityService {
             row.source = ringHistorySource
         }
         row.syncedAt = syncedAt
-        row.updatedAt = Date()
+        row.updatedAt = AppClock.now
         // Cheap during a sync burst — the day recomputes its calorie estimate once, when the
         // event bus sees the sync complete (`DailyCalorieEstimator.flushDirty`).
         DailyCalorieEstimator.markDirty(dayStart)
@@ -1033,7 +1033,7 @@ enum ActivityService {
     }
     
     @discardableResult
-    static func finishSummary(for session: ActivitySession, endedAt: Date = Date(), context: ModelContext) -> ActivitySessionSummary {
+    static func finishSummary(for session: ActivitySession, endedAt: Date = AppClock.now, context: ModelContext) -> ActivitySessionSummary {
         session.endedAt = endedAt
         session.status = .finished
         // Preserve explicitly provided calories (coach-created sessions) at finish.
@@ -1057,7 +1057,7 @@ enum ActivityService {
     }
 
     private static func recomputeSummary(for session: ActivitySession, preserveProvidedCalories: Bool, context: ModelContext) -> ActivitySessionSummary {
-        let endedAt = session.endedAt ?? Date()
+        let endedAt = session.endedAt ?? AppClock.now
         backfillSamples(for: session, endedAt: endedAt, context: context)
         let samples = ActivityRepository.samples(sessionId: session.id, context: context)
         let hrRows = samples.filter { $0.kind == MeasurementKind.heartRate.rawValue && $0.value > 0 }
@@ -1084,7 +1084,7 @@ enum ActivityService {
         session.maxHeartRate = hr.max()
         session.avgSpO2 = average(spo2)
         session.latestSpO2 = spo2Rows.last?.value
-        session.updatedAt = Date()
+        session.updatedAt = AppClock.now
 
         return ActivitySessionSummary(
             session: session,
@@ -1115,7 +1115,7 @@ enum ActivityService {
         context: ModelContext
     ) -> Bool {
         guard session.status == .finished,
-              newEndedAt <= Date(),
+              newEndedAt <= AppClock.now,
               newEndedAt.timeIntervalSince(newStartedAt) > session.totalPauseSeconds
         else { return false }
 
@@ -1165,7 +1165,7 @@ enum ActivityService {
         if session.useGps, let dist = session.distanceMeters {
             row.distanceMeters = max(0, row.distanceMeters - dist)
         }
-        row.updatedAt = Date()
+        row.updatedAt = AppClock.now
     }
 
     private static func editPayload(from session: ActivitySession, newType: String, newStart: Date, newEnd: Date) -> String {
@@ -1198,8 +1198,8 @@ enum ActivityService {
         if let distance = session.distanceMeters, session.useGps {
             row.distanceMeters += distance
         }
-        row.syncedAt = Date()
-        row.updatedAt = Date()
+        row.syncedAt = AppClock.now
+        row.updatedAt = AppClock.now
         row.source = row.source == "manual_recording" ? "manual_recording" : "hr_and_manual"
     }
     
@@ -1267,7 +1267,7 @@ enum ActivityService {
     private static func gpsDistance(session: ActivitySession, context: ModelContext) -> Double? {
         // Window to [startedAt, endedAt] so a post-finish time edit excludes out-of-window route
         // segments (inert for unedited sessions — every point lies inside the recorded span).
-        let windowEnd = session.endedAt ?? Date()
+        let windowEnd = session.endedAt ?? AppClock.now
         let points = ActivityRepository.gpsPoints(sessionId: session.id, context: context)
             .filter { $0.accepted && $0.timestamp >= session.startedAt && $0.timestamp <= windowEnd }
         guard points.count >= 2 else { return nil }
@@ -1304,7 +1304,7 @@ enum ActivityRecorderService {
     static func resume(_ session: ActivitySession, context: ModelContext) {
         guard session.status == .paused else { return }
         if let lastPause = ActivityRepository.events(sessionId: session.id, context: context).last(where: { $0.kind == "paused" }) {
-            session.totalPauseSeconds += max(0, Date().timeIntervalSince(lastPause.timestamp))
+            session.totalPauseSeconds += max(0, AppClock.now.timeIntervalSince(lastPause.timestamp))
         }
         session.status = .recording
         context.insert(ActivityEvent(sessionId: session.id, kind: "resumed"))
@@ -1322,8 +1322,8 @@ enum ActivityRecorderService {
     
     static func cancel(_ session: ActivitySession, context: ModelContext) {
         session.status = .cancelled
-        session.endedAt = Date()
-        session.updatedAt = Date()
+        session.endedAt = AppClock.now
+        session.updatedAt = AppClock.now
         context.insert(ActivityEvent(sessionId: session.id, kind: "gps_stopped"))
         context.insert(ActivityEvent(sessionId: session.id, kind: "cancelled"))
         try? context.save()
@@ -1358,7 +1358,7 @@ enum ActivityRecorderService {
     }
 
     static func recoverStaleSession(context: ModelContext) -> [ActivitySession] {
-        let cutoff = Calendar.current.date(byAdding: .hour, value: -6, to: Date()) ?? Date()
+        let cutoff = Calendar.current.date(byAdding: .hour, value: -6, to: AppClock.now) ?? AppClock.now
         return ActivityRepository.sessions(context: context)
             .filter { ($0.status == .recording || $0.status == .paused) && $0.startedAt < cutoff }
     }
@@ -1384,7 +1384,7 @@ enum ActivityRecorderService {
         // sessions that could own it — recording/paused, or finished inside the backfill window — instead
         // of the whole session table, and probe the session's samples with limited queries instead of
         // loading them all (audit batch B).
-        let now = Date()
+        let now = AppClock.now
         let recording = ActivitySessionStatus.recording.rawValue
         let paused = ActivitySessionStatus.paused.rawValue
         let finished = ActivitySessionStatus.finished.rawValue

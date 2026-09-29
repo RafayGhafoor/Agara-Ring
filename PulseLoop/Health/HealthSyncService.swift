@@ -116,7 +116,7 @@ final class HealthSyncService {
 
         if resetWatermarksFirst { prefsStore.resetWatermarks(to: nil) }
 
-        let now = Date()
+        let now = AppClock.now
         let device = ringDevice(context: context)
         var state = prefsStore.syncState
         var counts = SyncCounts()
@@ -589,7 +589,7 @@ extension HealthSyncService {
     private func readAge() -> Int? {
         guard let dob = try? store.dateOfBirthComponents(),
               let birthDate = Calendar.current.date(from: dob) else { return nil }
-        return Calendar.current.dateComponents([.year], from: birthDate, to: Date()).year
+        return Calendar.current.dateComponents([.year], from: birthDate, to: AppClock.now).year
     }
 
     private func readBiologicalSex() -> String? {

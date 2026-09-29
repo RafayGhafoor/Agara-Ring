@@ -16,7 +16,7 @@ struct LogPastActivityView: View {
     private let maximumDate: Date
 
     init(path: Binding<NavigationPath>) {
-        let now = Date()
+        let now = AppClock.now
         _path = path
         _startedAt = State(initialValue: now.addingTimeInterval(-3600))
         maximumDate = now

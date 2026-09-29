@@ -68,7 +68,7 @@ struct VeepooDecoder {
     /// packet repair) and the tests decode against the moment the frames were received, not today.
     var now: @Sendable () -> Date
 
-    init(calendar: Calendar = .current, now: @escaping @Sendable () -> Date = { Date() }) {
+    init(calendar: Calendar = .current, now: @escaping @Sendable () -> Date = { AppClock.now }) {
         self.calendar = calendar
         self.now = now
     }

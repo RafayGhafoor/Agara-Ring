@@ -913,7 +913,7 @@ extension RingBLEClient: RingCommandWriter {
         if case let .ringCapabilities(capabilities) = decoded { ringCapabilities = capabilities }
         if case let .battery(percent) = decoded {
             ringBatteryPercent = percent
-            let reading = ChargeEstimator.Reading(date: Date(), percent: percent)
+            let reading = ChargeEstimator.Reading(date: AppClock.now, percent: percent)
             lastBatteryReading = reading
             if isCharging { chargeSeries.add(percent: reading.percent, at: reading.date) }
         }

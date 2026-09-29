@@ -64,7 +64,7 @@ struct RootAppView: View {
                 // Test tooling: `-sampleData YES` loads the release "Explore without ring" sample set (banner + chips).
                 if DebugLaunch.bool("sampleData") {
                     SeedData.clearAll(modelContext)
-                    let profile = UserProfile(name: "", onboardingCompleted: true, baselineCompleted: true)
+                    let profile = UserProfile(name: StoreCapture.profile(""), onboardingCompleted: true, baselineCompleted: true)
                     modelContext.insert(profile)
                     try? modelContext.save()
                     SampleDataStore.shared.forgetForTooling()
@@ -80,7 +80,7 @@ struct RootAppView: View {
                 // calories) so the on-device estimated-total path is visible in the UI.
                 if DebugLaunch.bool("demoEstimatedCalories") {
                     for offset in 0...2 {
-                        guard let day = Calendar.current.date(byAdding: .day, value: -offset, to: Date()),
+                        guard let day = Calendar.current.date(byAdding: .day, value: -offset, to: AppClock.now),
                               let row = MetricsRepository.activity(on: day, context: modelContext) else { continue }
                         row.source = ActivityService.ringHistorySource
                         DailyCalorieEstimator.recompute(day: day, context: modelContext)
@@ -516,7 +516,7 @@ struct AppHeader: View {
     /// without — "\(lead)\(suffix)". The pick advances every 2 hours (and differs day to day),
     /// so it stays stable within each 2-hour block — no flicker as the view re-renders.
     private var greeting: (lead: String, suffix: String) {
-        let now = Date()
+        let now = AppClock.now
         let cal = Calendar.current
         let hour = cal.component(.hour, from: now)
         let day = cal.ordinality(of: .day, in: .year, for: now) ?? 0
@@ -856,7 +856,7 @@ enum BatteryTier: Equatable {
 }
 
 /// Time-of-day greeting, mirroring the web app's `greetingForHour()`.
-func greetingForHour(_ date: Date = Date()) -> String {
+func greetingForHour(_ date: Date = AppClock.now) -> String {
     switch Calendar.current.component(.hour, from: date) {
     case 5..<12: return "Good morning"
     case 12..<17: return "Good afternoon"

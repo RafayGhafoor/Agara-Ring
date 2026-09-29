@@ -280,7 +280,7 @@ struct ActivityDailyUpdate {
         distanceMeters: Double? = nil,
         activeMinutes: Int? = nil,
         source: String = "sync",
-        syncedAt: Date? = Date()
+        syncedAt: Date? = AppClock.now
     ) {
         self.date = date
         self.steps = steps

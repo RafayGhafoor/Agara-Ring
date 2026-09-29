@@ -25,7 +25,7 @@ enum ManualActivityService {
         durationMinutes: Double,
         distanceMeters: Double? = nil,
         notes: String? = nil,
-        now: Date = Date(),
+        now: Date = AppClock.now,
         context: ModelContext
     ) throws -> ActivitySession {
         let canonicalType = ActivityMeta.meta(type).type

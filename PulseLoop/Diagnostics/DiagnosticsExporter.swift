@@ -13,7 +13,7 @@ enum DiagnosticsExporter {
     /// Serialize a diagnostics report to pretty-printed JSON.
     static func exportJSON(context: ModelContext, maxLogs: Int = 500) -> String {
         var root: [String: Any] = [:]
-        root["generatedAt"] = ISO8601DateFormatter().string(from: Date())
+        root["generatedAt"] = ISO8601DateFormatter().string(from: AppClock.now)
         root["app"] = appInfo()
         root["device"] = deviceInfo(context: context)
         root["logs"] = recentLogs(context: context, limit: maxLogs)
@@ -33,7 +33,7 @@ enum DiagnosticsExporter {
     static func exportFile(context: ModelContext) -> URL? {
         guard !SampleDataStore.isActiveNow else { return nil }   // nothing real to report while only sample data is loaded
         let json = exportJSON(context: context)
-        let stamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
+        let stamp = ISO8601DateFormatter().string(from: AppClock.now).replacingOccurrences(of: ":", with: "-")
         do {
             let url = try ExportFiles.freshDirectory().appendingPathComponent("agara-diagnostics-\(stamp).json")
             try json.data(using: .utf8)?.write(to: url)

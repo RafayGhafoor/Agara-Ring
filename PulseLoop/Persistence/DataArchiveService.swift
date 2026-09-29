@@ -78,7 +78,7 @@ enum DataArchiveService {
         attachmentsDirectory: URL? = nil,
         includeRawPackets: Bool = false
     ) async throws -> Data {
-        guard !SampleDataStore.isActiveNow else { throw DataArchiveError.sampleDataLoaded }
+        guard !SampleDataStore.isActiveNow, !StoreCapture.isActive else { throw DataArchiveError.sampleDataLoaded }   // store capture carries the sample walk
         try beginExclusiveOperation()
         defer { isBusy = false }
         let sink = ArchiveDataSink()
@@ -91,7 +91,7 @@ enum DataArchiveService {
     }
 
     /// The export's file name — Android's: `agara-export-<yyyy-MM-dd-HHmm>.json.gz`.
-    static func exportFileName(now: Date = Date()) -> String {
+    static func exportFileName(now: Date = AppClock.now) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd-HHmm"
@@ -103,7 +103,7 @@ enum DataArchiveService {
     /// already shared, and each one holds their whole health history.
     /// Raw BLE packets are included only when `includeRawPackets` is set (Android's "include diagnostics").
     static func exportFile(context: ModelContext, includeRawPackets: Bool = false) async throws -> URL {
-        guard !SampleDataStore.isActiveNow else { throw DataArchiveError.sampleDataLoaded }
+        guard !SampleDataStore.isActiveNow, !StoreCapture.isActive else { throw DataArchiveError.sampleDataLoaded }   // store capture carries the sample walk
         try beginExclusiveOperation()
         defer { isBusy = false }
         let url = try ExportFiles.freshDirectory().appendingPathComponent(exportFileName())
@@ -135,7 +135,7 @@ enum DataArchiveService {
     ) async throws {
         let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
         let head = "{\"formatVersion\":\(AgaraArchive.currentFormatVersion),\"exportedAt\":"
-            + "\(ArchiveCoding.millis(Date())),\"appVersion\":" + jsonString(appVersion)
+            + "\(ArchiveCoding.millis(AppClock.now)),\"appVersion\":" + jsonString(appVersion)
         try sink.write(Data(head.utf8))
 
         var counts: [(String, Int)] = []
@@ -574,7 +574,7 @@ enum DataArchiveService {
         CoachSettingsStore.shared.settings = decode(CoachSettings.self, "pulseloop.coach.settings.v1") ?? .default
         AppleHealthPrefsStore.shared.prefs = decode(AppleHealthPrefs.self, "pulseloop.applehealth.prefs.v1") ?? .default
         if AppleHealthPrefsStore.shared.prefs.masterEnabled {
-            AppleHealthPrefsStore.shared.resetWatermarks(to: Date())
+            AppleHealthPrefsStore.shared.resetWatermarks(to: AppClock.now)
         }
         #if DEBUG
         // The factory-reset flow re-arms `forceOnboarding`; an imported completed profile should

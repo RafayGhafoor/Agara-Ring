@@ -45,7 +45,7 @@ struct MeasurementRingView: View {
 
     var body: some View {
         TimelineView(.animation) { context in
-            let elapsed = measureStart.map { context.date.timeIntervalSince($0) } ?? 0
+            let elapsed = measureStart.map { AppClock.adjust(context.date).timeIntervalSince($0) } ?? 0
 
             ZStack {
                 if !reduceMotion, stage == .searching || stage == .locking {

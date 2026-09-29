@@ -22,7 +22,7 @@ enum RestingHRBaselineService {
     /// only when the rounded value actually changes, so the `VitalsStore` signature invalidates
     /// exactly when colors must change (and not every 6 hours).
     @MainActor
-    static func refreshIfStale(context: ModelContext, now: Date = Date()) {
+    static func refreshIfStale(context: ModelContext, now: Date = AppClock.now) {
         let profiles = (try? context.fetch(FetchDescriptor<UserProfile>())) ?? []
         guard let profile = profiles.first else { return }
         if let last = profile.hrRestingBaselineUpdatedAt, now.timeIntervalSince(last) < refreshInterval {

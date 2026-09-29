@@ -141,7 +141,7 @@ struct HRSampleWindow {
     var receivedReading: Bool { !samples.isEmpty }
 
     /// - Parameter historySyncing: a history transfer is running on the same link — use the wider gap.
-    mutating func begin(at now: Date = Date(), historySyncing: Bool = false) {
+    mutating func begin(at now: Date = AppClock.now, historySyncing: Bool = false) {
         startedAt = now
         samples = []
         lastSampleAt = nil
@@ -150,7 +150,7 @@ struct HRSampleWindow {
     }
 
     /// Collect a sample, unless it's still inside the warm-up echo.
-    mutating func collect(_ bpm: Int, at now: Date = Date()) {
+    mutating func collect(_ bpm: Int, at now: Date = AppClock.now) {
         guard let startedAt, now.timeIntervalSince(startedAt) >= warmup else { return }
         if let lastSampleAt { intervals.append(now.timeIntervalSince(lastSampleAt)) }
         samples.append(bpm)
@@ -168,7 +168,7 @@ struct HRSampleWindow {
 
     /// Contact lost: readings had begun, and then stopped arriving. Never true during the warm-up,
     /// since nothing has been collected yet.
-    func contactLost(at now: Date = Date()) -> Bool {
+    func contactLost(at now: Date = AppClock.now) -> Bool {
         guard let lastSampleAt else { return false }
         return now.timeIntervalSince(lastSampleAt) > contactGap
     }
@@ -426,7 +426,7 @@ final class RingSyncCoordinator {
         // The battery re-request is part of the startup handshake. No-op when the GATT characteristic
         // is absent.
         client.readBattery()
-        lastSyncAt = Date()
+        lastSyncAt = AppClock.now
         // Show the progress bar immediately; the engine's own `.syncProgress` stages refine the
         // label and the `"done"` stage (or the stall timeout) clears it.
         updateSync(stage: "Syncing…")
@@ -579,7 +579,7 @@ final class RingSyncCoordinator {
         }
         if let goal = MetricsRepository.goals(context: context) {
             goal.steps = steps
-            goal.updatedAt = Date()
+            goal.updatedAt = AppClock.now
         } else {
             context.insert(UserGoal(steps: steps))
         }
@@ -859,7 +859,7 @@ final class RingSyncCoordinator {
     /// pinned to the last full history pass.
     private var lastLiveStamp = Date.distantPast
     private func stampLiveSync() {
-        let now = Date()
+        let now = AppClock.now
         guard now.timeIntervalSince(lastLiveStamp) >= 10 else { return }
         lastLiveStamp = now
         lastSyncAt = now
@@ -894,7 +894,7 @@ final class RingSyncCoordinator {
             // fast-fail a measurement that was about to succeed. Revisit with a capture.
             break
         case .deviceStateChanged(.connected, _):
-            lastSyncAt = Date()
+            lastSyncAt = AppClock.now
             // Ring came back mid-workout: the new connection's engine doesn't know a stream was
             // running, so re-issue the live HR command.
             restartWorkoutHeartRateIfActive()
@@ -927,7 +927,7 @@ final class RingSyncCoordinator {
     /// `syncHistory()`) keeps the label honest for rings whose history only comes down with the connect
     /// handshake.
     private func updateSync(stage: String) {
-        lastSyncAt = Date()
+        lastSyncAt = AppClock.now
         guard stage != "done" else { endSync(); return }
         syncStage = stage
         // Transition-guarded: Observation notifies on every set (no equality check), so an
@@ -1111,7 +1111,7 @@ private extension RingSyncCoordinator {
     /// The engine's own `.syncProgress` stages drive the progress bar and stamp `lastSyncAt`; the kick
     /// itself must not, or a ring whose `syncHistory()` is a no-op would show "Synced just
     /// now" without a byte on the wire.
-    func resyncHistoryIfStale(now: Date = Date()) {
+    func resyncHistoryIfStale(now: Date = AppClock.now) {
         guard isConnected, !isSyncing, !workoutHRActive else { return }
         // Never start a history pass under a running spot measurement: every HR sample calls this, so the
         // first test after a connect used to kick the pass itself and starve its own samples.

@@ -290,11 +290,11 @@ private struct EditWorkoutSheet: View {
         self.session = session
         _type = State(initialValue: ActivityMeta.meta(session.type).type)
         _startedAt = State(initialValue: session.startedAt)
-        _endedAt = State(initialValue: session.endedAt ?? Date())
+        _endedAt = State(initialValue: session.endedAt ?? AppClock.now)
     }
 
     private var validationMessage: String? {
-        if endedAt > Date() { return "End time can't be in the future." }
+        if endedAt > AppClock.now { return "End time can't be in the future." }
         if endedAt.timeIntervalSince(startedAt) <= session.totalPauseSeconds {
             return session.totalPauseSeconds > 0
                 ? "The window must be longer than the \(max(1, Int(session.totalPauseSeconds / 60))) min of pauses in this workout."
@@ -321,13 +321,13 @@ private struct EditWorkoutSheet: View {
             }
 
             fieldRow("Starts") {
-                DatePicker("", selection: $startedAt, in: ...Date(), displayedComponents: [.date, .hourAndMinute])
+                DatePicker("", selection: $startedAt, in: ...AppClock.now, displayedComponents: [.date, .hourAndMinute])
                     .labelsHidden()
                     .tint(AgaraColors.accent)
             }
 
             fieldRow("Ends") {
-                DatePicker("", selection: $endedAt, in: ...Date(), displayedComponents: [.date, .hourAndMinute])
+                DatePicker("", selection: $endedAt, in: ...AppClock.now, displayedComponents: [.date, .hourAndMinute])
                     .labelsHidden()
                     .tint(AgaraColors.accent)
             }
@@ -546,7 +546,7 @@ struct RecordLiveView: View {
                     ElapsedTimeText(
                         startedAt: session.startedAt,
                         totalPauseSeconds: session.totalPauseSeconds,
-                        pausedAt: paused ? (liveWorkout.stats?.pausedAt ?? Date()) : nil
+                        pausedAt: paused ? (liveWorkout.stats?.pausedAt ?? AppClock.now) : nil
                     )
 
                     LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
@@ -612,7 +612,7 @@ struct RecordLiveView: View {
             .sheet(isPresented: $confirmFinish) {
                 // Under a minute is a mis-tap, not a workout: offer to discard it rather than save a
                 // "0m" entry into today's list (Android matches, `WorkoutEndRules.minimumSeconds`).
-                if elapsed(session: session, now: Date()) < 60 {
+                if elapsed(session: session, now: AppClock.now) < 60 {
                     WorkoutEndSheet(
                         title: "Discard this workout?",
                         message: "It's under a minute — too short to count. Keep recording, or discard it.",
@@ -671,7 +671,7 @@ struct RecordLiveView: View {
     /// Mini recap shown on the finish/discard sheets.
     private func endSheetStats(session: ActivitySession) -> [(label: String, value: String)] {
         var stats: [(label: String, value: String)] = [
-            (label: "Duration", value: ActivityMeta.duration(elapsed(session: session, now: Date())))
+            (label: "Duration", value: ActivityMeta.duration(elapsed(session: session, now: AppClock.now)))
         ]
         if session.useGps {
             let meters = liveWorkout.stats?.distanceMeters ?? 0
@@ -696,7 +696,7 @@ struct RecordLiveView: View {
 // whole screen — and the 1 Hz clock invalidates nothing but the duration text.
 
 /// "Xs ago" copy for tile subtitles. Takes `now` so a slow TimelineView can keep it honest.
-private func agoLabel(_ date: Date, now: Date = Date()) -> String {
+private func agoLabel(_ date: Date, now: Date = AppClock.now) -> String {
     let s = max(0, Int(now.timeIntervalSince(date)))
     return s < 60 ? "\(s)s ago" : "\(s / 60)m ago"
 }
@@ -713,7 +713,7 @@ private struct ElapsedTimeText: View {
             clock(now: pausedAt, muted: true)
         } else {
             TimelineView(.periodic(from: startedAt, by: 1)) { timeline in
-                clock(now: timeline.date, muted: false)
+                clock(now: AppClock.adjust(timeline.date), muted: false)
             }
         }
     }
@@ -770,7 +770,7 @@ private struct LiveHRTile: View {
                 value: hr.map { "\($0.value)" } ?? "—",
                 unit: hr == nil ? nil : "bpm",
                 label: "Heart rate",
-                subtitle: subtitle(now: timeline.date),
+                subtitle: subtitle(now: AppClock.adjust(timeline.date)),
                 pulsing: coordinator.hrState == .measuring,
                 tint: AgaraColors.heartRate,
                 muted: hr == nil
@@ -809,7 +809,7 @@ private struct LiveSpO2Tile: View {
                 value: spo2.map { "\($0.value)%" } ?? "—",
                 unit: nil,
                 label: "SpO₂",
-                subtitle: subtitle(now: timeline.date),
+                subtitle: subtitle(now: AppClock.adjust(timeline.date)),
                 pulsing: coordinator.spo2State == .measuring,
                 tint: AgaraColors.spo2,
                 muted: spo2 == nil
@@ -852,7 +852,7 @@ private struct LivePaceTile: View {
     private var label: String {
         guard let stats else { return "—" }
         let meters = stats.distanceMeters
-        let frozenNow = stats.pausedAt ?? Date()
+        let frozenNow = stats.pausedAt ?? AppClock.now
         let elapsedSec = max(0, Int(frozenNow.timeIntervalSince(startedAt) - totalPauseSeconds))
         if showsSpeed {
             guard elapsedSec > 0, meters >= 50 else { return "—" }

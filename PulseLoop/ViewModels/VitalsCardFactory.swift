@@ -23,7 +23,7 @@ enum VitalsCardFactory {
         var components: [MetricKind: [MetricSample]] = [:]
         var summary: TodaySummary?
         var range: MetricRange = .twentyFourHours
-        var now: Date = Date()
+        var now: Date = AppClock.now
         var units: UnitsPreference = .metric
     }
 
@@ -368,6 +368,8 @@ enum VitalsCardFactory {
 
     private static func lastUpdated(_ date: Date?, now: Date) -> String? {
         guard let date else { return nil }
+        // Store capture (debug only): a capture never depends on how long a sync took.
+        if StoreCapture.isActive { return "Updated \(StoreCapture.justNow)" }
         let minutes = Int(now.timeIntervalSince(date) / 60)
         if minutes < 1 { return "Updated just now" }
         if minutes < 60 { return "Updated \(minutes)m ago" }

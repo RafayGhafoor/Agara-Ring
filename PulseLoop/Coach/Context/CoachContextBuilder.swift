@@ -9,7 +9,7 @@ enum CoachContextBuilder {
     static func build(
         context: ModelContext,
         conversationSummary: String? = nil,
-        now: Date = Date(),
+        now: Date = AppClock.now,
         budget: CoachContextBudget = .full,
         environment: CoachContextPacket.EnvironmentContext? = nil,
         includeNutrition: Bool = true
@@ -189,7 +189,7 @@ enum CoachContextBuilder {
             }
     }
 
-    private static func memories(context: ModelContext, limit: Int = 8, valueCap: Int = .max, now: Date = Date()) -> [CoachContextPacket.MemoryContext] {
+    private static func memories(context: ModelContext, limit: Int = 8, valueCap: Int = .max, now: Date = AppClock.now) -> [CoachContextPacket.MemoryContext] {
         let descriptor = FetchDescriptor<CoachMemory>(
             sortBy: [SortDescriptor(\.importance, order: .reverse), SortDescriptor(\.updatedAt, order: .reverse)]
         )

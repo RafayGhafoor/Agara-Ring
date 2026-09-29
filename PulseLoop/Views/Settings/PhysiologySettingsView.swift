@@ -113,7 +113,7 @@ struct PhysiologySettingsView: View {
         } else {
             profile.altitudeMeters = nil
         }
-        profile.updatedAt = Date()
+        profile.updatedAt = AppClock.now
         try? modelContext.save()
         dismiss()
     }

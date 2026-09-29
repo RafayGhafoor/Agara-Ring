@@ -21,7 +21,7 @@ struct CoachTraceEvent: Identifiable, Equatable, Sendable {
 
     init(label: String, status: Status, toolName: String? = nil) {
         self.id = UUID()
-        self.timestamp = Date()
+        self.timestamp = AppClock.now
         self.label = label
         self.toolName = toolName
         self.status = status

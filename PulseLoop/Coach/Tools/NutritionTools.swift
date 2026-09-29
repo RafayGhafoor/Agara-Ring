@@ -272,7 +272,7 @@ enum NutritionTools {
                 name: args.name, mealType: args.mealType, calories: args.calories,
                 proteinG: args.proteinG, carbsG: args.carbsG, fatG: args.fatG, notes: args.notes
             )
-            if Calendar.current.isDateInToday(entry.timestamp) {
+            if AppClock.isToday(entry.timestamp) {
                 apply(updates, to: entry)
                 NutritionRepository.update(entry, context: ctx.modelContext)
                 ctx.loggedMealIds.append(entry.id)
@@ -332,7 +332,7 @@ enum NutritionTools {
         if let notes = updates.notes { entry.notes = notes }
         // A user-requested correction to a database/estimate row marks it edited.
         if numbersChanged && entry.source != .manual { entry.userEdited = true }
-        entry.updatedAt = Date()
+        entry.updatedAt = AppClock.now
     }
 
     private static func decodeConfidence(_ raw: String) -> DecodeConfidence {
@@ -346,7 +346,7 @@ enum NutritionTools {
     /// Combine a YYYY-MM-DD date with an optional HH:mm time; unstated time on a past day
     /// lands at noon, today at the current clock time.
     private static func resolveTimestamp(date: String, time: String?) -> Date {
-        let day = CoachDataAccess.parseLocalDate(date) ?? Calendar.current.startOfDay(for: Date())
+        let day = CoachDataAccess.parseLocalDate(date) ?? Calendar.current.startOfDay(for: AppClock.now)
         if let time {
             let parts = time.split(separator: ":").compactMap { Int($0) }
             if parts.count >= 2,
@@ -354,7 +354,7 @@ enum NutritionTools {
                 return stamped
             }
         }
-        if Calendar.current.isDateInToday(day) { return Date() }
+        if AppClock.isToday(day) { return AppClock.now }
         return Calendar.current.date(bySettingHour: 12, minute: 0, second: 0, of: day) ?? day
     }
 }

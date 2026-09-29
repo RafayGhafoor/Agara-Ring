@@ -112,7 +112,7 @@ struct MetricDetailView: View {
 
     /// The chart's x-range: the calendar day 12am–12am for Today (as the vendor app draws it — a "today"
     /// starting 2 PM yesterday couldn't be read against the clock), the data's own span otherwise.
-    private var xDomain: ClosedRange<Date>? { period == .today ? ChartAxes.dayWindow(Date()) : nil }
+    private var xDomain: ClosedRange<Date>? { period == .today ? ChartAxes.dayWindow(AppClock.now) : nil }
 
     /// What the chart plots: 30-min averages (3 h over a week, daily over a month) for continuous signals —
     /// the raw 1 Hz live + 5-min history mix drew as a jagged wall — and individual readings for spot metrics
@@ -327,7 +327,7 @@ struct MetricDetailView: View {
 
     private func reload() {
         // Today is the calendar day: the 24 h fetch always covers midnight onwards, so trim to it.
-        let dayStart = Calendar.current.startOfDay(for: Date())
+        let dayStart = Calendar.current.startOfDay(for: AppClock.now)
         func window(_ s: [MetricSample]) -> [MetricSample] { period == .today ? s.filter { $0.timestamp >= dayStart } : s }
         if metric == .bloodPressure {
             primary = window(MetricsService.metricRange(metric: .bloodPressureSystolic, range: period.range, context: modelContext))
@@ -349,7 +349,7 @@ struct MetricDetailView: View {
     }
 
     private func loadReadings() {
-        let now = Date()
+        let now = AppClock.now
         let start: Date
         switch period {
         case .today: start = Calendar.current.startOfDay(for: now)

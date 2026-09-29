@@ -71,7 +71,7 @@ enum MetricsRepository {
         descriptor.fetchLimit = 1
         let row = try? context.fetch(descriptor).first
         // A hot row newer than the seal boundary is always the newest; otherwise a sealed block may hold a later one.
-        if let row, BlockStore.utcDay(ms: BlockStore.ms(row.timestamp)) >= BlockStore.sealBoundary(now: Date()) { return row }
+        if let row, BlockStore.utcDay(ms: BlockStore.ms(row.timestamp)) >= BlockStore.sealBoundary(now: AppClock.now) { return row }
         guard let sealed = MeasurementSeries.latest(metric: raw, context: context) else { return row }
         if let row, BlockStore.ms(row.timestamp) >= sealed.ts { return row }
         return MeasurementSeries.detached(sealed)
@@ -89,7 +89,7 @@ enum MetricsRepository {
         descriptor.fetchLimit = limit
         let rows = (try? context.fetch(descriptor)) ?? []
         // Only a window that reaches below the hot window can involve sealed blocks.
-        guard BlockStore.utcDay(ms: BlockStore.ms(start)) < BlockStore.sealBoundary(now: Date()) else { return rows }
+        guard BlockStore.utcDay(ms: BlockStore.ms(start)) < BlockStore.sealBoundary(now: AppClock.now) else { return rows }
         let sealed = MeasurementSeries.points(metric: raw, from: start, to: end, context: context)
         guard !sealed.isEmpty else { return rows }
         return Array((rows + sealed.map(MeasurementSeries.detached)).sorted { $0.timestamp > $1.timestamp }.prefix(limit))
@@ -163,7 +163,7 @@ enum MeasurementRepository {
         kind: MeasurementKind,
         value: Double,
         unit: String,
-        timestamp: Date = Date(),
+        timestamp: Date = AppClock.now,
         source: MeasurementSource = .ring,
         confidence: DecodeConfidence = .known,
         activitySessionId: UUID? = nil,
@@ -338,7 +338,7 @@ enum MeasurementConfigRepository {
 
     @MainActor
     static func save(_ config: DeviceMeasurementConfig, context: ModelContext) {
-        config.updatedAt = Date()
+        config.updatedAt = AppClock.now
         try? context.save()
     }
 }
@@ -446,7 +446,7 @@ enum NutritionRepository {
     /// Save after in-place edits to `entry` (the caller mutated the row already).
     @MainActor
     static func update(_ entry: MealEntry, context: ModelContext) {
-        entry.updatedAt = Date()
+        entry.updatedAt = AppClock.now
         try? context.save()
         AgaraDataChange.shared.notify()
     }
@@ -486,7 +486,7 @@ enum NutritionRepository {
     @MainActor
     static func touchProduct(_ product: CachedFoodProduct) {
         product.useCount += 1
-        product.lastUsedAt = Date()
+        product.lastUsedAt = AppClock.now
     }
 
     /// Insert or refresh a fetched product in the cache (keyed on its OFF code), keeping the
@@ -507,7 +507,7 @@ enum NutritionRepository {
             existing.sodiumMg100g = product.sodiumMg100g
             existing.servingSizeText = product.servingSizeText
             existing.servingQuantityG = product.servingQuantityG
-            existing.fetchedAt = Date()
+            existing.fetchedAt = AppClock.now
             try? context.save()
             return existing
         }
@@ -547,7 +547,7 @@ enum DebugRepository {
     @discardableResult
     @MainActor
     static func insertRawPacket(
-        timestamp: Date = Date(),
+        timestamp: Date = AppClock.now,
         direction: PacketDirection,
         commandId: Int,
         hexPayload: String,
@@ -593,7 +593,7 @@ enum DebugRepository {
     /// Delete audit rows older than `auditRetentionDays` in two batch deletes (no fetch), then save.
     /// Run once per launch (and by every maintenance pass).
     @MainActor
-    static func pruneAuditTables(now: Date = Date(), context: ModelContext) {
+    static func pruneAuditTables(now: Date = AppClock.now, context: ModelContext) {
         StorageMaintenance.pruneAuditTables(now: now, days: auditRetentionDays, context: context)
         try? context.save()
     }
@@ -607,7 +607,7 @@ enum DebugRepository {
 
     /// The rolling window both apps keep (catalog `storage_raw_packets_window_hours` / `_max_rows`). Does NOT save.
     @MainActor
-    static func pruneRawPacketWindow(now: Date = Date(), hours: Int = AgaraConfig.Storage.rawPacketsWindowHours,
+    static func pruneRawPacketWindow(now: Date = AppClock.now, hours: Int = AgaraConfig.Storage.rawPacketsWindowHours,
                                      maxRows: Int = AgaraConfig.Storage.rawPacketsMaxRows, context: ModelContext) {
         StorageMaintenance.pruneRawPacketWindow(now: now, hours: hours, maxRows: maxRows, context: context)
     }

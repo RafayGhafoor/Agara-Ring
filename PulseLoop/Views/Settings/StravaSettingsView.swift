@@ -130,7 +130,7 @@ struct StravaSettingsView: View {
     private static func relative(_ date: Date) -> String {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .short
-        return formatter.localizedString(for: date, relativeTo: Date())
+        return formatter.localizedString(for: date, relativeTo: AppClock.now)
     }
 
     private func modeLabel(_ mode: StravaUploadMode) -> String {
@@ -176,7 +176,7 @@ struct StravaSettingsView: View {
             get: { store.prefs.uploadMode },
             set: { newMode in
                 if newMode == .automatic && store.prefs.uploadMode != .automatic {
-                    StravaPrefsStore.shared.stampWatermarks(to: Date())
+                    StravaPrefsStore.shared.stampWatermarks(to: AppClock.now)
                 }
                 store.prefs.uploadMode = newMode
             }

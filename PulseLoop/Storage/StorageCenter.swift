@@ -45,7 +45,7 @@ final class StorageCenter {
     }
 
     var banner: StorageLadder.Banner {
-        guard let usage else { return .none }
+        guard let usage, !StoreCapture.isActive else { return .none }   // store capture: only the sample-data banner may show
         return StorageLadder.banner(usedBytes: usage.usedBytes, capBytes: prefs.capBytes, freeDiskBytes: usage.freeDiskBytes)
     }
 
@@ -64,7 +64,7 @@ final class StorageCenter {
     // MARK: Runs
 
     /// The routine pass: at most once per `storage_maintenance_interval_hours`, gated by the `storage_compaction` flag.
-    func runIfDue(now: Date = Date()) {
+    func runIfDue(now: Date = AppClock.now) {
         guard !isRunning, container != nil else { return }
         // Never compete with a ring history pass; the next foreground picks it up.
         guard !SyncProgress.shared.isSyncing else { return }
@@ -83,7 +83,7 @@ final class StorageCenter {
 
     func optimizeNow() {
         guard canOptimize else { return }
-        start(now: Date(), optimize: true)
+        start(now: AppClock.now, optimize: true)
     }
 
     /// Await the current pass (tests, and the screen refreshing after it).

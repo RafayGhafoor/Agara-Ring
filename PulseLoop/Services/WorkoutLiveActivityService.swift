@@ -68,7 +68,7 @@ final class WorkoutLiveActivityService: ObservableObject {
             lastHeartRate: nil,
             lastSpO2: nil,
             activityType: activityType,
-            lastUpdated: Date(),
+            lastUpdated: AppClock.now,
             useImperial: displayOptions.useImperial
         )
 

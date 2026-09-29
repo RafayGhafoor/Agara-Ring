@@ -192,7 +192,7 @@ private struct NutritionGoalsGroup: View {
         goal.intakeProteinG = protein > 0 ? Int(protein) : nil
         goal.intakeCarbsG = carbs > 0 ? Int(carbs) : nil
         goal.intakeFatG = fat > 0 ? Int(fat) : nil
-        goal.updatedAt = Date()
+        goal.updatedAt = AppClock.now
         try? modelContext.save()
         AgaraDataChange.shared.notify()
     }

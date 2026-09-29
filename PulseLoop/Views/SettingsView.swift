@@ -173,7 +173,7 @@ struct SettingsView: View {
         // Hidden until unlocked by tapping the version 7× in About (like Android's developer options).
         // Debug builds only: a release build has no hidden menu (store launch, App Store 2.3.1(a)).
         #if DEBUG
-        if developerUnlocked {
+        if developerUnlocked, StoreCapture.showsDebugChrome {
             rows.append(SettingsRowItem(icon: "ladybug", tint: AgaraColors.danger, title: "Developer") {
                 path.append(AppRoute.debug)
             })

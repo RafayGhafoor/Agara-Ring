@@ -51,7 +51,7 @@ enum ActionTools {
             case "fat_g": goal.intakeFatG = Int(args.target)
             default: return .error("invalid goal_type '\(args.goalType)'")
             }
-            goal.updatedAt = Date()
+            goal.updatedAt = AppClock.now
             try? ctx.modelContext.save()
             AgaraDataChange.shared.notify()
             return .object(["ok": true, "goal_type": args.goalType, "target": args.target])
@@ -167,7 +167,7 @@ enum ActionTools {
                 return .object(["ok": false, "needs_follow_up": true, "reason": "duration_missing",
                                 "suggested_question": "Roughly how long was the \(args.activityType) session?"])
             }
-            let now = Date()
+            let now = AppClock.now
             var start: Date = resolveStart(date: args.date, time: args.startTime)
                 ?? CoachDataAccess.parseLocalDate(args.date).map { $0.addingTimeInterval(12 * 3600) }
                 ?? now
@@ -233,7 +233,7 @@ enum ActionTools {
                 type: args.type, notes: args.notes, distanceKm: args.distanceKm,
                 durationMin: args.durationMin, perceivedEffort: args.perceivedEffort, startTime: args.startTime
             )
-            let isToday = Calendar.current.isDateInToday(session.startedAt)
+            let isToday = AppClock.isToday(session.startedAt)
             if isToday {
                 applyUpdatesNow(updates, to: session, context: ctx.modelContext)
                 ctx.loggedActivityIds.append(session.id)
@@ -347,12 +347,12 @@ enum ActionTools {
         let newType = updates.type ?? session.type
         var newStart = session.startedAt
         if let start = updates.startTime, let date = CoachDataAccess.parseLocalDate(start) { newStart = date }
-        var newEnd = session.endedAt ?? Date()
+        var newEnd = session.endedAt ?? AppClock.now
         if let durationMin = updates.durationMin {
             newEnd = newStart.addingTimeInterval(durationMin * 60 + session.totalPauseSeconds)
         } else if newStart != session.startedAt {
             // Start moved without a new duration: shift the whole window, keeping its span.
-            newEnd = newStart.addingTimeInterval((session.endedAt ?? Date()).timeIntervalSince(session.startedAt))
+            newEnd = newStart.addingTimeInterval((session.endedAt ?? AppClock.now).timeIntervalSince(session.startedAt))
         }
         let didEdit = newType != session.type || newStart != session.startedAt || newEnd != session.endedAt
         if didEdit {
@@ -364,7 +364,7 @@ enum ActionTools {
         // A user-stated distance overrides the GPS recompute, so apply it after the edit.
         if let distanceKm = updates.distanceKm { session.distanceMeters = distanceKm * 1000 }
 
-        session.updatedAt = Date()
+        session.updatedAt = AppClock.now
         try? context.save()
         // `applyEdit` already notified; only notify again when it didn't run or we changed
         // something after it (the distance override), so a plain edit doesn't double-bump.

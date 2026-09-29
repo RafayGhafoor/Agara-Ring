@@ -44,7 +44,7 @@ enum ReadingDeletion {
 
     /// Delete `rows` (expanded to whole readings), tombstoning the history ones, and save. Returns rows removed.
     @discardableResult
-    static func delete(_ rows: [Measurement], context: ModelContext, now: Date = Date()) -> Int {
+    static func delete(_ rows: [Measurement], context: ModelContext, now: Date = AppClock.now) -> Int {
         // Readings older than the hot window live in blocks; the reader hands them out as detached rows (no context).
         // Those are removed from their block (re-encoded without the point, a revision bump) and tombstoned by
         // (metric, ts, source); a history reading also gets the usual `history:` key so a re-sync can't restore it.
@@ -111,7 +111,7 @@ enum ReadingDeletion {
     }
 
     /// Remember a new tombstone (activity buckets, archive import).
-    static func record(key: String, kindRaw: String, timestamp: Date, context: ModelContext, now: Date = Date()) {
+    static func record(key: String, kindRaw: String, timestamp: Date, context: ModelContext, now: Date = AppClock.now) {
         var keys = loadCache(context)
         guard !keys.contains(key) else { return }
         context.insert(MeasurementDeletion(measurementId: key, kindRaw: kindRaw, timestamp: timestamp, deletedAt: now))
@@ -184,7 +184,7 @@ enum ActivityBucketDeletion {
         row.deletedSteps += removedSteps
         row.deletedDistanceMeters += removedDistance
         row.calories = 0
-        row.updatedAt = Date()
+        row.updatedAt = AppClock.now
     }
 
     /// What a day's stored total becomes when the ring pushes a cumulative `ringTotal` for it.

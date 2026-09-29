@@ -418,7 +418,7 @@ struct MeasurementSheet: View {
         case .searching, .locking:
             ambientPulse = true
             beatPulse = true
-            elapsed = measureStart.map { Date().timeIntervalSince($0) } ?? 0
+            elapsed = measureStart.map { AppClock.now.timeIntervalSince($0) } ?? 0
         case .result:
             ringColor = AgaraColors.success
         case .preparing, .error:
@@ -479,7 +479,7 @@ struct MeasurementSheet: View {
 
     private func tickElapsed() {
         guard stage == .searching, let start = measureStart else { return }
-        elapsed = Date().timeIntervalSince(start)
+        elapsed = AppClock.now.timeIntervalSince(start)
         if !announcedStillWorking, elapsed >= 12 {
             announcedStillWorking = true
             announce("Still working, keep still")

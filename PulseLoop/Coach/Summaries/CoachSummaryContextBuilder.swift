@@ -18,7 +18,7 @@ enum CoachSummaryContextBuilder {
 
     // MARK: Today
 
-    static func today(context: ModelContext, now: Date = Date(),
+    static func today(context: ModelContext, now: Date = AppClock.now,
                       environment: CoachContextPacket.EnvironmentContext? = nil) -> Built {
         let summary = MetricsService.buildTodaySummary(context: context)
         let packet = CoachContextBuilder.build(context: context, now: now)
@@ -53,7 +53,7 @@ enum CoachSummaryContextBuilder {
 
     // MARK: Sleep — nightly
 
-    static func sleepDay(context: ModelContext, now: Date = Date(),
+    static func sleepDay(context: ModelContext, now: Date = AppClock.now,
                          environment: CoachContextPacket.EnvironmentContext? = nil) -> Built? {
         let range = SleepService.sleepRange(.day, context: context, now: now)
         // `SleepDayRule`: the main sleep is the day's longest session (a nap after the night used to be `.last`);
@@ -94,7 +94,7 @@ enum CoachSummaryContextBuilder {
 
     // MARK: Sleep — aggregate
 
-    static func sleepRange(_ range: SleepRangeKey, context: ModelContext, now: Date = Date()) -> Built {
+    static func sleepRange(_ range: SleepRangeKey, context: ModelContext, now: Date = AppClock.now) -> Built {
         let summary = SleepService.sleepRange(range, context: context, now: now)
         let valid = SleepInsights.validSessions(summary.sessions)
         let avgMin = SleepInsights.averageDuration(valid)

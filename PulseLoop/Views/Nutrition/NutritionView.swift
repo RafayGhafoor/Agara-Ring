@@ -9,7 +9,7 @@ struct NutritionView: View {
     @Binding var path: NavigationPath
 
     @State private var dataChange = AgaraDataChange.shared
-    @State private var selectedDay = Calendar.current.startOfDay(for: Date())
+    @State private var selectedDay = Calendar.current.startOfDay(for: AppClock.now)
     // Cached off the render path (reload() on token/day change), mirroring ActivityView —
     // an @Query invalidation re-running the fetch every body eval flashes glass on iOS 26.
     @State private var entries: [MealEntry] = []
@@ -49,7 +49,7 @@ struct NutritionView: View {
         return CoachGate.isOn && coach.providerMode != .appleOnDevice
     }
 
-    private var isToday: Bool { Calendar.current.isDateInToday(selectedDay) }
+    private var isToday: Bool { AppClock.isToday(selectedDay) }
 
     private func reload() {
         entries = NutritionRepository.entries(on: selectedDay, context: modelContext)
@@ -156,7 +156,7 @@ struct NutritionView: View {
 
     private var dayTitle: String {
         if isToday { return "Today" }
-        if Calendar.current.isDateInYesterday(selectedDay) { return "Yesterday" }
+        if AppClock.isYesterday(selectedDay) { return "Yesterday" }
         return Self.dayFormatter.string(from: selectedDay)
     }
 
@@ -191,7 +191,7 @@ struct NutritionView: View {
 
     private func shiftDay(_ delta: Int) {
         guard let day = Calendar.current.date(byAdding: .day, value: delta, to: selectedDay) else { return }
-        selectedDay = min(Calendar.current.startOfDay(for: day), Calendar.current.startOfDay(for: Date()))
+        selectedDay = min(Calendar.current.startOfDay(for: day), Calendar.current.startOfDay(for: AppClock.now))
     }
 
     // MARK: - Meal groups

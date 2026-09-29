@@ -45,13 +45,13 @@ struct SleepView: View {
         // `sleepRange`/`dayReferenceNight` apply the usual 4 AM "last night" flip. Week/Month/Year
         // keep their own anchor (dayOffset is ignored there).
         let token = dataChange.token   // subscribe: re-run the body (and re-fetch below) on each synced batch
-        let effectiveNow = Calendar.current.date(byAdding: .day, value: -dayOffset, to: Date()) ?? Date()
+        let effectiveNow = Calendar.current.date(byAdding: .day, value: -dayOffset, to: AppClock.now) ?? AppClock.now
         // The fetches run once per (range, day, data batch, reference night) — not on every body pass (a
         // scrub, a carousel page or a sheet toggle re-runs the body; the Year range is a year of nights).
-        let anchor = range == .day ? SleepService.dayReferenceNight(now: effectiveNow) : Calendar.current.startOfDay(for: Date())
+        let anchor = range == .day ? SleepService.dayReferenceNight(now: effectiveNow) : Calendar.current.startOfDay(for: AppClock.now)
         let loaded = tabCache.value(for: "\(range.rawValue)|\(dayOffset)|\(token)|\(anchor.timeIntervalSince1970)") {
             SleepTabData(
-                summary: SleepService.sleepRange(range, context: modelContext, now: range == .day ? effectiveNow : Date()),
+                summary: SleepService.sleepRange(range, context: modelContext, now: range == .day ? effectiveNow : AppClock.now),
                 goalMinutes: MetricsRepository.goals(context: modelContext)?.sleepMinutes,
                 activitySteps: MetricsRepository.latestActivity(context: modelContext)?.steps,
                 earliestDay: SleepRepository.sessions(context: modelContext).first.map { Calendar.current.startOfDay(for: $0.date) }
@@ -347,7 +347,7 @@ struct SleepView: View {
     /// Graphical date picker bounded to [oldest browsable day ... today].
     private var dayPickerSheet: some View {
         let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
+        let today = calendar.startOfDay(for: AppClock.now)
         let selection = Binding<Date>(
             get: { calendar.date(byAdding: .day, value: -dayOffset, to: today) ?? today },
             set: { setDay(to: $0) }
@@ -375,7 +375,7 @@ struct SleepView: View {
     /// night, clamped to a 1-year floor. 0 (locked to today) when there's no data at all.
     private var maxDayOffset: Int {
         let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
+        let today = calendar.startOfDay(for: AppClock.now)
         guard let earliest = earliestDataDay else { return 0 }
         let earliestMinus7 = calendar.date(byAdding: .day, value: -7, to: earliest) ?? earliest
         let yearAgo = calendar.date(byAdding: .day, value: -365, to: today) ?? today
@@ -384,7 +384,7 @@ struct SleepView: View {
     }
     private var floorDay: Date {
         let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
+        let today = calendar.startOfDay(for: AppClock.now)
         return calendar.date(byAdding: .day, value: -maxDayOffset, to: today) ?? today
     }
 
@@ -404,7 +404,7 @@ struct SleepView: View {
     }
     private func setDay(to date: Date) {
         let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
+        let today = calendar.startOfDay(for: AppClock.now)
         let offset = calendar.dateComponents([.day], from: calendar.startOfDay(for: date), to: today).day ?? 0
         let clamped = min(maxDayOffset, max(0, offset))
         dayNavEdge = clamped > dayOffset ? .leading : .trailing   // further back = enters from leading
@@ -418,13 +418,13 @@ struct SleepView: View {
     private func dayLabels(_ shownDay: Date) -> (primary: String, secondary: String) {
         let calendar = Calendar.current
         let absolute = shownDay.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
-        if calendar.isDateInToday(shownDay) { return ("Today", absolute) }
-        if calendar.isDateInYesterday(shownDay) { return ("Yesterday", absolute) }
-        let daysAgo = calendar.dateComponents([.day], from: shownDay, to: calendar.startOfDay(for: Date())).day ?? 0
+        if AppClock.isToday(shownDay, calendar: calendar) { return ("Today", absolute) }
+        if AppClock.isYesterday(shownDay, calendar: calendar) { return ("Yesterday", absolute) }
+        let daysAgo = calendar.dateComponents([.day], from: shownDay, to: calendar.startOfDay(for: AppClock.now)).day ?? 0
         if daysAgo < 7 {
             return (shownDay.formatted(.dateTime.weekday(.wide)), shownDay.formatted(.dateTime.month(.abbreviated).day()))
         }
-        let sameYear = calendar.component(.year, from: shownDay) == calendar.component(.year, from: Date())
+        let sameYear = calendar.component(.year, from: shownDay) == calendar.component(.year, from: AppClock.now)
         let primary = sameYear ? absolute : shownDay.formatted(.dateTime.month(.abbreviated).day().year())
         return (primary, "")
     }
@@ -432,16 +432,16 @@ struct SleepView: View {
     private func voiceLabel(_ shownDay: Date) -> String {
         let calendar = Calendar.current
         let full = shownDay.formatted(.dateTime.weekday(.wide).month(.wide).day())
-        if calendar.isDateInToday(shownDay) { return "Today, \(full)" }
-        if calendar.isDateInYesterday(shownDay) { return "Yesterday, \(full)" }
-        let sameYear = calendar.component(.year, from: shownDay) == calendar.component(.year, from: Date())
+        if AppClock.isToday(shownDay, calendar: calendar) { return "Today, \(full)" }
+        if AppClock.isYesterday(shownDay, calendar: calendar) { return "Yesterday, \(full)" }
+        let sameYear = calendar.component(.year, from: shownDay) == calendar.component(.year, from: AppClock.now)
         return sameYear ? full : shownDay.formatted(.dateTime.weekday(.wide).month(.wide).day().year())
     }
 
     /// Speak the newly-selected day + its session count — the carousel repopulates silently and
     /// focus stays on the chevron, so VoiceOver users otherwise get no confirmation of the change.
     private func announceDay(_ offset: Int) {
-        let now = Calendar.current.date(byAdding: .day, value: -offset, to: Date()) ?? Date()
+        let now = Calendar.current.date(byAdding: .day, value: -offset, to: AppClock.now) ?? AppClock.now
         let sessionCount = SleepInsights.validSessions(SleepService.sleepRange(.day, context: modelContext, now: now).sessions).count
         let day = SleepService.dayReferenceNight(now: now)
         let sessionsPhrase = sessionCount == 0
@@ -495,7 +495,7 @@ struct SleepView: View {
                         let days = calendar.dateComponents(
                             [.day],
                             from: calendar.startOfDay(for: date),
-                            to: calendar.startOfDay(for: Date())
+                            to: calendar.startOfDay(for: AppClock.now)
                         ).day ?? 0
                         dayOffset = max(0, days)
                         range = .day

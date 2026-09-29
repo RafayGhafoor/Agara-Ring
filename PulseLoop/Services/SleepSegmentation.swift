@@ -117,7 +117,7 @@ extension SleepService {
             container = existing
         } else {
             container = SleepSession(date: dateKey, startAt: start, endAt: start, totalMinutes: 0,
-                                     syncedAt: Date(), sourceAddress: source)
+                                     syncedAt: AppClock.now, sourceAddress: source)
             context.insert(container)
             allSessions.append(container)
         }
@@ -186,7 +186,7 @@ extension SleepService {
                                    dayBlocks injectedBlocks: [SleepStageBlock]? = nil) {
         let calendar = Calendar.current
         let day = calendar.startOfDay(for: dateKey)
-        let now = Date()
+        let now = AppClock.now
 
         let daySessions = injectedSessions ?? ((try? context.fetch(FetchDescriptor<SleepSession>())) ?? [])
             .filter { calendar.isDate($0.date, inSameDayAs: day) }

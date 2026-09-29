@@ -45,7 +45,7 @@ final class CoachSummaryService {
         return (try? modelContext.fetch(descriptor))?.first
     }
 
-    func currentToday(now: Date = Date()) -> CoachSummary? {
+    func currentToday(now: Date = AppClock.now) -> CoachSummary? {
         summary(kind: CoachSummaryKind.today.rawValue, scopeKey: CoachDataAccess.localDateString(now))
     }
 
@@ -66,7 +66,7 @@ final class CoachSummaryService {
 
     // MARK: - Refresh (self-gating)
 
-    func refreshTodayIfNeeded(now: Date = Date()) async {
+    func refreshTodayIfNeeded(now: Date = AppClock.now) async {
         let environment = await CoachEnvironmentContextService.shared.snapshot(now: now)
         let built = CoachSummaryContextBuilder.today(context: modelContext, now: now, environment: environment)
         let existing = summary(kind: CoachSummaryKind.today.rawValue, scopeKey: built.scopeKey)
@@ -77,7 +77,7 @@ final class CoachSummaryService {
         await generateAndUpsert(.today, built: built, existing: existing, now: now)
     }
 
-    func refreshSleepDayIfNeeded(now: Date = Date()) async {
+    func refreshSleepDayIfNeeded(now: Date = AppClock.now) async {
         let environment = await CoachEnvironmentContextService.shared.snapshot(now: now)
         guard let built = CoachSummaryContextBuilder.sleepDay(context: modelContext, now: now, environment: environment),
               let endAt = built.sleepSessionEnd else { return }
@@ -105,7 +105,7 @@ final class CoachSummaryService {
         await generateAndUpsert(.sleepDay, built: built, existing: existing, now: now)
     }
 
-    func refreshSleepRangeIfNeeded(_ range: SleepRangeKey, now: Date = Date()) async {
+    func refreshSleepRangeIfNeeded(_ range: SleepRangeKey, now: Date = AppClock.now) async {
         let built = CoachSummaryContextBuilder.sleepRange(range, context: modelContext, now: now)
         let existing = summary(kind: CoachSummaryKind.sleepRange(range).rawValue, scopeKey: built.scopeKey)
         if let existing {

@@ -22,7 +22,7 @@ final class WearableLog {
 
     init(
         id: UUID = UUID(),
-        timestamp: Date = Date(),
+        timestamp: Date = AppClock.now,
         deviceType: RingDeviceType? = nil,
         category: WearableLogCategory,
         level: WearableLogLevel,

@@ -33,7 +33,7 @@ enum PendingActionExecutor {
 
         case .updateActivitySession:
             apply(action.updates, to: session, context: context)
-            session.updatedAt = Date()
+            session.updatedAt = AppClock.now
             try? context.save()
             AgaraDataChange.shared.notify()
             return "Updated the \(typeLabel) session."
@@ -74,12 +74,12 @@ enum PendingActionExecutor {
         let newType = updates.type ?? session.type
         var newStart = session.startedAt
         if let start = updates.startTime, let date = CoachDataAccess.parseLocalDate(start) { newStart = date }
-        var newEnd = session.endedAt ?? Date()
+        var newEnd = session.endedAt ?? AppClock.now
         if let durationMin = updates.durationMin {
             newEnd = newStart.addingTimeInterval(durationMin * 60 + session.totalPauseSeconds)
         } else if newStart != session.startedAt {
             // Start moved without a new duration: shift the whole window, keeping its span.
-            newEnd = newStart.addingTimeInterval((session.endedAt ?? Date()).timeIntervalSince(session.startedAt))
+            newEnd = newStart.addingTimeInterval((session.endedAt ?? AppClock.now).timeIntervalSince(session.startedAt))
         }
         if newType != session.type || newStart != session.startedAt || newEnd != session.endedAt {
             _ = ActivityService.applyEdit(

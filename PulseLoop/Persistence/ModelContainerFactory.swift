@@ -52,7 +52,7 @@ enum ModelContainerFactory {
     /// store instead of crashing on every launch. The moved files are kept so the data can be recovered
     /// (Files app / a later import). Only if even a fresh store fails does it fall back to memory.
     /// The caller shows `StoreRecoveryNotice` once.
-    static func makeRecovering(url: URL? = nil, now: Date = Date()) -> (container: ModelContainer, movedAside: URL?) {
+    static func makeRecovering(url: URL? = nil, now: Date = AppClock.now) -> (container: ModelContainer, movedAside: URL?) {
         do {
             return (try make(url: url), nil)
         } catch {
@@ -75,7 +75,7 @@ enum ModelContainerFactory {
     /// Move `store` and its SQLite side files to `<store>.broken-<yyyyMMdd-HHmmss>[-wal|-shm]`.
     /// Returns the moved main file's URL (nil when there was nothing to move).
     @discardableResult
-    static func moveAside(_ store: URL, now: Date = Date()) -> URL? {
+    static func moveAside(_ store: URL, now: Date = AppClock.now) -> URL? {
         let fm = FileManager.default
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")

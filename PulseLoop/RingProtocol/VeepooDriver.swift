@@ -103,10 +103,10 @@ final class VeepooDriver: WearableDriver {
         // slots, which cover the same ground, while the ratchet converges on the same number.
         if characteristic == CBUUID(string: VeepooUUIDs.liveSteps) {
             guard let total = decoder.liveSteps(frame: data) else { return [] }
-            let minute = Calendar.current.component(.minute, from: Date())
+            let minute = Calendar.current.component(.minute, from: AppClock.now)
             guard minute != lastLiveMinute else { return [] }
             lastLiveMinute = minute
-            return [.activityUpdate(timestamp: Date(), steps: total, distanceMeters: 0, calories: 0)]
+            return [.activityUpdate(timestamp: AppClock.now, steps: total, distanceMeters: 0, calories: 0)]
         }
 
         switch data[0] {
@@ -127,7 +127,7 @@ final class VeepooDriver: WearableDriver {
         case VeepooOpcode.realtime.rawValue:
             guard let activity = decoder.activity(frame: data) else { return [] }
             return [.activityUpdate(
-                timestamp: Date(),
+                timestamp: AppClock.now,
                 steps: activity.steps,
                 distanceMeters: Double(activity.distanceMeters),
                 calories: activity.calories
@@ -142,14 +142,14 @@ final class VeepooDriver: WearableDriver {
             if let refusal = decoder.oxygenRefusal(frame: data) {
                 return [.measurementRejected(mode: SpotMode.spo2, reason: refusal)]
             }
-            return decoder.oxygen(frame: data).map { [.spo2Result(value: $0, timestamp: Date())] } ?? []
+            return decoder.oxygen(frame: data).map { [.spo2Result(value: $0, timestamp: AppClock.now)] } ?? []
         case 0x90 where measuring:
             // One-shot BP stream: progress %, then the final 90 <sys> <dia> 64 00 01 …
             if let refusal = decoder.bloodPressureRefusal(frame: data) {
                 return [.measurementRejected(mode: SpotMode.bloodPressure, reason: refusal)]
             }
             return decoder.bloodPressure(frame: data).map {
-                [.bloodPressureSample(systolic: $0.systolic, diastolic: $0.diastolic, timestamp: Date())]
+                [.bloodPressureSample(systolic: $0.systolic, diastolic: $0.diastolic, timestamp: AppClock.now)]
             } ?? []
         case 0x89 where spotTest?.opcode == 0x89:
             return spotTestEvents(data)
@@ -171,7 +171,7 @@ final class VeepooDriver: WearableDriver {
     /// start) is dropped; a plain `d0 01`/`d0 02` means no finger.
     private func heartRateEvents(_ data: Data) -> [RingDecodedEvent] {
         switch decoder.heartRateReply(frame: data) {
-        case let .bpm(value)?: return [.heartRateSample(bpm: value, timestamp: Date())]
+        case let .bpm(value)?: return [.heartRateSample(bpm: value, timestamp: AppClock.now)]
         case .notWorn?: return [.measurementRejected(mode: SpotMode.heartRate, reason: .notWorn)]
         case .busy?, .warmingUp?, nil: return []
         }
@@ -184,7 +184,7 @@ final class VeepooDriver: WearableDriver {
         guard sub == spotTest?.sub else { return [.unknown(commandId: data[0], raw: data)] }
         if sub == 0x06 {
             switch decoder.stressReply(frame: data) {
-            case let .result(value)?: return [.stressSample(value: Int(value), timestamp: Date())]
+            case let .result(value)?: return [.stressSample(value: Int(value), timestamp: AppClock.now)]
             case let .refused(reason)?: return [.measurementRejected(mode: SpotMode.stress, reason: reason)]
             default: return []
             }
@@ -192,7 +192,7 @@ final class VeepooDriver: WearableDriver {
         switch decoder.glucoseReply(frame: data) {
         case let .result(mmol)?:
             // The app stores glucose in mg/dL (the DF path converts the same way).
-            return [.bloodSugarSample(mgdl: mmol * 18.016, timestamp: Date())]
+            return [.bloodSugarSample(mgdl: mmol * 18.016, timestamp: AppClock.now)]
         case let .refused(reason)?: return [.measurementRejected(mode: SpotMode.glucose, reason: reason)]
         default: return []
         }
@@ -200,7 +200,7 @@ final class VeepooDriver: WearableDriver {
 
     private func bloodComponentsEvents(_ data: Data) -> [RingDecodedEvent] {
         switch decoder.bloodComponentsReply(frame: data) {
-        case let .result(reading)?: return [.bloodComponentsSample(reading, timestamp: Date())]
+        case let .result(reading)?: return [.bloodComponentsSample(reading, timestamp: AppClock.now)]
         case let .refused(reason)?: return [.measurementRejected(mode: SpotMode.bloodComponents, reason: reason)]
         case .progress?, .stopped?: return []
         case nil: return [.unknown(commandId: data[0], raw: data)]

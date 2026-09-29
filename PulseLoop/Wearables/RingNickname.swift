@@ -165,7 +165,7 @@ extension DeviceRepository {
         if let identifier = device.peripheralIdentifier {
             memory.set(device.nickname, for: identifier)
         }
-        device.updatedAt = Date()
+        device.updatedAt = AppClock.now
         try? context.save()
         AgaraDataChange.shared.notify()
         return device

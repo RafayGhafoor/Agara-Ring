@@ -26,7 +26,7 @@ import SwiftData
 /// screen, so this file is how a scripted run proves what happened (`tools/e2e_ios.sh --mac`).
 enum E2ETrace {
     nonisolated static func log(_ message: String) {
-        let line = "\(ISO8601DateFormatter().string(from: Date())) \(message)\n"
+        let line = "\(ISO8601DateFormatter().string(from: AppClock.now)) \(message)\n"
         FileHandle.standardError.write(Data(line.utf8))
         guard let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
         let url = docs.appendingPathComponent("e2e.log")
@@ -130,15 +130,20 @@ final class VirtualRingLink {
         let profiles = try context.fetch(FetchDescriptor<UserProfile>(
             sortBy: [SortDescriptor(\.createdAt, order: .forward)]))
         if let profile = profiles.first {
+            // A store capture on an install an earlier emulator run already seeded ("Emulator").
+            if StoreCapture.isActive, profile.name != StoreCapture.profileName {
+                profile.name = StoreCapture.profileName
+                try context.save()
+            }
             guard !profile.onboardingCompleted else { return }
             profile.onboardingCompleted = true
             profile.baselineCompleted = true
-            profile.updatedAt = Date()
+            profile.updatedAt = AppClock.now
         } else {
             // Fill plausible physiology too: an empty profile makes the calorie estimator and HR-zone
             // math produce nonsense (a 7 500-step day read as ~1 500 kcal in testing).
             context.insert(UserProfile(
-                name: "Emulator",
+                name: StoreCapture.profile("Emulator"),
                 age: 32,
                 sex: "male",
                 heightCm: 178,
@@ -168,7 +173,7 @@ final class VirtualRingLink {
         }
         // A day of battery drain, so Wearable › Battery history (and its scrub tooltip) has a line to show —
         // the emulator only reports its level once a minute, and the history is throttled.
-        let dayAgo = Date().addingTimeInterval(-24 * 3600)
+        let dayAgo = AppClock.now.addingTimeInterval(-24 * 3600)
         if try context.fetchCount(FetchDescriptor<BatterySample>(predicate: #Predicate { $0.timestamp > dayAgo })) < 2 {
             for hour in 0..<24 {
                 context.insert(BatterySample(percent: 95 - hour * 3 / 2,
@@ -176,6 +181,16 @@ final class VirtualRingLink {
             }
             try context.save()
             NSLog("[VirtualRing] seeded 24 h of battery history")
+        }
+        // Store capture: the sample walk with a GPS route stands in for the plain session below, so the Activity list and
+        // the workout summary's route map can be shot against the hero ring emulator. Idempotent (its id is derived from
+        // the day); it is never exported or synced (`SampleWorkout`).
+        if StoreCapture.isActive {
+            if SampleWorkout.insert(into: context, now: AppClock.now, creditActiveMinutes: true) != nil {
+                try context.save()
+                NSLog("[VirtualRing] seeded the store-capture walk with a GPS route")
+            }
+            return
         }
         let finishedToday = try context.fetchCount(FetchDescriptor<ActivitySession>(
             predicate: #Predicate { $0.statusRaw == "finished" }))
@@ -185,7 +200,7 @@ final class VirtualRingLink {
         // The session must end in the past **and** stay inside today: a fixed "an hour ago, 45 min
         // long" crosses midnight when the run happens just after midnight, which credits the minutes
         // to yesterday and leaves today's goal ring at 0 MIN.
-        let now = Date()
+        let now = AppClock.now
         let dayStart = Calendar.current.startOfDay(for: now)
         let elapsedMinutes = Int(now.timeIntervalSince(dayStart) / 60)
         let durationMinutes = Double(min(45, max(1, elapsedMinutes - 1)))

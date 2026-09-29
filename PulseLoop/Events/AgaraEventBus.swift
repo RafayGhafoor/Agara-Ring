@@ -256,8 +256,8 @@ final class EventPersistenceSubscriber {
             device.state = state
             device.bleAddressHint = address ?? device.bleAddressHint
             if state == .connected {
-                device.lastConnectedAt = Date()
-                device.lastSyncAt = Date()
+                device.lastConnectedAt = AppClock.now
+                device.lastSyncAt = AppClock.now
             }
             context.insert(device)
         case let .deviceIdentified(deviceType, wearableModelID, advertisedName, capabilities, peripheralIdentifier):
@@ -341,7 +341,7 @@ final class EventPersistenceSubscriber {
                     calories: calories,
                     distanceMeters: distanceMeters,
                     source: "live",
-                    syncedAt: Date()
+                    syncedAt: AppClock.now
                 ),
                 context: context
             )
@@ -441,7 +441,7 @@ final class EventPersistenceSubscriber {
             // finished sync from a bare CONNECT (`lastSyncAt`, re-stamped every connect).
             if stage == "done" {
                 if let device = DeviceRepository.current(context: context) {
-                    device.lastFullSyncAt = Date()
+                    device.lastFullSyncAt = AppClock.now
                 }
                 // The rows are committed by now; the next sync re-checks against the database.
                 seenHistoryKeys.removeAll(keepingCapacity: true)
@@ -521,7 +521,7 @@ final class EventPersistenceSubscriber {
     @discardableResult
     private func recordBatterySample(_ percent: Int) -> Bool {
         guard (0...100).contains(percent) else { return false }   // guard the Device()-fallback default / garbage
-        let now = Date()
+        let now = AppClock.now
         let changed = percent != lastBatteryPercent
         let floorElapsed = lastBatteryLogAt.map { now.timeIntervalSince($0) >= batteryMinInterval } ?? true
         guard changed || floorElapsed else { return false }

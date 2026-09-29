@@ -47,6 +47,10 @@ struct AgaraApp: App {
     }
 
     init() {
+        // Store-screenshot tooling (`-fixedNow <ISO>`, `-storeCapture YES`): debug builds only, and applied before
+        // anything reads the clock or builds a view, so the first frame is already right. No-ops in Release.
+        AppClock.applyLaunchArguments()
+        StoreCapture.applyLaunchArguments()
         // Manrope ships as data assets; register it before the first view resolves a `Font.custom`.
         AgaraFontRegistry.registerBundledFonts()
         AgaraUIKitFonts.apply()

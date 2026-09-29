@@ -59,7 +59,7 @@ struct ProfileSettingsView: View {
         guard profile.preferredGlucoseUnit != unit else { return }
         profile.preferredGlucoseUnit = unit
         // `updatedAt` is what the vitals cards watch to re-render in the new unit.
-        profile.updatedAt = Date()
+        profile.updatedAt = AppClock.now
         try? modelContext.save()
     }
 

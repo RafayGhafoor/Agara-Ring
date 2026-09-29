@@ -68,7 +68,7 @@ enum MemoryTools {
         expiresInDays: Int? = nil
     ) -> CoachMemory {
         let expiresAt = expiresInDays.flatMap {
-            Calendar.current.date(byAdding: .day, value: $0, to: Date())
+            Calendar.current.date(byAdding: .day, value: $0, to: AppClock.now)
         }
         let mem = CoachMemory(
             key: key, value: value,

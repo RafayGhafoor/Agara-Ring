@@ -165,7 +165,7 @@ struct AppleHealthSettingsView: View {
     private static func relative(_ date: Date) -> String {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .short
-        return formatter.localizedString(for: date, relativeTo: Date())
+        return formatter.localizedString(for: date, relativeTo: AppClock.now)
     }
 
     // MARK: - Bindings & actions
@@ -215,7 +215,7 @@ struct AppleHealthSettingsView: View {
     }
 
     private func startNewDataOnly() {
-        store.resetWatermarks(to: Date())
+        store.resetWatermarks(to: AppClock.now)
         store.prefs.backfillChoice = .newDataOnly
         Task { await service.exportIncremental(context: modelContext) }
     }

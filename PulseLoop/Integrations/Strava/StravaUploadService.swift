@@ -69,7 +69,8 @@ final class StravaUploadService {
     /// User-initiated upload of one session. No-ops silently when the session is already on
     /// Strava or an upload for it is already in flight; failures land in `lastErrorBySession`.
     func upload(session: ActivitySession, context: ModelContext) async {
-        guard !uploadingSessionIds.contains(session.id), session.stravaActivityId == nil else { return }
+        guard !uploadingSessionIds.contains(session.id), session.stravaActivityId == nil,
+              !SampleWorkout.isSample(session) else { return }   // the sample walk is never uploaded
         uploadingSessionIds.insert(session.id)
         lastErrorBySession[session.id] = nil
         defer { uploadingSessionIds.remove(session.id) }
@@ -128,7 +129,8 @@ final class StravaUploadService {
             predicate: #Predicate { $0.statusRaw == finishedRaw && $0.endedAt != nil && $0.updatedAt > watermark },
             sortBy: [SortDescriptor(\.updatedAt, order: .forward)]
         )
-        return (try? context.fetch(descriptor)) ?? []
+        // The sample walk (SampleWorkout, present in a store-capture run) is never uploaded.
+        return ((try? context.fetch(descriptor)) ?? []).filter { !SampleWorkout.isSample($0) }
     }
 
     private func advanceWatermark(to date: Date) {
@@ -250,7 +252,7 @@ final class StravaUploadService {
     private func finalizeSuccess(session: ActivitySession, activityId: String, name: String, context: ModelContext) {
         session.stravaActivityId = activityId
         var next = prefs.state
-        next.lastUploadAt = Date()
+        next.lastUploadAt = AppClock.now
         next.lastUploadSummary = name
         prefs.state = next
         try? context.save()

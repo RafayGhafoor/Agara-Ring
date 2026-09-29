@@ -225,7 +225,7 @@ struct AboutSettingsView: View {
 
     #if DEBUG
     private func registerVersionTap() {
-        let now = Date()
+        let now = AppClock.now
         if let last = lastVersionTap, now.timeIntervalSince(last) > 2 { versionTapCount = 0 }
         lastVersionTap = now
 

@@ -174,7 +174,7 @@ struct DataExportSettingsView: View {
 
                 // Demo data rows only behind the `demo_data` flag (off in release; debug turns it on via the
                 // feature-flag override) — consistency plan B.
-                if features.isOn(.demoData) {
+                if features.isOn(.demoData), StoreCapture.showsDebugChrome {
                     SettingsGroup(
                         header: "Demo data",
                         footer: "Sample data for exploring the app without a ring."

@@ -23,13 +23,13 @@ enum ShareCardRenderer {
     }
 
     /// PNG-wrapped render ready for `ShareLink`; nil when rendering or PNG encoding fails.
-    static func shareImage(model: ShareCardModel, format: ShareCardFormat, date: Date = Date()) -> ShareCardImage? {
+    static func shareImage(model: ShareCardModel, format: ShareCardFormat, date: Date = AppClock.now) -> ShareCardImage? {
         guard let image = render(model: model, format: format), let data = image.pngData() else { return nil }
         return ShareCardImage(pngData: data, filename: filename(activityLabel: model.activityLabel, date: date))
     }
 
     /// "agara-{slug}-{yyyy-MM-dd}.png" — slug from the activity label, share date.
-    static func filename(activityLabel: String, date: Date = Date()) -> String {
+    static func filename(activityLabel: String, date: Date = AppClock.now) -> String {
         let slug = activityLabel.lowercased()
             .replacingOccurrences(of: "[^a-z0-9]+", with: "-", options: .regularExpression)
             .trimmingCharacters(in: CharacterSet(charactersIn: "-"))

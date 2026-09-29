@@ -72,8 +72,8 @@ final class WorkoutSensorPollingService: ObservableObject {
     func start(sessionID: UUID, plan: WorkoutVitalsPlan) {
         self.sessionID = sessionID
         self.plan = plan
-        nextHRPoll = .now
-        nextSpO2Poll = .now
+        nextHRPoll = AppClock.now
+        nextSpO2Poll = AppClock.now
         launchLoop()
     }
 
@@ -84,8 +84,8 @@ final class WorkoutSensorPollingService: ObservableObject {
 
     func resume() {
         guard sessionID != nil else { return }
-        nextHRPoll = .now
-        nextSpO2Poll = .now
+        nextHRPoll = AppClock.now
+        nextSpO2Poll = AppClock.now
         launchLoop()
     }
 
@@ -104,18 +104,18 @@ final class WorkoutSensorPollingService: ObservableObject {
 
         let latestHR = ActivityRepository.latestSample(sessionId: activeSession.id, kind: "hr", context: context)?.timestamp
         let latestSpO2 = ActivityRepository.latestSample(sessionId: activeSession.id, kind: "spo2", context: context)?.timestamp
-        let now = Date()
+        let now = AppClock.now
 
         if let latestHR, now.timeIntervalSince(latestHR) < 90 {
             // HR is fresh; leave the schedule untouched.
         } else {
-            nextHRPoll = .now
+            nextHRPoll = AppClock.now
         }
 
         if let latestSpO2, now.timeIntervalSince(latestSpO2) < 360 {
             // SpO2 is fresh; leave the schedule untouched.
         } else {
-            nextSpO2Poll = .now
+            nextSpO2Poll = AppClock.now
         }
 
         if pollingTask == nil {
@@ -131,39 +131,39 @@ final class WorkoutSensorPollingService: ObservableObject {
         pollingTask = Task { @MainActor [weak self] in
             while !Task.isCancelled {
                 guard let self else { return }
-                let now = Date()
+                let now = AppClock.now
 
                 switch self.plan.hrMode {
                 case .stream:
                     // Samples arrive on their own; just watch for a stalled stream.
                     if now >= self.nextHRPoll {
                         self.checkStreamHealth()
-                        self.nextHRPoll = Date().addingTimeInterval(self.streamCheckInterval)
+                        self.nextHRPoll = AppClock.now.addingTimeInterval(self.streamCheckInterval)
                     }
                 case .spotPoll:
                     if !self.isPolling, now >= self.nextHRPoll {
                         let didRead = await self.poll(kind: .heartRate)
-                        self.nextHRPoll = Date().addingTimeInterval(didRead ? self.hrInterval : self.disconnectedRetry)
+                        self.nextHRPoll = AppClock.now.addingTimeInterval(didRead ? self.hrInterval : self.disconnectedRetry)
                     } else if now >= self.nextHRPoll {
                         self.record(kind: "hr", status: "skipped")
-                        self.nextHRPoll = Date().addingTimeInterval(self.hrInterval)
+                        self.nextHRPoll = AppClock.now.addingTimeInterval(self.hrInterval)
                     }
                 case .off:
-                    self.nextHRPoll = Date().addingTimeInterval(self.hrInterval)
+                    self.nextHRPoll = AppClock.now.addingTimeInterval(self.hrInterval)
                 }
 
                 switch self.plan.spo2Mode {
                 case .spotPoll:
                     if !self.isPolling, now >= self.nextSpO2Poll {
                         let didRead = await self.poll(kind: .spo2)
-                        self.nextSpO2Poll = Date().addingTimeInterval(didRead ? self.spo2Interval : self.disconnectedRetry)
+                        self.nextSpO2Poll = AppClock.now.addingTimeInterval(didRead ? self.spo2Interval : self.disconnectedRetry)
                     } else if now >= self.nextSpO2Poll {
                         self.record(kind: "spo2", status: "skipped")
-                        self.nextSpO2Poll = Date().addingTimeInterval(self.spo2Interval)
+                        self.nextSpO2Poll = AppClock.now.addingTimeInterval(self.spo2Interval)
                     }
                 case .ringLog, .off:
                     // No instant reading exists (or capture is off) — never attempt one.
-                    self.nextSpO2Poll = Date().addingTimeInterval(self.spo2Interval)
+                    self.nextSpO2Poll = AppClock.now.addingTimeInterval(self.spo2Interval)
                 }
 
                 try? await Task.sleep(for: .seconds(5))
@@ -193,7 +193,7 @@ final class WorkoutSensorPollingService: ObservableObject {
         let latestLive = ActivityRepository.latestSample(
             sessionId: sessionID, kind: hrKind, source: MeasurementSource.live.rawValue, context: context
         )?.timestamp
-        let age = Date().timeIntervalSince(latestLive ?? session.startedAt)
+        let age = AppClock.now.timeIntervalSince(latestLive ?? session.startedAt)
         if age > streamStallSeconds {
             consecutiveStreamStalls += 1
             record(kind: "hr_stream", status: "stalled",
@@ -216,7 +216,7 @@ final class WorkoutSensorPollingService: ObservableObject {
         coordinator.stopWorkoutHeartRate()
         plan.hrMode = .spotPoll
         consecutiveStreamStalls = 0
-        nextHRPoll = .now
+        nextHRPoll = AppClock.now
         record(kind: "hr_stream", status: "fallback_spot",
                errorMessage: "stream dead after \(maxStreamStalls) restarts — switching to spot reads")
         onPlanDegraded?(plan)
@@ -259,7 +259,7 @@ final class WorkoutSensorPollingService: ObservableObject {
             case .heartRate: session.hrPollCount += 1
             case .spo2: session.spo2PollCount += 1
             }
-            session.lastSensorPollAt = Date()
+            session.lastSensorPollAt = AppClock.now
             record(kind: kindRaw, status: "success", value: Double(value))
         } else {
             switch kind {

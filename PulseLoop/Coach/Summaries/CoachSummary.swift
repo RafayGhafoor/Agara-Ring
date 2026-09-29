@@ -58,8 +58,8 @@ final class CoachSummary {
         self.chipsJSON = Self.encodeChips(chips)
         self.conversationId = nil
         self.dataSignature = dataSignature
-        self.createdAt = Date()
-        self.updatedAt = Date()
+        self.createdAt = AppClock.now
+        self.updatedAt = AppClock.now
     }
 
     var chips: [String] {
@@ -68,7 +68,7 @@ final class CoachSummary {
         return arr
     }
 
-    func apply(_ content: CoachSummaryContent, signature: String, now: Date = Date()) {
+    func apply(_ content: CoachSummaryContent, signature: String, now: Date = AppClock.now) {
         title = content.title
         body = content.body
         chipsJSON = Self.encodeChips(content.chips)

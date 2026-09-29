@@ -182,7 +182,7 @@ struct StorageSettingsView: View {
 
     private func spanDays() -> Double? {
         guard let oldest = MetricsRepository.oldestMeasurementTimestamp(context: modelContext) else { return nil }
-        return Date().timeIntervalSince(oldest) / 86_400
+        return AppClock.now.timeIntervalSince(oldest) / 86_400
     }
 
     // MARK: - Always kept

@@ -62,7 +62,7 @@ enum RingEventBridge {
     ///   because the ring's clock carries no year (anything outside its retention cannot be trusted);
     ///   cloud rows carry real epochs from our own server, so re-importing a two-month account must
     ///   not be silently trimmed to the last 8 days. Value-range gates always apply.
-    static func events(for decoded: RingDecodedEvent, now: Date = Date(), trustTimestamps: Bool = false) -> [AgaraEvent] {
+    static func events(for decoded: RingDecodedEvent, now: Date = AppClock.now, trustTimestamps: Bool = false) -> [AgaraEvent] {
         switch decoded {
         case let .activityUpdate(timestamp, steps, distanceMeters, calories):
             // A live cumulative update ratchets the daily row via `max`, so a single misframed packet
@@ -249,14 +249,14 @@ enum RingEventBridge {
     /// A sleep session start is plausible if it falls within roughly the last week and is not in the
     /// future. The the ring sleep big-data payload can carry several recent nights (day-indexed), so the
     /// window matches the ~8-day history horizon; a value outside it indicates a misdecoded frame.
-    static func isPlausibleSleepStart(_ start: Date, now: Date = Date()) -> Bool {
+    static func isPlausibleSleepStart(_ start: Date, now: Date = AppClock.now) -> Bool {
         isWithinHistoryWindow(start, now: now)
     }
 
     /// A live activity update's ring-supplied timestamp is plausible within the same ~8-day history
     /// window as sleep. A garbage future timestamp is especially dangerous here because `buildTodaySummary`
     /// treats the max-dated row as "today", so a future date would permanently poison the visible day.
-    static func isPlausibleActivityTimestamp(_ timestamp: Date, now: Date = Date()) -> Bool {
+    static func isPlausibleActivityTimestamp(_ timestamp: Date, now: Date = AppClock.now) -> Bool {
         isWithinHistoryWindow(timestamp, now: now)
     }
 

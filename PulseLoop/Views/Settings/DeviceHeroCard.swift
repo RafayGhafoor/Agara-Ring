@@ -76,7 +76,7 @@ struct DeviceHeroStatus: Equatable {
         if let lastSync {
             let formatter = RelativeDateTimeFormatter()
             formatter.unitsStyle = .short
-            syncText = "Synced " + formatter.localizedString(for: lastSync, relativeTo: now)
+            syncText = "Synced " + StoreCapture.relative(formatter.localizedString(for: lastSync, relativeTo: now))
         } else {
             syncText = nil
         }
@@ -124,7 +124,7 @@ struct DeviceHeroCard: View {
             nickname: device?.nickname,
             batteryPercent: battery,
             lastSync: coordinator.lastSyncAt,
-            now: Date(),
+            now: AppClock.now,
             isCharging: AgaraFeatureStore.shared.isOn(.chargingState) && ble.isCharging,
             chargeEstimate: ble.chargeEstimate
         )

@@ -14,7 +14,7 @@ enum DataQualityAnalyzer {
         var isDemo: Bool
     }
 
-    static func warnings(_ input: Inputs, now: Date = Date()) -> [String] {
+    static func warnings(_ input: Inputs, now: Date = AppClock.now) -> [String] {
         var out: [String] = []
 
         if input.isDemo {

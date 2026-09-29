@@ -47,7 +47,7 @@ final class VeepooSyncEngine: RingSyncEngine {
     private var planIndex = 0
     /// The ring and the day the pass started on — the ledger keys (a pass that crosses midnight keeps its dates).
     private var passRing: String?
-    private var passToday = Date()
+    private var passToday = AppClock.now
     /// The current day's DF header record count (`total_blocks`) and the record numbers received intact.
     private var dayTotalBlocks: Int?
     private var dayRecords: Set<Int> = []

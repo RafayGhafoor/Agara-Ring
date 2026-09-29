@@ -122,7 +122,7 @@ final class LiveWorkoutManager {
         seedRingLogSpO2(into: fresh)
         if session.status == .paused {
             let pausedEvent = ActivityRepository.events(sessionId: session.id, context: context).last { $0.kind == "paused" }
-            fresh.setPaused(pausedEvent?.timestamp ?? Date())
+            fresh.setPaused(pausedEvent?.timestamp ?? AppClock.now)
         }
         stats = fresh
     }
@@ -179,7 +179,7 @@ final class LiveWorkoutManager {
             )
         )
         lastPushedDistance = 0
-        lastPushAt = Date()
+        lastPushAt = AppClock.now
         startPushTicker()
         try? context.save()
         return session
@@ -190,7 +190,7 @@ final class LiveWorkoutManager {
         gps.stop()
         polling.pause()
         coordinator.stopWorkoutHeartRate()
-        stats?.setPaused(Date())
+        stats?.setPaused(AppClock.now)
         push(session, status: "paused", force: true)
     }
 
@@ -264,7 +264,7 @@ final class LiveWorkoutManager {
     /// Push current state to the Live Activity, throttled: only when distance moved ≥ 30 m, or
     /// ≥ 20 s elapsed, or `force` (status change). All inputs are O(1) reads from `stats`.
     private func push(_ session: ActivitySession, status: String, force: Bool) {
-        let now = Date()
+        let now = AppClock.now
         let distance = stats?.distanceMeters ?? 0
         let movedEnough = abs(distance - lastPushedDistance) >= 30
         let timeEnough = now.timeIntervalSince(lastPushAt) >= 20
@@ -287,7 +287,7 @@ final class LiveWorkoutManager {
                 lastHeartRate: stats?.lastHR?.value ?? coordinator.latestHRValue,
                 lastSpO2: stats?.lastSpO2?.value ?? coordinator.latestSpO2Value,
                 activityType: session.type,
-                lastUpdated: Date(),
+                lastUpdated: AppClock.now,
                 useImperial: usesImperialUnits
             )
         )
@@ -296,7 +296,7 @@ final class LiveWorkoutManager {
     /// Final Live Activity content: frozen timer + summary stats. Requires the finish summary to
     /// have run (endedAt / distanceMeters / avgHeartRate populated).
     private func finishedState(_ session: ActivitySession) -> WorkoutActivityAttributes.ContentState {
-        let endedAt = session.endedAt ?? Date()
+        let endedAt = session.endedAt ?? AppClock.now
         let elapsed = max(0, Int(endedAt.timeIntervalSince(session.startedAt) - session.totalPauseSeconds))
         let distance = session.distanceMeters ?? stats?.distanceMeters ?? 0
         return WorkoutActivityAttributes.ContentState(
@@ -310,7 +310,7 @@ final class LiveWorkoutManager {
             lastHeartRate: stats?.lastHR?.value ?? coordinator.latestHRValue,
             lastSpO2: stats?.lastSpO2?.value ?? coordinator.latestSpO2Value,
             activityType: session.type,
-            lastUpdated: Date(),
+            lastUpdated: AppClock.now,
             useImperial: usesImperialUnits,
             avgHeartRate: session.avgHeartRate.map { Int($0.rounded()) }
         )
@@ -369,7 +369,7 @@ final class LiveWorkoutManager {
             // A long silence means the phone was suspended while the ring kept logging on its own —
             // pull the ring log now so the chart gap fills without waiting for finish.
             let last = session.lastSensorPollAt ?? session.startedAt
-            if Date().timeIntervalSince(last) > 300 { coordinator.syncWorkoutVitals() }
+            if AppClock.now.timeIntervalSince(last) > 300 { coordinator.syncWorkoutVitals() }
         }
     }
 
@@ -405,7 +405,7 @@ final class LiveWorkoutManager {
     private func isFreshlyActive(_ session: ActivitySession) -> Bool {
         let last = [session.lastSensorPollAt, session.lastGpsPointAt].compactMap { $0 }.max() ?? session.startedAt
         let window: TimeInterval = session.vitalsModeRaw == "stream" ? 600 : 180
-        return Date().timeIntervalSince(last) < window
+        return AppClock.now.timeIntervalSince(last) < window
     }
 
     private var usesImperialUnits: Bool {

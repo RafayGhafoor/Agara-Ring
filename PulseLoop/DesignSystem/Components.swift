@@ -684,6 +684,7 @@ struct ActivityWorkoutRow: View {
             .sampleChip(.bottomTrailing)
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("activity.workoutRow")
         .disabled(onTap == nil)
     }
 

@@ -126,7 +126,7 @@ final class SyncPlanStore {
 
     func state(ring: String, date: String) -> SyncPlan.DayState? { all[ring]?[date] }
 
-    func set(_ state: SyncPlan.DayState, ring: String, date: String, today: Date = Date(), calendar: Calendar = .current) {
+    func set(_ state: SyncPlan.DayState, ring: String, date: String, today: Date = AppClock.now, calendar: Calendar = .current) {
         var value = all
         var dates = value[ring] ?? [:]
         dates[date] = state

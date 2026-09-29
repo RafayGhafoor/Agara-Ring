@@ -25,7 +25,7 @@ nonisolated enum MeasurementSeries {
     }
 
     /// Sealed, readable blocks of a metric whose day overlaps `[fromMs, toMs]`, minus those whose rows still exist.
-    static func visibleBlocks(metric: String, fromMs: Int64, toMs: Int64, context: ModelContext, now: Date = Date()) -> [MeasurementBlock] {
+    static func visibleBlocks(metric: String, fromMs: Int64, toMs: Int64, context: ModelContext, now: Date = AppClock.now) -> [MeasurementBlock] {
         let lo = Int(BlockStore.utcDay(ms: fromMs)), hi = Int(BlockStore.utcDay(ms: toMs))
         guard lo <= hi else { return [] }
         let d = FetchDescriptor<MeasurementBlock>(
@@ -48,7 +48,7 @@ nonisolated enum MeasurementSeries {
     }
 
     /// Decode a block for reading. A block that no longer decodes is marked (state 1/2) and yields nothing.
-    static func points(of block: MeasurementBlock, context: ModelContext, now: Date = Date()) -> [Point] {
+    static func points(of block: MeasurementBlock, context: ModelContext, now: Date = AppClock.now) -> [Point] {
         let dec = AGB.decode(block.data)
         guard dec.isOK else {
             BlockStore.markUnreadable(block, dec.status, context: context, now: now)
@@ -59,7 +59,7 @@ nonisolated enum MeasurementSeries {
     }
 
     /// Every sealed point of `metric` with `from <= ts <= to`, oldest first. Rows are NOT included; callers add them.
-    static func points(metric: String, from: Date, to: Date, context: ModelContext, now: Date = Date()) -> [Point] {
+    static func points(metric: String, from: Date, to: Date, context: ModelContext, now: Date = AppClock.now) -> [Point] {
         let lo = BlockStore.ms(from), hi = BlockStore.ms(to)
         var out: [Point] = []
         for block in visibleBlocks(metric: metric, fromMs: lo, toMs: hi, context: context, now: now) {
@@ -77,7 +77,7 @@ nonisolated enum MeasurementSeries {
     }
 
     /// Newest sealed point of a metric (nil if none). Uses the summary column `t_last`: only the newest block is decoded.
-    static func latest(metric: String, context: ModelContext, now: Date = Date()) -> Point? {
+    static func latest(metric: String, context: ModelContext, now: Date = AppClock.now) -> Point? {
         var d = FetchDescriptor<MeasurementBlock>(
             predicate: #Predicate { $0.metric == metric && $0.sealed == true && $0.state == 0 },
             sortBy: [SortDescriptor(\.tLast, order: .reverse)]
@@ -121,7 +121,7 @@ nonisolated enum MeasurementSeries {
     /// Count / sum / first / last of a metric's sealed points in `[fromMs, toMs)`. A block whose whole UTC day lies inside
     /// the window contributes its stored `n`/`sum`/`t_first`/`t_last` **without decoding**; only the (at most two) blocks per
     /// series that straddle the window edges are decoded and clipped.
-    static func stats(metric: String, fromMs: Int64, toMs: Int64, context: ModelContext, now: Date = Date()) -> Stats {
+    static func stats(metric: String, fromMs: Int64, toMs: Int64, context: ModelContext, now: Date = AppClock.now) -> Stats {
         var out = Stats()
         for block in visibleBlocks(metric: metric, fromMs: fromMs, toMs: toMs - 1, context: context, now: now) {
             let dayLo = Int64(block.utcDay) * AGB.dayMs, dayHi = dayLo + AGB.dayMs

@@ -126,9 +126,9 @@ struct CoachOrchestrator {
                 let label = registry.tool(named: fc.name)?.publicLabel ?? "Working"
                 onTrace(CoachTraceEvent(label: label, status: .runningTool, toolName: fc.name))
 
-                let startedAt = Date()
+                let startedAt = AppClock.now
                 let result = await ToolCallExecutor.execute(fc, registry: registry, context: toolContext)
-                let finishedAt = Date()
+                let finishedAt = AppClock.now
 
                 if result.isError, result.jsonString.contains("invalid arguments") {
                     argFailures[fc.name, default: 0] += 1

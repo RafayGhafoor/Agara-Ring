@@ -204,7 +204,7 @@ final class MeasurementService {
 
     private func beginMeasuring() {
         stage = .searching
-        measureStart = Date()
+        measureStart = AppClock.now
         if notifications.isAppInBackground, let spec {
             Task { await notifications.post(.measuring(spec.title)) }
         }

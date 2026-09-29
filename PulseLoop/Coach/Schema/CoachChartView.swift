@@ -176,7 +176,7 @@ struct CoachChartView: View {
         let blocks = chart.data.compactMap { point -> SleepStageBlock? in
             guard let stage = SleepStage(rawValue: point.series ?? ""), let start = Int(point.x) else { return nil }
             return SleepStageBlock(
-                sessionId: UUID(), startAt: Date(),
+                sessionId: UUID(), startAt: AppClock.now,
                 startMinute: start, durationMinutes: Int(point.y), stage: stage
             )
         }

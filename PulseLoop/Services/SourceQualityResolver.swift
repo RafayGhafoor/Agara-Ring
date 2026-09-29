@@ -15,7 +15,7 @@ enum SourceQualityResolver {
     /// - Everything else is `stale` past the freshness window, else `good` (or `unknown` with no data).
     static func quality(for metric: MetricKind,
                         latest: Date?,
-                        now: Date = Date(),
+                        now: Date = AppClock.now,
                         calibration: Calibration) -> SourceQuality {
         switch metric {
         case .glucose:

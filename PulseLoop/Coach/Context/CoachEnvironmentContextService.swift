@@ -61,7 +61,7 @@ final class CoachEnvironmentContextService: NSObject, CLLocationManagerDelegate 
 
     /// Build the environment context, or nil when the toggle is off. Never throws:
     /// weather failures degrade to city-only or a stale cached reading.
-    func snapshot(now: Date = Date()) async -> CoachContextPacket.EnvironmentContext? {
+    func snapshot(now: Date = AppClock.now) async -> CoachContextPacket.EnvironmentContext? {
         guard CoachSettingsStore.shared.settings.enableEnvironmentContext else { return nil }
 
         // Resolve a coordinate: a fresh coarse fix (foreground + authorized), else the cache.

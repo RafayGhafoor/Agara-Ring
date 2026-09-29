@@ -45,7 +45,7 @@ enum VeepooEncoder {
     /// Bytes 12–13 carry the phone's timezone the way the vendor SDK builds them: `01`, then the UTC
     /// offset in 15-minute steps as a signed byte (+05:00 → `01 14`, −10:00 → `01 d8`). The frame used to
     /// send a constant `00 d8` there (UTC−10) whatever the phone's zone was.
-    static func authentication(now: Date = Date(), calendar: Calendar = .current,
+    static func authentication(now: Date = AppClock.now, calendar: Calendar = .current,
                                timeZone: TimeZone? = nil) -> Data {
         let components = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: now)
         let year = UInt16(components.year ?? 0)
@@ -61,7 +61,7 @@ enum VeepooEncoder {
     }
 
     /// The zone's UTC offset at `date` in 15-minute steps, as a two's-complement byte.
-    static func utcOffsetQuarterHours(_ zone: TimeZone, at date: Date = Date()) -> UInt8 {
+    static func utcOffsetQuarterHours(_ zone: TimeZone, at date: Date = AppClock.now) -> UInt8 {
         let steps = zone.secondsFromGMT(for: date) / 900
         return UInt8(bitPattern: Int8(clamping: steps))
     }

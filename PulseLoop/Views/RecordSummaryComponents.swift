@@ -19,7 +19,7 @@ struct WorkoutSummaryData {
     @MainActor
     static func build(session: ActivitySession, context: ModelContext) -> WorkoutSummaryData {
         var data = WorkoutSummaryData()
-        let windowEnd = session.endedAt ?? Date()
+        let windowEnd = session.endedAt ?? AppClock.now
         data.accepted = ActivityRepository.gpsPoints(sessionId: session.id, context: context)
             .filter { $0.accepted && $0.timestamp >= session.startedAt && $0.timestamp <= windowEnd }
         data.hr = sessionHRSamples(session.id, context: context)
@@ -170,9 +170,9 @@ struct WorkoutMetricsSections: View {
         let time = DateFormatter(); time.dateFormat = "h:mm"
         let timeAmPm = DateFormatter(); timeAmPm.dateFormat = "h:mm a"
         let day: String
-        if Calendar.current.isDateInToday(session.startedAt) {
+        if AppClock.isToday(session.startedAt) {
             day = "Today"
-        } else if Calendar.current.isDateInYesterday(session.startedAt) {
+        } else if AppClock.isYesterday(session.startedAt) {
             day = "Yesterday"
         } else {
             let d = DateFormatter(); d.dateFormat = "MMM d"

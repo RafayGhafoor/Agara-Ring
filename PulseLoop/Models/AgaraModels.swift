@@ -170,15 +170,15 @@ final class Device {
         self.deviceTypeRaw = deviceType.rawValue
         self.wearableModelID = wearableModelID
         self.capabilitiesRaw = capabilities.csv
-        self.createdAt = Date()
-        self.updatedAt = Date()
+        self.createdAt = AppClock.now
+        self.updatedAt = AppClock.now
     }
 
     var state: RingConnectionState {
         get { RingConnectionState(rawValue: stateRaw) ?? .idle }
         set {
             stateRaw = newValue.rawValue
-            updatedAt = Date()
+            updatedAt = AppClock.now
         }
     }
 
@@ -195,7 +195,7 @@ final class Device {
         get { RingDeviceType(rawValue: deviceTypeRaw) ?? .veepoo }
         set {
             deviceTypeRaw = newValue.rawValue
-            updatedAt = Date()
+            updatedAt = AppClock.now
         }
     }
 
@@ -203,7 +203,7 @@ final class Device {
         get { Set(csv: capabilitiesRaw) }
         set {
             capabilitiesRaw = newValue.csv
-            updatedAt = Date()
+            updatedAt = AppClock.now
         }
     }
 }
@@ -250,8 +250,8 @@ final class ActivityDaily {
         self.distanceMeters = distanceMeters
         self.activeMinutes = activeMinutes
         self.source = source
-        self.createdAt = Date()
-        self.updatedAt = Date()
+        self.createdAt = AppClock.now
+        self.updatedAt = AppClock.now
     }
 }
 
@@ -299,7 +299,7 @@ final class Measurement {
         self.confidenceRaw = confidence.rawValue
         self.activitySessionId = activitySessionId
         self.rawPacketId = rawPacketId
-        self.createdAt = Date()
+        self.createdAt = AppClock.now
     }
     
     var kind: MeasurementKind { MeasurementKind(rawValue: kindRaw) ?? .heartRate }
@@ -317,11 +317,11 @@ final class BatterySample {
     var timestamp: Date
     var createdAt: Date
 
-    init(id: UUID = UUID(), percent: Int, timestamp: Date = Date()) {
+    init(id: UUID = UUID(), percent: Int, timestamp: Date = AppClock.now) {
         self.id = id
         self.percent = percent
         self.timestamp = timestamp
-        self.createdAt = Date()
+        self.createdAt = AppClock.now
     }
 }
 
@@ -360,8 +360,8 @@ final class SleepSession {
         self.totalMinutes = totalMinutes
         self.score = score
         self.syncedAt = syncedAt
-        self.createdAt = Date()
-        self.updatedAt = Date()
+        self.createdAt = AppClock.now
+        self.updatedAt = AppClock.now
         self.sourceAddress = sourceAddress
     }
 }
@@ -424,7 +424,7 @@ final class RawPacketRow {
     
     init(
         id: UUID = UUID(),
-        timestamp: Date = Date(),
+        timestamp: Date = AppClock.now,
         direction: PacketDirection,
         commandId: Int,
         hexPayload: String,
@@ -440,7 +440,7 @@ final class RawPacketRow {
         self.decodedKind = decodedKind
         self.decodedJSON = decodedJSON
         self.confidenceRaw = confidence.rawValue
-        self.createdAt = Date()
+        self.createdAt = AppClock.now
     }
     
     var direction: PacketDirection { PacketDirection(rawValue: directionRaw) ?? .incoming }
@@ -461,7 +461,7 @@ final class DerivedUpdateRow {
     
     init(
         id: UUID = UUID(),
-        timestamp: Date = Date(),
+        timestamp: Date = AppClock.now,
         kind: String,
         entityType: String,
         entityId: String,
@@ -571,8 +571,8 @@ final class UserProfile {
         self.usesBetaBlockers = usesBetaBlockers
         self.hasKnownLungCondition = hasKnownLungCondition
         self.preferredGlucoseUnitRaw = preferredGlucoseUnit.rawValue
-        self.createdAt = Date()
-        self.updatedAt = Date()
+        self.createdAt = AppClock.now
+        self.updatedAt = AppClock.now
     }
 }
 
@@ -606,7 +606,7 @@ final class UserGoal {
         self.workoutsPerWeek = workoutsPerWeek
         self.distanceMeters = distanceMeters
         self.calories = calories
-        self.updatedAt = Date()
+        self.updatedAt = AppClock.now
     }
 }
 
@@ -624,7 +624,7 @@ final class DeviceMeasurementConfig {
     var stressEnabled: Bool = true
     var hrvEnabled: Bool = true
     var temperatureEnabled: Bool = true
-    var updatedAt: Date = Date()
+    var updatedAt: Date = AppClock.now
 
     init(deviceId: UUID) {
         self.deviceId = deviceId
@@ -685,7 +685,7 @@ final class ActivitySession {
         id: UUID = UUID(),
         type: String,
         status: ActivitySessionStatus = .recording,
-        startedAt: Date = Date(),
+        startedAt: Date = AppClock.now,
         endedAt: Date? = nil,
         totalPauseSeconds: Double = 0,
         calories: Double? = nil,
@@ -703,15 +703,15 @@ final class ActivitySession {
         self.distanceMeters = distanceMeters
         self.notes = notes
         self.useGps = useGps
-        self.createdAt = Date()
-        self.updatedAt = Date()
+        self.createdAt = AppClock.now
+        self.updatedAt = AppClock.now
     }
     
     var status: ActivitySessionStatus {
         get { ActivitySessionStatus(rawValue: statusRaw) ?? .recording }
         set {
             statusRaw = newValue.rawValue
-            updatedAt = Date()
+            updatedAt = AppClock.now
         }
     }
 }
@@ -769,7 +769,7 @@ final class MeasurementDeletion {
     var timestamp: Date
     var deletedAt: Date
 
-    init(measurementId: String, kindRaw: String, timestamp: Date, deletedAt: Date = Date()) {
+    init(measurementId: String, kindRaw: String, timestamp: Date, deletedAt: Date = AppClock.now) {
         self.measurementId = measurementId
         self.kindRaw = kindRaw
         self.timestamp = timestamp
@@ -798,7 +798,7 @@ final class ActivityBucketSample {
         self.steps = steps
         self.distanceMeters = distanceMeters
         self.source = source
-        self.updatedAt = Date()
+        self.updatedAt = AppClock.now
     }
 }
 
@@ -827,7 +827,7 @@ final class ActivityGpsPoint {
         horizontalAccuracy: Double? = nil,
         speed: Double? = nil,
         course: Double? = nil,
-        timestamp: Date = Date(),
+        timestamp: Date = AppClock.now,
         accepted: Bool = true,
         rejectionReason: String? = nil
     ) {
@@ -860,7 +860,7 @@ final class ActivitySensorPollEvent {
     init(
         id: UUID = UUID(),
         sessionId: UUID,
-        timestamp: Date = Date(),
+        timestamp: Date = AppClock.now,
         kind: String,
         status: String,
         value: Double? = nil,
@@ -884,7 +884,7 @@ final class ActivityEvent {
     var timestamp: Date
     var payloadJSON: String?
     
-    init(id: UUID = UUID(), sessionId: UUID, kind: String, timestamp: Date = Date(), payloadJSON: String? = nil) {
+    init(id: UUID = UUID(), sessionId: UUID, kind: String, timestamp: Date = AppClock.now, payloadJSON: String? = nil) {
         self.id = id
         self.sessionId = sessionId
         self.kind = kind
@@ -908,8 +908,8 @@ final class CoachConversation {
     init(id: UUID = UUID(), title: String = "Today check-in") {
         self.id = id
         self.title = title
-        self.createdAt = Date()
-        self.updatedAt = Date()
+        self.createdAt = AppClock.now
+        self.updatedAt = AppClock.now
     }
 }
 
@@ -951,7 +951,7 @@ final class CoachMessage {
         inputTokens: Int? = nil, outputTokens: Int? = nil, costUSD: Double? = nil,
         modelUsed: String? = nil, providerUsed: String? = nil,
         loggedActivityIdsJSON: String? = nil, loggedMealIdsJSON: String? = nil,
-        createdAt: Date = Date()
+        createdAt: Date = AppClock.now
     ) {
         self.id = id
         self.conversationId = conversationId
@@ -1004,8 +1004,8 @@ final class CoachMemory {
         self.expiresAt = expiresAt
         self.sourceMessageId = sourceMessageId
         self.isUserEditable = isUserEditable
-        self.createdAt = Date()
-        self.updatedAt = Date()
+        self.createdAt = AppClock.now
+        self.updatedAt = AppClock.now
     }
 }
 
@@ -1039,6 +1039,6 @@ final class CoachToolCall {
         self.label = label
         self.statusRaw = statusRaw
         self.sequence = sequence
-        self.createdAt = Date()
+        self.createdAt = AppClock.now
     }
 }

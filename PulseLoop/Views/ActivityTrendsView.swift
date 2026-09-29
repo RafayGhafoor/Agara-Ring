@@ -86,7 +86,7 @@ struct ActivityTrendsView: View {
             for row in MetricsRepository.activityRows(context: modelContext) {
                 byDay[cal.startOfDay(for: row.date), default: 0] += rowValue(row, metric: metric)
             }
-            let today = cal.startOfDay(for: Date())
+            let today = cal.startOfDay(for: AppClock.now)
             return (0..<7).reversed().compactMap { offset in
                 guard let day = cal.date(byAdding: .day, value: -offset, to: today) else { return nil }
                 return MetricSample(timestamp: day, value: byDay[day] ?? 0)
@@ -103,16 +103,16 @@ struct ActivityTrendsView: View {
             totals[key, default: 0] += s.value
         }
         // Build the last 12 months, oldest first, filling gaps with 0.
-        let thisMonthStart = cal.date(from: cal.dateComponents([.year, .month], from: Date())) ?? Date()
+        let thisMonthStart = cal.date(from: cal.dateComponents([.year, .month], from: AppClock.now)) ?? AppClock.now
         return (0..<12).reversed().compactMap { offset -> MetricSample? in
             guard let monthStart = cal.date(byAdding: .month, value: -offset, to: thisMonthStart) else { return nil }
             let key = cal.dateComponents([.year, .month], from: monthStart)
             // Divide by elapsed days for the in-progress current month (else a partial month's
             // total is spread over the full 30/31, understating its per-day bar + the headline
             // average). Completed months use their full calendar length.
-            let isCurrentMonth = cal.isDate(monthStart, equalTo: Date(), toGranularity: .month)
+            let isCurrentMonth = cal.isDate(monthStart, equalTo: AppClock.now, toGranularity: .month)
             let days = isCurrentMonth
-                ? cal.component(.day, from: Date())
+                ? cal.component(.day, from: AppClock.now)
                 : (cal.range(of: .day, in: .month, for: monthStart)?.count ?? 30)
             let perDay = days > 0 ? (totals[key] ?? 0) / Double(days) : 0
             return MetricSample(timestamp: monthStart, value: perDay)
@@ -261,7 +261,7 @@ struct ActivityTrendsView: View {
         let cal = Calendar.current
         switch period {
         case .twelveMonths:
-            let year = cal.component(.year, from: samples.last?.timestamp ?? Date())
+            let year = cal.component(.year, from: samples.last?.timestamp ?? AppClock.now)
             return "\(year)"
         default:
             guard let first = samples.first?.timestamp, let last = samples.last?.timestamp else {

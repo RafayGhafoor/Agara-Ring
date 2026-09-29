@@ -241,7 +241,7 @@ struct HeartRateZoneSettingsView: View {
             profile.hrCustomElevatedStart = Double(elevatedStart)
             profile.hrCustomHighStart = Double(highStart)
         }
-        profile.updatedAt = Date()
+        profile.updatedAt = AppClock.now
         try? modelContext.save()
         dismiss()
     }

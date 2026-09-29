@@ -134,7 +134,7 @@ struct AgaraCloudSettingsView: View {
         do {
             let pushed = try await sync.push(context: modelContext)
             let pulled = try await sync.pull(context: modelContext)
-            lastSync = Date()
+            lastSync = AppClock.now
             UserDefaults.standard.set(lastSync, forKey: "agara.lastSync")
             statusText = "Pushed \(pushed.days) day(s) / \(pushed.measurements) reading(s), pulled \(pulled) day(s)."
             Self.log.info("sync done: \(statusText ?? "")")

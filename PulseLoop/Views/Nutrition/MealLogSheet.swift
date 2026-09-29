@@ -453,11 +453,11 @@ struct ServingPickerView: View {
     }
 
     private func save() {
-        let now = Date()
+        let now = AppClock.now
         let clock = Calendar.current.dateComponents([.hour, .minute], from: now)
         let timestamp = Calendar.current.date(
-            bySettingHour: Calendar.current.isDateInToday(day) ? (clock.hour ?? 12) : 12,
-            minute: Calendar.current.isDateInToday(day) ? (clock.minute ?? 0) : 0,
+            bySettingHour: AppClock.isToday(day) ? (clock.hour ?? 12) : 12,
+            minute: AppClock.isToday(day) ? (clock.minute ?? 0) : 0,
             second: 0, of: day
         ) ?? day
 
@@ -502,7 +502,7 @@ struct ManualMealForm: View {
     let onSaved: () -> Void
 
     @State private var name = ""
-    @State private var time = Date()
+    @State private var time = AppClock.now
     @State private var calories = ""
     @State private var protein = ""
     @State private var carbs = ""
@@ -576,7 +576,7 @@ struct ManualMealForm: View {
             sodium = entry.sodiumMg.map(fieldText) ?? ""
             notes = entry.notes ?? ""
             showMoreNutrients = entry.fiberG != nil || entry.sugarG != nil || entry.sodiumMg != nil
-        } else if !Calendar.current.isDateInToday(day) {
+        } else if !AppClock.isToday(day) {
             // Logging on a past day: default to midday rather than the current clock time.
             time = Calendar.current.date(bySettingHour: 12, minute: 0, second: 0, of: day) ?? day
         }

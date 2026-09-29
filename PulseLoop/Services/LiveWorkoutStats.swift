@@ -67,7 +67,7 @@ final class LiveWorkoutStats {
             // Ring-log samples only fill in when the stream has nothing fresh — a working live
             // stream must never be overwritten by the coarse 5-min log.
             if let current = lastHR, current.source == .live,
-               Date().timeIntervalSince(current.at) < liveHRStaleSeconds {
+               AppClock.now.timeIntervalSince(current.at) < liveHRStaleSeconds {
                 return
             }
             if let current = lastHR, timestamp <= current.at { return }

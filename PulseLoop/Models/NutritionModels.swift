@@ -17,7 +17,7 @@ enum MealType: String, Codable, CaseIterable {
     }
 
     /// Default meal type for a new entry logged at the given time of day.
-    static func inferred(at date: Date = Date()) -> MealType {
+    static func inferred(at date: Date = AppClock.now) -> MealType {
         switch Calendar.current.component(.hour, from: date) {
         case 4..<11: return .breakfast
         case 11..<15: return .lunch
@@ -81,7 +81,7 @@ final class MealEntry {
 
     init(
         id: UUID = UUID(),
-        timestamp: Date = Date(),
+        timestamp: Date = AppClock.now,
         name: String,
         mealType: MealType,
         calories: Double,
@@ -124,15 +124,15 @@ final class MealEntry {
         self.photoRefJSON = photoRefJSON
         self.notes = notes
         self.loggedByCoach = loggedByCoach
-        self.createdAt = Date()
-        self.updatedAt = Date()
+        self.createdAt = AppClock.now
+        self.updatedAt = AppClock.now
     }
 
     var mealType: MealType {
         get { MealType(rawValue: mealTypeRaw) ?? .snack }
         set {
             mealTypeRaw = newValue.rawValue
-            updatedAt = Date()
+            updatedAt = AppClock.now
         }
     }
 
@@ -140,7 +140,7 @@ final class MealEntry {
         get { MealEntrySource(rawValue: sourceRaw) ?? .manual }
         set {
             sourceRaw = newValue.rawValue
-            updatedAt = Date()
+            updatedAt = AppClock.now
         }
     }
 
@@ -150,7 +150,7 @@ final class MealEntry {
     func setTimestamp(_ newValue: Date) {
         timestamp = newValue
         date = Calendar.current.startOfDay(for: newValue)
-        updatedAt = Date()
+        updatedAt = AppClock.now
     }
 }
 
@@ -205,8 +205,8 @@ final class CachedFoodProduct {
         self.sodiumMg100g = sodiumMg100g
         self.servingSizeText = servingSizeText
         self.servingQuantityG = servingQuantityG
-        self.fetchedAt = Date()
+        self.fetchedAt = AppClock.now
         self.useCount = 0
-        self.lastUsedAt = Date()
+        self.lastUsedAt = AppClock.now
     }
 }

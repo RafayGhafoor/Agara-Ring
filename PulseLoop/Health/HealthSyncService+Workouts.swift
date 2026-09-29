@@ -31,6 +31,11 @@ extension HealthSyncService {
         // transiently-failing session therefore *stops* the pass (rather than being skipped) so a later
         // success can't leapfrog the watermark past it — it is retried on the next run.
         for session in sessions {
+            // The sample walk (SampleWorkout, present in a store-capture run) is never exported; the watermark moves past it.
+            if SampleWorkout.isSample(session) {
+                advanceWorkoutWatermark(to: session.updatedAt, state: &state)
+                continue
+            }
             guard let end = session.endedAt, end > session.startedAt else {
                 // Zero/negative duration will never become exportable — let the watermark move past it.
                 advanceWorkoutWatermark(to: session.updatedAt, state: &state)

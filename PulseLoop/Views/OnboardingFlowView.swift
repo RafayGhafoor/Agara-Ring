@@ -83,7 +83,7 @@ struct OnboardingFlowView: View {
         }
         profile.onboardingCompleted = true
         profile.baselineCompleted = true
-        profile.updatedAt = Date()
+        profile.updatedAt = AppClock.now
         try? modelContext.save()
         // "Explore without ring": load the labelled sample set (banner + chips on every tab) now that a profile exists.
         SampleDataStore.shared.activateIfExploring(context: modelContext)

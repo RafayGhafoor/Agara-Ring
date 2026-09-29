@@ -23,7 +23,7 @@ extension ActivityService {
     static func migrateGarbageActivityIfNeeded(context: ModelContext) {
         let key = "activityGarbageCleanup.v1"
         guard !UserDefaults.standard.bool(forKey: key) else { return }
-        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: Date())) ?? Date()
+        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: AppClock.now)) ?? AppClock.now
         for row in MetricsRepository.activityRows(context: context)
         where row.steps > RingEventBridge.maxDailySteps
             || row.distanceMeters > RingEventBridge.maxDailyDistanceMeters

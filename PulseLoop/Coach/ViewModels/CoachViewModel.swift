@@ -213,7 +213,7 @@ final class CoachViewModel {
         _ conversationId: UUID, context: ModelContext, usage: CoachTokenUsage? = nil, cost: Double? = nil
     ) {
         if let convo = fetchConversation(conversationId, context: context) {
-            convo.updatedAt = Date()
+            convo.updatedAt = AppClock.now
             if let usage {
                 convo.totalInputTokens += usage.inputTokens
                 convo.totalOutputTokens += usage.outputTokens

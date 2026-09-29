@@ -86,14 +86,14 @@ struct WearableSettingsView: View {
 
     private var lastSyncedLabel: String {
         guard let date = coordinator.lastSyncAt else { return "Not yet" }
-        return Self.relativeFormatter.localizedString(for: date, relativeTo: Date())
+        return StoreCapture.relative(Self.relativeFormatter.localizedString(for: date, relativeTo: AppClock.now))
     }
 
     /// "Connected · synced 2 min ago", or the charging line ("Charging · 64 % · Full in ~20 min") on the charger.
     private var statusLine: String {
         if charging { return ChargeEstimator.statusLine(percent: batteryPercent, estimate: ble.chargeEstimate) }
         guard let date = coordinator.lastSyncAt else { return "Connected" }
-        let ago = Date().timeIntervalSince(date) < 60 ? "just now" : Self.relativeFormatter.localizedString(for: date, relativeTo: Date())
+        let ago = StoreCapture.isActive || AppClock.now.timeIntervalSince(date) < 60 ? "just now" : Self.relativeFormatter.localizedString(for: date, relativeTo: AppClock.now)
         return "Connected · synced \(ago)"
     }
 
@@ -362,7 +362,7 @@ private struct BatteryHistorySection: View {
     }
 
     private func reload() {
-        let end = Date()
+        let end = AppClock.now
         let start: Date
         switch range {
         case .twentyFourHours: start = Calendar.current.date(byAdding: .hour, value: -24, to: end) ?? end
