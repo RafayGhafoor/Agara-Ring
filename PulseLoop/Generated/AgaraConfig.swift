@@ -11,6 +11,12 @@ enum AgaraConfig {
         static let measurementsCollection: String = "measurements"
         static let pushDays: Int = 90
         static let pushMaxMeasurements: Int = 5000
+        static let v2BaseUrl: String = "https://api.agaralife.com"
+        static let firebaseApiKey: String = ""
+        static let firebaseProjectId: String = ""
+        static let syncIntervalMinutes: Int = 60
+        static let syncRetryBackoffSeconds: String = "30,120,600,1800"
+        static let verifyPollSeconds: Int = 5
     }
     enum Ring {
         static let historyWindowDays: Int = 8
