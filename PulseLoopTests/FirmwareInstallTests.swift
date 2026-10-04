@@ -569,7 +569,7 @@ final class FirmwareInstallGatesTests: XCTestCase {
 
     func testInstallCopySaysAgaraNeverAVendorAndShowsProgress() {
         let body = FirmwareInstallText.confirmBody(version: "00.12.09", minBattery: 40)
-        XCTAssertTrue(body.contains("AGARA Health") && body.contains("00.12.09") && body.contains("40 %"))
+        XCTAssertTrue(body.contains("AGARA Heart") && body.contains("00.12.09") && body.contains("40 %"))
         XCTAssertTrue(body.contains("charger") && body.contains("stop working"))
         let t = InstallState.transferring(sent: 66_036, total: 132_072, block: 16, blocks: 33)
         XCTAssertEqual(FirmwareInstallText.headline(t), "Installing · 50 %")

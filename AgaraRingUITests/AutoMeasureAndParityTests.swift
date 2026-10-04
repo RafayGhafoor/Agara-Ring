@@ -113,7 +113,7 @@ final class AutoMeasureAndParityTests: AgaraUITestCase {
         XCTAssertTrue(version.waitForExistence(timeout: 5))
         // The debug row is a button; its text can surface as the label or the value depending on the runtime.
         let versionText = version.label + " " + ((version.value as? String) ?? "")
-        XCTAssertTrue(versionText.contains("1.0.0 (2)") || anyElement(labelContains: "1.0.0 (2)").exists,
+        XCTAssertTrue(versionText.contains("1.0.0 (3)") || anyElement(labelContains: "1.0.0 (3)").exists,
                       "version from the bundle (\(versionText))")
         for id in ["about.social.website", "about.social.instagram", "about.social.telegram",
                    "about.contact.email", "about.contact.phone", "about.licences"] {

@@ -4,7 +4,7 @@ import WidgetKit
 /// Configuration for the half-width (systemSmall) widget: one metric, picked via Edit Widget.
 struct SingleMetricConfigIntent: WidgetConfigurationIntent {
     static let title: LocalizedStringResource = "Choose Metric"
-    static let description = IntentDescription("Pick which AGARA Health metric this widget shows.")
+    static let description = IntentDescription("Pick which AGARA Heart metric this widget shows.")
 
     @Parameter(title: "Metric", default: .activity)
     var metric: WidgetMetric
@@ -13,7 +13,7 @@ struct SingleMetricConfigIntent: WidgetConfigurationIntent {
 /// Configuration for the full-width (systemMedium) widget: two tiles side by side.
 struct DualMetricConfigIntent: WidgetConfigurationIntent {
     static let title: LocalizedStringResource = "Choose Metrics"
-    static let description = IntentDescription("Pick the left and right AGARA Health metrics.")
+    static let description = IntentDescription("Pick the left and right AGARA Heart metrics.")
 
     @Parameter(title: "Left Metric", default: .activity)
     var left: WidgetMetric

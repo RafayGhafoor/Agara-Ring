@@ -8,7 +8,7 @@
 		<string>com.pulseloop.coach.process</string>
 	</array>
 	<key>CFBundleDisplayName</key>
-	<string>AGARA Health</string>
+	<string>AGARA Heart</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>

@@ -13,7 +13,7 @@ enum CoachSummaryPromptBuilder {
             focus = "This card sits on the Sleep page for a multi-night range. Summarize the sleep trend (average duration, consistency, score) over the period."
         }
         return """
-        You write a short coach card for AGARA Health, a smart-ring health app, grounded in the user's own data.
+        You write a short coach card for AGARA Heart, a smart-ring health app, grounded in the user's own data.
 
         \(focus)
 
