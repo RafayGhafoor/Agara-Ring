@@ -85,6 +85,7 @@ struct MealAnalysisSheet: View {
         .fullScreenCover(isPresented: $showCamera) {
             CameraPicker { image = $0 }
                 .ignoresSafeArea()
+                .agaraRingEnvironment()
         }
         .photosPicker(isPresented: $showLibrary, selection: $photosItem, matching: .images)
         .onChange(of: photosItem) { _, item in

@@ -69,6 +69,25 @@ final class AutoMeasureAndParityTests: AgaraUITestCase {
         eventually(timeout: 20, "restore to 30 min not confirmed") { state(0) == "idle" && (again.value as? String) == "30 min" }
     }
 
+    /// Rebrand-measure spec item 1: "Live heart rate" sits at the top of Auto-measure, off by default, with its
+    /// one-line explanation.
+    func testLiveHeartRateToggleTopsAutoMeasureAndDefaultsOff() throws {
+        // The parity test persists `live_hr_toggle=off` as an override; pin the shipped `on` explicitly.
+        try launch(features: Self.allFeatures + ",live_hr_toggle=on")
+        waitForConnected()
+        openSettingsRow("Auto-measure")
+        let toggle = element("autoMeasure.liveHeartRate")
+        waitFor(toggle, timeout: 20, "Live heart rate toggle missing (flag live_hr_toggle)")
+        XCTAssertTrue(text(containing: "Streams your pulse continuously while connected").exists, "explanation missing")
+        let hr = app.buttons["autoMeasure.interval.0"]
+        if hr.waitForExistence(timeout: 30) {
+            XCTAssertLessThan(toggle.frame.minY, hr.frame.minY, "the toggle tops the screen")
+        }
+        let value = (app.switches["autoMeasure.liveHeartRate"].value as? String) ?? (toggle.value as? String) ?? ""
+        XCTAssertTrue(value == "0" || value.lowercased() == "off", "live HR should default off (value \(value))")
+        attachScreenshot("auto-measure-live-hr")
+    }
+
     // MARK: - Phase 5
 
     func testDataExportAboutAndProfileGlucoseUnit() throws {
@@ -92,7 +111,10 @@ final class AutoMeasureAndParityTests: AgaraUITestCase {
         waitFor(element("about.hero"), "About hero missing")
         let version = element("about.version")
         XCTAssertTrue(version.waitForExistence(timeout: 5))
-        XCTAssertTrue(anyElement(labelContains: "1.0.0 (1)").exists, "version from the bundle")
+        // The debug row is a button; its text can surface as the label or the value depending on the runtime.
+        let versionText = version.label + " " + ((version.value as? String) ?? "")
+        XCTAssertTrue(versionText.contains("1.0.0 (2)") || anyElement(labelContains: "1.0.0 (2)").exists,
+                      "version from the bundle (\(versionText))")
         for id in ["about.social.website", "about.social.instagram", "about.social.telegram",
                    "about.contact.email", "about.contact.phone", "about.licences"] {
             XCTAssertTrue(element(id).exists, "\(id) missing")
@@ -138,7 +160,7 @@ final class AutoMeasureAndParityTests: AgaraUITestCase {
         let history = text(containing: "BATTERY HISTORY")
         scrollTo(history)
         XCTAssertLessThan(alerts.frame.minY, history.frame.minY, "Low-battery alert comes before Battery history")
-        XCTAssertFalse(text(containing: "Live heart rate").exists, "live HR toggle is behind live_hr_toggle")
+        XCTAssertFalse(text(containing: "Live heart rate").exists, "the live HR toggle moved to Auto-measure")
         attachScreenshot("wearable-actions")
     }
 

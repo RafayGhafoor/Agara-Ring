@@ -88,7 +88,7 @@ struct SleepView: View {
         }
         .sensoryFeedback(.selection, trigger: dayOffset)
         .onChange(of: dayOffset) { _, newOffset in announceDay(newOffset) }
-        .sheet(isPresented: $showDayPicker) { dayPickerSheet }
+        .sheet(isPresented: $showDayPicker) { dayPickerSheet.agaraRingEnvironment() }
         .task(id: "\(range.rawValue)-\(dayOffset)") {
             guard coachEnabled else { return }
             if range == .day {

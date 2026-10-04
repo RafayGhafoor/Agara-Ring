@@ -85,8 +85,10 @@ struct SettingsView: View {
 
     /// Auto-measure is offered when the flag is on and the ring reported a schedule (or says it has one).
     private var showsAutoMeasure: Bool {
-        guard features.isOn(.autoMeasureSettings), let device = devices.first else { return false }
-        return !device.autoMeasureSchedule.isEmpty || device.ringCapabilities?.autoMeasure == true
+        guard let device = devices.first else { return false }
+        return AutoMeasure.showsSettingsRow(flagOn: features.isOn(.autoMeasureSettings),
+                                            schedule: device.autoMeasureSchedule,
+                                            supportsAutoMeasure: device.ringCapabilities?.autoMeasure == true)
     }
 
     /// User setup: profile (with the glucose unit), physiology (flag), appearance, the ring's auto-measure

@@ -155,7 +155,11 @@ final class ConsistencyPhase456Tests: XCTestCase {
     // MARK: - Phase 6: flags
 
     func testParityFlagsDefaultOffAndGroupOverrides() {
-        for flag in AgaraFeatureStore.parityFlags { XCTAssertFalse(flag.defaultOn, "\(flag) must ship off") }
+        // `live_hr_toggle` ships on since 2026-10-04 (rebrand-measure-1.0 spec item 1: the toggle defaults the stream off).
+        for flag in AgaraFeatureStore.parityFlags where flag != .liveHrToggle {
+            XCTAssertFalse(flag.defaultOn, "\(flag) must ship off")
+        }
+        XCTAssertTrue(AgaraFeature.liveHrToggle.defaultOn, "the live heart-rate toggle is offered in 1.0.0 (2)")
         let parity = AgaraFeatureStore.parse("parity=on")
         XCTAssertEqual(Set(parity.keys), Set(AgaraFeatureStore.parityFlags))
         let all = AgaraFeatureStore.parse("all=on,coach=off")

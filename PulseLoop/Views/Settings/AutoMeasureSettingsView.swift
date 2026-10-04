@@ -10,6 +10,8 @@ struct AutoMeasureSettingsView: View {
     @Environment(RingBLEClient.self) private var ble
     @Query private var devices: [Device]
     @State private var store = AutoMeasureStore.shared
+    @State private var features = AgaraFeatureStore.shared
+    @State private var livePrefs = VeepooLivePrefsStore.shared
 
     /// The ring's schedule: this session's latest report, else the one persisted on the device row.
     private var schedule: [AutoMeasureEntry] {
@@ -21,14 +23,12 @@ struct AutoMeasureSettingsView: View {
 
     private var connected: Bool { ble.state == .connected }
 
-    /// Whether the schedule row for a ring type code is shown (flags gate UI, never the ring's data).
+    /// The one-line explanation under the toggle (same wording as Android).
+    static let liveHeartRateExplanation = "Streams your pulse continuously while connected; uses more ring battery."
+
+    /// Whether the schedule row for a ring type code is shown — the rule lives in `AutoMeasure.isOffered`.
     static func isOffered(_ type: Int, isOn: (AgaraFeature) -> Bool) -> Bool {
-        switch type {
-        case 1: return isOn(.vitalsBp)
-        case 2: return isOn(.vitalsGlucose)
-        case 8: return isOn(.bloodComponents)
-        default: return true
-        }
+        AutoMeasure.isOffered(type, isOn: isOn)
     }
 
     var body: some View {
@@ -38,6 +38,13 @@ struct AutoMeasureSettingsView: View {
                     .font(AgaraFont.subheadline)
                     .foregroundStyle(AgaraColors.textSecondary)
                     .padding(.horizontal, 4)
+                // Spec item 1: the continuous `D0` stream, off by default (`ring_live_hr_default_on`), flag `live_hr_toggle`.
+                if features.isOn(.liveHrToggle) {
+                    SettingsGroup(footer: Self.liveHeartRateExplanation) {
+                        FormToggleRow(title: "Live heart rate", isOn: $livePrefs.liveHeartRateEnabled)
+                            .accessibilityIdentifier("autoMeasure.liveHeartRate")
+                    }
+                }
                 if !connected {
                     Label("Connect your ring to change these settings.", systemImage: "antenna.radiowaves.left.and.right.slash")
                         .font(AgaraFont.subheadline)

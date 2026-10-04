@@ -28,6 +28,7 @@ struct HelpTip: View {
         .popover(isPresented: $shown, arrowEdge: .top) {
             HelpBubbleText(text: text)
                 .presentationCompactAdaptation(.popover)
+                .agaraRingEnvironment()
         }
     }
 }
@@ -121,6 +122,7 @@ struct CoachMark: ViewModifier {
                     .accessibilityHint("Double-tap to dismiss")
                     .accessibilityIdentifier("coachMark.\(id)")
                     .presentationCompactAdaptation(.popover)
+                    .agaraRingEnvironment()
             }
             .onChange(of: shown) { _, now in
                 if !now { store.markSeen(id) }

@@ -109,9 +109,9 @@ struct VitalsView: View {
             // build) SwiftUI presents the queued sheet from the hub's `viewDidDisappear`, with an
             // environment that no longer carries the `.environment(_:)` objects set on the WindowGroup —
             // `MeasurementSheet`'s `@Environment(RingBLEClient.self)` then traps ("No Observable object of
-            // type RingBLEClient found"). That was the Mac "Measure → Heart rate" crash (2026-09-25).
-            .environment(ble)
-            .environment(coordinator)
+            // type RingBLEClient found"). That was the Mac "Measure → Heart rate" crash (2026-09-25). All four objects
+            // now come from the one holder (`AgaraRingEnvironment`), like every other presentation root.
+            .agaraRingEnvironment()
         })
     }
 

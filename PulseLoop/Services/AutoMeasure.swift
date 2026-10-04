@@ -19,16 +19,76 @@ enum AutoMeasure {
     static let setBodyLength = 42
     static let chunkLength = 17
 
-    /// Intervals the ring accepts for `entry`: multiples of its step from the step up to 4 h (the current value
-    /// is always included, so a ring set elsewhere to something unusual still shows it).
-    static func intervals(for entry: AutoMeasureEntry) -> [Int] {
-        let step = entry.stepMinutes
-        var values: [Int] = []
-        if step > 0 {
-            values = Array(stride(from: step, through: max(step, maxIntervalMinutes), by: step))
-        }
+    /// Intervals the ring accepts for `entry`: `acceptedIntervals` plus the current value (always included, so a
+    /// ring set elsewhere to something unusual still shows it).
+    static func intervals(for entry: AutoMeasureEntry,
+                          shortIntervals: String = AgaraConfig.Ring.autoMeasureShortIntervalsMinutes) -> [Int] {
+        var values = acceptedIntervals(for: entry, shortIntervals: shortIntervals)
         if entry.intervalMinutes > 0, !values.contains(entry.intervalMinutes) { values.append(entry.intervalMinutes) }
         return values.sorted()
+    }
+
+    /// What we offer for `entry` (spec item 4, `docs/process/plans/rebrand-measure-1.0.md`): the catalog's short
+    /// intervals (`ring_auto_measure_short_intervals_minutes`, filled only from what the real ring was probed to
+    /// accept) that are below the row's step, then the multiples of the step up to 4 h. An empty catalog value
+    /// leaves the step multiples only. Same rule as Android.
+    static func acceptedIntervals(for entry: AutoMeasureEntry,
+                                  shortIntervals: String = AgaraConfig.Ring.autoMeasureShortIntervalsMinutes) -> [Int] {
+        let step = entry.stepMinutes
+        guard step > 0 else { return [] }
+        let short = parseIntervals(shortIntervals).filter { $0 < step }
+        let multiples = Array(stride(from: step, through: max(step, maxIntervalMinutes), by: step))
+        return Array(Set(short + multiples)).sorted()
+    }
+
+    /// "5, 10,15" → [5, 10, 15]; blanks, non-numbers and values ≤ 0 are ignored.
+    static func parseIntervals(_ raw: String) -> [Int] {
+        raw.split(separator: ",").compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }.filter { $0 > 0 }
+    }
+
+    /// Whether the schedule row for a ring type code is shown (flags gate UI, never the ring's data): BP type 1,
+    /// glucose 2, blood components 8 stay hidden while their flag is off.
+    static func isOffered(_ type: Int, isOn: (AgaraFeature) -> Bool) -> Bool {
+        switch type {
+        case 1: return isOn(.vitalsBp)
+        case 2: return isOn(.vitalsGlucose)
+        case 8: return isOn(.bloodComponents)
+        default: return true
+        }
+    }
+
+    /// The Auto-measure row (Settings and the Wearable screen) shows when the ring reported a schedule **or**
+    /// merely supports auto-measure (spec item 2 — Android's `ringCaps.autoMeasure` rule).
+    static func showsSettingsRow(flagOn: Bool, schedule: [AutoMeasureEntry], supportsAutoMeasure: Bool) -> Bool {
+        flagOn && (!schedule.isEmpty || supportsAutoMeasure)
+    }
+
+    // MARK: Default schedule (spec item 3)
+
+    /// The default interval for `entry`: the smallest accepted value ≥ `defaultMinutes` (30; a SpO₂ row with
+    /// step 60 → 60). Nil when the row offers nothing.
+    static func defaultInterval(for entry: AutoMeasureEntry,
+                                defaultMinutes: Int = AgaraConfig.Ring.autoMeasureDefaultIntervalMinutes,
+                                shortIntervals: String = AgaraConfig.Ring.autoMeasureShortIntervalsMinutes) -> Int? {
+        let accepted = acceptedIntervals(for: entry, shortIntervals: shortIntervals)
+        return accepted.first { $0 >= defaultMinutes } ?? accepted.last
+    }
+
+    /// The writes that put a freshly read schedule on the defaults: every shown (flags), unlocked row that is not
+    /// already on + at its default interval becomes enabled at that interval, keeping its window.
+    static func defaultWrites(for entries: [AutoMeasureEntry], isOn: (AgaraFeature) -> Bool,
+                              defaultMinutes: Int = AgaraConfig.Ring.autoMeasureDefaultIntervalMinutes,
+                              shortIntervals: String = AgaraConfig.Ring.autoMeasureShortIntervalsMinutes) -> [AutoMeasureEntry] {
+        entries.sorted { $0.type < $1.type }.compactMap { entry in
+            guard isOffered(entry.type, isOn: isOn), !isLocked(entry),
+                  let target = defaultInterval(for: entry, defaultMinutes: defaultMinutes, shortIntervals: shortIntervals)
+            else { return nil }
+            if entry.enabled && entry.intervalMinutes == target { return nil }
+            var next = entry
+            next.enabled = true
+            next.intervalMinutes = target
+            return next
+        }
     }
 
     /// The row can't be changed: the ring marks the interval unmodifiable (Lorenz on ours), or a row stored
@@ -126,6 +186,28 @@ final class AutoMeasureStore {
 
     /// Sends the frames; returns false when no ring is connected. Set by the app (the coordinator).
     var sender: ((AutoMeasureEntry) -> Bool)?
+    /// The connected ring's identity (the per-ring history ledger key), for the once-per-ring defaults. Set by the app.
+    var ringAddress: (() -> String?)?
+    /// Feature-flag lookup for the defaults (which rows are shown). Injectable for tests.
+    var isFeatureOn: (AgaraFeature) -> Bool = { AgaraFeatureStore.isOn($0) }
+    /// Where the per-ring "defaults applied" marks live (like the other prefs). Injectable for tests.
+    var defaults: UserDefaults = .standard
+    /// Default writes still to send, one at a time (each waits for the previous one's read-back).
+    private(set) var pendingDefaults: [AutoMeasureEntry] = []
+
+    /// UserDefaults key holding the ring addresses whose schedule already got the defaults.
+    static let defaultsAppliedKey = "agara.autoMeasure.defaultsApplied.v1"
+
+    func defaultsApplied(for address: String) -> Bool {
+        (defaults.stringArray(forKey: Self.defaultsAppliedKey) ?? []).contains(address)
+    }
+
+    private func markDefaultsApplied(for address: String) {
+        var all = defaults.stringArray(forKey: Self.defaultsAppliedKey) ?? []
+        guard !all.contains(address) else { return }
+        all.append(address)
+        defaults.set(all, forKey: Self.defaultsAppliedKey)
+    }
     /// How long a write may wait for the ring's ack + read-back before it is reported as failed.
     var timeout: TimeInterval = 12
 
@@ -158,6 +240,7 @@ final class AutoMeasureStore {
             try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
             guard !Task.isCancelled else { return }
             self?.fail(type, "The ring didn't confirm the change.")
+            self?.sendNextDefault()   // a default the ring didn't confirm is not retried; the next one goes out
         }
     }
 
@@ -177,13 +260,36 @@ final class AutoMeasureStore {
                     fail(type, "The ring kept its previous setting.")
                 }
             }
+            applyDefaultsIfNeeded(entries)
+            sendNextDefault()
         case let .decodedPacket(.settingAck(commandId, ok)) where commandId == 0xB3 && !ok:
             for type in requested.keys where writes[type] == .saving { fail(type, "The ring refused the change.") }
+            sendNextDefault()   // a refused default is not retried (the mark is already stored); move on
         case let .deviceStateChanged(state, _) where state != .connected:
+            pendingDefaults = []
             for type in requested.keys where writes[type] == .saving { fail(type, "The ring disconnected.") }
         default:
             break
         }
+    }
+
+    /// Spec item 3: the first read-back from a ring with no "defaults applied" mark queues the default writes
+    /// (`AutoMeasure.defaultWrites`) and stores the mark, so the user's later changes are never overwritten. An
+    /// already-paired ring gets this once after the update (no mark yet) — intended.
+    private func applyDefaultsIfNeeded(_ entries: [AutoMeasureEntry]) {
+        guard let address = ringAddress?(), !address.isEmpty, !defaultsApplied(for: address) else { return }
+        markDefaultsApplied(for: address)
+        pendingDefaults = AutoMeasure.defaultWrites(for: entries, isOn: isFeatureOn)
+        #if DEBUG
+        E2ETrace.log("auto-measure defaults: \(pendingDefaults.map { "type \($0.type) every \($0.intervalMinutes) min" })")
+        #endif
+    }
+
+    /// One default write at a time (a read-back would fail a second write in flight): the next goes out once nothing
+    /// is saving — after the previous read-back, refusal or timeout. A disconnect drops the rest. Same as Android.
+    private func sendNextDefault() {
+        guard !pendingDefaults.isEmpty, !writes.values.contains(.saving) else { return }
+        set(pendingDefaults.removeFirst())
     }
 
     private func settle(_ type: Int) {

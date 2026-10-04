@@ -41,14 +41,14 @@ final class InfoPlistBrandingTests: XCTestCase {
         }
     }
 
-    func testDisplayNamesAndKeyPromptsSayAgaraRing() throws {
+    func testDisplayNamesAndKeyPromptsSayAgaraHealth() throws {
         for (bundle, plist) in try plists() {
-            XCTAssertEqual(plist["CFBundleDisplayName"] as? String, "Agara Ring", "\(bundle) display name")
+            XCTAssertEqual(plist["CFBundleDisplayName"] as? String, "AGARA Health", "\(bundle) display name")
         }
         let app = Bundle.main.infoDictionary ?? [:]
         XCTAssertEqual(app["NSBluetoothAlwaysUsageDescription"] as? String,
-                       "Agara Ring connects to your ring over Bluetooth to sync steps, sleep and vitals.")
+                       "AGARA Health connects to your ring over Bluetooth to sync steps, sleep and vitals.")
         XCTAssertEqual(app["NSLocalNetworkUsageDescription"] as? String,
-                       "Agara Ring connects to the AI model server you run on your own network, so coaching can happen without sending your health data to a cloud provider.")
+                       "AGARA Health connects to the AI model server you run on your own network, so coaching can happen without sending your health data to a cloud provider.")
     }
 }

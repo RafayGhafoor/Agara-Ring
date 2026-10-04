@@ -235,9 +235,11 @@ struct ActivityDetailView: View {
             }
             .sheet(isPresented: $editing) {
                 EditWorkoutSheet(session: session)
+                    .agaraRingEnvironment()
             }
             .sheet(isPresented: $presentingShare) {
                 ShareCardSheet(session: session)
+                    .agaraRingEnvironment()
             }
             .sheet(isPresented: $confirmingDelete) {
                 WorkoutEndSheet(
@@ -252,6 +254,7 @@ struct ActivityDetailView: View {
                     ActivityRecorderService.delete(session, context: modelContext)
                     dismiss()
                 }
+                .agaraRingEnvironment()
             }
         } else {
             EmptyStateView(title: "Workout not found", body: "This session is no longer in local storage.")
@@ -612,7 +615,7 @@ struct RecordLiveView: View {
             .sheet(isPresented: $confirmFinish) {
                 // Under a minute is a mis-tap, not a workout: offer to discard it rather than save a
                 // "0m" entry into today's list (Android matches, `WorkoutEndRules.minimumSeconds`).
-                if elapsed(session: session, now: AppClock.now) < 60 {
+                Group { if elapsed(session: session, now: AppClock.now) < 60 {
                     WorkoutEndSheet(
                         title: "Discard this workout?",
                         message: "It's under a minute — too short to count. Keep recording, or discard it.",
@@ -630,7 +633,8 @@ struct RecordLiveView: View {
                         confirmIcon: "flag.checkered",
                         destructive: false
                     ) { finish(session) }
-                }
+                } }
+                .agaraRingEnvironment()
             }
             .sheet(isPresented: $confirmDiscard) {
                 WorkoutEndSheet(
@@ -641,6 +645,7 @@ struct RecordLiveView: View {
                     confirmIcon: "trash",
                     destructive: true
                 ) { discard(session) }
+                .agaraRingEnvironment()
             }
         } else {
             EmptyStateView(title: "No active workout", body: "Start a workout from Activity.")

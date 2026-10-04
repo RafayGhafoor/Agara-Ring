@@ -23,6 +23,9 @@ enum AgaraConfig {
         static let measureTypicalSecondsStress: Int = 30
         static let measureTypicalSecondsGlucose: Int = 30
         static let measureTypicalSecondsBloodComponents: Int = 30
+        static let autoMeasureDefaultIntervalMinutes: Int = 30
+        static let autoMeasureShortIntervalsMinutes: String = ""
+        static let liveHrDefaultOn: Int = 0
         static let firmwareCheckUrl: String = "https://www.vphband.com:9001/api/Version/GetVersionForSport"
         static let firmwareMinBatteryPercent: Int = 40
         static let firmwareBlockAckTimeoutS: Int = 10
@@ -164,7 +167,7 @@ enum AgaraFeature: String, CaseIterable {
     case activityTrackingSettings = "activity_tracking_settings"
     /// Today/Vitals chart resolution setting (iOS only today).
     case chartResolutionSetting = "chart_resolution_setting"
-    /// Live heart-rate toggle on the Wearable screen (iOS only today).
+    /// Live heart-rate toggle (continuous D0 stream while connected) on the Auto-measure screen, both apps. Default state from `ring_live_hr_default_on` (off). Was off and iOS-only until 2026-10-04 — while hidden the stream still ran.
     case liveHrToggle = "live_hr_toggle"
     /// Workout share card (iOS only today).
     case shareCard = "share_card"
@@ -211,7 +214,7 @@ enum AgaraFeature: String, CaseIterable {
         case .hrZonesEditor: return false
         case .activityTrackingSettings: return false
         case .chartResolutionSetting: return false
-        case .liveHrToggle: return false
+        case .liveHrToggle: return true
         case .shareCard: return false
         case .staleWorkoutRecovery: return false
         case .activityTrendsYear: return false

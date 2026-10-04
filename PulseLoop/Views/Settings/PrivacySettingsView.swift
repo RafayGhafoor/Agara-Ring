@@ -103,7 +103,7 @@ struct PrivacySettingsView: View {
                 }
                 SettingsGroup(
                     header: "Delete my data",
-                    footer: "Removes everything Agara Ring stores on this phone, including sign-ins and keys, and unpairs your ring. Data already in Apple Health stays there."
+                    footer: "Removes everything AGARA Health stores on this phone, including sign-ins and keys, and unpairs your ring. Data already in Apple Health stays there."
                 ) {
                     actionRow("Delete all my data", systemImage: "trash.fill", tint: AgaraColors.danger) {
                         ask(ResetAction.deleteAll)

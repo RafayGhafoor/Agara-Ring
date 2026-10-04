@@ -7,7 +7,7 @@ enum FirmwareInstallText {
     static let confirmTitle = "Install firmware?"
 
     static func confirmBody(version: String, minBattery: Int) -> String {
-        "Firmware \(version) will be written to your Agara Ring. This takes several minutes.\n\n"
+        "Firmware \(version) will be written to your AGARA Health ring. This takes several minutes.\n\n"
             + "• Keep the ring on its charger, right next to the phone (battery at least \(minBattery) %).\n"
             + "• Keep the app open — the screen stays on until it finishes.\n"
             + "• The ring restarts when it's done.\n\n"
@@ -38,7 +38,7 @@ enum FirmwareInstallText {
         case .paused: return "The ring asked to wait a moment; it continues by itself."
         case .reconnecting: return "Keep the ring next to the phone. It continues where it stopped."
         case let .verifying(target): return "Waiting for the ring to restart and report \(target)."
-        case .succeeded: return "Your Agara Ring is running the new firmware."
+        case .succeeded: return "Your AGARA Health ring is running the new firmware."
         case .failed: return state.failureMessage ?? ""
         }
     }
@@ -171,6 +171,7 @@ private struct FirmwareInstallCover: ViewModifier {
             set: { presented in if !presented { controller.dismiss() } }
         )) {
             FirmwareInstallScreen()
+                .agaraRingEnvironment()
         }
     }
 }

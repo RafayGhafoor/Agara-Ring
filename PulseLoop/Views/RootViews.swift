@@ -180,7 +180,8 @@ struct RootAppView: View {
                 routeDeepLinkIfNeeded()
             }
             .navigationDestination(for: AppRoute.self) { route in
-                switch route {
+                // Every pushed screen re-injects the ring objects (see `AgaraRingEnvironment`).
+                Group { switch route {
                 case let .activityDetail(id):
                     ActivityDetailView(sessionId: id)
                 case let .metricDetail(metric):
@@ -258,7 +259,8 @@ struct RootAppView: View {
                     #else
                     EmptyView()
                     #endif
-                }
+                } }
+                .agaraRingEnvironment()
             }
         }
         .alert("Data store reset", isPresented: Binding(
@@ -277,11 +279,23 @@ struct RootAppView: View {
         // System mode: no override, so the OS setting flows down (and into `systemScheme`). Otherwise the
         // chosen theme's side drives the status bar and system controls.
         .preferredColorScheme(colorSchemeOverride)
-        .onChange(of: resolvedTheme.name, initial: true) { _, _ in
-            // The XCTest host keeps the shipped `.dark`; tests select themes themselves.
-            guard NSClassFromString("XCTestCase") == nil else { return }
-            ThemeStore.current = resolvedTheme
-        }
+        .onChange(of: resolvedTheme.name, initial: true) { _, _ in applyResolvedTheme() }
+        // Catch up on an OS light/dark change that happened while the app was not active.
+        .onChange(of: scenePhase) { _, phase in if phase == .active { applyResolvedTheme() } }
+    }
+
+    /// Follows the OS light/dark setting (System mode) — but only while the scene is active. When the app goes to the
+    /// background iOS snapshots it for the app switcher in *both* appearances, flipping `colorScheme`; applying that
+    /// flip swapped the theme and re-identified the whole stack (`.id(theme.name)`) in the middle of
+    /// `_performSystemSnapshotWithActions` — every presented sheet was torn down and every hosting controller rebuilt
+    /// during the snapshot. That is the path of the TestFlight 1.0.0 (1) crash (`EnvironmentBox.update` trap) and why
+    /// an open sheet vanished after a trip to the home screen (`BackgroundSnapshotTests`).
+    private func applyResolvedTheme() {
+        // The XCTest host keeps the shipped `.dark`; tests select themes themselves.
+        guard NSClassFromString("XCTestCase") == nil else { return }
+        guard ThemeApplyPolicy.shouldApply(scenePhase: scenePhase, current: ThemeStore.current.name,
+                                           resolved: resolvedTheme.name) else { return }
+        ThemeStore.current = resolvedTheme
     }
 
     private var resolvedTheme: AgaraTheme {
@@ -487,12 +501,19 @@ struct MainTabView: View {
                 onOpenMeal: { requestCoachRoute(.mealDetail($0)) }
             )
                 .presentationDragIndicator(.visible) // grabber ("pull tab") at the top of the sheet
-                // CoachView reads the coordinator; pass it explicitly (see the note on VitalsView's sheet —
-                // a sheet presented on the iPad/Mac idiom can lose the WindowGroup's environment objects).
-                .environment(coordinator)
+                // CoachView reads the coordinator; re-inject the ring objects (see `AgaraRingEnvironment`).
+                .agaraRingEnvironment()
         }
         .background(AgaraColors.background.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
+    }
+}
+
+/// When a resolved theme may replace the current one: only when it differs and the scene is active (see
+/// `RootAppView.applyResolvedTheme` — the background snapshot flips the OS appearance).
+enum ThemeApplyPolicy {
+    static func shouldApply(scenePhase: ScenePhase, current: String, resolved: String) -> Bool {
+        current != resolved && scenePhase == .active
     }
 }
 
@@ -567,12 +588,13 @@ struct AppHeader: View {
         let greeting = self.greeting
         // The brand lockup sits centred above the row, so it reads as the app's masthead and the
         // greeting/status below stay aligned with the rest of the screen's leading edge.
-        VStack(spacing: 6) {
+        // Height 22 / spacing 4 — the same as Android's `AppChrome` (22.dp / 4.dp).
+        VStack(spacing: 4) {
             // White type on dark themes, dark type on light ones (the orange A is the same).
             Image(ThemeStore.current.isLight ? "agara-wordmark-dark" : "agara-wordmark")
                 .resizable()
                 .scaledToFit()
-                .frame(height: 11)
+                .frame(height: 22)
                 .frame(maxWidth: .infinity, alignment: .center)
                 .accessibilityHidden(true)
         HStack(alignment: .center, spacing: 12) {

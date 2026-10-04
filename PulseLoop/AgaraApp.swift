@@ -146,7 +146,12 @@ struct AgaraApp: App {
         _bleClient = State(initialValue: client)
         _coordinator = State(initialValue: coordinator)
         _gpsRecorder = State(initialValue: gps)
-        _liveWorkout = State(initialValue: LiveWorkoutManager(coordinator: coordinator, gps: gps, context: container.mainContext))
+        let liveWorkout = LiveWorkoutManager(coordinator: coordinator, gps: gps, context: container.mainContext)
+        _liveWorkout = State(initialValue: liveWorkout)
+        // The one holder every presentation root re-injects from (`.agaraRingEnvironment()`), so no sheet, cover or
+        // background-snapshot rebuild can read `@Environment(X.self)` without the object (TestFlight 1.0.0 (1) crash).
+        AgaraRingEnvironment.current = AgaraRingEnvironment(ble: client, coordinator: coordinator, gps: gps,
+                                                            liveWorkout: liveWorkout)
 
         let subscriber = EventPersistenceSubscriber(context: container.mainContext)
         subscriber.keepEveryHeartRateSample = { [weak coordinator] in
@@ -209,6 +214,9 @@ struct AgaraApp: App {
         SyncProgress.shared.start()
         // Auto-measure writes (`b3 01`): the store tracks ack + read-back, the coordinator sends.
         AutoMeasureStore.shared.sender = { [coordinator] entry in coordinator.setAutoMeasure(entry) }
+        // The once-per-ring default schedule is keyed by the ring's identity ("virtual" for the emulator socket, as
+        // on Android).
+        AutoMeasureStore.shared.ringAddress = { [client] in client.connectionSource }
         AutoMeasureStore.shared.start()
         // Daily check-in notifications: route taps + register the background wake.
         UNUserNotificationCenter.current().delegate = notificationDelegate
@@ -223,10 +231,8 @@ struct AgaraApp: App {
             RootAppView()
                 // The default for every Text without its own font — Manrope, never SF Pro.
                 .font(AgaraFont.body)
-                .environment(bleClient)
-                .environment(coordinator)
-                .environment(gpsRecorder)
-                .environment(liveWorkout)
+                // All four ring objects, from the same holder every presentation root uses.
+                .agaraRingEnvironment()
                 .task {
                     // Off the launch path: the routine pass waits until the ring sync has had its head start.
                     guard !Self.isRunningUnitTests else { return }

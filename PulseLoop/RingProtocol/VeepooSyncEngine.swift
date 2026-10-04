@@ -63,6 +63,10 @@ final class VeepooSyncEngine: RingSyncEngine {
     /// Whether the continuous `D0 01` heart-rate test stream is held open (live HR mode). Managed by
     /// `reconcileLiveStream`, which follows `VeepooLivePrefsStore.liveHeartRateEnabled`.
     private var liveStreamStarted = false
+    /// The app itself holds the `D0` stream (a workout's HR or a spot HR test, `startHeartRate` /
+    /// `measureHeartRateSpot` until `stopHeartRate`). While set, `reconcileLiveStream` never sends `D0 00`, whatever
+    /// the live-HR preference says — that would kill the app's own stream. Same as Android's `appHeldStream`.
+    private var appHeldStream = false
     /// A SpO₂ / blood-pressure test holds the ring's optical sensor. The ring runs **one** test at a time:
     /// any `D0 01` while one is running switches it to heart rate and abandons the other — on the real ring
     /// the SpO₂ test ended itself (`80 02 02`) and the BP test froze at 40 %, both exactly when the poll tick
@@ -103,6 +107,9 @@ final class VeepooSyncEngine: RingSyncEngine {
     private var profile: UserProfileValues?
     /// Feature-flag lookup, injectable so tests can pin a flag without touching UserDefaults.
     var isFeatureOn: (AgaraFeature) -> Bool = { AgaraFeatureStore.isOn($0) }
+    /// The live heart-rate preference (`VeepooLivePrefsStore`), injectable for tests.
+    var wantsLiveHeartRate: () -> Bool = { VeepooLivePrefsStore.shared.liveHeartRateEnabled }
+    private var livePrefObserver: NSObjectProtocol?
 
     /// How many days of history the loop walks.
     ///
@@ -115,6 +122,18 @@ final class VeepooSyncEngine: RingSyncEngine {
         self.writer = writer
         self.decoder = decoder
         self.historyDays = historyDays
+        // Apply a live-HR toggle at once (off → `D0 00` once), not at the next 30 s poll tick.
+        livePrefObserver = NotificationCenter.default.addObserver(
+            forName: VeepooLivePrefsStore.didChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.liveHeartRatePreferenceChanged() }
+        }
+    }
+
+    /// The user flipped the live heart-rate preference: start or stop the `D0` stream now.
+    func liveHeartRatePreferenceChanged() {
+        guard authenticated else { return }
+        reconcileLiveStream()
     }
 
     // MARK: Link lifecycle
@@ -131,6 +150,7 @@ final class VeepooSyncEngine: RingSyncEngine {
         dayTotalBlocks = nil
         dayRecords = []
         liveStreamStarted = false
+        appHeldStream = false
         spotTestActive = false
         historyFinished = false
         historyInFlight = false
@@ -277,13 +297,14 @@ final class VeepooSyncEngine: RingSyncEngine {
     /// every poll tick so a settings change applies within ~30 s.
     private func reconcileLiveStream() {
         guard !historyInFlight, !spotTestActive, !FirmwareUpdateHold.active else { return }
-        let wantsLive = VeepooLivePrefsStore.shared.liveHeartRateEnabled
+        let wantsLive = wantsLiveHeartRate()
         if wantsLive, !liveStreamStarted, historyFinished {
             liveStreamStarted = true
             writer?.enqueue(VeepooEncoder.heartRateStart())
         } else if !wantsLive, liveStreamStarted {
             liveStreamStarted = false
-            writer?.enqueue(VeepooEncoder.heartRateStop())
+            // The app's own stream (workout / spot test) rides the same `D0`: leave it to the app's `stopHeartRate`.
+            if !appHeldStream { writer?.enqueue(VeepooEncoder.heartRateStop()) }
         } else if wantsLive, liveStreamStarted {
             // Re-assert the start every tick: the ring can end the test stream on its side (observed:
             // ~20 s of 1 Hz rows then silence while the link still stood), and once it has, the only
@@ -561,10 +582,12 @@ final class VeepooSyncEngine: RingSyncEngine {
     /// off them and decodes the D0/0x80/0x90 streams into live events. The Vitals screen drives the
     /// session (start on tap, stop when the reading lands) exactly like it does for other families.
     func startHeartRate() {
+        appHeldStream = true
         writer?.enqueue(VeepooEncoder.heartRateStart())
     }
 
     func stopHeartRate() {
+        appHeldStream = false
         writer?.enqueue(VeepooEncoder.heartRateStop())
         // `D0 00` ends whatever `D0` stream was open, the live one included; the tick restarts it.
         liveStreamStarted = false
@@ -575,6 +598,7 @@ final class VeepooSyncEngine: RingSyncEngine {
     /// (see `spotHeartRateActive`). Workout and live streams use `startHeartRate` and don't pause it.
     func measureHeartRateSpot() {
         spotHeartRateActive = true
+        appHeldStream = true
         writer?.enqueue(VeepooEncoder.heartRateStart())
     }
 

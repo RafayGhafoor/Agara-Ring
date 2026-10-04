@@ -209,9 +209,11 @@ struct DataExportSettingsView: View {
         .confirmAction($confirm)
         .sheet(item: $diagnosticsURL) { url in
             DiagnosticsShareSheet(items: [url])
+                .agaraRingEnvironment()
         }
         .sheet(item: $exportURL) { url in
             DiagnosticsShareSheet(items: [url])
+                .agaraRingEnvironment()
         }
         .fileImporter(isPresented: $showImporter, allowedContentTypes: [.json, .gzip, .data]) { result in
             guard case let .success(url) = result else { return }

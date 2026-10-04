@@ -152,6 +152,7 @@ struct LegalSettingsGroup: View {
             }
             .sheet(isPresented: $showingDisclaimer) {
                 WellnessDisclaimerView(onClose: { showingDisclaimer = false })
+                    .agaraRingEnvironment()
             }
         }
     }
