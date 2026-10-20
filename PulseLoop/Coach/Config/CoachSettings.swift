@@ -27,7 +27,7 @@ enum CoachProviderMode: String, Codable, CaseIterable, Identifiable {
         case .userOpenRouterKey: return "OpenRouter"
         case .userMiniMaxKey: return "MiniMax"
         case .localOpenAICompat: return "Local / self-hosted"
-        case .backendProxy: return "Backend proxy"
+        case .backendProxy: return CoachCopy.providerCloud
         }
     }
 }
@@ -328,6 +328,18 @@ final class CoachSettingsStore {
         } else {
             self.settings = .default
         }
+        #if DEBUG
+        // Test tooling (`-coachOn YES`): start with the coach switched on, so a UI test can reach the coach's own
+        // screens without walking Settings › AI Coach › Enable (which asks about check-ins on the way). Debug only.
+        if DebugLaunch.bool("coachOn"), !settings.coachMasterEnabled {
+            settings.coachMasterEnabled = true
+        }
+        // Test tooling (`-coachProvider offlineStub`): pin the provider so a UI test's turn is deterministic — the
+        // scripted answer needs no model and no network.
+        if let raw = DebugLaunch.string("coachProvider"), let mode = CoachProviderMode(rawValue: raw) {
+            settings.providerMode = mode
+        }
+        #endif
     }
 
     private func persist() {

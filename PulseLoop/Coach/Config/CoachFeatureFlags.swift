@@ -103,7 +103,9 @@ struct CoachFeatureFlags {
             let model = settings.resolvedLocalModel
             return model.isEmpty ? "Ready · self-hosted" : "Ready · \(model)"
         case .backendProxy:
-            return "Backend proxy not available yet."
+            // The cloud coach's real status is the tab's own state (see `CoachSettingsSection.statusLine`); this is the
+            // neutral fallback for any other caller of the flag summary.
+            return CoachCopy.providerCloud
         }
     }
 }

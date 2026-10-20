@@ -44,7 +44,7 @@ struct SettingsView: View {
             // map. Blank is legitimate (llama.cpp ignores the field), hence the fallback.
             return settings.resolvedLocalModel.isEmpty ? "Self-hosted" : settings.resolvedLocalModel
         case .backendProxy:
-            return "Backend proxy"
+            return CoachCopy.providerCloud
         }
     }
 
