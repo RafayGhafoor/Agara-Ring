@@ -904,6 +904,13 @@ final class CoachConversation {
     var totalInputTokens: Int = 0
     var totalOutputTokens: Int = 0
     var totalCostUSD: Double = 0
+    /// Rolling summary of the conversation, sent as the turn's `summary` so context older than the
+    /// replayed window is not lost (contract §6). Nil until the first refresh. Defaulted so the
+    /// SwiftData migration stays additive.
+    var rollingSummary: String? = nil
+    /// Answers already covered by `rollingSummary`. The summary is rebuilt once this falls
+    /// `AgaraConfig.Coach.summaryEveryTurns` answers behind (see `CoachRollingSummary`).
+    var summarizedAnswerCount: Int = 0
 
     init(id: UUID = UUID(), title: String = "Today check-in") {
         self.id = id
