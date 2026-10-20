@@ -38,6 +38,9 @@ final class CoachNudgePolicyTests: XCTestCase {
             var night_data_percent: Double?
             var baseline_nights: Int?
             var evening_stress_above_normal: Bool?
+            /// The canonical catalog's spelling of the same fact (`docs/config/coach_nudges_cases.json` was written by a
+            /// second agent in parallel). Both are accepted so neither vocabulary has to be rewritten by hand.
+            var stress_evening_above_normal: Bool?
             var evening_stress: Double?
             var baseline_evening_stress: Double?
             var steps_today: Int?
@@ -71,6 +74,7 @@ final class CoachNudgePolicyTests: XCTestCase {
             var category_last_sent: [String: String]?
             var category_last_severity: [String: Double]?
             var snoozed_until: [String: String]?
+            var notifications_enabled: Bool?
         }
         var id: String
         var why: String?
@@ -109,8 +113,9 @@ final class CoachNudgePolicyTests: XCTestCase {
         var signals = CoachSignals(now: now)
         let sleepGoalMinutes = (input.sleep_goal_hours ?? 8) * 60
         let baselineStress = input.baseline_evening_stress ?? 30
+        let aboveNormal = input.evening_stress_above_normal ?? input.stress_evening_above_normal
         let eveningStress = input.evening_stress
-            ?? (input.evening_stress_above_normal == true ? baselineStress + 10 : baselineStress)
+            ?? (aboveNormal == true ? baselineStress + 10 : baselineStress)
         let baselineRHR = 60.0
         let rhrDelta = input.rhr_delta_percent ?? 0
         let underGoal = input.sleep_under_goal_hours ?? 0
@@ -224,6 +229,8 @@ final class CoachNudgePolicyTests: XCTestCase {
     private func ledger(from input: Case.LedgerInput?, now: Date) -> NudgeLedger {
         var ledger = NudgeLedger()
         guard let input else { return ledger }
+        // Absent means "notifications are on": most cases are about the policy's other clauses.
+        ledger.notificationsEnabled = input.notifications_enabled ?? true
         for entry in input.sent_today ?? [] {
             guard let rule = NudgeRule(rawValue: entry.nudge) else { continue }
             ledger.sent.append(NudgeLedger.Sent(
@@ -317,9 +324,30 @@ final class CoachNudgePolicyTests: XCTestCase {
                 failures.append("\(testCase.id): emitted \(emitted), expected \(testCase.expect.emit)")
             }
             for (rule, reason) in testCase.expect.silent ?? [:] {
-                let actual = NudgeRule(rawValue: rule).flatMap { plan.silent[$0] }
-                if actual != reason {
-                    failures.append("\(testCase.id): silent[\(rule)] = \(actual ?? "nil"), expected \(reason)")
+                // The catalog distinguishes WHICH sink was silenced ("a1_push": the push was sunk, the card still
+                // shows) because that is what the user sees; the policy records the rule and its one reason. Compare
+                // on the rule, so both vocabularies describe the same behaviour instead of one rewriting 92 cases.
+                let key = NudgeRule(rawValue: rule)
+                    ?? NudgeRule(rawValue: rule.replacingOccurrences(of: "_push", with: "")
+                        .replacingOccurrences(of: "_card", with: ""))
+                guard let key else {
+                    failures.append("\(testCase.id): silent[\(rule)] is not a rule or a sink key")
+                    continue
+                }
+                // A "_push" key means the PUSH was sunk while the card may still show (notifications off, quiet hours,
+                // the daily limit); a "_card" key means the nudge itself produced nothing. Compare against what the plan
+                // actually delivers, so "notifications off" is proven by the absence of a push rather than by a label.
+                if rule.hasSuffix("_push") {
+                    let pushed = plan.delivered.contains { $0.rule == key && $0.delivery == .push }
+                    if pushed { failures.append("\(testCase.id): \(key.rawValue) was pushed, expected: \(reason)") }
+                } else if rule.hasSuffix("_card") {
+                    let shown = plan.delivered.contains { $0.rule == key }
+                    if shown { failures.append("\(testCase.id): \(key.rawValue) was delivered, expected: \(reason)") }
+                } else {
+                    let actual = plan.silent[key]
+                    if actual != reason {
+                        failures.append("\(testCase.id): silent[\(rule)] = \(actual ?? "nil"), expected \(reason)")
+                    }
                 }
             }
             if plan.pushCount != testCase.expect.push_count {

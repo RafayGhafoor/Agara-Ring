@@ -95,6 +95,10 @@ struct NudgeLedger: Equatable, Sendable {
     /// Routine pushes already spent today. Normally derived from `sent`; kept separately so a caller (or a policy
     /// case) can state the budget without inventing delivery rows that would also trip the 6-hour gap.
     var routinePushesToday: Int = 0
+    /// The OS notification permission (or the user's master switch). False = no push at all, but the nudge still
+    /// appears as a Today card and in the "For you" list (policy rule 10) — the card is the product, the push is the
+    /// interruption.
+    var notificationsEnabled: Bool = true
     /// Template id → last time it was shown, for the 7-day rotation.
     var templateLastUsed: [String: Date] = [:]
 

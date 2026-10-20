@@ -124,6 +124,14 @@ enum CoachNudgePolicy {
         let celebrationLimit = settings.celebrationExtra ? 1 : 0
 
         for nudge in gated {
+            // Notifications off (or not yet permitted): the nudge is still delivered — as a card — and consumes no push
+            // budget. Dropping it entirely would make "turn off notifications" mean "turn off the feature".
+            if nudge.delivery == .push, !ledger.notificationsEnabled {
+                var asCard = nudge
+                asCard.delivery = .card
+                plan.delivered.append(asCard)
+                continue
+            }
             if nudge.delivery == .push {
                 if nudge.isCelebration {
                     guard celebrations < celebrationLimit else {
