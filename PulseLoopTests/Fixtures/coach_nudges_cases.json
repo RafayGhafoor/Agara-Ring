@@ -291,69 +291,113 @@
       }
     },
     {
-      "id": "a3-good-to-go-morning-card",
-      "why": "Sleep at 90 percent of goal with resting HR and evening stress at baseline is A3, and A3 is a card.",
-      "now": "2026-10-20T07:30:00Z",
+      "id": "a1-third-signal-stress",
+      "why": "Two signals down can also be sleep plus last evening's stress, with resting HR at baseline: A1 does not require a heart-rate change.",
+      "now": "2026-10-21T07:30:00Z",
       "signals": {
         "rhr_delta_percent": 0,
-        "sleep_total_hours": 7.2,
-        "night_data_percent": 96,
+        "sleep_under_goal_hours": 2.4,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "stress_evening_above_normal": true
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [
+          "a1"
+        ],
+        "push_count": 1
+      }
+    },
+    {
+      "id": "a1-fires-exactly-at-threshold",
+      "why": "12% and 2.0 h are the thresholds themselves: the rule is at-or-beyond, so the boundary case fires.",
+      "now": "2026-10-21T07:30:00Z",
+      "signals": {
+        "rhr_delta_percent": 12,
+        "sleep_under_goal_hours": 2.0,
+        "night_data_percent": 95,
         "baseline_nights": 21
       },
       "ledger": {},
       "expect": {
         "emit": [
-          "a3"
+          "a1"
         ],
+        "push_count": 1
+      }
+    },
+    {
+      "id": "a1-silent-with-six-nights-even-with-thin-baseline",
+      "why": "Six nights of history: getting 6/7 of the way to a baseline is not enough, the recovery rules stay silent and Today says 'Learning your baseline'.",
+      "now": "2026-10-21T07:30:00Z",
+      "signals": {
+        "rhr_delta_percent": 30,
+        "sleep_under_goal_hours": 4.0,
+        "night_data_percent": 95,
+        "baseline_nights": 6
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [],
+        "silent": {
+          "a1": "learning the baseline"
+        },
         "push_count": 0
       }
     },
     {
-      "id": "a1-one-below-each-threshold",
-      "why": "Both readiness signals sit just under their thresholds: one signal is weather.",
-      "now": "2026-10-20T07:30:00Z",
+      "id": "a1-silent-on-thin-data-even-at-threshold",
+      "why": "79% of the night recorded is below the 80% floor: a mostly-unrecorded night is not judged even when the numbers look bad.",
+      "now": "2026-10-21T07:30:00Z",
       "signals": {
-        "rhr_delta_percent": 11,
-        "sleep_under_goal_hours": 1.9,
-        "night_data_percent": 95,
+        "rhr_delta_percent": 25,
+        "sleep_under_goal_hours": 3.0,
+        "night_data_percent": 79,
         "baseline_nights": 21
       },
       "ledger": {},
       "expect": {
         "emit": [],
         "silent": {
-          "a1": "only one signal down"
+          "a1": "night data below 80%"
         },
         "push_count": 0
       }
     },
     {
-      "id": "a1-rhr-alone-at-threshold",
-      "why": "Resting HR exactly at threshold is still only one signal down.",
-      "now": "2026-10-20T07:30:00Z",
+      "id": "a1-card-when-notifications-off",
+      "why": "With notifications off every nudge still appears as a Today card: A1 is delivered, it just does not push.",
+      "now": "2026-10-21T07:30:00Z",
       "signals": {
-        "rhr_delta_percent": 12,
-        "sleep_under_goal_hours": 0,
+        "rhr_delta_percent": 16,
+        "sleep_under_goal_hours": 2.2,
         "night_data_percent": 95,
         "baseline_nights": 21
       },
-      "ledger": {},
+      "ledger": {
+        "notifications_enabled": false
+      },
       "expect": {
-        "emit": [],
+        "emit": [
+          "a1"
+        ],
         "silent": {
-          "a1": "only one signal down"
+          "a1_push": "notifications off"
         },
         "push_count": 0
       }
     },
     {
-      "id": "a2-three-hours-forty-alone",
-      "why": "Under four hours with no other signal is A2, a card.",
-      "now": "2026-10-20T07:30:00Z",
+      "id": "a2-under-four-hours-alone",
+      "why": "3 h 40 is under the 4 h floor, so A2 fires on the short night alone with every other signal at baseline.",
+      "now": "2026-10-21T07:30:00Z",
       "signals": {
-        "sleep_total_hours": 3.67,
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 4.3,
         "night_data_percent": 95,
-        "baseline_nights": 21
+        "baseline_nights": 21,
+        "sleep_total_hours": 3.7
       },
       "ledger": {},
       "expect": {
@@ -364,14 +408,34 @@
       }
     },
     {
-      "id": "a2-absorbed-when-stress-is-also-up",
-      "why": "A very short night plus the evening's stress is two signals: A1 absorbs A2.",
-      "now": "2026-10-20T07:30:00Z",
+      "id": "a2-two-hours-under-goal-alone",
+      "why": "At exactly 2 h under goal with no other signal down, A2 is the card (A1 needs its second signal).",
+      "now": "2026-10-21T07:30:00Z",
       "signals": {
-        "sleep_total_hours": 3.5,
-        "evening_stress_above_normal": true,
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 2.0,
         "night_data_percent": 95,
-        "baseline_nights": 21
+        "baseline_nights": 21,
+        "sleep_total_hours": 6.0
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [
+          "a2"
+        ],
+        "push_count": 0
+      }
+    },
+    {
+      "id": "a2-silent-at-3h59-with-other-signals",
+      "why": "Just under 4 h but two signals down: A1 absorbs the short night, A2 does not also show.",
+      "now": "2026-10-21T07:30:00Z",
+      "signals": {
+        "rhr_delta_percent": 15,
+        "sleep_under_goal_hours": 4.05,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "sleep_total_hours": 3.95
       },
       "ledger": {},
       "expect": {
@@ -385,59 +449,1728 @@
       }
     },
     {
-      "id": "a1-sent-today-does-not-repeat",
-      "why": "A rule judged on last night fires once a day.",
-      "now": "2026-10-20T09:00:00Z",
+      "id": "a2-silent-on-thin-night",
+      "why": "A 3 h night with 55% coverage is a gap in the record, not a short night.",
+      "now": "2026-10-21T07:30:00Z",
       "signals": {
-        "rhr_delta_percent": 13,
-        "sleep_under_goal_hours": 2.5,
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 5.0,
+        "night_data_percent": 55,
+        "baseline_nights": 21,
+        "sleep_total_hours": 3.0
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [],
+        "silent": {
+          "a2": "night data below 80%"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "a2-suppressed-by-its-own-cooldown",
+      "why": "The short-night card was already shown 3 h ago with the same rounded numbers and nothing changed: no repeat inside the 6 h gap.",
+      "now": "2026-10-21T11:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 4.2,
         "night_data_percent": 95,
-        "baseline_nights": 21
+        "baseline_nights": 21,
+        "sleep_total_hours": 3.8
       },
       "ledger": {
         "sent_today": [
           {
-            "nudge": "a1",
-            "at": "2026-10-20T07:30:00Z"
+            "nudge": "a2",
+            "at": "2026-10-21T08:00:00Z"
+          }
+        ],
+        "category_last_sent": {
+          "recovery": "2026-10-21T08:00:00Z"
+        }
+      },
+      "expect": {
+        "emit": [],
+        "silent": {
+          "a2": "category cooldown 6h"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "a3-fires-when-everything-is-level",
+      "why": "Sleep at 95% of goal with resting HR and last evening's stress at or better than baseline: the green-light card.",
+      "now": "2026-10-21T07:30:00Z",
+      "signals": {
+        "rhr_delta_percent": -3,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "sleep_total_hours": 7.6,
+        "sleep_goal_hours": 8.0,
+        "sleep_goal_progress_percent": 95,
+        "stress_evening_above_normal": false
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [
+          "a3"
+        ],
+        "push_count": 0
+      }
+    },
+    {
+      "id": "a3-silent-just-under-the-sleep-floor",
+      "why": "89% of the sleep goal misses A3's 90% floor: no 'you're recovered' on an hour of shortfall.",
+      "now": "2026-10-21T07:30:00Z",
+      "signals": {
+        "rhr_delta_percent": -2,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "sleep_total_hours": 7.1,
+        "sleep_goal_hours": 8.0,
+        "sleep_goal_progress_percent": 89
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [],
+        "silent": {
+          "a3": "sleep at 89% of goal"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "a3-silent-when-stress-was-high",
+      "why": "Good sleep and good resting HR are not enough: elevated stress the evening before blocks the green light.",
+      "now": "2026-10-21T07:30:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "sleep_total_hours": 7.8,
+        "sleep_goal_hours": 8.0,
+        "sleep_goal_progress_percent": 97,
+        "stress_evening_above_normal": true
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [],
+        "silent": {
+          "a3": "evening stress above normal"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "a3-never-pushes",
+      "why": "A3 is a card by definition: telling someone they are fine does not earn a notification.",
+      "now": "2026-10-21T07:30:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "sleep_total_hours": 7.9,
+        "sleep_goal_hours": 8.0,
+        "sleep_goal_progress_percent": 99
+      },
+      "ledger": {
+        "notifications_enabled": true
+      },
+      "expect": {
+        "emit": [
+          "a3"
+        ],
+        "silent": {
+          "a3_push": "card only"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "b1-silent-before-the-check-time",
+      "why": "At 12:00 the afternoon has not started: B1 waits for its 15:00 check, so the user is not nagged while there is time.",
+      "now": "2026-10-21T12:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "steps_today": 1500,
+        "step_goal": 10000,
+        "awake": true,
+        "in_workout": false
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [],
+        "silent": {
+          "b1": "before the 15:00 check"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "b1-silent-exactly-at-quarter",
+      "why": "25% at the check time is not 'behind': the rule is below the fraction, so the boundary stays quiet.",
+      "now": "2026-10-21T15:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "steps_today": 2500,
+        "step_goal": 10000,
+        "awake": true,
+        "in_workout": false
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [],
+        "silent": {
+          "b1": "at or above 25% of goal"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "b1-silent-in-a-workout",
+      "why": "Under 25% but in the middle of a workout: the steps are coming, so no reminder.",
+      "now": "2026-10-21T15:10:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "steps_today": 900,
+        "step_goal": 10000,
+        "awake": true,
+        "in_workout": true
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [],
+        "silent": {
+          "b1": "in a workout"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "b1-silent-after-a-short-night",
+      "why": "A2 fired this morning, so activity stays silent for the rest of the day: recovery beats activity.",
+      "now": "2026-10-21T15:10:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "steps_today": 1200,
+        "step_goal": 10000,
+        "awake": true,
+        "in_workout": false
+      },
+      "ledger": {
+        "sent_today": [
+          {
+            "nudge": "a2",
+            "at": "2026-10-21T07:40:00Z"
           }
         ]
       },
       "expect": {
         "emit": [],
         "silent": {
-          "a1": "already sent today",
-          "a2": "absorbed by a1"
+          "b1": "recovery fired today"
         },
         "push_count": 0
       }
     },
     {
-      "id": "a3-one-percent-below-the-goal",
-      "why": "88 percent of the sleep goal is not A3.",
-      "now": "2026-10-20T07:30:00Z",
+      "id": "b1-silent-when-the-day-is-thin",
+      "why": "The ring only recorded 70% of the day so far: 'you are behind' could be a gap in the record, so nothing is sent.",
+      "now": "2026-10-21T15:10:00Z",
       "signals": {
-        "sleep_total_hours": 7.1,
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
         "night_data_percent": 95,
-        "baseline_nights": 21
+        "baseline_nights": 21,
+        "steps_today": 600,
+        "step_goal": 10000,
+        "day_data_percent": 70,
+        "awake": true,
+        "in_workout": false
       },
       "ledger": {},
       "expect": {
         "emit": [],
         "silent": {
-          "a3": "a signal is below baseline"
+          "b1": "day data below 80%"
         },
         "push_count": 0
       }
     },
     {
-      "id": "learning-baseline-never-nudges-recovery",
-      "why": "Below seven nights there is no baseline, so no recovery nudge.",
-      "now": "2026-10-20T07:30:00Z",
+      "id": "b1-dropped-in-quiet-hours",
+      "why": "A nudge that lands inside quiet hours is dropped, never saved for the morning: the 22:00 check window does not survive to 08:00.",
+      "now": "2026-10-21T22:30:00Z",
       "signals": {
-        "baseline_nights": 3,
-        "rhr_delta_percent": 40,
-        "sleep_under_goal_hours": 3,
-        "night_data_percent": 98
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "steps_today": 1800,
+        "step_goal": 10000,
+        "awake": true,
+        "in_workout": false
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [],
+        "silent": {
+          "b1": "quiet hours"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "b2-fires-in-the-band",
+      "why": "92% of the goal after 17:00 with quiet hours 3 h away: the card appears.",
+      "now": "2026-10-21T19:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "steps_today": 9200,
+        "step_goal": 10000,
+        "awake": true,
+        "in_workout": false
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [
+          "b2"
+        ],
+        "push_count": 0
+      }
+    },
+    {
+      "id": "b2-silent-at-84-percent",
+      "why": "84% is below the 85% band: too far to call it 'almost there'.",
+      "now": "2026-10-21T19:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "steps_today": 8400,
+        "step_goal": 10000,
+        "awake": true,
+        "in_workout": false
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [],
+        "silent": {
+          "b2": "outside the 85–99% band"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "b2-silent-before-17",
+      "why": "90% at 15:00 is not B2: earlier in the day there is time to close the ring without a reminder.",
+      "now": "2026-10-21T15:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "steps_today": 9000,
+        "step_goal": 10000,
+        "awake": true,
+        "in_workout": false
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [],
+        "silent": {
+          "b2": "before 17:00"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "b2-silent-exactly-at-the-buffer",
+      "why": "20:00 with quiet hours at 22:00 is exactly the 2 h buffer: the boundary is silent.",
+      "now": "2026-10-21T20:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "steps_today": 9600,
+        "step_goal": 10000,
+        "awake": true,
+        "in_workout": false
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [],
+        "silent": {
+          "b2": "quiet hours within the buffer"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "b2-not-now-pauses-the-category",
+      "why": "'Not now' on a B2 pauses the activity category until the next wake time, so the 09:00 card cannot return at 19:00.",
+      "now": "2026-10-21T19:30:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "steps_today": 9500,
+        "step_goal": 10000,
+        "awake": true,
+        "in_workout": false
+      },
+      "ledger": {
+        "snoozed_until": {
+          "activity": "2026-10-22T06:45:00Z"
+        }
+      },
+      "expect": {
+        "emit": [],
+        "silent": {
+          "b2": "category paused until wake"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "b3-fires-after-three-still-hours",
+      "why": "No 15-minute block with 250 steps in the last 180 minutes, awake and not training: one movement nudge.",
+      "now": "2026-10-21T14:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "steps_today": 4200,
+        "step_goal": 10000,
+        "awake": true,
+        "in_workout": false,
+        "minutes_since_active_block": 185
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [
+          "b3"
+        ],
+        "push_count": 1
+      }
+    },
+    {
+      "id": "b3-silent-at-the-window-edge",
+      "why": "An active block 179 minutes ago is inside the window: not still yet.",
+      "now": "2026-10-21T14:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "steps_today": 4200,
+        "step_goal": 10000,
+        "awake": true,
+        "in_workout": false,
+        "minutes_since_active_block": 179
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [],
+        "silent": {
+          "b3": "active within 180 min"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "b3-once-a-day",
+      "why": "B3 already fired at 11:20: a second still-stretch nudge the same day is exactly the nagging the rule avoids.",
+      "now": "2026-10-21T17:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "steps_today": 4600,
+        "step_goal": 10000,
+        "awake": true,
+        "in_workout": false,
+        "minutes_since_active_block": 200
+      },
+      "ledger": {
+        "sent_today": [
+          {
+            "nudge": "b3",
+            "at": "2026-10-21T11:20:00Z"
+          }
+        ]
+      },
+      "expect": {
+        "emit": [],
+        "silent": {
+          "b3": "already sent today"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "b3-silent-while-asleep",
+      "why": "Asleep at 02:00: no movement reminder, ever.",
+      "now": "2026-10-22T02:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "steps_today": 0,
+        "step_goal": 10000,
+        "awake": false,
+        "in_workout": false,
+        "minutes_since_active_block": 400
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [],
+        "silent": {
+          "b3": "asleep"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "b4-fires-once-only",
+      "why": "The goal was reached and celebrated at 16:10; a second B4 the same evening would be a duplicate of the same achievement.",
+      "now": "2026-10-21T20:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "steps_today": 10400,
+        "step_goal": 10000,
+        "awake": true,
+        "in_workout": false
+      },
+      "ledger": {
+        "celebration_sent_today": [
+          "b4"
+        ]
+      },
+      "expect": {
+        "emit": [],
+        "silent": {
+          "b4": "already celebrated today"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "b4-cancels-the-been-still-push",
+      "why": "Goal already reached: B4 wins the day and B3 stays silent even after three still hours.",
+      "now": "2026-10-21T20:30:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "steps_today": 10500,
+        "step_goal": 10000,
+        "awake": true,
+        "in_workout": false,
+        "minutes_since_active_block": 200
+      },
+      "ledger": {
+        "celebration_sent_today": [
+          "b4"
+        ]
+      },
+      "expect": {
+        "emit": [],
+        "silent": {
+          "b3": "goal reached"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "b4-survives-a-full-routine-day",
+      "why": "Two routine pushes were already used: the celebration still goes out because celebrations have their own slot.",
+      "now": "2026-10-21T18:30:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "steps_today": 10100,
+        "step_goal": 10000,
+        "awake": true,
+        "in_workout": false
+      },
+      "ledger": {
+        "routine_pushes_today": 2
+      },
+      "expect": {
+        "emit": [
+          "b4"
+        ],
+        "push_count": 1
+      }
+    },
+    {
+      "id": "c1-fires-on-own-percentile",
+      "why": "Stress at the user's 82nd percentile and at 64 for 70 minutes with only 120 steps: high for them, and they were not walking it off.",
+      "now": "2026-10-21T14:30:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "awake": true,
+        "stress_high_minutes": 70,
+        "stress_percentile_now": 82,
+        "stress_score_now": 64,
+        "steps_during_stress": 120
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [
+          "c1"
+        ],
+        "push_count": 1
+      }
+    },
+    {
+      "id": "c1-silent-below-the-absolute-floor",
+      "why": "The user's 80th percentile is 55 — below the absolute 60 floor, so a low-percentile user is not nudged about nothing.",
+      "now": "2026-10-21T14:30:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "awake": true,
+        "stress_high_minutes": 90,
+        "stress_percentile_now": 88,
+        "stress_score_now": 57,
+        "steps_during_stress": 60
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [],
+        "silent": {
+          "c1": "below the 60 floor"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "c1-silent-because-they-were-moving",
+      "why": "High stress by percentile for 70 minutes, but 640 steps in that time: the walking is the answer, no nudge needed.",
+      "now": "2026-10-21T14:30:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "awake": true,
+        "stress_high_minutes": 70,
+        "stress_percentile_now": 90,
+        "stress_score_now": 71,
+        "steps_during_stress": 640
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [],
+        "silent": {
+          "c1": "too many steps during the high stretch"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "c1-silent-before-an-hour",
+      "why": "55 minutes of high stress has not yet reached the 60-minute duration.",
+      "now": "2026-10-21T14:30:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "awake": true,
+        "stress_high_minutes": 55,
+        "stress_percentile_now": 91,
+        "stress_score_now": 70,
+        "steps_during_stress": 40
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [],
+        "silent": {
+          "c1": "duration below 60 min"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "c1-one-followup-only",
+      "why": "The follow-up went out 3 h later and stress is still high: a second follow-up is not allowed that day.",
+      "now": "2026-10-21T18:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "awake": true,
+        "stress_high_minutes": 80,
+        "stress_percentile_now": 92,
+        "stress_score_now": 74,
+        "steps_during_stress": 90
+      },
+      "ledger": {
+        "sent_today": [
+          {
+            "nudge": "c1",
+            "at": "2026-10-21T11:40:00Z"
+          },
+          {
+            "nudge": "c1",
+            "at": "2026-10-21T14:50:00Z",
+            "kind": "followup"
+          }
+        ]
+      },
+      "expect": {
+        "emit": [],
+        "silent": {
+          "c1": "follow-up already used today"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "c1-followup-allowed-after-three-hours",
+      "why": "One follow-up, 3 h after the first push, and only while stress is still high.",
+      "now": "2026-10-21T15:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "awake": true,
+        "stress_high_minutes": 75,
+        "stress_percentile_now": 94,
+        "stress_score_now": 77,
+        "steps_during_stress": 110
+      },
+      "ledger": {
+        "sent_today": [
+          {
+            "nudge": "c1",
+            "at": "2026-10-21T11:50:00Z"
+          }
+        ],
+        "category_last_sent": {
+          "stress": "2026-10-21T11:50:00Z"
+        }
+      },
+      "expect": {
+        "emit": [
+          "c1"
+        ],
+        "push_count": 1
+      }
+    },
+    {
+      "id": "e1-fires-on-three-drifted-nights",
+      "why": "Three of the last seven nights had a bedtime more than 2 h from the user's median: a pattern, worth one push a week.",
+      "now": "2026-10-21T09:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "drift_nights_last_7": 3,
+        "median_bedtime": "23:10",
+        "median_wake": "06:45"
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [
+          "e1"
+        ],
+        "push_count": 1
+      }
+    },
+    {
+      "id": "e1-silent-on-two-drifted-nights",
+      "why": "Two drifted nights out of seven is a normal week: E1 needs three.",
+      "now": "2026-10-21T09:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "drift_nights_last_7": 2
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [],
+        "silent": {
+          "e1": "only 2 drifted nights"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "e1-weekly-cooldown",
+      "why": "E1 went out five days ago: a drift is a pattern, and a pattern does not need a reminder every day.",
+      "now": "2026-10-21T09:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "drift_nights_last_7": 5
+      },
+      "ledger": {
+        "category_last_sent": {
+          "insight": "2026-10-16T09:00:00Z"
+        }
+      },
+      "expect": {
+        "emit": [],
+        "silent": {
+          "e1": "weekly cooldown"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "e1-silent-on-thin-sleep-history",
+      "why": "Only four nights recorded in the window: no median worth calling 'your usual'.",
+      "now": "2026-10-21T09:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "drift_nights_last_7": 3,
+        "nights_recorded_last_7": 4
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [],
+        "silent": {
+          "e1": "fewer than 5 recorded nights"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "e2-fires-on-a-real-trend",
+      "why": "Steps up 14% over the previous fortnight with 11 of 14 days above the earlier average: a trend, not one big day.",
+      "now": "2026-10-21T20:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "improvement_metric": "steps",
+        "improvement_percent": 14,
+        "days_above_previous": 11
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [
+          "e2"
+        ],
+        "push_count": 1
+      }
+    },
+    {
+      "id": "e2-silent-on-one-big-day",
+      "why": "Up 18% but only 7 of 14 days above the earlier average: one long walk is not progress.",
+      "now": "2026-10-21T20:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "improvement_metric": "steps",
+        "improvement_percent": 18,
+        "days_above_previous": 7
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [],
+        "silent": {
+          "e2": "only 7 of 14 days above the earlier average"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "e2-silent-under-ten-percent",
+      "why": "A 6% rise is inside normal week-to-week noise.",
+      "now": "2026-10-21T20:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "improvement_metric": "sleep",
+        "improvement_percent": 6,
+        "days_above_previous": 12
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [],
+        "silent": {
+          "e2": "below 10%"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "e2-per-metric-cooldown",
+      "why": "Steps were celebrated 9 days ago; the cooldown is 14 days per metric, so the same metric waits.",
+      "now": "2026-10-21T20:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "improvement_metric": "steps",
+        "improvement_percent": 15,
+        "days_above_previous": 12
+      },
+      "ledger": {
+        "metric_celebrated": {
+          "steps": "2026-10-12T20:00:00Z"
+        }
+      },
+      "expect": {
+        "emit": [],
+        "silent": {
+          "e2": "steps celebrated 9 days ago"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "e2-other-metric-not-blocked",
+      "why": "The steps cooldown does not block sleep: each metric has its own 14-day window.",
+      "now": "2026-10-21T20:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "improvement_metric": "sleep",
+        "improvement_percent": 13,
+        "days_above_previous": 10
+      },
+      "ledger": {
+        "metric_celebrated": {
+          "steps": "2026-10-12T20:00:00Z"
+        }
+      },
+      "expect": {
+        "emit": [
+          "e2"
+        ],
+        "push_count": 1
+      }
+    },
+    {
+      "id": "f1-fires-at-three",
+      "why": "Three days in a row is the first streak milestone.",
+      "now": "2026-10-21T20:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "streak_days": 3,
+        "steps_today": 10200,
+        "step_goal": 10000,
+        "awake": true
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [
+          "f1"
+        ],
+        "push_count": 1
+      }
+    },
+    {
+      "id": "f1-silent-at-four",
+      "why": "Four days is not a milestone: the next one is seven.",
+      "now": "2026-10-21T20:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "streak_days": 4,
+        "steps_today": 10300,
+        "step_goal": 10000,
+        "awake": true
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [],
+        "silent": {
+          "f1": "4 is not a milestone"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "f1-fires-at-thirty-then-every-thirty",
+      "why": "Thirty days fires, and the next milestone is sixty — so thirty-one stays quiet.",
+      "now": "2026-10-21T20:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "streak_days": 60,
+        "steps_today": 10100,
+        "step_goal": 10000,
+        "awake": true
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [
+          "f1"
+        ],
+        "push_count": 1
+      }
+    },
+    {
+      "id": "f1-silent-when-notifications-off-but-card-shows",
+      "why": "Notifications off does not hide a streak: it becomes a Today card and a line in the Coach 'For you' list.",
+      "now": "2026-10-21T20:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "streak_days": 7,
+        "steps_today": 10400,
+        "step_goal": 10000,
+        "awake": true
+      },
+      "ledger": {
+        "notifications_enabled": false
+      },
+      "expect": {
+        "emit": [
+          "f1"
+        ],
+        "silent": {
+          "f1_push": "notifications off"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "f2-fires-on-the-chosen-day",
+      "why": "Sunday 18:00 is the default review slot and six days of the week have good data: the review is built.",
+      "now": "2026-10-25T18:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "good_days_last_7": 6
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [
+          "f2"
+        ],
+        "push_count": 1
+      }
+    },
+    {
+      "id": "f2-silent-off-schedule",
+      "why": "Wednesday is not the review day: one push and one card a week, on the user's chosen slot.",
+      "now": "2026-10-21T18:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "good_days_last_7": 7
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [],
+        "silent": {
+          "f2": "not the chosen day"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "f2-silent-on-a-gappy-week",
+      "why": "Four days of good data is below the five-day floor: the review is skipped rather than built from gaps.",
+      "now": "2026-10-25T18:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "good_days_last_7": 4
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [],
+        "silent": {
+          "f2": "fewer than 5 good days"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "f2-recommendation-keep-it-up",
+      "why": "Nothing needs fixing this week: the scored recommendation list is empty and the review says keep it up rather than inventing advice.",
+      "now": "2026-10-25T18:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "good_days_last_7": 7,
+        "recommendation_candidates": []
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [
+          "f2"
+        ],
+        "silent": {
+          "f2_recommendation": "keep it up"
+        },
+        "push_count": 1
+      }
+    },
+    {
+      "id": "g1-fires-after-a-day-without-sync",
+      "why": "A paired ring with no sync for 27 hours: one push a day, and its button opens the ring screen.",
+      "now": "2026-10-21T10:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "ring_paired": true,
+        "hours_since_sync": 27
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [
+          "g1"
+        ],
+        "push_count": 1
+      }
+    },
+    {
+      "id": "g1-silent-while-syncing",
+      "why": "No sync for 3 hours is normal between check-ins.",
+      "now": "2026-10-21T10:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "ring_paired": true,
+        "hours_since_sync": 3
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [],
+        "silent": {
+          "g1": "synced recently"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "g1-silent-without-a-ring",
+      "why": "No ring is paired: there is nothing to reconnect, so G1 is not the right nudge.",
+      "now": "2026-10-21T10:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "ring_paired": false,
+        "hours_since_sync": 48
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [],
+        "silent": {
+          "g1": "no ring paired"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "g1-once-a-day",
+      "why": "G1 already fired at 09:00 and the ring is still out of touch: waiting a day beats a push every hour.",
+      "now": "2026-10-21T16:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "ring_paired": true,
+        "hours_since_sync": 33
+      },
+      "ledger": {
+        "sent_today": [
+          {
+            "nudge": "g1",
+            "at": "2026-10-21T09:00:00Z"
+          }
+        ]
+      },
+      "expect": {
+        "emit": [],
+        "silent": {
+          "g1": "already sent today"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "policy-daily-limit-two-routine",
+      "why": "Two routine pushes are already out and a third topic is eligible: the limit wins, and the third waits for tomorrow.",
+      "now": "2026-10-21T16:30:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "steps_today": 1000,
+        "step_goal": 10000,
+        "awake": true,
+        "in_workout": false,
+        "stress_high_minutes": 70,
+        "stress_percentile_now": 90,
+        "stress_score_now": 70,
+        "steps_during_stress": 50
+      },
+      "ledger": {
+        "routine_pushes_today": 2
+      },
+      "expect": {
+        "emit": [],
+        "silent": {
+          "b1": "routine daily limit reached",
+          "c1": "routine daily limit reached"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "policy-user-limit-of-one",
+      "why": "The user chose the smallest limit (1): the second routine push of the day is held even though it is eligible.",
+      "now": "2026-10-21T16:30:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "steps_today": 900,
+        "step_goal": 10000,
+        "awake": true,
+        "in_workout": false
+      },
+      "ledger": {
+        "routine_pushes_today": 1,
+        "daily_limit": 1
+      },
+      "expect": {
+        "emit": [],
+        "silent": {
+          "b1": "user limit of 1 reached"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "policy-user-limit-of-three",
+      "why": "The user chose the largest limit (3): a third routine push is allowed.",
+      "now": "2026-10-21T16:30:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "steps_today": 900,
+        "step_goal": 10000,
+        "awake": true,
+        "in_workout": false
+      },
+      "ledger": {
+        "routine_pushes_today": 2,
+        "daily_limit": 3
+      },
+      "expect": {
+        "emit": [
+          "b1"
+        ],
+        "push_count": 1
+      }
+    },
+    {
+      "id": "policy-priority-recovery-first",
+      "why": "Recovery outranks activity when both are eligible at the same instant: A1 is delivered first and B1 waits.",
+      "now": "2026-10-21T15:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 18,
+        "sleep_under_goal_hours": 2.8,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "steps_today": 900,
+        "step_goal": 10000,
+        "awake": true,
+        "in_workout": false
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [
+          "a1"
+        ],
+        "silent": {
+          "b1": "recovery outranks activity"
+        },
+        "push_count": 1
+      }
+    },
+    {
+      "id": "policy-priority-stress-over-goal",
+      "why": "Stress outranks activity: with both eligible, C1 is the one delivered.",
+      "now": "2026-10-21T15:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "steps_today": 1200,
+        "step_goal": 10000,
+        "awake": true,
+        "in_workout": false,
+        "stress_high_minutes": 80,
+        "stress_percentile_now": 93,
+        "stress_score_now": 75,
+        "steps_during_stress": 40
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [
+          "c1"
+        ],
+        "silent": {
+          "b1": "stress outranks activity"
+        },
+        "push_count": 1
+      }
+    },
+    {
+      "id": "policy-merge-a1-absorbs-a2",
+      "why": "Related nudges merge: the same morning produces one recovery message, not two.",
+      "now": "2026-10-21T07:30:00Z",
+      "signals": {
+        "rhr_delta_percent": 20,
+        "sleep_under_goal_hours": 4.8,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "sleep_total_hours": 3.2
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [
+          "a1"
+        ],
+        "silent": {
+          "a2": "absorbed by a1"
+        },
+        "push_count": 1
+      }
+    },
+    {
+      "id": "policy-merge-b4-cancels-activity",
+      "why": "Goal reached merges the activity nudges: B1 and B2 are cancelled for the rest of the day, B4 is the one message.",
+      "now": "2026-10-21T18:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "steps_today": 10800,
+        "step_goal": 10000,
+        "awake": true,
+        "in_workout": false
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [
+          "b4"
+        ],
+        "silent": {
+          "b1": "goal reached",
+          "b2": "goal reached"
+        },
+        "push_count": 1
+      }
+    },
+    {
+      "id": "policy-fingerprint-after-rounding",
+      "why": "The fingerprint comes from the rounded numbers, so 1,204 steps and 1,196 steps are the same fingerprint and the second is not sent.",
+      "now": "2026-10-21T18:20:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "steps_today": 1196,
+        "step_goal": 10000,
+        "awake": true,
+        "in_workout": false
+      },
+      "ledger": {
+        "fingerprints_today": [
+          "b1:88"
+        ]
+      },
+      "expect": {
+        "emit": [],
+        "silent": {
+          "b1": "duplicate fingerprint today"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "policy-fingerprint-changes-with-the-number",
+      "why": "A materially different number is new information: 1,900 steps is a different fingerprint and may be sent once the gap allows.",
+      "now": "2026-10-21T20:10:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "steps_today": 1900,
+        "step_goal": 10000,
+        "awake": true,
+        "in_workout": false
+      },
+      "ledger": {
+        "fingerprints_today": [
+          "b1:81"
+        ],
+        "category_last_sent": {
+          "activity": "2026-10-21T15:00:00Z"
+        }
+      },
+      "expect": {
+        "emit": [
+          "b1"
+        ],
+        "silent": {
+          "b1_fingerprint": "b1:81 was the old numbers"
+        },
+        "push_count": 1
+      }
+    },
+    {
+      "id": "policy-cooldown-six-hours",
+      "why": "The same topic 2 h after a push, no worse: the 6 h gap holds it back.",
+      "now": "2026-10-21T17:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "steps_today": 1100,
+        "step_goal": 10000,
+        "awake": true,
+        "in_workout": false
+      },
+      "ledger": {
+        "category_last_sent": {
+          "activity": "2026-10-21T15:00:00Z"
+        }
+      },
+      "expect": {
+        "emit": [],
+        "silent": {
+          "b1": "inside the 6h category gap"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "policy-cooldown-broken-when-materially-worse",
+      "why": "The gap can be broken only by getting materially worse: 400 steps at 17:30 after 2,200 at 15:00 does not qualify, doubt is resolved by staying silent.",
+      "now": "2026-10-21T17:30:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "steps_today": 400,
+        "step_goal": 10000,
+        "awake": true,
+        "in_workout": false,
+        "previous_fingerprint_value": 2200
+      },
+      "ledger": {
+        "category_last_sent": {
+          "activity": "2026-10-21T15:00:00Z"
+        }
+      },
+      "expect": {
+        "emit": [],
+        "silent": {
+          "b1": "inside the 6h gap and not materially worse"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "policy-dismissal-ladder-doubles-twice",
+      "why": "Six activity dismissals in seven days take the ladder to 24 h: an eligible B1 inside that gap stays silent.",
+      "now": "2026-10-21T16:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "steps_today": 1500,
+        "step_goal": 10000,
+        "awake": true,
+        "in_workout": false
+      },
+      "ledger": {
+        "category_dismissals_7d": {
+          "activity": 6
+        },
+        "category_last_sent": {
+          "activity": "2026-10-20T20:00:00Z"
+        }
+      },
+      "expect": {
+        "emit": [],
+        "silent": {
+          "b1": "category gap widened to 24h"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "policy-any-tap-resets-the-ladder",
+      "why": "One tap on an activity nudge resets the ladder: the next eligible B1 goes out at the plain 6 h gap.",
+      "now": "2026-10-21T16:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "steps_today": 1500,
+        "step_goal": 10000,
+        "awake": true,
+        "in_workout": false
+      },
+      "ledger": {
+        "category_dismissals_7d": {
+          "activity": 0
+        },
+        "category_last_sent": {
+          "activity": "2026-10-21T08:00:00Z"
+        }
+      },
+      "expect": {
+        "emit": [
+          "b1"
+        ],
+        "push_count": 1
+      }
+    },
+    {
+      "id": "policy-quiet-hours-follow-sleep",
+      "why": "'Follow my sleep' moves quiet hours to 23:40–07:10: a 23:50 nudge is dropped by the user's own schedule, not the 22:00 default.",
+      "now": "2026-10-21T23:50:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "steps_today": 2000,
+        "step_goal": 10000,
+        "awake": true,
+        "in_workout": false,
+        "quiet_start": "23:40",
+        "quiet_end": "07:10"
+      },
+      "ledger": {},
+      "expect": {
+        "emit": [],
+        "silent": {
+          "b1": "quiet hours (follow my sleep)"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "policy-quiet-hours-never-saved",
+      "why": "A nudge dropped in quiet hours leaves no fingerprint and no queue entry: nothing arrives at 08:00.",
+      "now": "2026-10-21T23:30:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "steps_today": 2000,
+        "step_goal": 10000,
+        "awake": true,
+        "in_workout": false,
+        "streak_days": 7
+      },
+      "ledger": {
+        "quiet_hours": [
+          "22:00",
+          "08:00"
+        ]
+      },
+      "expect": {
+        "emit": [],
+        "silent": {
+          "f1": "quiet hours",
+          "b1": "quiet hours"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "policy-recovery-then-activity-full-day",
+      "why": "Recovery fired at 07:30, so the whole day stays activity-free even at 15:00 with 800 steps.",
+      "now": "2026-10-21T15:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 14,
+        "sleep_under_goal_hours": 2.6,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "steps_today": 800,
+        "step_goal": 10000,
+        "awake": true,
+        "in_workout": false
+      },
+      "ledger": {
+        "sent_today": [
+          {
+            "nudge": "a1",
+            "at": "2026-10-21T07:30:00Z"
+          }
+        ]
+      },
+      "expect": {
+        "emit": [],
+        "silent": {
+          "b1": "recovery fired today",
+          "b2": "recovery fired today",
+          "b3": "recovery fired today"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "policy-celebration-off-obeys-the-limit",
+      "why": "With the celebration extra turned off, a celebration push counts against the routine limit and the limit is used up.",
+      "now": "2026-10-21T20:00:00Z",
+      "signals": {
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
+        "night_data_percent": 95,
+        "baseline_nights": 21,
+        "streak_days": 14,
+        "steps_today": 10300,
+        "step_goal": 10000,
+        "awake": true
+      },
+      "ledger": {
+        "routine_pushes_today": 2,
+        "celebration_extra": "off"
+      },
+      "expect": {
+        "emit": [],
+        "silent": {
+          "f1": "celebrations share the routine limit"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "policy-notifications-off-keeps-the-list",
+      "why": "Notifications off: nothing is pushed, but A1 is still a Today card and sits in the Coach 'For you' list.",
+      "now": "2026-10-21T07:30:00Z",
+      "signals": {
+        "rhr_delta_percent": 15,
+        "sleep_under_goal_hours": 2.5,
+        "night_data_percent": 95,
+        "baseline_nights": 21
+      },
+      "ledger": {
+        "notifications_enabled": false
+      },
+      "expect": {
+        "emit": [
+          "a1"
+        ],
+        "silent": {
+          "a1_push": "notifications off"
+        },
+        "push_count": 0
+      }
+    },
+    {
+      "id": "policy-learning-baseline-suppresses-everything-recovery",
+      "why": "Five nights recorded: 'Learning your baseline' is shown and A1, A2 and A3 are all silent.",
+      "now": "2026-10-21T07:30:00Z",
+      "signals": {
+        "rhr_delta_percent": 25,
+        "sleep_under_goal_hours": 5.0,
+        "night_data_percent": 95,
+        "baseline_nights": 5,
+        "sleep_total_hours": 3.0,
+        "sleep_goal_progress_percent": 40
       },
       "ledger": {},
       "expect": {
@@ -451,1018 +2184,89 @@
       }
     },
     {
-      "id": "thin-night-sends-nothing",
-      "why": "60 percent of the night recorded is under the data floor.",
-      "now": "2026-10-20T07:30:00Z",
+      "id": "policy-no-vitals-alarm",
+      "why": "A resting HR 40% above baseline is still a wellness comparison: no vitals alarm fires and the wording stays comparative.",
+      "now": "2026-10-21T07:30:00Z",
       "signals": {
         "rhr_delta_percent": 40,
-        "sleep_under_goal_hours": 3,
-        "night_data_percent": 60,
+        "sleep_under_goal_hours": 0.2,
+        "night_data_percent": 99,
         "baseline_nights": 21
       },
       "ledger": {},
       "expect": {
         "emit": [],
         "silent": {
-          "a1": "night data below 80%"
+          "a1": "only one signal down; no vitals alarm exists"
         },
         "push_count": 0
       }
     },
     {
-      "id": "b1-at-the-quarter-mark",
-      "why": "Exactly 25 percent is not 'below a quarter'.",
-      "now": "2026-10-20T15:00:00Z",
+      "id": "policy-goal-change-needs-confirmation",
+      "why": "The 'Lighter today' action is only offered as a button on A1/A2 and never applied by itself: with neither fired, the goal is untouched.",
+      "now": "2026-10-21T15:00:00Z",
       "signals": {
-        "rhr_delta_percent": 20,
-        "steps_today": 2500,
-        "step_goal": 10000,
-        "awake": true
-      },
-      "ledger": {},
-      "expect": {
-        "emit": [],
-        "silent": {
-          "b1": "not below a quarter of the goal"
-        },
-        "push_count": 0
-      }
-    },
-    {
-      "id": "b1-before-the-check-time",
-      "why": "B1 waits for its check time.",
-      "now": "2026-10-20T14:59:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "steps_today": 100,
-        "step_goal": 10000,
-        "awake": true
-      },
-      "ledger": {},
-      "expect": {
-        "emit": [],
-        "silent": {
-          "b1": "before the check time"
-        },
-        "push_count": 0
-      }
-    },
-    {
-      "id": "b1-inside-the-six-hour-gap",
-      "why": "The same category cannot repeat inside the 6-hour gap.",
-      "now": "2026-10-20T15:10:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "steps_today": 1800,
-        "step_goal": 10000,
-        "awake": true
-      },
-      "ledger": {
-        "category_last_sent": {
-          "activity": "2026-10-20T12:00:00Z"
-        }
-      },
-      "expect": {
-        "emit": [],
-        "silent": {
-          "b1": "inside the 6h gap"
-        },
-        "push_count": 0
-      }
-    },
-    {
-      "id": "b1-materially-worse-breaks-the-gap",
-      "why": "A materially worse reading may speak inside the gap.",
-      "now": "2026-10-20T15:10:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "steps_today": 500,
-        "step_goal": 10000,
-        "awake": true
-      },
-      "ledger": {
-        "category_last_sent": {
-          "activity": "2026-10-20T12:00:00Z"
-        },
-        "category_last_severity": {
-          "activity": 50
-        }
-      },
-      "expect": {
-        "emit": [
-          "b1"
-        ],
-        "push_count": 1
-      }
-    },
-    {
-      "id": "b2-at-eighty-seven-percent",
-      "why": "85-99 percent after 17:00 is B2, a card.",
-      "now": "2026-10-20T17:30:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "steps_today": 8700,
-        "step_goal": 10000,
-        "awake": true
-      },
-      "ledger": {},
-      "expect": {
-        "emit": [
-          "b2"
-        ],
-        "push_count": 0
-      }
-    },
-    {
-      "id": "b2-one-percent-below-the-band",
-      "why": "84 percent is not almost there.",
-      "now": "2026-10-20T17:30:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "steps_today": 8400,
-        "step_goal": 10000,
-        "awake": true
-      },
-      "ledger": {},
-      "expect": {
-        "emit": [],
-        "silent": {
-          "b2": "outside the almost-there band"
-        },
-        "push_count": 0
-      }
-    },
-    {
-      "id": "b2-quiet-buffer-boundary",
-      "why": "Exactly two hours before quiet hours still counts.",
-      "now": "2026-10-20T20:00:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "steps_today": 9000,
-        "step_goal": 10000,
-        "awake": true
-      },
-      "ledger": {},
-      "expect": {
-        "emit": [
-          "b2"
-        ],
-        "push_count": 0
-      }
-    },
-    {
-      "id": "b2-one-minute-inside-the-buffer",
-      "why": "One minute inside the buffer is already noise.",
-      "now": "2026-10-20T20:01:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "steps_today": 9000,
-        "step_goal": 10000,
-        "awake": true
-      },
-      "ledger": {},
-      "expect": {
-        "emit": [],
-        "silent": {
-          "b2": "quiet hours within the buffer"
-        },
-        "push_count": 0
-      }
-    },
-    {
-      "id": "b4-card-at-goal",
-      "why": "Goal reached is the Today card, and it cancels B1 for the day.",
-      "now": "2026-10-20T18:00:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "steps_today": 10050,
-        "step_goal": 10000,
-        "awake": true
-      },
-      "ledger": {},
-      "expect": {
-        "emit": [
-          "b4"
-        ],
-        "silent": {
-          "b1": "goal reached"
-        },
-        "push_count": 0
-      }
-    },
-    {
-      "id": "b4-silent-one-step-short",
-      "why": "99.99 percent is not the goal.",
-      "now": "2026-10-20T18:00:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "steps_today": 9999,
-        "step_goal": 10000,
-        "awake": true
-      },
-      "ledger": {},
-      "expect": {
-        "emit": [],
-        "silent": {
-          "b4": "goal not reached",
-          "b2": "outside the almost-there band"
-        },
-        "push_count": 0
-      }
-    },
-    {
-      "id": "f1-three-day-streak",
-      "why": "A three-day streak is a celebration push and absorbs B4.",
-      "now": "2026-10-20T20:00:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "steps_today": 10200,
-        "step_goal": 10000,
-        "awake": true,
-        "streak_days": 3
-      },
-      "ledger": {},
-      "expect": {
-        "emit": [
-          "f1"
-        ],
-        "silent": {
-          "b4": "absorbed by f1"
-        },
-        "push_count": 1
-      }
-    },
-    {
-      "id": "f1-off-milestone",
-      "why": "Four days is not a listed milestone, so B4 speaks instead.",
-      "now": "2026-10-20T20:00:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "steps_today": 10200,
-        "step_goal": 10000,
-        "awake": true,
-        "streak_days": 4
-      },
-      "ledger": {},
-      "expect": {
-        "emit": [
-          "b4"
-        ],
-        "silent": {
-          "f1": "no streak milestone today"
-        },
-        "push_count": 0
-      }
-    },
-    {
-      "id": "f1-repeat-after-thirty",
-      "why": "After 30 the streak repeats every 30 days.",
-      "now": "2026-10-20T20:00:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "steps_today": 10200,
-        "step_goal": 10000,
-        "awake": true,
-        "streak_days": 60
-      },
-      "ledger": {},
-      "expect": {
-        "emit": [
-          "f1"
-        ],
-        "push_count": 1
-      }
-    },
-    {
-      "id": "celebration-extra-off",
-      "why": "With the celebration push off, F1 is suppressed and B4 still lands as a card.",
-      "now": "2026-10-20T20:00:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "steps_today": 10200,
-        "step_goal": 10000,
-        "awake": true,
-        "streak_days": 7
-      },
-      "settings": {
-        "celebration_extra": false
-      },
-      "ledger": {},
-      "expect": {
-        "emit": [
-          "b4"
-        ],
-        "silent": {
-          "f1": "celebration push already used today"
-        },
-        "push_count": 0
-      }
-    },
-    {
-      "id": "c1-stress-sustained",
-      "why": "An hour of high stress with little movement is C1.",
-      "now": "2026-10-20T15:00:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "stress_high_minutes": 75,
-        "stress_high_steps": 100
-      },
-      "ledger": {},
-      "expect": {
-        "emit": [
-          "c1"
-        ],
-        "push_count": 1
-      }
-    },
-    {
-      "id": "c1-walked-it-off",
-      "why": "300 steps during the run means the user was walking it off.",
-      "now": "2026-10-20T15:00:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "stress_high_minutes": 75,
-        "stress_high_steps": 300
-      },
-      "ledger": {},
-      "expect": {
-        "emit": [],
-        "silent": {
-          "c1": "moving during the stress"
-        },
-        "push_count": 0
-      }
-    },
-    {
-      "id": "c1-in-a-workout",
-      "why": "No stress nudge during a workout.",
-      "now": "2026-10-20T15:00:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "stress_high_minutes": 90,
-        "in_workout": true
-      },
-      "ledger": {},
-      "expect": {
-        "emit": [],
-        "silent": {
-          "c1": "in a workout"
-        },
-        "push_count": 0
-      }
-    },
-    {
-      "id": "c1-followup-after-three-hours",
-      "why": "One follow-up is allowed three hours later.",
-      "now": "2026-10-20T15:00:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "stress_high_minutes": 90
-      },
-      "ledger": {
-        "sent_today": [
-          {
-            "nudge": "c1",
-            "at": "2026-10-20T11:00:00Z"
-          }
-        ]
-      },
-      "expect": {
-        "emit": [
-          "c1"
-        ],
-        "push_count": 1
-      }
-    },
-    {
-      "id": "c1-followup-too-soon",
-      "why": "Two hours later is too soon for the follow-up.",
-      "now": "2026-10-20T15:00:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "stress_high_minutes": 90
-      },
-      "ledger": {
-        "sent_today": [
-          {
-            "nudge": "c1",
-            "at": "2026-10-20T13:00:00Z"
-          }
-        ]
-      },
-      "expect": {
-        "emit": [],
-        "silent": {
-          "c1": "inside the 3h gap"
-        },
-        "push_count": 0
-      }
-    },
-    {
-      "id": "c1-one-followup-only",
-      "why": "At most one follow-up a day.",
-      "now": "2026-10-20T16:00:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "stress_high_minutes": 90
-      },
-      "ledger": {
-        "sent_today": [
-          {
-            "nudge": "c1",
-            "at": "2026-10-20T11:00:00Z"
-          },
-          {
-            "nudge": "c1",
-            "at": "2026-10-20T12:30:00Z"
-          }
-        ]
-      },
-      "expect": {
-        "emit": [],
-        "silent": {
-          "c1": "one follow-up already sent"
-        },
-        "push_count": 0
-      }
-    },
-    {
-      "id": "e1-drift-three-nights",
-      "why": "Three drifting nights in a week is E1. (09:00: after quiet hours, since a push never lands inside them.)",
-      "now": "2026-10-20T09:00:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "drift_nights": 3
-      },
-      "ledger": {},
-      "expect": {
-        "emit": [
-          "e1"
-        ],
-        "push_count": 1
-      }
-    },
-    {
-      "id": "e1-drift-two-nights",
-      "why": "Two nights is not a pattern.",
-      "now": "2026-10-20T07:30:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "drift_nights": 2
-      },
-      "ledger": {},
-      "expect": {
-        "emit": [],
-        "silent": {
-          "e1": "sleep times steady"
-        },
-        "push_count": 0
-      }
-    },
-    {
-      "id": "e1-weekly-cooldown",
-      "why": "E1 speaks at most once a week.",
-      "now": "2026-10-20T07:30:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "drift_nights": 4
-      },
-      "ledger": {
-        "sent_today": [
-          {
-            "nudge": "e1",
-            "at": "2026-10-19T07:30:00Z"
-          }
-        ]
-      },
-      "expect": {
-        "emit": [],
-        "silent": {
-          "e1": "inside the 168h gap"
-        },
-        "push_count": 0
-      }
-    },
-    {
-      "id": "e2-improving-ten-days",
-      "why": "Plus 14 percent with ten of fourteen days above the earlier average is E2. (09:00: after quiet hours, since a push never lands inside them.)",
-      "now": "2026-10-20T09:00:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "improvement_percent": 14,
-        "days_above": 10
-      },
-      "ledger": {},
-      "expect": {
-        "emit": [
-          "e2"
-        ],
-        "push_count": 1
-      }
-    },
-    {
-      "id": "e2-nine-days-above",
-      "why": "Nine days above is one short of a trend.",
-      "now": "2026-10-20T07:30:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "improvement_percent": 14,
-        "days_above": 9
-      },
-      "ledger": {},
-      "expect": {
-        "emit": [],
-        "silent": {
-          "e2": "no improvement over two weeks"
-        },
-        "push_count": 0
-      }
-    },
-    {
-      "id": "e2-fortnight-cooldown",
-      "why": "E2 speaks at most every 14 days per metric.",
-      "now": "2026-10-20T07:30:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "improvement_percent": 14,
-        "days_above": 10
-      },
-      "ledger": {
-        "sent_today": [
-          {
-            "nudge": "e2",
-            "at": "2026-10-17T07:30:00Z"
-          }
-        ]
-      },
-      "expect": {
-        "emit": [],
-        "silent": {
-          "e2": "inside the 336h gap"
-        },
-        "push_count": 0
-      }
-    },
-    {
-      "id": "f2-sunday-review",
-      "why": "Sunday 18:00 with six good days is the weekly review.",
-      "now": "2026-10-18T18:30:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "good_days": 6
-      },
-      "ledger": {},
-      "expect": {
-        "emit": [
-          "f2"
-        ],
-        "push_count": 1
-      }
-    },
-    {
-      "id": "f2-four-good-days",
-      "why": "Four good days is too thin to review.",
-      "now": "2026-10-18T18:30:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "good_days": 4
-      },
-      "ledger": {},
-      "expect": {
-        "emit": [],
-        "silent": {
-          "f2": "not enough good days this week"
-        },
-        "push_count": 0
-      }
-    },
-    {
-      "id": "f2-wrong-day",
-      "why": "The review only runs on the user's chosen day.",
-      "now": "2026-10-20T18:30:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "good_days": 6
-      },
-      "ledger": {},
-      "expect": {
-        "emit": [],
-        "silent": {
-          "f2": "not the weekly review day"
-        },
-        "push_count": 0
-      }
-    },
-    {
-      "id": "g1-no-sync-for-a-day",
-      "why": "A paired ring with no sync for 24 hours is G1. (09:00: after quiet hours, since a push never lands inside them.)",
-      "now": "2026-10-20T09:00:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "ring_paired": true,
-        "sync_hours_ago": 24
-      },
-      "ledger": {},
-      "expect": {
-        "emit": [
-          "g1"
-        ],
-        "push_count": 1
-      }
-    },
-    {
-      "id": "g1-once-a-day",
-      "why": "G1 pushes at most once a day.",
-      "now": "2026-10-20T15:00:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "ring_paired": true,
-        "sync_hours_ago": 30
-      },
-      "ledger": {
-        "sent_today": [
-          {
-            "nudge": "g1",
-            "at": "2026-10-20T08:00:00Z"
-          }
-        ]
-      },
-      "expect": {
-        "emit": [],
-        "silent": {
-          "g1": "already sent today"
-        },
-        "push_count": 0
-      }
-    },
-    {
-      "id": "g1-fresh-sync",
-      "why": "A fresh sync is nothing to report.",
-      "now": "2026-10-20T07:30:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "ring_paired": true,
-        "sync_hours_ago": 2
-      },
-      "ledger": {},
-      "expect": {
-        "emit": [],
-        "silent": {
-          "g1": "ring synced recently"
-        },
-        "push_count": 0
-      }
-    },
-    {
-      "id": "g1-unpaired-ring",
-      "why": "No ring, no sync nudge.",
-      "now": "2026-10-20T07:30:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "ring_paired": false,
-        "sync_hours_ago": 48
-      },
-      "ledger": {},
-      "expect": {
-        "emit": [],
-        "silent": {
-          "g1": "no ring paired"
-        },
-        "push_count": 0
-      }
-    },
-    {
-      "id": "daily-limit-reached",
-      "why": "Two routine pushes are the default daily budget.",
-      "now": "2026-10-20T15:05:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "steps_today": 2100,
-        "step_goal": 10000,
-        "awake": true,
-        "stress_high_minutes": 70
-      },
-      "ledger": {
-        "routine_pushes_today": 2
-      },
-      "expect": {
-        "emit": [],
-        "silent": {
-          "b1": "daily push limit reached",
-          "c1": "daily push limit reached"
-        },
-        "push_count": 0
-      }
-    },
-    {
-      "id": "priority-stress-wins-the-last-push",
-      "why": "Stress outranks activity for the last push.",
-      "now": "2026-10-20T15:05:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "steps_today": 2100,
-        "step_goal": 10000,
-        "awake": true,
-        "stress_high_minutes": 70
-      },
-      "settings": {
-        "daily_limit": 1
-      },
-      "ledger": {},
-      "expect": {
-        "emit": [
-          "c1"
-        ],
-        "silent": {
-          "b1": "daily push limit reached"
-        },
-        "push_count": 1
-      }
-    },
-    {
-      "id": "not-now-pauses-the-category",
-      "why": "'Not now' pauses the category until the next wake.",
-      "now": "2026-10-20T15:05:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "steps_today": 1800,
-        "step_goal": 10000,
-        "awake": true
-      },
-      "ledger": {
-        "snoozed_until": {
-          "activity": "2026-10-21T08:00:00Z"
-        }
-      },
-      "expect": {
-        "emit": [],
-        "silent": {
-          "b1": "not now until tomorrow"
-        },
-        "push_count": 0
-      }
-    },
-    {
-      "id": "topic-turned-off",
-      "why": "A disabled topic produces nothing.",
-      "now": "2026-10-20T15:05:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "steps_today": 1800,
-        "step_goal": 10000,
-        "awake": true
-      },
-      "settings": {
-        "disabled_topics": [
-          "activity"
-        ]
-      },
-      "ledger": {},
-      "expect": {
-        "emit": [],
-        "silent": {
-          "b1": "turned off in settings"
-        },
-        "push_count": 0
-      }
-    },
-    {
-      "id": "step-reminders-off",
-      "why": "Step reminders off silences the activity rules.",
-      "now": "2026-10-20T15:05:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "steps_today": 1800,
-        "step_goal": 10000,
-        "awake": true
-      },
-      "settings": {
-        "step_reminders": false
-      },
-      "ledger": {},
-      "expect": {
-        "emit": [],
-        "silent": {
-          "b1": "step reminders are off"
-        },
-        "push_count": 0
-      }
-    },
-    {
-      "id": "quiet-hours-drop-the-push",
-      "why": "A push that lands in quiet hours is dropped, not saved.",
-      "now": "2026-10-20T23:00:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "stress_high_minutes": 80
-      },
-      "ledger": {},
-      "expect": {
-        "emit": [],
-        "silent": {
-          "c1": "quiet hours"
-        },
-        "push_count": 0
-      }
-    },
-    {
-      "id": "quiet-hours-keep-the-card",
-      "why": "Cards still appear in quiet hours; only pushes are dropped.",
-      "now": "2026-10-20T23:30:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "steps_today": 10050,
-        "step_goal": 10000,
-        "awake": true
-      },
-      "ledger": {},
-      "expect": {
-        "emit": [
-          "b4"
-        ],
-        "push_count": 0
-      }
-    },
-    {
-      "id": "duplicate-fingerprint-b2",
-      "why": "The same rounded numbers are never sent twice in a day.",
-      "now": "2026-10-20T17:30:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "steps_today": 9000,
-        "step_goal": 10000,
-        "awake": true
-      },
-      "ledger": {
-        "fingerprints_today": [
-          "b2:90"
-        ]
-      },
-      "expect": {
-        "emit": [],
-        "silent": {
-          "b2": "duplicate fingerprint today"
-        },
-        "push_count": 0
-      }
-    },
-    {
-      "id": "b3-been-still",
-      "why": "Three hours without an active block is B3.",
-      "now": "2026-10-20T15:00:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "steps_today": 3000,
-        "step_goal": 10000,
-        "awake": true,
-        "minutes_since_active_block": 200
-      },
-      "ledger": {},
-      "expect": {
-        "emit": [
-          "b3"
-        ],
-        "push_count": 1
-      }
-    },
-    {
-      "id": "b3-once-a-day",
-      "why": "B3 fires at most once a day.",
-      "now": "2026-10-20T15:00:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "steps_today": 3000,
-        "step_goal": 10000,
-        "awake": true,
-        "minutes_since_active_block": 200
-      },
-      "ledger": {
-        "sent_today": [
-          {
-            "nudge": "b3",
-            "at": "2026-10-20T10:00:00Z"
-          }
-        ]
-      },
-      "expect": {
-        "emit": [],
-        "silent": {
-          "b3": "already sent today"
-        },
-        "push_count": 0
-      }
-    },
-    {
-      "id": "b3-in-a-workout",
-      "why": "A workout is movement, not stillness.",
-      "now": "2026-10-20T15:00:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "steps_today": 3000,
-        "awake": true,
-        "minutes_since_active_block": 200,
-        "in_workout": true
-      },
-      "ledger": {},
-      "expect": {
-        "emit": [],
-        "silent": {
-          "b3": "in a workout"
-        },
-        "push_count": 0
-      }
-    },
-    {
-      "id": "goal-override-lowers-todays-goal",
-      "why": "A lighter day lowers today's goal by 20 percent, so 8,100 is over 100 percent of it.",
-      "now": "2026-10-20T18:00:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "steps_today": 8100,
-        "step_goal": 10000,
-        "goal_override_percent": 20,
-        "awake": true
-      },
-      "ledger": {},
-      "expect": {
-        "emit": [
-          "b4"
-        ],
-        "push_count": 0
-      }
-    },
-    {
-      "id": "goal-override-almost-there",
-      "why": "Against the lighter goal 7,000 steps is 87 percent: almost there.",
-      "now": "2026-10-20T17:30:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "steps_today": 7000,
-        "step_goal": 10000,
-        "goal_override_percent": 20,
-        "awake": true
-      },
-      "ledger": {},
-      "expect": {
-        "emit": [
-          "b2"
-        ],
-        "push_count": 0
-      }
-    },
-    {
-      "id": "awake-false-silences-activity",
-      "why": "Nothing activity-related while the user is asleep.",
-      "now": "2026-10-20T15:05:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "steps_today": 100,
-        "awake": false
-      },
-      "ledger": {},
-      "expect": {
-        "emit": [],
-        "silent": {
-          "b1": "not awake"
-        },
-        "push_count": 0
-      }
-    },
-    {
-      "id": "thin-day-data-silences-activity",
-      "why": "Half a day of data is not judged.",
-      "now": "2026-10-20T15:05:00Z",
-      "signals": {
-        "rhr_delta_percent": 20,
-        "steps_today": 2100,
-        "day_data_percent": 50,
-        "awake": true
-      },
-      "ledger": {},
-      "expect": {
-        "emit": [],
-        "silent": {
-          "b1": "day data below 80%"
-        },
-        "push_count": 0
-      }
-    },
-    {
-      "id": "recovery-card-survives-quiet-hours",
-      "why": "A short night card is still there; at 06:30 the quiet window has just ended.",
-      "now": "2026-10-20T06:30:00Z",
-      "signals": {
-        "sleep_total_hours": 3.5,
+        "rhr_delta_percent": 0,
+        "sleep_under_goal_hours": 0.0,
         "night_data_percent": 95,
-        "baseline_nights": 21
+        "baseline_nights": 21,
+        "steps_today": 4200,
+        "step_goal": 10000,
+        "awake": true,
+        "in_workout": false,
+        "minutes_since_active_block": 20
       },
       "ledger": {},
       "expect": {
-        "emit": [
-          "a2"
-        ],
+        "emit": [],
+        "silent": {
+          "b1": "too early",
+          "b3": "recently active"
+        },
         "push_count": 0
       }
     }
-  ]
+  ],
+  "fieldNotes": {
+    "signals (new keys used by the expansion; booleans default false, numbers default 0/unset)": {
+      "sleep_goal_hours": "the user's sleep goal for the night",
+      "sleep_goal_progress_percent": "sleep_total / sleep_goal, for A3's 90% floor",
+      "stress_evening_above_normal": "last evening's stress above the user's own normal — A1's third signal, and a blocker for A3",
+      "day_data_percent": "share of the day recorded so far, for the 80% floor",
+      "minutes_since_active_block": "minutes since the last 15-min block with >= 250 steps",
+      "stress_high_minutes": "how long stress has sat at or above the higher of the user's 80th percentile and 60",
+      "stress_percentile_now": "the user's percentile of the current reading",
+      "stress_score_now": "the current stress reading (0-100), against the absolute 60 floor",
+      "steps_during_stress": "steps inside the high-stress stretch",
+      "drift_nights_last_7": "nights (of the last 7) whose bedtime or wake time is > 2 h from the user's median",
+      "nights_recorded_last_7": "nights with enough data inside the drift window",
+      "improvement_metric": "steps | sleep | active_minutes",
+      "improvement_percent": "the 14-day window against the 14 days before it",
+      "days_above_previous": "days of the window above the earlier average (need >= 10 of 14)",
+      "good_days_last_7": "days with >= 80% data, for the weekly review's 5-day floor",
+      "recommendation_candidates": "the scored recommendation list; empty means 'keep it up'",
+      "ring_paired": "a ring is paired at all",
+      "hours_since_sync": "hours since the last successful sync",
+      "awake": "the user is awake now",
+      "in_workout": "a workout is in progress",
+      "quiet_start": "override of the quiet-hours start (as 'HH:MM')",
+      "quiet_end": "override of the quiet-hours end",
+      "previous_fingerprint_value": "the number that was in the last fingerprint, to judge 'materially worse'"
+    },
+    "ledger (new keys)": {
+      "routine_pushes_today": "routine pushes already delivered today",
+      "daily_limit": "the user's chosen limit (1-3), default 2",
+      "celebration_extra": "on | off",
+      "celebration_sent_today": "celebration nudge ids already delivered today",
+      "fingerprints_today": "fingerprints already delivered today ('<nudge>:<rounded number>')",
+      "category_last_sent": "per category, the last delivery time",
+      "category_dismissals_7d": "per category, dismissals in the last 7 days",
+      "snoozed_until": "per category, 'Not now' pause end (the user's next wake time)",
+      "metric_celebrated": "per metric, the last E2 delivery",
+      "notifications_enabled": "false = cards and the 'For you' list only",
+      "quiet_hours": "(start, end) when it is not the default",
+      "sent_today": "nudges already delivered today, with their times"
+    }
+  }
 }

@@ -54,12 +54,23 @@ final class CoachNudgePolicyTests: XCTestCase {
             var stress_high_steps: Int?
             var streak_days: Int?
             var drift_nights: Int?
+            /// The canonical catalog's spelling of the same fact (`docs/config/coach_nudges_cases.json`).
+            var drift_nights_last_7: Int?
+            var nights_recorded_last_7: Int?
             var drift_minutes: Int?
             var improvement_percent: Double?
             var days_above: Int?
+            /// The canonical catalog's spelling of the same fact.
+            var days_above_previous: Int?
             var good_days: Int?
+            var good_days_last_7: Int?
             var ring_paired: Bool?
             var sync_hours_ago: Double?
+            var hours_since_sync: Double?
+            /// Quiet hours appear under `signals` in the canonical catalog and under `settings` in the fixture's own
+            /// cases; both are the user's setting, which is why they are applied to `NudgeSettings` either way.
+            var quiet_start: String?
+            var quiet_end: String?
         }
         struct LedgerInput: Decodable {
             struct Sent: Decodable {
@@ -75,6 +86,13 @@ final class CoachNudgePolicyTests: XCTestCase {
             var category_last_severity: [String: Double]?
             var snoozed_until: [String: String]?
             var notifications_enabled: Bool?
+            /// Celebration pushes already shown today (`b4`, `e2`, `f1`): the policy's once-a-day gate for them.
+            var celebration_sent_today: [String]?
+            /// The user's chosen routine limit, and whether celebrations get their own push.
+            var daily_limit: Int?
+            var celebration_extra: String?
+            /// `["22:00", "08:00"]`: the same two bounds the settings carry.
+            var quiet_hours: [String]?
         }
         var id: String
         var why: String?
@@ -164,10 +182,11 @@ final class CoachNudgePolicyTests: XCTestCase {
             signals.stressRun = CoachSignals.StressRun(minutes: minutes, steps: input.stress_high_steps ?? 0)
         }
 
-        if let drifting = input.drift_nights {
+        if let drifting = input.drift_nights_last_7 ?? input.drift_nights {
             let defaultDrift = N.e1DriftHours * 60 + 30
             let drift: Int = input.drift_minutes ?? defaultDrift
-            let window: Int = N.e1WindowNights
+            // A case may record fewer nights than the window: only those nights exist to judge.
+            let window: Int = min(N.e1WindowNights, input.nights_recorded_last_7 ?? N.e1WindowNights)
             var nights: [CoachSignals.NightPoint] = []
             for index in 0..<window {
                 let offset: Int = index < drifting ? drift : 0
@@ -184,7 +203,7 @@ final class CoachNudgePolicyTests: XCTestCase {
             }
         }
 
-        if let goodDays = input.good_days {
+        if let goodDays = input.good_days_last_7 ?? input.good_days {
             signals.days = (0..<N.e1WindowNights).map { index in
                 CoachSignals.DayPoint(
                     steps: index < goodDays ? 9_400 : 0,
@@ -199,7 +218,7 @@ final class CoachNudgePolicyTests: XCTestCase {
             // The window average must land on the stated improvement while `days_above` days sit above the earlier
             // average: solve for the strong days, the weak ones stay just under it.
             let earlier = 5_000.0
-            let above = input.days_above ?? N.e2MinDaysAbove
+            let above = input.days_above_previous ?? input.days_above ?? N.e2MinDaysAbove
             let window = N.e2WindowDays
             let weak = earlier * 0.95
             let target = earlier * (1 + improvement / 100)
@@ -219,7 +238,9 @@ final class CoachNudgePolicyTests: XCTestCase {
         signals.ring = CoachSignals.Ring(
             paired: input.ring_paired ?? false,
             name: "Agara Ring",
-            lastSync: input.sync_hours_ago.map { now.addingTimeInterval(-$0 * 3600) }
+            lastSync: (input.hours_since_sync ?? input.sync_hours_ago).map {
+                now.addingTimeInterval(-$0 * 3600)
+            }
         )
         return signals
     }
@@ -240,6 +261,20 @@ final class CoachNudgePolicyTests: XCTestCase {
                 fingerprint: "\(rule.rawValue):\(entry.severity ?? 0)",
                 delivery: rule.delivery,
                 severity: entry.severity ?? .greatestFiniteMagnitude,
+                templateID: "\(rule.rawValue)_v1"
+            ))
+        }
+        // A celebration that already went out today is a push of a celebration rule: the once-a-day gate and the
+        // daily budget both read it from the delivered rows.
+        for raw in input.celebration_sent_today ?? [] {
+            guard let rule = NudgeRule(rawValue: raw) else { continue }
+            ledger.sent.append(NudgeLedger.Sent(
+                rule: rule,
+                category: rule.category,
+                at: now.addingTimeInterval(-3600),
+                fingerprint: "\(rule.rawValue):0",
+                delivery: .push,
+                severity: 0,
                 templateID: "\(rule.rawValue)_v1"
             ))
         }
@@ -283,17 +318,25 @@ final class CoachNudgePolicyTests: XCTestCase {
         return ledger
     }
 
-    private func settings(from input: Case.Settings?) -> NudgeSettings {
+    /// The settings a case states. The canonical catalog puts quiet hours under `signals` and the routine limit and
+    /// celebration toggle under `ledger`; the fixture's own cases put them in `settings`. All three are the user's
+    /// setting, so they are read from wherever the case states them.
+    private func settings(from testCase: Case) -> NudgeSettings {
         var settings = NudgeSettings.standard
-        guard let input else { return settings }
-        settings.dailyLimit = input.daily_limit ?? settings.dailyLimit
-        settings.celebrationExtra = input.celebration_extra ?? settings.celebrationExtra
-        settings.disabledTopics = Set((input.disabled_topics ?? []).compactMap(NudgeCategory.init(rawValue:)))
-        settings.stepReminders = input.step_reminders ?? settings.stepReminders
-        settings.quietStart = input.quiet_start.flatMap(CoachSignals.minuteOfDay) ?? settings.quietStart
-        settings.quietEnd = input.quiet_end.flatMap(CoachSignals.minuteOfDay) ?? settings.quietEnd
-        settings.weeklyReviewWeekday = input.weekly_review_day.flatMap(NudgeSettings.weekday) ?? settings.weeklyReviewWeekday
-        settings.weeklyReviewMinute = input.weekly_review_time.flatMap(CoachSignals.minuteOfDay) ?? settings.weeklyReviewMinute
+        let input = testCase.settings
+        let quiet = testCase.ledger?.quiet_hours ?? []
+        settings.dailyLimit = input?.daily_limit ?? testCase.ledger?.daily_limit ?? settings.dailyLimit
+        settings.celebrationExtra = (input?.celebration_extra
+            ?? (testCase.ledger?.celebration_extra == "on" ? true : nil))
+            ?? settings.celebrationExtra
+        settings.disabledTopics = Set((input?.disabled_topics ?? []).compactMap(NudgeCategory.init(rawValue:)))
+        settings.stepReminders = input?.step_reminders ?? settings.stepReminders
+        let quietStart = input?.quiet_start ?? testCase.signals.quiet_start ?? (quiet.count > 0 ? quiet[0] : nil)
+        let quietEnd = input?.quiet_end ?? testCase.signals.quiet_end ?? (quiet.count > 1 ? quiet[1] : nil)
+        settings.quietStart = quietStart.flatMap(CoachSignals.minuteOfDay) ?? settings.quietStart
+        settings.quietEnd = quietEnd.flatMap(CoachSignals.minuteOfDay) ?? settings.quietEnd
+        settings.weeklyReviewWeekday = input?.weekly_review_day.flatMap(NudgeSettings.weekday) ?? settings.weeklyReviewWeekday
+        settings.weeklyReviewMinute = input?.weekly_review_time.flatMap(CoachSignals.minuteOfDay) ?? settings.weeklyReviewMinute
         return settings
     }
 
@@ -307,7 +350,7 @@ final class CoachNudgePolicyTests: XCTestCase {
         for testCase in cases {
             let now = date(testCase.now)
             let signals = signals(from: testCase.signals, now: now)
-            let settings = settings(from: testCase.settings)
+            let settings = settings(from: testCase)
             let ledger = ledger(from: testCase.ledger, now: now)
             let outcomes = NudgeRules.evaluate(signals, settings: settings, now: now)
             let plan = CoachNudgePolicy.decide(
