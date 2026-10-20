@@ -28,12 +28,13 @@ enum CoachResponseSchema {
       "safety_note": string or null (null unless there is a genuine safety concern),
       "data_quality_note": string or null (null unless a data gap materially affects the answer),
       "sources": array of { "title": string, "url": string, "publisher": string } (use [] if none),
-      "follow_up_chips": array of strings (≤ 2 items, each ≤ 60 chars),
+      "follow_up_chips": array of exactly 3 strings (each ≤ 60 chars), specific to this user's numbers,
       "actions_taken": array of strings (use [] if none),
       "confidence": one of "low" | "medium" | "high"
     }
     Do NOT use a "message" key. Do NOT wrap the JSON in ``` fences. Put your \
-    formatted text inside "summary" and "bullets".
+    formatted text inside "summary" and "bullets". "follow_up_chips" must have \
+    exactly 3 items — not 2, not 4.
     """
 
     /// The `text.format` object for a Responses API request.
@@ -84,7 +85,11 @@ enum CoachResponseSchema {
                 "follow_up_chips": [
                     "type": "array",
                     "items": ["type": "string", "maxLength": 60],
-                    "maxItems": 2,
+                    // Exactly three (contract §8; `coach_followups` in the shared catalog). The server
+                    // validates the count, so providers that cannot enforce these bounds still fail
+                    // an answer that returns two.
+                    "minItems": AgaraConfig.Coach.followups,
+                    "maxItems": AgaraConfig.Coach.followups,
                 ],
                 "actions_taken": ["type": "array", "items": ["type": "string"]],
                 "confidence": ["type": "string", "enum": ["low", "medium", "high"]],

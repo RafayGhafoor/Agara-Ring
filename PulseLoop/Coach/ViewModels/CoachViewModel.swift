@@ -65,9 +65,15 @@ final class CoachViewModel {
             nutritionPrefs: NutritionPrefsStore.shared.prefs)
         let budget = flags.contextBudget
         let environment = await CoachEnvironmentContextService.shared.snapshot()
-        let packet = CoachContextBuilder.build(context: context, budget: budget, environment: environment)
+        // The rolling summary stands in for the turns that fall out of the replayed window, so it
+        // travels with every turn (contract §6's `summary`).
+        let conversation = fetchConversation(conversationId, context: context)
+        let packet = CoachContextBuilder.build(
+            context: context, conversationSummary: conversation?.rollingSummary, budget: budget,
+            environment: environment)
         let recent = recentMessages(
-            conversationId: conversationId, excluding: userMessage.id, context: context, limit: budget.historyTurns)
+            conversationId: conversationId, excluding: userMessage.id, context: context,
+            limit: CoachTranscriptWindow.limit(for: budget))
         let userImages = CoachAttachmentStore.payloads(for: attachments)
 
         let orchestrator = CoachOrchestrator(
@@ -89,6 +95,28 @@ final class CoachViewModel {
         }
 
         persist(result, conversationId: conversationId, context: context, flags: flags)
+        refreshRollingSummary(conversationId: conversationId, context: context)
+    }
+
+    /// Rebuilds the conversation's rolling summary once it is `summaryEveryTurns` answers behind, and
+    /// records how many answers it covers. Called after every turn so a long conversation keeps a
+    /// summary of what fell out of the window without paying a model round trip for it.
+    func refreshRollingSummary(conversationId: UUID, context: ModelContext) {
+        guard let conversation = fetchConversation(conversationId, context: context) else { return }
+        let descriptor = FetchDescriptor<CoachMessage>(
+            predicate: #Predicate { $0.conversationId == conversationId },
+            sortBy: [SortDescriptor(\.createdAt, order: .forward)]
+        )
+        let rows = (try? context.fetch(descriptor)) ?? []
+        let turns = rows.filter { $0.role == "user" || $0.role == "assistant" }
+            .map { CoachTurnText(role: $0.role, text: $0.body) }
+        let answerCount = rows.filter { $0.role == "assistant" }.count
+        guard CoachRollingSummary.shouldRefresh(
+            answerCount: answerCount, summarizedAnswerCount: conversation.summarizedAnswerCount) else { return }
+        conversation.rollingSummary = CoachRollingSummary.make(
+            previous: conversation.rollingSummary, turns: turns)
+        conversation.summarizedAnswerCount = answerCount
+        try? context.save()
     }
 
     // MARK: - Provider resolution
