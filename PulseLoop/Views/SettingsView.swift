@@ -26,11 +26,15 @@ struct SettingsView: View {
     private var coachTrailing: String {
         guard coachStore.settings.coachMasterEnabled else { return "Off" }
         let settings = coachStore.settings
-        switch settings.providerMode {
+        // The effective mode, not the stored one: a release build routes a stored bring-your-own-key mode to the
+        // cloud coach or on-device, and the row must say what a turn actually uses.
+        switch CoachClientResolver.effectiveMode(for: settings.providerMode, cloudReady: CoachGate.cloudReady) {
         case .offlineStub:
             return "Offline"
         case .appleOnDevice:
             return "Apple on-device"
+        case .agaraCloud:
+            return "Agara Cloud"
         case .userOpenAIKey:
             return CoachModel(rawValue: settings.model)?.label ?? settings.model
         case .userGeminiKey:
