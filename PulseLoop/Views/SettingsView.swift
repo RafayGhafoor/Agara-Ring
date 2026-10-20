@@ -60,7 +60,7 @@ struct SettingsView: View {
     }
 
     private var notificationsTrailing: String {
-        coachStore.settings.notificationsEnabled ? "On" : "Off"
+        NudgePreferencesStore.shared.masterOn ? "On" : "Off"
     }
 
     var body: some View {
@@ -121,9 +121,10 @@ struct SettingsView: View {
             rows.append(SettingsRowItem(icon: "sparkles", tint: AgaraColors.accent, title: "AI Coach", trailingValue: coachTrailing) {
                 path.append(AppRoute.settingsCoach)
             })
-            // Check-ins are a coach sub-feature — only show the row once the coach is on.
-            if coachStore.settings.coachMasterEnabled {
-                rows.append(SettingsRowItem(icon: "bell.badge", tint: AgaraColors.warning, title: "Coach Check-Ins", trailingValue: notificationsTrailing) {
+            // Notifications is no longer a coach sub-screen: the nudges own it (2026-10-21), so it is reachable with
+            // the coach off — except when the coach cannot be switched on at all, where check-ins are all it holds.
+            if coachStore.settings.coachMasterEnabled || AgaraFeatureStore.isOn(.coachNudges) {
+                rows.append(SettingsRowItem(icon: "bell.badge", tint: AgaraColors.warning, title: "Notifications", trailingValue: notificationsTrailing) {
                     path.append(AppRoute.settingsNotifications)
                 })
             }

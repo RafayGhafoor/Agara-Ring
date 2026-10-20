@@ -78,7 +78,7 @@ struct CoachSignals: Equatable, Sendable {
     struct Goals: Equatable, Sendable {
         var steps: Int = 8000
         var sleepMinutes: Double = 8 * 60
-        /// A `DailyGoalOverride` for today: the step goal is lowered by this percent for today only.
+        /// Today's "lighter" override: the step goal is lowered by this percent for today only (`DailyGoalOverrideStore`).
         var stepGoalLowerPercent: Int = 0
     }
 
@@ -253,7 +253,7 @@ enum CoachSignalsBuilder {
         signals.goals = CoachSignals.Goals(
             steps: goal?.steps ?? 8000,
             sleepMinutes: Double(goal?.sleepMinutes ?? 8 * 60),
-            stepGoalLowerPercent: DailyGoalOverride.lowerPercent(context: context, on: now, calendar: calendar) ?? 0
+            stepGoalLowerPercent: DailyGoalOverrideStore.shared.active(now: now)?.percent ?? 0
         )
 
         signals.today = CoachSignals.Today(

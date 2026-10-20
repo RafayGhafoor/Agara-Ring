@@ -167,6 +167,20 @@ extension ConfirmAction {
         )
     }
 
+    /// "Lighter today" (nudge A1/A2): lowers *today's* step goal by 10% or 20% and expires at midnight. Normal severity —
+    /// nothing is deleted and the user's real goal is untouched. Copy from the nudge catalog (`nudge_lighter_*`).
+    static func lighterToday(percent: Int, _ perform: @escaping () -> Void) -> ConfirmAction {
+        ConfirmAction(
+            key: "lighterToday",
+            title: AgaraCopy.nudgeLighterPromptTitle,
+            message: AgaraCopy.nudgeLighterPromptBody.replacingOccurrences(of: "{percent}", with: "\(percent)%"),
+            confirmLabel: AgaraCopy.nudgeButtonLighterToday,
+            cancelLabel: "Cancel",
+            severity: .normal,
+            perform: perform
+        )
+    }
+
     static func resetAppData(confirmLabel: String = "Reset app data", _ perform: @escaping () -> Void) -> ConfirmAction {
         ConfirmAction(key: "resetAppData", title: AgaraCopy.confirmResetAppDataTitle, message: AgaraCopy.confirmResetAppDataBody,
                       confirmLabel: confirmLabel, perform: perform)

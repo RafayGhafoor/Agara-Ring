@@ -12,6 +12,12 @@ import UIKit
 /// there, categories here).
 enum AgaraNotificationCategory: String, CaseIterable {
     case measurement, sync, firmware, battery, coach
+    /// The three proactive-nudge categories (spec: `agara.coach.recovery`, `agara.coach.stress`,
+    /// `agara.coach.generic`). Their buttons and the seeded coach answer they open are defined in
+    /// `Coach/Nudges/NudgeNotifications.swift` — this layer stays the one place categories are registered.
+    case coachRecovery = "coach.recovery"
+    case coachStress = "coach.stress"
+    case coachGeneric = "coach.generic"
 
     /// `UNNotificationCategory` identifier (also the thread, so each kind groups on the lock screen).
     var identifier: String { "agara.\(rawValue)" }
@@ -80,7 +86,9 @@ final class AgaraNotifications {
     /// Register the categories and follow the app lifecycle. Called once at launch (not under unit tests).
     func start() {
         UNUserNotificationCenter.current().setNotificationCategories(Set(AgaraNotificationCategory.allCases.map {
-            UNNotificationCategory(identifier: $0.identifier, actions: [], intentIdentifiers: [], options: [])
+            // `actions` is empty for the non-nudge categories and carries the nudge buttons for the three coach ones
+            // (`NudgeNotifications.swift`).
+            UNNotificationCategory(identifier: $0.identifier, actions: $0.actions, intentIdentifiers: [], options: [])
         }))
         #if canImport(UIKit)
         let center = NotificationCenter.default

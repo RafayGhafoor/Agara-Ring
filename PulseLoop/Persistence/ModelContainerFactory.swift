@@ -30,10 +30,9 @@ enum ModelContainerFactory {
             CoachMemory.self,
             CoachToolCall.self,
             CoachNotificationRecord.self,
-            NudgeLedgerEntry.self,
-            NudgeLedgerDismissal.self,
-            DailyGoalOverride.self,
-            NudgeSettingsRecord.self,
+            // Nudges keep nothing in SwiftData: the ledger, the preferences and the one-day goal override are a few
+            // hundred bytes of day-keyed bookkeeping in UserDefaults (NudgeLedgerStore / NudgePreferencesStore /
+            // DailyGoalOverrideStore), so no schema migration rides on a notification feature.
             CoachSummary.self,
             WearableLog.self,
             MealEntry.self,

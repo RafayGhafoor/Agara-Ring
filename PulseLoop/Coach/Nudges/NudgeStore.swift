@@ -118,151 +118,42 @@ struct NudgeLedger: Equatable, Sendable {
         dismissed.filter { $0.category == category && $0.at >= since }.count
     }
 
-    /// Build the ledger the policy reads from the persisted rows.
+    /// Build the ledger the policy reads from the delivery rows (`NudgeLedgerStore`). This is the only place the two
+    /// meet: the policy stays a pure function of this value, and the store stays free of policy.
     static func build(
         entries: [NudgeLedgerEntry],
-        dismissals: [NudgeLedgerDismissal],
         snoozes: [NudgeCategory: Date],
         now: Date,
         calendar: Calendar = .current
     ) -> NudgeLedger {
         var ledger = NudgeLedger()
         ledger.sent = entries.compactMap { entry in
-            guard let rule = NudgeRule(rawValue: entry.ruleRaw),
-                  let category = NudgeCategory(rawValue: entry.categoryRaw),
-                  let delivery = NudgeDelivery(rawValue: entry.deliveryRaw)
-            else { return nil }
+            guard let rule = NudgeRule(rawValue: entry.rule) else { return nil }
             return Sent(
                 rule: rule,
-                category: category,
-                at: entry.sentAt,
-                fingerprint: entry.fingerprint,
-                delivery: delivery,
-                severity: entry.severity,
+                category: entry.category,
+                at: entry.date,
+                fingerprint: entry.nudgeId,
+                delivery: .push,
+                severity: 0,
                 templateID: entry.templateID
             )
         }
-        ledger.dismissed = dismissals.map {
-            Dismissal(category: NudgeCategory(rawValue: $0.categoryRaw) ?? .insight, at: $0.dismissedAt)
+        // A dismissal is a "Not now" or a push nobody tapped inside the untapped window (NudgeOutcome knows which).
+        ledger.dismissed = entries.filter(\.isDismissal).map {
+            Dismissal(category: $0.category, at: $0.date)
         }
         ledger.snoozedUntil = snoozes
-        for sent in ledger.sent {
+        for sent in ledger.sent where !sent.templateID.isEmpty {
             if let existing = ledger.templateLastUsed[sent.templateID], existing > sent.at { continue }
             ledger.templateLastUsed[sent.templateID] = sent.at
         }
-        // A push that was never tapped inside the untapped window counts as a dismissal for the learning rule.
-        let untapped = TimeInterval(AgaraConfig.Nudges.policyUntappedHours) * 3600
-        for sent in ledger.sent where sent.delivery == .push {
-            guard now.timeIntervalSince(sent.at) >= untapped else { continue }
-            let tapped = dismissals.contains { $0.sentAt == sent.at }
-            if !tapped { ledger.dismissed.append(Dismissal(category: sent.category, at: sent.at.addingTimeInterval(untapped))) }
-        }
+        // Routine pushes already spent today: celebrations draw on their own budget (policy rule 1).
+        ledger.routinePushesToday = entries.filter {
+            calendar.isDate($0.date, inSameDayAs: now) && !$0.category.isCelebration && $0.outcome == .shown
+        }.count
         return ledger
     }
 }
 
 // MARK: - Persistence
-
-/// Delivery history for the deterministic nudges. Supersedes `CoachNotificationRecord` for nudge history: that row
-/// keeps the coach's own check-in slots, this one records what the rule engine decided, for the daily limit, the
-/// fingerprint, the 6-hour gap, the learning ladder and the 7-day wording rotation.
-@Model
-final class NudgeLedgerEntry {
-    @Attribute(.unique) var id: UUID
-    var ruleRaw: String
-    var categoryRaw: String
-    var deliveryRaw: String
-    var fingerprint: String
-    var severity: Double
-    var templateID: String
-    var sentAt: Date
-    var title: String
-    var body: String
-    /// When the user tapped the nudge (opened the Coach tab). Any tap resets the learning ladder.
-    var tappedAt: Date?
-
-    init(
-        id: UUID = UUID(),
-        rule: NudgeRule,
-        category: NudgeCategory,
-        delivery: NudgeDelivery,
-        fingerprint: String,
-        severity: Double,
-        templateID: String,
-        sentAt: Date = AppClock.now,
-        title: String,
-        body: String,
-        tappedAt: Date? = nil
-    ) {
-        self.id = id
-        self.ruleRaw = rule.rawValue
-        self.categoryRaw = category.rawValue
-        self.deliveryRaw = delivery.rawValue
-        self.fingerprint = fingerprint
-        self.severity = severity
-        self.templateID = templateID
-        self.sentAt = sentAt
-        self.title = title
-        self.body = body
-        self.tappedAt = tappedAt
-    }
-}
-
-/// An explicit "Not now" (as opposed to a push that was simply not tapped).
-@Model
-final class NudgeLedgerDismissal {
-    @Attribute(.unique) var id: UUID
-    var categoryRaw: String
-    var dismissedAt: Date
-    var sentAt: Date?
-
-    init(id: UUID = UUID(), category: NudgeCategory, dismissedAt: Date = AppClock.now, sentAt: Date? = nil) {
-        self.id = id
-        self.categoryRaw = category.rawValue
-        self.dismissedAt = dismissedAt
-        self.sentAt = sentAt
-    }
-}
-
-/// The user's "make today lighter" choice: a lower step goal for one day only. The normal goal is never changed —
-/// the row expires at midnight and the goal comes back by itself.
-@Model
-final class DailyGoalOverride {
-    @Attribute(.unique) var id: UUID
-    var date: Date
-    /// Percent the step goal is lowered by for that day (10 or 20).
-    var percentLower: Int
-    var expiresAt: Date
-
-    init(id: UUID = UUID(), date: Date, percentLower: Int, expiresAt: Date) {
-        self.id = id
-        self.date = date
-        self.percentLower = percentLower
-        self.expiresAt = expiresAt
-    }
-
-    static func lowerPercent(context: ModelContext, on date: Date, calendar: Calendar = .current) -> Int? {
-        let start = calendar.startOfDay(for: date)
-        guard let end = calendar.date(byAdding: .day, value: 1, to: start) else { return nil }
-        let predicate = #Predicate<DailyGoalOverride> { $0.date >= start && $0.date < end && $0.expiresAt > date }
-        return ((try? context.fetch(FetchDescriptor<DailyGoalOverride>(predicate: predicate))) ?? []).first?.percentLower
-    }
-}
-
-/// One row holding the user's nudge preferences as JSON, so `NudgeSettings` can stay a pure value.
-@Model
-final class NudgeSettingsRecord {
-    @Attribute(.unique) var id: UUID
-    var payload: Data
-    var updatedAt: Date
-
-    init(id: UUID = UUID(), settings: NudgeSettings = .standard, updatedAt: Date = AppClock.now) {
-        self.id = id
-        self.payload = (try? JSONEncoder().encode(settings)) ?? Data()
-        self.updatedAt = updatedAt
-    }
-
-    var settings: NudgeSettings {
-        (try? JSONDecoder().decode(NudgeSettings.self, from: payload)) ?? .standard
-    }
-}
