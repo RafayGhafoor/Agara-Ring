@@ -114,12 +114,19 @@ enum NudgeRules {
         }
 
         func a3() -> RuleOutcome {
+            // A3 ("good to go") has its own, earlier end: the reassurance is a morning message, and letting it run to the
+            // activity check made it fire every ordinary afternoon (reports carried it into the activity cases).
+            if minute >= (CoachSignals.minuteOfDay(N.a3UntilTime) ?? 12 * 60) {
+                return silent(.a3, "after the good-to-go window")
+            }
             if let reason = recoverySilence { return silent(.a3, reason) }
             guard let goalPercent = signals.sleepGoalPercent else { return silent(.a3, "no night recorded") }
             let rhrOK = (signals.restingHeartRateDeltaPercent ?? 0) <= 0
             let stressOK = !signals.stressAboveNormal
-            guard rhrOK, stressOK, goalPercent >= Double(N.a3SleepGoalPercent) else {
-                return silent(.a3, "a signal is below baseline")
+            guard stressOK else { return silent(.a3, "evening stress above normal") }
+            guard rhrOK else { return silent(.a3, "resting heart rate above baseline") }
+            guard goalPercent >= Double(N.a3SleepGoalPercent) else {
+                return silent(.a3, "sleep at \(Int(goalPercent.rounded()))% of goal")
             }
             let total = signals.sleepTotalMinutes ?? 0
             return make(.a3, slots: [
@@ -137,7 +144,7 @@ enum NudgeRules {
         /// Activity rules need a day that was actually recorded, a user who is awake, and no workout in progress.
         private var activitySilence: String? {
             if !settings.stepReminders { return "step reminders are off" }
-            if !signals.today.awake { return "not awake" }
+            if !signals.today.awake { return "asleep" }
             if signals.today.inWorkout { return "in a workout" }
             if !signals.dayHasEnoughData { return "day data below \(N.minDataPercent)%" }
             return nil
@@ -167,9 +174,9 @@ enum NudgeRules {
         func b1() -> RuleOutcome {
             if let reason = activitySilence { return silent(.b1, reason) }
             let checkTime = CoachSignals.minuteOfDay(N.b1CheckTime) ?? 0
-            guard minute >= checkTime else { return silent(.b1, "before the check time") }
+            guard minute >= checkTime else { return silent(.b1, "before the \(N.b1CheckTime) check") }
             guard signals.stepGoalPercent < Double(N.b1FractionPercent) else {
-                return silent(.b1, "not below a quarter of the goal")
+                return silent(.b1, "at or above \(N.b1FractionPercent)% of goal")
             }
             return make(.b1, slots: stepSlots(), evidence: stepEvidence, severity: 100 - signals.stepGoalPercent)
         }
@@ -177,13 +184,14 @@ enum NudgeRules {
         func b2() -> RuleOutcome {
             if let reason = activitySilence { return silent(.b2, reason) }
             let after = CoachSignals.minuteOfDay(N.b2After) ?? 0
-            guard minute >= after else { return silent(.b2, "before the almost-there window") }
+            guard minute >= after else { return silent(.b2, "before 17:00") }
             let percent = signals.stepGoalPercent
             guard percent >= Double(N.b2FractionMinPercent), percent <= Double(N.b2FractionMaxPercent) else {
-                return silent(.b2, "outside the almost-there band")
+                return silent(.b2, "outside the 85–99% band")
             }
             let quietStart = settings.quietStartMinute(signals: signals)
-            guard quietStart - minute >= N.b2QuietBufferHours * 60 else {
+            // Inclusive: "2 h before quiet hours" includes exactly 2 h before.
+            guard quietStart - minute > N.b2QuietBufferHours * 60 else {
                 return silent(.b2, "quiet hours within the buffer")
             }
             return make(.b2, slots: stepSlots(), evidence: stepEvidence, severity: 100 - percent)
@@ -191,7 +199,7 @@ enum NudgeRules {
 
         func b3() -> RuleOutcome {
             if let reason = activitySilence { return silent(.b3, reason) }
-            guard signals.minutesSinceActiveBlock >= N.b3WindowMinutes else { return silent(.b3, "moved recently") }
+            guard signals.minutesSinceActiveBlock >= N.b3WindowMinutes else { return silent(.b3, "active within 180 min") }
             return make(.b3, slots: [.walkMin: .number(movementBreakMinutes)], evidence: [
                 CoachNudgeEvidence(metric: "minutes_since_active_block", value: Double(signals.minutesSinceActiveBlock), unit: "min")
             ], severity: Double(signals.minutesSinceActiveBlock) / 60)
@@ -208,13 +216,17 @@ enum NudgeRules {
         // MARK: Stress (C)
 
         func c1() -> RuleOutcome {
+            // Two gates the catalog states and the first version missed: a percentile alone is not a reading (a user whose
+            // 80th percentile is 30 should not be nudged about nothing), and stress while walking is being discharged,
+            // not endured.
             if !settings.topicEnabled(.stress) { return silent(.c1, "stress nudges are off") }
-            if !signals.today.awake { return silent(.c1, "not awake") }
+            if !signals.today.awake { return silent(.c1, "asleep") }
             if signals.today.inWorkout { return silent(.c1, "in a workout") }
-            guard let run = signals.stressRun else { return silent(.c1, "no sustained high stress") }
-            guard run.minutes >= N.c1MinDurationMinutes else { return silent(.c1, "stress not sustained") }
+            guard let run = signals.stressRun else { return silent(.c1, "no sustained high stress reading") }
+            guard run.minutes >= N.c1MinDurationMinutes else { return silent(.c1, "duration below 60 min") }
+            guard run.score >= N.c1MinScore else { return silent(.c1, "below the \(N.c1MinScore) floor") }
             // Walking it off is not a reason to be told you are stressed.
-            guard run.steps < N.c1MaxSteps else { return silent(.c1, "moving during the stress") }
+            guard run.steps < N.c1MaxSteps else { return silent(.c1, "too many steps during the high stretch") }
             return make(.c1, slots: [.stressMinutes: .count(run.minutes, unit: .minute)], evidence: [
                 CoachNudgeEvidence(metric: "stress_minutes_high", value: Double(run.minutes), unit: "min"),
                 CoachNudgeEvidence(metric: "stress_steps_during", value: Double(run.steps), unit: "steps"),
@@ -225,14 +237,16 @@ enum NudgeRules {
         // MARK: Insight (E, F)
 
         func e1() -> RuleOutcome {
-            guard signals.nights.count >= N.e1WindowNights else { return silent(.e1, "not enough nights") }
+            guard signals.nights.count >= N.e1WindowNights else { return silent(.e1, "fewer than 5 recorded nights") }
             let medianBed = CoachSignalsBuilder.median(signals.nights.map { Double($0.bedMinute) })
             let medianWake = CoachSignalsBuilder.median(signals.nights.map { Double($0.wakeMinute) })
             let driftMinutes = signals.nights.map { night in
                 max(abs(Double(night.bedMinute) - medianBed), abs(Double(night.wakeMinute) - medianWake))
             }
             let drifting = driftMinutes.filter { $0 > Double(N.e1DriftHours * 60) }.count
-            guard drifting >= N.e1DriftNights else { return silent(.e1, "sleep times steady") }
+            guard drifting >= N.e1DriftNights else {
+                return silent(.e1, "only \(drifting) drifted nights")
+            }
             let drift = CoachSignalsBuilder.median(driftMinutes)
             return make(.e1, slots: [
                 .driftMinutes: .count(Int(drift.rounded()), unit: .minute),
@@ -279,7 +293,12 @@ enum NudgeRules {
                 $0.improvementPercent >= Double(N.e2ImprovementPercent) && $0.daysAbove >= N.e2MinDaysAbove
             }
             guard let best = qualifying.max(by: { $0.improvementPercent < $1.improvementPercent }) else {
-                return silent(.e2, "no improvement over two weeks")
+                // Say which half of the test failed: not enough change, or not enough days carrying it.
+                if let biggest = trends.max(by: { $0.improvementPercent < $1.improvementPercent }),
+                   biggest.improvementPercent >= Double(N.e2ImprovementPercent) {
+                    return silent(.e2, "only \(biggest.daysAbove) of 14 days above the earlier average")
+                }
+                return silent(.e2, "below \(N.e2ImprovementPercent)%")
             }
             return make(.e2, slots: [
                 .pctAbove: .percent(best.improvementPercent),
@@ -295,7 +314,7 @@ enum NudgeRules {
             let streak = signals.stepGoalStreakDays
             let milestones = N.f1StreakDays.split(separator: ",").compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }
             let isMilestone = milestones.contains(streak) || (streak > (milestones.max() ?? 0) && (streak - (milestones.max() ?? 0)) % N.f1RepeatEvery == 0)
-            guard isMilestone else { return silent(.f1, "no streak milestone today") }
+            guard isMilestone else { return silent(.f1, "\(streak) is not a milestone") }
             return make(.f1, slots: [.streakDays: .number(streak)], evidence: [
                 CoachNudgeEvidence(metric: "streak_days", value: Double(streak), unit: "days")
             ], severity: Double(streak))
@@ -304,11 +323,11 @@ enum NudgeRules {
         func f2() -> RuleOutcome {
             let calendar = Calendar.current
             let weekday = calendar.component(.weekday, from: now)
-            guard weekday == settings.weeklyReviewWeekday else { return silent(.f2, "not the weekly review day") }
+            guard weekday == settings.weeklyReviewWeekday else { return silent(.f2, "not the chosen day") }
             guard minute >= settings.weeklyReviewMinute else { return silent(.f2, "before the weekly review time") }
             let week = Array(signals.days.prefix(N.e1WindowNights))
             let goodDays = week.filter(\.hasGoodData).count
-            guard goodDays >= N.f2MinGoodDays else { return silent(.f2, "not enough good days this week") }
+            guard goodDays >= N.f2MinGoodDays else { return silent(.f2, "fewer than \(N.f2MinGoodDays) good days") }
             guard let best = week.max(by: { $0.steps < $1.steps }), best.steps > 0 else {
                 return silent(.f2, "no day stands out this week")
             }
@@ -327,7 +346,7 @@ enum NudgeRules {
         func g1() -> RuleOutcome {
             guard signals.ring.paired else { return silent(.g1, "no ring paired") }
             guard let hours = signals.hoursSinceSync else { return silent(.g1, "the ring has not synced yet") }
-            guard hours >= Double(N.g1NoSyncHours) else { return silent(.g1, "ring synced recently") }
+            guard hours >= Double(N.g1NoSyncHours) else { return silent(.g1, "synced recently") }
             return make(.g1, slots: [
                 .hoursSinceSync: .count(Int(hours.rounded()), unit: .hour),
                 .ringName: .text(signals.ring.name)
@@ -367,7 +386,9 @@ enum NudgeRules {
         private func fingerprint(_ rule: NudgeRule, severity: Double) -> String {
             switch rule {
             case .b1, .b2, .b4:
-                return "\(rule.rawValue):\(signals.today.steps / 100)"
+                // Rounded, not truncated: "the rounded numbers" is what the policy promises, and 1,196 and 1,204
+                // are the same reading at any sensible rounding.
+                return "\(rule.rawValue):\(Int((Double(signals.today.steps) / 100).rounded()))"
             case .b3:
                 return "b3:\(signals.minutesSinceActiveBlock / 60)"
             case .c1:

@@ -157,15 +157,17 @@ final class NudgeRulesTests: XCTestCase {
     }
 
     func testA3SilentOnePercentBelowTheGoal() {
+        // 89% of the goal, RHR and evening stress at baseline: the sleep floor is the only thing saying no, and the
+        // reason now names that cause instead of "a signal is below baseline".
         let signals = morningSignal(sleepTotalMinutes: 480 * 0.89)
-        XCTAssertEqual(outcome(signals, .a3).silentReason, "a signal is below baseline")
+        XCTAssertEqual(outcome(signals, .a3).silentReason, "sleep at 89% of goal")
     }
 
     // MARK: B1 behind on steps
 
     func testB1SilentOneMinuteBeforeTheCheckTime() {
         let signals = activitySignal(steps: 100, hour: 14, minute: 59)
-        XCTAssertEqual(outcome(signals, .b1).silentReason, "before the check time")
+        XCTAssertEqual(outcome(signals, .b1).silentReason, "before the 15:00 check")
     }
 
     func testB1FiresOneStepBelowAQuarterOfTheGoal() {
@@ -180,14 +182,14 @@ final class NudgeRulesTests: XCTestCase {
     func testB1SilentAtExactlyAQuarterOfTheGoal() {
         let threshold = 10_000 * N.b1FractionPercent / 100
         let signals = activitySignal(steps: threshold, hour: 15)
-        XCTAssertEqual(outcome(signals, .b1).silentReason, "not below a quarter of the goal")
+        XCTAssertEqual(outcome(signals, .b1).silentReason, "at or above 25% of goal")
     }
 
     // MARK: B2 almost there
 
     func testB2SilentBeforeSeventeen() {
         let signals = activitySignal(steps: 8_600, hour: 16, minute: 59)
-        XCTAssertEqual(outcome(signals, .b2).silentReason, "before the almost-there window")
+        XCTAssertEqual(outcome(signals, .b2).silentReason, "before 17:00")
     }
 
     func testB2FiresAtTheLowerBandEdge() {
@@ -197,7 +199,7 @@ final class NudgeRulesTests: XCTestCase {
 
     func testB2SilentOnePercentBelowTheBand() {
         let signals = activitySignal(steps: 10_000 * (N.b2FractionMinPercent - 1) / 100, hour: 17)
-        XCTAssertEqual(outcome(signals, .b2).silentReason, "outside the almost-there band")
+        XCTAssertEqual(outcome(signals, .b2).silentReason, "outside the 85–99% band")
     }
 
     func testB2SilentWhenQuietHoursAreInsideTheBuffer() {
@@ -212,7 +214,7 @@ final class NudgeRulesTests: XCTestCase {
     func testB3SilentOneMinuteInsideTheWindow() {
         var signals = activitySignal(steps: 3_000, hour: 14)
         signals.today.blocks = [CoachSignals.StepBlock(startMinute: 14 * 60 - N.b3WindowMinutes + 1 - N.b3BlockMinutes, steps: N.b3BlockSteps)]
-        XCTAssertEqual(outcome(signals, .b3).silentReason, "moved recently")
+        XCTAssertEqual(outcome(signals, .b3).silentReason, "active within 180 min")
     }
 
     func testB3FiresAtTheWindowEdge() {
@@ -245,15 +247,17 @@ final class NudgeRulesTests: XCTestCase {
 
     // MARK: C1 stress
 
-    private func stressSignal(minutes: Int, steps: Int, hour: Int = 15) -> CoachSignals {
+    private func stressSignal(minutes: Int, steps: Int, score: Int = 75, hour: Int = 15) -> CoachSignals {
         var signals = morningSignal(hour: hour)
-        signals.stressRun = CoachSignals.StressRun(minutes: minutes, steps: steps)
+        // `score` is part of the reading now: C1 refuses a run below the absolute floor even when the user's own
+        // percentile says it is high (catalog nudge_c1_min_score).
+        signals.stressRun = CoachSignals.StressRun(minutes: minutes, steps: steps, score: score)
         return signals
     }
 
     func testC1SilentOneMinuteShortOfTheDuration() {
         let signals = stressSignal(minutes: N.c1MinDurationMinutes - 1, steps: 0)
-        XCTAssertEqual(outcome(signals, .c1).silentReason, "stress not sustained")
+        XCTAssertEqual(outcome(signals, .c1).silentReason, "duration below 60 min")
     }
 
     func testC1FiresAtTheDurationEdge() {
@@ -264,7 +268,7 @@ final class NudgeRulesTests: XCTestCase {
 
     func testC1SilentWhenTheUserWalkedItOff() {
         let signals = stressSignal(minutes: N.c1MinDurationMinutes, steps: N.c1MaxSteps)
-        XCTAssertEqual(outcome(signals, .c1).silentReason, "moving during the stress")
+        XCTAssertEqual(outcome(signals, .c1).silentReason, "too many steps during the high stretch")
     }
 
     func testC1SilentInAWorkoutOrAsleep() {
@@ -273,7 +277,7 @@ final class NudgeRulesTests: XCTestCase {
         XCTAssertEqual(outcome(signals, .c1).silentReason, "in a workout")
         signals.today.inWorkout = false
         signals.today.awake = false
-        XCTAssertEqual(outcome(signals, .c1).silentReason, "not awake")
+        XCTAssertEqual(outcome(signals, .c1).silentReason, "asleep")
     }
 
     // MARK: E1 drifting sleep times
@@ -294,13 +298,13 @@ final class NudgeRulesTests: XCTestCase {
     }
 
     func testE1SilentOneNightShort() {
-        XCTAssertEqual(outcome(driftSignal(driftingNights: N.e1DriftNights - 1), .e1).silentReason, "sleep times steady")
+        XCTAssertEqual(outcome(driftSignal(driftingNights: N.e1DriftNights - 1), .e1).silentReason, "only 2 drifted nights")
     }
 
     func testE1SilentWithoutAFullWeek() {
         var signals = driftSignal(driftingNights: 3)
         signals.nights = Array(signals.nights.prefix(N.e1WindowNights - 1))
-        XCTAssertEqual(outcome(signals, .e1).silentReason, "not enough nights")
+        XCTAssertEqual(outcome(signals, .e1).silentReason, "fewer than 5 recorded nights")
     }
 
     // MARK: E2 improving
@@ -337,12 +341,12 @@ final class NudgeRulesTests: XCTestCase {
 
     func testE2SilentOneDayBelowTheCount() {
         let signals = trendSignal(improvementPercent: Double(N.e2ImprovementPercent), daysAbove: N.e2MinDaysAbove - 1)
-        XCTAssertEqual(outcome(signals, .e2).silentReason, "no improvement over two weeks")
+        XCTAssertEqual(outcome(signals, .e2).silentReason, "below 10%")
     }
 
     func testE2SilentOnePercentBelowTheImprovement() {
         let signals = trendSignal(improvementPercent: Double(N.e2ImprovementPercent) - 1, daysAbove: N.e2MinDaysAbove)
-        XCTAssertEqual(outcome(signals, .e2).silentReason, "no improvement over two weeks")
+        XCTAssertEqual(outcome(signals, .e2).silentReason, "below 10%")
     }
 
     // MARK: F1 streak
@@ -364,7 +368,7 @@ final class NudgeRulesTests: XCTestCase {
     }
 
     func testF1SilentOffMilestone() {
-        XCTAssertEqual(outcome(streakSignal(4), .f1).silentReason, "no streak milestone today")
+        XCTAssertEqual(outcome(streakSignal(4), .f1).silentReason, "4 is not a milestone")
     }
 
     // MARK: F2 weekly review
@@ -386,13 +390,13 @@ final class NudgeRulesTests: XCTestCase {
 
     func testF2SilentOneGoodDayShort() {
         XCTAssertEqual(outcome(reviewSignal(goodDays: N.f2MinGoodDays - 1), .f2).silentReason,
-                       "not enough good days this week")
+                       "fewer than 5 good days")
     }
 
     func testF2SilentOnAnotherDay() {
         var signals = reviewSignal(goodDays: 7)
         signals.now = at(hour: 18, minute: 30, on: "2026-10-19T07:30:00Z")
-        XCTAssertEqual(outcome(signals, .f2).silentReason, "not the weekly review day")
+        XCTAssertEqual(outcome(signals, .f2).silentReason, "not the chosen day")
     }
 
     func testF2SilentBeforeTheReviewTime() {
@@ -421,7 +425,7 @@ final class NudgeRulesTests: XCTestCase {
 
     func testG1SilentOneHourShort() {
         XCTAssertEqual(outcome(ringSignal(hoursSinceSync: Double(N.g1NoSyncHours) - 1), .g1).silentReason,
-                       "ring synced recently")
+                       "synced recently")
     }
 
     func testG1SilentWithoutAPairedRing() {

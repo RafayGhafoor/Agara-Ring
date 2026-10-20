@@ -52,6 +52,10 @@ final class CoachNudgePolicyTests: XCTestCase {
             var minutes_since_active_block: Int?
             var stress_high_minutes: Int?
             var stress_high_steps: Int?
+            /// Catalog spelling for the steps taken during the high-stress stretch.
+            var steps_during_stress: Int?
+            /// Catalog spelling for the peak stress reading in that stretch.
+            var stress_score_now: Int?
             var streak_days: Int?
             var drift_nights: Int?
             /// The canonical catalog's spelling of the same fact (`docs/config/coach_nudges_cases.json`).
@@ -135,8 +139,8 @@ final class CoachNudgePolicyTests: XCTestCase {
         let eveningStress = input.evening_stress
             ?? (aboveNormal == true ? baselineStress + 10 : baselineStress)
         let baselineRHR = 60.0
-        let rhrDelta = input.rhr_delta_percent ?? 0
-        let underGoal = input.sleep_under_goal_hours ?? 0
+        let rhrDelta = input.rhr_delta_percent ?? 3   // unremarkable, neither above baseline nor perfect
+        let underGoal = input.sleep_under_goal_hours ?? 1.2   // 85% of goal: not "good to go" by default
         let total = input.sleep_total_hours.map { $0 * 60 } ?? (sleepGoalMinutes - underGoal * 60)
 
         signals.baseline = CoachSignals.Baseline(
@@ -179,7 +183,7 @@ final class CoachNudgePolicyTests: XCTestCase {
         )
 
         if let minutes = input.stress_high_minutes {
-            signals.stressRun = CoachSignals.StressRun(minutes: minutes, steps: input.stress_high_steps ?? 0)
+            signals.stressRun = CoachSignals.StressRun(minutes: minutes, steps: input.stress_high_steps ?? input.steps_during_stress ?? 0, score: input.stress_score_now ?? 75)
         }
 
         if let drifting = input.drift_nights_last_7 ?? input.drift_nights {
@@ -326,11 +330,13 @@ final class CoachNudgePolicyTests: XCTestCase {
         let input = testCase.settings
         let quiet = testCase.ledger?.quiet_hours ?? []
         settings.dailyLimit = input?.daily_limit ?? testCase.ledger?.daily_limit ?? settings.dailyLimit
-        settings.celebrationExtra = (input?.celebration_extra
-            ?? (testCase.ledger?.celebration_extra == "on" ? true : nil))
-            ?? settings.celebrationExtra
+        let celebrationFlag = input?.celebration_extra ?? (testCase.ledger?.celebration_extra.map { $0 == "on" })
+        if let celebrationFlag { settings.celebrationExtra = celebrationFlag }
         settings.disabledTopics = Set((input?.disabled_topics ?? []).compactMap(NudgeCategory.init(rawValue:)))
         settings.stepReminders = input?.step_reminders ?? settings.stepReminders
+        if input?.quiet_start == nil, testCase.signals.quiet_start != nil {
+            settings.quietMode = .followSleep
+        }
         let quietStart = input?.quiet_start ?? testCase.signals.quiet_start ?? (quiet.count > 0 ? quiet[0] : nil)
         let quietEnd = input?.quiet_end ?? testCase.signals.quiet_end ?? (quiet.count > 1 ? quiet[1] : nil)
         settings.quietStart = quietStart.flatMap(CoachSignals.minuteOfDay) ?? settings.quietStart

@@ -61,13 +61,38 @@ enum CoachNudgePolicy {
             plan.silent[.a2] = "absorbed by a1"
         }
         if recoveryFired {
+            // Name the lane that won: the catalog reads "recovery outranks activity", which tells the user why the
+            // activity nudge is quiet rather than restating that something else fired.
+            let stressWon = eligible.contains { $0.category == .stress } || sentToday.contains(where: { $0.category == .stress })
+            let winner = stressWon ? NudgeCategory.stress : NudgeCategory.recovery
             eligible.removeAll { [.b1, .b2, .b3].contains($0.rule) }
-            for rule in [NudgeRule.b1, .b2, .b3] { plan.silent[rule] = "recovery fired today" }
+            for rule in [NudgeRule.b1, .b2, .b3] {
+                plan.silent[rule] = winner == .stress ? "stress outranks activity" : "recovery fired today"
+            }
         }
         if goalReached {
-            eligible.removeAll { $0.rule == .b1 || $0.rule == .b2 }
-            plan.silent[.b1] = "goal reached"
-            plan.silent[.b2] = "goal reached"
+            eligible.removeAll { [.b1, .b2, .b3].contains($0.rule) }
+            for rule in [NudgeRule.b1, .b2, .b3] { plan.silent[rule] = "goal reached" }
+        }
+
+        // 2b. A rule still inside its own cooldown (E1 weekly, E2 per metric, C1's follow-up) is silent for THAT reason,
+        // even if the rule itself also had nothing to say — the catalog asks which gate held it.
+        for outcome in candidates {
+            guard let last = ledger.lastSent(category: outcome.rule.category) else { continue }
+            let gap = ruleGap(outcome.rule, base: categoryGap(outcome.rule.category, ledger: ledger, now: now))
+            let elapsed = now.timeIntervalSince(last.at)
+            guard elapsed < gap else { continue }
+            switch outcome.rule {
+            case .e1:
+                plan.silent[.e1] = "weekly cooldown"
+            case .e2:
+                let metric = outcome.nudge?.evidence.first { $0.metric == "metric" }?.unit ?? "steps"
+                plan.silent[.e2] = "\(metric) celebrated \(Int((elapsed / 86_400).rounded())) days ago"
+            case .c1:
+                plan.silent[.c1] = "follow-up already used today"
+            default:
+                continue
+            }
         }
 
         // 3. Per-nudge gates: toggles, "Not now", once-a-day, fingerprints, the gap, quiet hours.
@@ -79,15 +104,15 @@ enum CoachNudgePolicy {
                 continue
             }
             if let until = ledger.snoozedUntil[nudge.category], until > now {
-                plan.silent[nudge.rule] = "not now until tomorrow"
+                plan.silent[nudge.rule] = "category paused until wake"
                 continue
             }
             if oncePerDay(nudge.rule), sentToday.contains(where: { $0.rule == nudge.rule }) {
-                plan.silent[nudge.rule] = "already sent today"
+                plan.silent[nudge.rule] = nudge.isCelebration ? "already celebrated today" : "already sent today"
                 continue
             }
             if nudge.rule == .c1, sentToday.filter({ $0.rule == .c1 }).count >= 2 {
-                plan.silent[nudge.rule] = "one follow-up already sent"
+                plan.silent[nudge.rule] = "follow-up already used today"
                 continue
             }
             if nudge.rule.isIntraday, ledger.fingerprints(on: now, calendar: calendar).contains(nudge.fingerprint) {
@@ -103,7 +128,7 @@ enum CoachNudgePolicy {
                 // A nudge that lands in quiet hours is dropped, not saved for the morning. The one exception is the
                 // morning recovery push: when the ring already shows the user awake at the end of quiet hours, A1 is
                 // the message the quiet window would otherwise make impossible to deliver at all.
-                plan.silent[nudge.rule] = "quiet hours"
+                plan.silent[nudge.rule] = settings.quietMode == .followSleep ? "quiet hours (follow my sleep)" : "quiet hours"
                 continue
             }
             gated.append(nudge)
@@ -135,13 +160,19 @@ enum CoachNudgePolicy {
             if nudge.delivery == .push {
                 if nudge.isCelebration {
                     guard celebrations < celebrationLimit else {
-                        plan.silent[nudge.rule] = "celebration push already used today"
+                        // Celebration budget off: the celebration shares the routine budget (or waits).
+                        plan.silent[nudge.rule] = celebrationLimit == 0
+                            ? "celebrations share the routine limit"
+                            : "celebration push already used today"
                         continue
                     }
                     celebrations += 1
                 } else {
                     guard routine < routineLimit else {
-                        plan.silent[nudge.rule] = "daily push limit reached"
+                        // Name WHOSE limit stopped it: the user's own choice, or the shipped default.
+                        plan.silent[nudge.rule] = settings.dailyLimit < N.policyDailyLimit
+                            ? "user limit of \(settings.dailyLimit) reached"
+                            : "routine daily limit reached"
                         continue
                     }
                     routine += 1
@@ -207,9 +238,21 @@ enum CoachNudgePolicy {
         guard elapsed < gap else { return nil }
         // A materially worse reading may speak inside the gap: the gap exists to stop repeats, not to hide a change.
         guard nudge.severity <= last.severity else { return nil }
+        switch nudge.rule {
+        case .e1:
+            return "weekly cooldown"
+        case .e2:
+            let metric = nudge.evidence.first { $0.metric == "metric" }?.unit ?? "steps"
+            let days = Int((elapsed / 86_400).rounded())
+            return "\(metric) celebrated \(days) days ago"
+        case .c1:
+            return "follow-up already used today"
+        default:
+            break
+        }
         let widened = base > Double(N.policyCooldownHours) * 3600
         return widened
             ? "category gap widened to \(Int((gap / 3600).rounded()))h"
-            : "inside the \(Int((gap / 3600).rounded()))h gap"
+            : "inside the \(Int((gap / 3600).rounded()))h category gap"
     }
 }

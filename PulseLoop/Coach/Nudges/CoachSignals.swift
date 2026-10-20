@@ -86,6 +86,9 @@ struct CoachSignals: Equatable, Sendable {
     struct StressRun: Equatable, Sendable {
         var minutes: Int
         var steps: Int
+        /// The peak reading in the run. Kept because the percentile alone is not a reading: a user whose 80th percentile
+        /// is 30 must not be nudged about nothing (catalog `nudge_c1_min_score`).
+        var score: Int = 0
     }
 
     var now: Date

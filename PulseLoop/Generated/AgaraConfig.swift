@@ -125,6 +125,7 @@ enum AgaraConfig {
         static let a2UnderGoalHours: Int = 2
         static let a2Delivery: String = "card"
         static let a3SleepGoalPercent: Int = 90
+        static let a3UntilTime: String = "12:00"
         static let a3Delivery: String = "card"
         static let b1FractionPercent: Int = 25
         static let b1CheckTime: String = "15:00"

@@ -470,7 +470,7 @@
     },
     {
       "id": "a2-suppressed-by-its-own-cooldown",
-      "why": "The short-night card was already shown 3 h ago with the same rounded numbers and nothing changed: no repeat inside the 6 h gap.",
+      "why": "The short-night card was already shown 3 h ago with the same rounded numbers and nothing changed: no repeat inside the 6 h gap. (Vocabulary settled 2026-10-20: one phrase, \"already sent today\", for every same-day repeat.)",
       "now": "2026-10-21T11:00:00Z",
       "signals": {
         "rhr_delta_percent": 0,
@@ -493,7 +493,7 @@
       "expect": {
         "emit": [],
         "silent": {
-          "a2": "category cooldown 6h"
+          "a2": "already sent today"
         },
         "push_count": 0
       }
@@ -1572,10 +1572,10 @@
         "emit": [
           "f2"
         ],
-        "silent": {
+        "push_count": 1,
+        "annotations": {
           "f2_recommendation": "keep it up"
-        },
-        "push_count": 1
+        }
       }
     },
     {
@@ -1853,7 +1853,7 @@
     },
     {
       "id": "policy-fingerprint-after-rounding",
-      "why": "The fingerprint comes from the rounded numbers, so 1,204 steps and 1,196 steps are the same fingerprint and the second is not sent.",
+      "why": "The fingerprint comes from the ROUNDED STEP COUNT, so 1,204 steps and 1,196 steps round to the same fingerprint (b1:12) and the second is not sent. Same basis as same-fingerprint-never-twice (b1:24) and policy-fingerprint-changes-with-the-number (b1:81).",
       "now": "2026-10-21T18:20:00Z",
       "signals": {
         "rhr_delta_percent": 0,
@@ -1867,7 +1867,7 @@
       },
       "ledger": {
         "fingerprints_today": [
-          "b1:88"
+          "b1:12"
         ]
       },
       "expect": {
@@ -1904,10 +1904,10 @@
         "emit": [
           "b1"
         ],
-        "silent": {
+        "push_count": 1,
+        "annotations": {
           "b1_fingerprint": "b1:81 was the old numbers"
-        },
-        "push_count": 1
+        }
       }
     },
     {
@@ -2185,7 +2185,7 @@
     },
     {
       "id": "policy-no-vitals-alarm",
-      "why": "A resting HR 40% above baseline is still a wellness comparison: no vitals alarm fires and the wording stays comparative.",
+      "why": "A resting HR 40% above baseline is still a wellness comparison: no vitals alarm fires and the wording stays comparative. (No vitals alarm exists anywhere in the product - that is a property, not a silence reason.)",
       "now": "2026-10-21T07:30:00Z",
       "signals": {
         "rhr_delta_percent": 40,
@@ -2197,14 +2197,14 @@
       "expect": {
         "emit": [],
         "silent": {
-          "a1": "only one signal down; no vitals alarm exists"
+          "a1": "only one signal down"
         },
         "push_count": 0
       }
     },
     {
       "id": "policy-goal-change-needs-confirmation",
-      "why": "The 'Lighter today' action is only offered as a button on A1/A2 and never applied by itself: with neither fired, the goal is untouched.",
+      "why": "The 'Lighter today' action is only offered as a button on A1/A2 and never applied by itself: with neither fired the goal is untouched. At exactly the check time with 42% of the goal done, B1's reason is the descriptive one (the edge is inclusive), and B3 is inside its window 20 min after an active block.",
       "now": "2026-10-21T15:00:00Z",
       "signals": {
         "rhr_delta_percent": 0,
@@ -2221,8 +2221,8 @@
       "expect": {
         "emit": [],
         "silent": {
-          "b1": "too early",
-          "b3": "recently active"
+          "b1": "at or above 25% of goal",
+          "b3": "active within 180 min"
         },
         "push_count": 0
       }
