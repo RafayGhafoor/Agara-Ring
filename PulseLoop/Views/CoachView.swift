@@ -28,8 +28,9 @@ struct CoachView: View {
     @State private var dataChange = AgaraDataChange.shared
     @FocusState private var composerFocused: Bool
 
-    /// The empty thread's opening chips, built from the data the ring actually delivered (`CoachStarterPrompts`). They
-    /// are also the top-up pool for an answer that carries fewer than three follow-ups (`CoachFollowUpChips`).
+    /// The empty thread's opening chips, built from the data the ring actually delivered (`CoachStarterBuilder`: three
+    /// starters that quote the user's own numbers, degrading to generic questions when the store is empty). They are also
+    /// the top-up pool for an answer that carries fewer than three follow-ups (`CoachFollowUpChips`).
     @State private var starterPrompts: [String] = []
 
     // Image attachment (multimodal input). One staged image per message.
@@ -275,7 +276,7 @@ struct CoachView: View {
 
     /// Rebuild the empty thread's chips from the current data (cheap: one context packet, no model call).
     private func refreshStarterPrompts() {
-        starterPrompts = CoachStarterPrompts.make(packet: CoachContextBuilder.build(context: modelContext, budget: .compact))
+        starterPrompts = CoachStarterBuilder.build(context: modelContext).map(\.text)
     }
 
     private var composer: some View {

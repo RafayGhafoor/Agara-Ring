@@ -155,7 +155,23 @@ final class ConsistencyPhase456Tests: XCTestCase {
     // MARK: - Phase 6: flags
 
     func testParityFlagsDefaultOffAndGroupOverrides() {
-        for flag in AgaraFeatureStore.parityFlags { XCTAssertFalse(flag.defaultOn, "\(flag) must ship off") }
+        // The parity-switch rule is "off on both apps until the feature is ported". The owner closed that rule for the
+        // coach on 2026-10-20 (decision 5, docs/process/plans/coach-cloud-1.1.md): the 1.1 coach is iOS-only on purpose
+        // and the platform difference is recorded in docs/apps/parity-matrix.md, with per-platform flag values in
+        // docs/config/features.yaml (value: off, ios: on). Every OTHER parity flag must still ship off.
+        let platformSpecific: Set<AgaraFeature> = [.coach, .coachHistory]
+        XCTAssertTrue(platformSpecific.isSubset(of: Set(AgaraFeatureStore.parityFlags)),
+                      "the coach flags are parity switches too")
+        // coach_cloud is the new 1.1 switch (iOS on, Android off); it is deliberately not in parityFlags, whose meaning
+        // is "one switch per feature both apps already have", so assert its shipped value directly.
+        XCTAssertTrue(AgaraFeature.coachCloud.defaultOn, "coach_cloud ships ON for iOS 1.1")
+        for flag in AgaraFeatureStore.parityFlags {
+            if platformSpecific.contains(flag) {
+                XCTAssertTrue(flag.defaultOn, "\(flag) ships ON for iOS 1.1 (owner 2026-10-20)")
+            } else {
+                XCTAssertFalse(flag.defaultOn, "\(flag) must ship off")
+            }
+        }
         let parity = AgaraFeatureStore.parse("parity=on")
         XCTAssertEqual(Set(parity.keys), Set(AgaraFeatureStore.parityFlags))
         let all = AgaraFeatureStore.parse("all=on,coach=off")
