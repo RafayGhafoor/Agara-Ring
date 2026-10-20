@@ -5,6 +5,10 @@ import SwiftUI
 /// sources, and tappable follow-up chips.
 struct CoachResponseView: View {
     let response: CoachResponse
+    /// The conversation's data-based starter prompts: answers that carry fewer than three follow-ups (a debug-build
+    /// bring-your-own-key provider, or a message written before the contract required three) are topped up from here
+    /// instead of rendering a short row.
+    var fallbackChips: [String] = []
     var onChipTap: ((String) -> Void)?
 
     var body: some View {
@@ -90,16 +94,17 @@ struct CoachResponseView: View {
 
     @ViewBuilder
     private var chipsSection: some View {
-        if !response.followUpChips.isEmpty {
-            // Full-width tappable rows (≤2). Wider than the old capsules so a
-            // real follow-up question reads without truncation. `.prefix(2)`
-            // clamps legacy messages and non-strict providers at render time.
+        let chips = CoachFollowUpChips.balanced(response.followUpChips, fallback: fallbackChips)
+        if !chips.isEmpty {
+            // Full-width tappable rows — exactly three, the contract's number: wide enough that a real follow-up
+            // question reads without truncation. `balanced` keeps at most three and tops short answers up.
             VStack(spacing: 6) {
-                ForEach(Array(response.followUpChips.prefix(2)), id: \.self) { chip in
+                ForEach(chips, id: \.self) { chip in
                     Button { onChipTap?(chip) } label: {
                         CoachFollowUpChipLabel(text: chip)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier("coach.chip")
                 }
             }
             .padding(.top, 2)

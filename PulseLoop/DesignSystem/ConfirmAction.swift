@@ -127,6 +127,14 @@ extension ConfirmAction {
                       confirmLabel: AgaraCloudCopy.deleteAccountConfirm, perform: perform)
     }
 
+    /// Settings › AI Coach › Cloud coach › Withdraw consent (Apple 5.1.2(i)): stops cloud answers for good until the
+    /// user agrees again, and leaves the on-device coach working. Destructive because it takes a capability away.
+    static func withdrawCoachConsent(_ perform: @escaping () -> Void) -> ConfirmAction {
+        ConfirmAction(key: "withdrawCoachConsent", title: CoachCopy.consentWithdrawConfirmTitle,
+                      message: CoachCopy.consentWithdrawConfirmBody,
+                      confirmLabel: CoachCopy.consentWithdrawConfirm, perform: perform)
+    }
+
     static func removeAppleHealthData(_ perform: @escaping () -> Void) -> ConfirmAction {
         ConfirmAction(
             key: "removeAppleHealthData",

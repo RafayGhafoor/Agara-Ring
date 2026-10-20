@@ -1,13 +1,17 @@
 import SwiftUI
 import Charts
 
-/// Renders a `CoachChart` whose data is already embedded (computed by the
-/// `prepare_chart` tool). Generic over the five chart types; uses the point
-/// index for x-position so heterogeneous x labels (dates, minutes) stay ordered.
+/// Renders a `CoachChart` whose data is already embedded (computed by the `prepare_chart` tool).
 ///
-/// The y-axis autoscales to the data (trend charts never get forced through 0,
-/// so trends stay visible and lines don't fall off-frame), and `sleep_stage`
-/// reuses the Sleep page's hypnogram instead of thin bars.
+/// Built on the app's **one chart component** (`AgaraChart`, AGENTS Rule 10), like every other graph in the app: the
+/// wrapper owns the scrub/tap tooltip, the empty state, the accessibility summary and the frame height, and this view
+/// only supplies the marks, the scales and the coach's per-metric value labels. Before 1.1 it drew its own `Chart`
+/// with no tooltip, so a coach chart could not be scrubbed and its values were unreadable to VoiceOver — the audit in
+/// the 1.1 coach plan flagged it (`CoachChartView` vs `AgaraChart`).
+///
+/// Two things stay coach-specific and belong here, not in the shared component: the *data* (`CoachChartPoint` carries
+/// x as the server's own label string) and the metric colours/labels. `sleep_stage` keeps the Sleep page's
+/// hypnogram (`SleepStageBar`), which is the shared component for that shape.
 struct CoachChartView: View {
     let chart: CoachChart
     var height: CGFloat = 170
@@ -24,21 +28,21 @@ struct CoachChartView: View {
         }
     }
 
+    /// The shared component's empty state: the coach's own sentence, at the chart's height.
+    private var emptyState: AgaraChartEmpty {
+        AgaraChartEmpty(text: "No data to plot for this range.", minimumPoints: 1, minHeight: height)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(chart.title)
                 .font(AgaraFont.caption)
                 .foregroundStyle(AgaraColors.textSecondary)
 
-            if chart.data.isEmpty {
-                Text("No data to plot for this range.")
-                    .font(AgaraFont.caption.weight(.regular))
-                    .foregroundStyle(AgaraColors.textMuted)
-                    .frame(maxWidth: .infinity, minHeight: 60, alignment: .center)
-            } else if chart.chartType == .sleepStage {
+            if chart.chartType == .sleepStage {
                 sleepHypnogram
             } else {
-                plot.frame(height: height)
+                plot
             }
 
             if !chart.annotations.isEmpty {
@@ -65,56 +69,67 @@ struct CoachChartView: View {
 
     // MARK: - Standard plot (line / dot / bar / sparkline)
 
+    /// Line, dot and sparkline plot against the point's index: heterogeneous x labels (days, minutes) stay evenly
+    /// spaced instead of collapsing onto one another. The label still reaches the tooltip through `detailText`.
     @ViewBuilder private var plot: some View {
-        let indexed = Array(chart.data.enumerated())
-        let domain = yDomain
-        let showPoints = chart.data.count <= 8
-
         switch chart.chartType {
-        case .line:
-            Chart(indexed, id: \.offset) { i, point in
-                LineMark(x: .value("i", i), y: .value("y", point.y))
-                    .interpolationMethod(.monotone)
-                    .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
-                    .foregroundStyle(color)
-                if showPoints {
-                    PointMark(x: .value("i", i), y: .value("y", point.y))
-                        .symbolSize(20)
-                        .foregroundStyle(color)
+        case .line, .dot, .sparkline:
+            let points = chart.data.enumerated().map { index, point in
+                AgaraChartPoint(x: index, y: point.y, detailText: point.x)
+            }
+            AgaraChart(points: points,
+                       height: height,
+                       empty: emptyState,
+                       accessibilityTitle: chart.title,
+                       valueLabel: { Self.valueLabel($0, metric: chart.metric) },
+                       xLabel: { index in chart.data.indices.contains(index) ? chart.data[index].x : "" }) {
+                ForEach(Array(chart.data.enumerated()), id: \.offset) { index, point in
+                    switch chart.chartType {
+                    case .line:
+                        LineMark(x: .value("i", index), y: .value("y", point.y))
+                            .interpolationMethod(.monotone)
+                            .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
+                            .foregroundStyle(color)
+                        if chart.data.count <= 8 {
+                            PointMark(x: .value("i", index), y: .value("y", point.y))
+                                .symbolSize(20)
+                                .foregroundStyle(color)
+                        }
+                    case .sparkline:
+                        LineMark(x: .value("i", index), y: .value("y", point.y))
+                            .interpolationMethod(.monotone)
+                            .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
+                            .foregroundStyle(color)
+                    default:
+                        PointMark(x: .value("i", index), y: .value("y", point.y))
+                            .symbolSize(34)
+                            .foregroundStyle(color)
+                    }
                 }
             }
-            .chartYScale(domain: domain)
+            // The y-axis autoscales to the data (trend charts never get forced through 0), and spo2 is clamped to
+            // ≤100 — see `yDomain`, which is pure so it stays unit-tested.
+            .chartYScale(domain: yDomain)
             .chartXAxis(.hidden)
-            .chartYAxis { axisMarks }
-
-        case .sparkline:
-            Chart(indexed, id: \.offset) { i, point in
-                LineMark(x: .value("i", i), y: .value("y", point.y))
-                    .interpolationMethod(.monotone)
-                    .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
-                    .foregroundStyle(color)
+            .chartYAxis {
+                if chart.chartType != .sparkline { axisMarks }
             }
-            .chartYScale(domain: domain)
-            .chartXAxis(.hidden)
-            .chartYAxis(.hidden)
-
-        case .dot:
-            Chart(indexed, id: \.offset) { i, point in
-                PointMark(x: .value("i", i), y: .value("y", point.y))
-                    .symbolSize(34)
-                    .foregroundStyle(color)
-            }
-            .chartYScale(domain: domain)
-            .chartXAxis(.hidden)
-            .chartYAxis { axisMarks }
 
         case .bar:
-            Chart(indexed, id: \.offset) { i, point in
-                BarMark(x: .value("x", point.x), y: .value("y", point.y))
-                    .clipShape(UnevenRoundedRectangle(topLeadingRadius: 6, topTrailingRadius: 6))
-                    .foregroundStyle(color.opacity(0.85))
+            let points = chart.data.map { AgaraChartPoint(x: $0.x, y: $0.y) }
+            AgaraChart(points: points,
+                       height: height,
+                       empty: emptyState,
+                       accessibilityTitle: chart.title,
+                       valueLabel: { Self.valueLabel($0, metric: chart.metric) },
+                       xLabel: { $0 }) {
+                ForEach(chart.data, id: \.id) { point in
+                    BarMark(x: .value("x", point.x), y: .value("y", point.y))
+                        .clipShape(UnevenRoundedRectangle(topLeadingRadius: 6, topTrailingRadius: 6))
+                        .foregroundStyle(color.opacity(0.85))
+                }
             }
-            .chartYScale(domain: domain)
+            .chartYScale(domain: yDomain)
             .chartXAxis {
                 AxisMarks(values: .automatic(desiredCount: min(6, chart.data.count))) { _ in
                     AxisValueLabel().font(AgaraFont.nano.weight(.regular)).foregroundStyle(AgaraColors.textMuted)
@@ -131,6 +146,19 @@ struct CoachChartView: View {
         AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { _ in
             AxisGridLine().foregroundStyle(AgaraColors.borderSubtle)
             AxisValueLabel().font(AgaraFont.nano.weight(.regular)).foregroundStyle(AgaraColors.textMuted)
+        }
+    }
+
+    /// The tooltip's value line, in the metric's unit ("7,912" steps, "62 bpm", "7h 12m").
+    static func valueLabel(_ value: Double, metric: CoachChartMetric) -> String {
+        switch metric {
+        case .steps: return Int(value.rounded()).formatted()
+        case .hr: return "\(Int(value.rounded())) bpm"
+        case .spo2: return "\(Int(value.rounded()))%"
+        case .sleep: return SleepFormat.duration(Int(value.rounded()))
+        case .activeMinutes: return "\(Int(value.rounded())) min"
+        case .calories: return "\(Int(value.rounded())) kcal"
+        case .distance: return String(format: "%.1f km", value)
         }
     }
 

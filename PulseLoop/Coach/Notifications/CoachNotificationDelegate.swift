@@ -9,21 +9,22 @@ import UserNotifications
 final class CoachNavigation {
     static let shared = CoachNavigation()
     var requestedConversationId: UUID?
-    /// Drives the Coach sheet. Coach is no longer a tab, so all entry points
-    /// (summary-card tap, notification deep-link, header button) set this true.
-    var showCoach = false
+    /// Asks `MainTabView` to bring the Coach tab forward (summary-card tap, notification deep link, a card in
+    /// Today). The coach is a tab of its own now, so there is no sheet to present and no floating button to press —
+    /// the request only selects the tab, and the tab's state decides what it shows.
+    var wantsCoachTab = false
 
     /// Open the coach on a specific conversation (deep link).
     func open(_ conversationId: UUID) {
         requestedConversationId = conversationId
-        showCoach = true
+        wantsCoachTab = true
     }
 
-    /// Open the coach with no specific conversation (e.g. the floating bubble).
+    /// Open the coach with no specific conversation.
     /// Clears any prior deep-link id so it doesn't reopen a stale thread.
     func openRoot() {
         requestedConversationId = nil
-        showCoach = true
+        wantsCoachTab = true
     }
 }
 

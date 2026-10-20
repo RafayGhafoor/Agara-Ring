@@ -3,18 +3,11 @@ import SwiftData
 import UIKit
 import PhotosUI
 
-private let coldStartPrompts = [
-    "How am I doing today?",
-    "Explain my heart rate trend",
-    "Summarize my week",
-    "Should I work out?",
-    "What data is missing?"
-]
-
+/// The coach conversation itself: the thread, the composer, the empty thread's data-based starter prompts and the
+/// header's actions. `CoachTabView` hands it over when the tab's state is `.ready`; every other state is a card.
 struct CoachView: View {
-    /// Called when a workout card in the chat is tapped. Coach stays routing-agnostic
-    /// so it reads the same whether it's presented as a tab or (as now) as a sheet —
-    /// the presenter decides how to get to the activity detail.
+    /// Called when a workout card in the chat is tapped. Coach stays routing-agnostic so the tab's presenter decides
+    /// how to get to the activity detail.
     var onOpenWorkout: ((UUID) -> Void)?
     /// Called when a meal card in the chat is tapped — same presenter-decides
     /// routing contract as `onOpenWorkout`.
@@ -30,7 +23,14 @@ struct CoachView: View {
     @State private var keyboardHeight: CGFloat = 0
     @State private var nav = CoachNavigation.shared
     @State private var settingsStore = CoachSettingsStore.shared
+    @State private var quota = CoachQuotaStore.shared
+    /// Coalesced "rows changed" signal, so the empty thread's prompts follow the last sync.
+    @State private var dataChange = AgaraDataChange.shared
     @FocusState private var composerFocused: Bool
+
+    /// The empty thread's opening chips, built from the data the ring actually delivered (`CoachStarterPrompts`). They
+    /// are also the top-up pool for an answer that carries fewer than three follow-ups (`CoachFollowUpChips`).
+    @State private var starterPrompts: [String] = []
 
     // Image attachment (multimodal input). One staged image per message.
     @State private var stagedImage: UIImage?
@@ -86,6 +86,7 @@ struct CoachView: View {
                         ForEach(messages) { message in
                             CoachBubble(
                                 message: message,
+                                fallbackChips: starterPrompts,
                                 onChipTap: { send($0) },
                                 onConfirm: { viewModel.confirmPendingAction(message, context: modelContext) },
                                 onCancel: { viewModel.cancelPendingAction(message, context: modelContext) },
@@ -116,7 +117,7 @@ struct CoachView: View {
                 if showColdStart(messages) {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 6) {
-                            ForEach(coldStartPrompts, id: \.self) { prompt in
+                            ForEach(starterPrompts, id: \.self) { prompt in
                                 Button { send(prompt) } label: {
                                     Text(prompt)
                                         .font(AgaraFont.caption.weight(.regular))
@@ -125,6 +126,7 @@ struct CoachView: View {
                                         .agaraGlass(Capsule())
                                 }
                                 .buttonStyle(.plain)
+                                .accessibilityIdentifier("coach.starter")
                             }
                         }
                         .padding(.horizontal, 12).padding(.vertical, 8)
@@ -157,7 +159,10 @@ struct CoachView: View {
                 activeConversationId = latestMessageConversationId() ?? conversations.first?.id
             }
             if nav.requestedConversationId != nil { openRequestedConversation() }
+            refreshStarterPrompts()
         }
+        // New ring data changes what the empty thread should suggest ("I'm at 4,210 steps…").
+        .onChange(of: dataChange.token) { _, _ in refreshStarterPrompts() }
         .onChange(of: nav.requestedConversationId) { _, id in
             if id != nil { openRequestedConversation() }
         }
@@ -212,9 +217,22 @@ struct CoachView: View {
             CoachOrb(size: 40)
             VStack(alignment: .leading, spacing: 1) {
                 Text(AgaraCopy.coachTitle).font(AgaraFont.subheadline.weight(.semibold)).foregroundStyle(AgaraColors.textPrimary)
-                Text("Using your latest ring sync").font(AgaraFont.caption2.weight(.regular)).foregroundStyle(AgaraColors.textMuted)
+                Text(headerSubtitle).font(AgaraFont.caption2.weight(.regular)).foregroundStyle(AgaraColors.textMuted)
             }
             Spacer()
+            // The quota pill sits between the name and the actions: “24 left today”, from the last response's
+            // `X-Coach-Remaining-Day`. Hidden until the day's first response says how many are left.
+            if let pill = quota.pillText {
+                Text(pill)
+                    .font(AgaraFont.caption2.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(AgaraColors.textSecondary)
+                    .padding(.horizontal, 9).padding(.vertical, 5)
+                    .background(AgaraColors.cardSoft, in: Capsule())
+                    .overlay(Capsule().stroke(AgaraColors.borderSubtle, lineWidth: 0.5))
+                    .accessibilityIdentifier("coach.quota")
+                    .accessibilityLabel(quota.pillSpokenText ?? pill)
+                    .accessibilityHint(CoachCopy.quotaPillHint)
+            }
             // Sibling glass circles share one container so their glass renders/blends together.
             HStack(spacing: 12) {
                 Button { composerFocused = false; showUsage = true } label: {
@@ -236,7 +254,8 @@ struct CoachView: View {
                             .frame(width: 36, height: 36).agaraGlass(Circle(), interactive: true)
                             .minTapTarget(visualSize: 36)
                     }
-                    .accessibilityLabel("Conversation history")
+                    .accessibilityLabel(CoachCopy.historyButton)
+                    .accessibilityIdentifier("coach.history")
                 }
             }
             .agaraGlassContainer(spacing: 8)
@@ -244,6 +263,19 @@ struct CoachView: View {
         .padding(.horizontal, 16).padding(.vertical, 12)
         .background(AgaraColors.secondaryBackground)
         .overlay(alignment: .bottom) { Rectangle().fill(AgaraColors.borderSubtle).frame(height: 1) }
+    }
+
+    /// Where the answer comes from — the cloud proxy or this phone — under the coach's name. It is the one place the
+    /// user is told, without opening Settings, whether their data is leaving the device.
+    private var headerSubtitle: String {
+        settingsStore.settings.providerMode == .backendProxy
+            ? CoachCopy.headerCloudSubtitle
+            : CoachCopy.headerOnDeviceSubtitle
+    }
+
+    /// Rebuild the empty thread's chips from the current data (cheap: one context packet, no model call).
+    private func refreshStarterPrompts() {
+        starterPrompts = CoachStarterPrompts.make(packet: CoachContextBuilder.build(context: modelContext, budget: .compact))
     }
 
     private var composer: some View {
@@ -496,6 +528,8 @@ struct CoachOrb: View {
 
 struct CoachBubble: View {
     let message: CoachMessage
+    /// The conversation's data-based starter prompts, used to top an answer's chips up to three.
+    var fallbackChips: [String] = []
     var onChipTap: ((String) -> Void)?
     var onConfirm: (() -> Void)?
     var onCancel: (() -> Void)?
@@ -568,7 +602,7 @@ struct CoachBubble: View {
         if let turnError {
             CoachErrorBubble(error: turnError)
         } else if let structured {
-            CoachResponseView(response: structured, onChipTap: onChipTap)
+            CoachResponseView(response: structured, fallbackChips: fallbackChips, onChipTap: onChipTap)
                 .padding(14)
                 .agaraGlass(RoundedRectangle(cornerRadius: 18, style: .continuous))
         } else if message.role == "user" && message.body.isEmpty && !attachments.isEmpty {

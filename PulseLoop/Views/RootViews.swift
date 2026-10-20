@@ -309,12 +309,9 @@ struct MainTabView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var selected: MainTab
     @State private var nav = CoachNavigation.shared
-    @State private var coachStore = CoachSettingsStore.shared
     /// Card-reorder edit mode, entered inside a tab but chromed here: the Done bar floats above the
-    /// tab bar and the coach FAB has to step aside.
+    /// tab bar.
     @State private var reorder = CardReorderSession.shared
-    /// Route requested from inside the Coach sheet, pushed once the sheet dismisses.
-    @State private var pendingCoachRoute: AppRoute?
     /// A tapped notification's destination (`AgaraNotifications` deep links).
     @State private var deepLinks = AgaraDeepLinks.shared
 
@@ -324,22 +321,27 @@ struct MainTabView: View {
     init(path: Binding<NavigationPath>) {
         self._path = path
         // Optional `-startTab vitals` launch arg (parsed into UserDefaults) for screenshot tooling.
+        // A tab the bar does not show (Settings lives behind the gear now) falls back to Today.
         let raw = DebugLaunch.string("startTab")
         let requested = MainTab.allCases.first { $0.rawValue.lowercased() == raw } ?? .today
-        // Coach is no longer a tab (it opens as a sheet), so `-startTab coach`
-        // just lands on Today.
-        _selected = State(initialValue: Self.sessionTab ?? (requested == .coach ? .today : requested))
+        _selected = State(initialValue: Self.sessionTab ?? (Self.visibleTabs.contains(requested) ? requested : .today))
     }
 
     @State private var features = AgaraFeatureStore.shared
     @State private var sampleData = SampleDataStore.shared
-    /// Coach FAB + sheet: flag `coach` and the user's master switch (`CoachGate`).
-    private var coachEnabled: Bool { features.isOn(.coach) && coachStore.settings.coachMasterEnabled }
-    private var visibleTabs: [MainTab] {
-        // Coach is intentionally NOT a tab — it opens as a sheet. Keeping it a tab
-        // pushed the count to 6 and iOS collapsed everything into a "More" tab.
-        MainTab.allCases.filter { $0 != .coach }
+    /// The five tabs the bar shows. Settings is **not** one of them: it sits behind the gear in the top bar, on every
+    /// tab, so six items never push iOS into a "More" fold (the 1.0 reason the coach was a sheet instead of a tab).
+    /// The coach keeps its tab only while its flag is on; the tab itself then explains any state that blocks it.
+    private static var visibleTabs: [MainTab] {
+        MainTab.allCases.filter { tab in
+            switch tab {
+            case .settings: return false
+            case .coach: return AgaraFeatureStore.isOn(.coach)
+            default: return true
+            }
+        }
     }
+    private var visibleTabs: [MainTab] { Self.visibleTabs }
 
     /// The screen for a given tab. Shared by the iOS 26 stock `Tab` bar and the
     /// iOS 18–25 paged fallback so content wiring stays in one place.
@@ -351,17 +353,16 @@ struct MainTabView: View {
         case .vitals:   VitalsView(path: $path, isActive: selected == .vitals).readableColumn()
         case .activity: ActivityView(path: $path).readableColumn()
         case .sleep:    SleepView().readableColumn()
-        case .coach:    CoachView()
+        // The coach's own tab decides what to show (chat, or the card for the state that blocks it) and pushes
+        // Settings screens through the same `path` the other tabs use.
+        case .coach:
+            CoachTabView(
+                onOpenRoute: { path.append($0) },
+                onOpenWorkout: { path.append(AppRoute.activityDetail($0)) },
+                onOpenMeal: { path.append(AppRoute.mealDetail($0)) }
+            )
         case .settings: SettingsView(path: $path).readableColumn()
         }
-    }
-
-    /// A card tapped inside the chat can't push onto `path` directly: the sheet
-    /// sits outside this NavigationStack, so the detail would slide in behind it. Park
-    /// the route and dismiss; `pushPendingCoachRoute` runs once the sheet is gone.
-    private func requestCoachRoute(_ route: AppRoute) {
-        pendingCoachRoute = route
-        nav.showCoach = false
     }
 
     /// Follow (and clear) a notification's deep link. `.measure` lands on Vitals, which opens the Measure sheet
@@ -379,13 +380,16 @@ struct MainTabView: View {
             path.append(AppRoute.settingsWearable)
         case .coach:
             CoachNavigation.shared.openRoot()
+            openCoachTabIfRequested()
         }
     }
 
-    private func pushPendingCoachRoute() {
-        guard let route = pendingCoachRoute else { return }
-        pendingCoachRoute = nil
-        path.append(route)
+    /// Bring the Coach tab forward when something asked for it (a notification, a Today/Sleep summary card). The coach
+    /// used to be a sheet driven by `CoachNavigation.showCoach`; it is a tab now, so the same request selects it.
+    private func openCoachTabIfRequested() {
+        guard nav.wantsCoachTab else { return }
+        nav.wantsCoachTab = false
+        if visibleTabs.contains(.coach) { selected = .coach }
     }
 
     var body: some View {
@@ -449,20 +453,9 @@ struct MainTabView: View {
         }
         .animation(.easeInOut(duration: 0.25), value: coordinator.isSyncing)
         .animation(.easeInOut(duration: 0.25), value: MeasurementService.shared.isActive)
-        .animation(AgaraMotion.materialize, value: coachEnabled)   // FAB materializes in/out
         .animation(AgaraMotion.materialize, value: reorder.isEditing)
-        // Floating Coach chat bubble, bottom-right, hovering above the tab bar. It steps aside while
-        // reordering: the cards are disabled then anyway, and the Done bar wants the full width.
-        .overlay(alignment: .bottomTrailing) {
-            if coachEnabled && !reorder.isEditing {
-                CoachFAB { CoachNavigation.shared.openRoot() }
-                    .padding(.trailing, 18)
-                    .padding(.bottom, AgaraLayout.floatingBottomInset)
-                    .transition(.scale(scale: 0.6).combined(with: .opacity))
-            }
-        }
         // Reorder chrome lives here, not in the tab: only at this level can it clear the tab bar (which
-        // is Apple's own on iOS 26) and coexist with the FAB.
+        // is Apple's own on iOS 26).
         .overlay(alignment: .bottom) {
             if reorder.isEditing {
                 ReorderDoneBar { reorder.end() }
@@ -475,21 +468,16 @@ struct MainTabView: View {
         // Notification taps: switch to the tab (or push the screen) the deep link names.
         .onChange(of: deepLinks.pending) { _, _ in followDeepLink() }
         .onAppear(perform: followDeepLink)
-        .onChange(of: coachEnabled) { _, enabled in
-            // Coach turned off — dismiss the sheet and clear any pending deep link.
-            if !enabled { nav.requestedConversationId = nil; nav.showCoach = false }
-        }
-        // Coach opens as a sheet (swipe-to-dismiss) instead of a tab, so it never
-        // crowds the tab bar. All entry points set `nav.showCoach`.
-        .sheet(isPresented: $nav.showCoach, onDismiss: pushPendingCoachRoute) {
-            CoachView(
-                onOpenWorkout: { requestCoachRoute(.activityDetail($0)) },
-                onOpenMeal: { requestCoachRoute(.mealDetail($0)) }
-            )
-                .presentationDragIndicator(.visible) // grabber ("pull tab") at the top of the sheet
-                // CoachView reads the coordinator; pass it explicitly (see the note on VitalsView's sheet —
-                // a sheet presented on the iPad/Mac idiom can lose the WindowGroup's environment objects).
-                .environment(coordinator)
+        // A summary card or a notification asked for the coach: select its tab. On the tab, the coach's own state
+        // decides what the user sees (the chat, or the card explaining what unblocks it).
+        .onChange(of: nav.wantsCoachTab) { _, _ in openCoachTabIfRequested() }
+        // The coach flag was turned off in Developer: its tab disappears, so leave it rather than show an
+        // empty page behind a bar that no longer lists it.
+        .onChange(of: features.isOn(.coach)) { _, on in
+            if !on {
+                nav.requestedConversationId = nil
+                if selected == .coach { selected = .today }
+            }
         }
         .background(AgaraColors.background.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
@@ -594,8 +582,9 @@ struct AppHeader: View {
                 }
             }
             Spacer(minLength: 8)
-            // Clean top bar: just the live connection status. Settings is in the tab
-            // bar; Coach is the floating bubble above the tab bar.
+            // The live connection status, then Settings behind a gear. Settings has no tab of its own any more:
+            // six tabs made iOS collapse the bar into "More", and Settings belongs one tap away from every tab
+            // rather than beside them (AGENTS: the gear is on the top bar of all five tabs).
             // Tap the ring chip → Wearable settings (add-a-ring / status).
             RingStatusChip(state: effectiveState, batteryPercent: effectiveBattery,
                            isCharging: AgaraFeatureStore.shared.isOn(.chargingState) && ble.isCharging,
@@ -604,6 +593,17 @@ struct AppHeader: View {
                 path.append(AppRoute.settingsWearable)
             }
             .coachMark(CoachMarkStore.ringChip, text: AgaraHelp.hintRingChip)
+            Button {
+                path.append(AppRoute.settings)
+            } label: {
+                Image(systemName: "gearshape")
+                    .font(AgaraFont.body.weight(.regular))
+                    .foregroundStyle(AgaraColors.textSecondary)
+                    .frame(width: 40, height: 40)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("settingsGear")
+            .accessibilityLabel("Settings")
         }
         .padding(.horizontal, 20)
         .padding(.top, 8)
@@ -862,55 +862,6 @@ func greetingForHour(_ date: Date = AppClock.now) -> String {
     case 12..<17: return "Good afternoon"
     case 17..<22: return "Good evening"
     default: return "Good night"
-    }
-}
-
-/// Floating Coach chat bubble — a circular tinted-glass button that hovers above
-/// the tab bar (bottom-right) and opens the Coach chat sheet. Real Liquid Glass on
-/// iOS 26+, solid accent fallback on older systems / Reduce Transparency.
-struct CoachFAB: View {
-    var action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: "bubble.left.and.text.bubble.right.fill")
-                .font(AgaraFont.title2)
-                .foregroundStyle(AgaraColors.accent)
-                .frame(width: 56, height: 56)
-                .modifier(CoachFABGlass())
-                // Consume every touch inside the circle so taps never fall through
-                // to the content scrolling underneath the bubble.
-                .contentShape(Circle())
-        }
-        .buttonStyle(FABPressStyle())
-        .shadow(color: .black.opacity(0.3), radius: 10, y: 4)
-        .accessibilityLabel("Open Coach chat")
-    }
-}
-
-/// Press-in spring for the FAB. A ButtonStyle (not a gesture) so it never leaks
-/// the touch to the view below.
-private struct FABPressStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.9 : 1)
-            .animation(.snappy(duration: 0.18), value: configuration.isPressed)
-    }
-}
-
-/// Frosted Liquid Glass bubble (no solid fill) so the icon reads as glass. Real
-/// glass on iOS 26+, Material fallback otherwise / under Reduce Transparency.
-private struct CoachFABGlass: ViewModifier {
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-
-    func body(content: Content) -> some View {
-        if #available(iOS 26, *), !reduceTransparency {
-            content.glassEffect(.regular.interactive(), in: Circle())
-        } else {
-            content
-                .background(.ultraThinMaterial, in: Circle())
-                .overlay(Circle().stroke(AgaraColors.borderSubtle, lineWidth: 1))
-        }
     }
 }
 

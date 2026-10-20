@@ -18,6 +18,8 @@ struct CoachSettingsSection: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \CoachMemory.importance, order: .reverse) private var memories: [CoachMemory]
     @State private var store = CoachSettingsStore.shared
+    /// The cloud coach's disclosure record — the row that shows it and the button that takes it back read this.
+    @State private var consent = CoachConsentStore.shared
     /// Presents the "Enable Coach Check-Ins?" prompt when the coach is first switched on.
     @State private var confirm: ConfirmAction?
     /// Set when the user opts into check-ins but iOS denies notification permission.
@@ -80,6 +82,24 @@ struct CoachSettingsSection: View {
     @State private var showLocalKey: Bool = false
     @State private var localKeyError: String?
 
+    /// The status line. For the cloud coach it is the tab's own state — one source of truth for "can it answer, and
+    /// if not, what unblocks it" — so Settings and the tab can never disagree.
+    private var statusLine: String {
+        guard store.settings.coachMasterEnabled, store.settings.providerMode == .backendProxy else {
+            return flags.statusLine
+        }
+        let state = CoachTabStateInput.currentState()
+        return state == .ready ? CoachCopy.cloudStatusReady : state.title
+    }
+
+    /// Take the cloud disclosure back: consent off, provider back to on-device, quota forgotten. The phone's own coach
+    /// keeps working, which is exactly what the confirmation promised.
+    private func withdrawConsent() {
+        consent.withdraw()
+        store.settings.providerMode = .appleOnDevice
+        CoachQuotaStore.shared.reset()
+    }
+
     private var flags: CoachFeatureFlags {
         let hasKey: Bool
         switch store.settings.providerMode {
@@ -130,7 +150,7 @@ struct CoachSettingsSection: View {
     }
 
     var body: some View {
-        StatusCopy(title: "Status", body: flags.statusLine)
+        StatusCopy(title: "Status", body: statusLine)
 
         SettingsGroup(header: "AI Coach") {
             FormToggleRow(title: "Enable AI Coach", isOn: masterEnabledBinding)
@@ -145,6 +165,25 @@ struct CoachSettingsSection: View {
         }
 
         if store.settings.coachMasterEnabled {
+            // The cloud coach's disclosure (Apple 5.1.2(i)): where the agreement is recorded and where it is taken
+            // back. Withdrawing is a `ConfirmAction` like every other action that takes a capability away, and it
+            // switches the provider back to on-device in the same step, so a cloud turn cannot follow a withdrawal.
+            SettingsGroup(header: CoachCopy.consentSettingsHeader, footer: CoachCopy.consentSettingsFooter) {
+                FormValueRow(title: CoachCopy.consentRow) {
+                    Text(consent.hasConsent ? CoachCopy.consentGiven : CoachCopy.consentNotGiven)
+                        .font(AgaraFont.body)
+                        .foregroundStyle(AgaraColors.textSecondary)
+                        .accessibilityIdentifier("coach.consent.state")
+                }
+                if consent.hasConsent {
+                    DestructiveButton(title: CoachCopy.consentWithdraw, systemImage: "hand.raised.slash") {
+                        confirm = .withdrawCoachConsent { withdrawConsent() }
+                    }
+                    .padding(12)
+                    .accessibilityIdentifier("coach.consent.withdraw")
+                }
+            }
+
             SettingsGroup(header: "Provider") {
                 FormMenuRow(title: "Provider", value: store.settings.providerMode.label) {
                     Picker("Provider", selection: providerBinding) {
