@@ -61,6 +61,44 @@ struct TodayView: View {
 
     private var profile: UserProfile? { profiles.first }
 
+    /// The "Lighter today" override in force, if any. Reading `revision` keeps the view subscribed to the store (its
+    /// values live in `UserDefaults`, which SwiftUI cannot observe by itself).
+    private var activeGoalOverride: DailyGoalOverride? {
+        let store = DailyGoalOverrideStore.shared
+        _ = store.revision
+        return store.active()
+    }
+
+    /// "Lighter today" made today's goal lower. Today says so, and offers the way back (the user's normal goal is never
+    /// modified, so "back to normal" only drops the override).
+    @ViewBuilder private func todayGoalOverrideRow(summary: TodaySummary) -> some View {
+        let overrides = DailyGoalOverrideStore.shared
+        if let override = activeGoalOverride {
+            let normal = summary.goals.stepsDaily
+            let lowered = DailyGoalOverride.goal(normal, percent: override.percent)
+            HStack(spacing: 10) {
+                Image(systemName: "figure.walk.circle")
+                    .foregroundStyle(AgaraColors.steps)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Today's step goal is \(lowered.formatted()) — \(override.percent)% lighter")
+                        .font(AgaraFont.footnote.weight(.semibold))
+                        .foregroundStyle(AgaraColors.textPrimary)
+                    Text("Your normal goal of \(normal.formatted()) comes back tomorrow.")
+                        .font(AgaraFont.caption)
+                        .foregroundStyle(AgaraColors.textMuted)
+                }
+                Spacer(minLength: 0)
+                Button("Back to normal") { overrides.clear() }
+                    .font(AgaraFont.caption.weight(.semibold))
+                    .foregroundStyle(AgaraColors.accent)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(AgaraColors.card))
+            .accessibilityIdentifier("nudge.goalOverride")
+        }
+    }
+
     /// Build the store exactly once, off the `body` path.
     private func ensureStore() {
         if store == nil { store = TodayStore(modelContext: modelContext, profile: profile) }
@@ -105,6 +143,11 @@ struct TodayView: View {
                 } else {
                     HeroInsightCardView(title: hero.title, summary: hero.summary, chips: hero.chips)
                 }
+
+                // Proactive nudges (deterministic, on-device): the Today cards, the "Learning your baseline" state and —
+                // while a "Lighter today" override is active — the honest statement of today's lowered goal.
+                NudgeTodaySection()
+                todayGoalOverrideRow(summary: summary)
 
                 LazyVGrid(columns: tileColumns, spacing: 12) {
                     tiles(activeStore)

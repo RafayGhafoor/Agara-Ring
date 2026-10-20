@@ -84,6 +84,18 @@ struct CoachView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(spacing: 12) {
+                        // A nudge's seeded answer (tap on a nudge or "Why?"): already written, with its numbers, its
+                        // chart and three questions. No model call until the user sends one.
+                        if let seed = nav.requestedSeed {
+                            CoachSeedCard(
+                                seed: seed,
+                                onAsk: { question in
+                                    nav.requestedSeed = nil
+                                    send(question)
+                                },
+                                onDismiss: { nav.requestedSeed = nil }
+                            )
+                        }
                         ForEach(messages) { message in
                             CoachBubble(
                                 message: message,

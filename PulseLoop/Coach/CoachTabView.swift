@@ -21,19 +21,28 @@ struct CoachTabView: View {
     @State private var showConsent = false
 
     var body: some View {
-        Group {
-            if state == .ready {
-                CoachView(onOpenWorkout: onOpenWorkout, onOpenMeal: onOpenMeal)
-            } else {
-                CoachStateCard(
-                    state: state,
-                    quotaBody: quotaStore.quotaBody,
-                    primary: primaryAction(for: state),
-                    secondary: secondaryAction(for: state)
-                )
+        VStack(spacing: 0) {
+            // Proactive nudges at the top of the Coach tab (policy rule 10: notifications off still means the nudges
+            // appear here). Same card view as Today, compact, and only while the nudge feature is on.
+            if AgaraFeatureStore.isOn(.coachNudges) {
+                ScrollView { NudgeForYouList() }
+                    .frame(maxHeight: 250)
+                    .scrollBounceBehavior(.basedOnSize)
             }
+            Group {
+                if state == .ready {
+                    CoachView(onOpenWorkout: onOpenWorkout, onOpenMeal: onOpenMeal)
+                } else {
+                    CoachStateCard(
+                        state: state,
+                        quotaBody: quotaStore.quotaBody,
+                        primary: primaryAction(for: state),
+                        secondary: secondaryAction(for: state)
+                    )
+                }
+            }
+            .animation(.easeInOut(duration: 0.2), value: state)
         }
-        .animation(.easeInOut(duration: 0.2), value: state)
         .sheet(isPresented: $showConsent) {
             CoachConsentSheet()
                 // The sheet's agree button records the consent and closes the sheet; the body then re-resolves to

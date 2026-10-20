@@ -314,6 +314,8 @@ struct MainTabView: View {
     @State private var reorder = CardReorderSession.shared
     /// A tapped notification's destination (`AgaraNotifications` deep links).
     @State private var deepLinks = AgaraDeepLinks.shared
+    /// A nudge button pressed on a push can arrive before any screen is up; it sets this and the tab follows it.
+    @State private var nudgeDelivery = NudgeDelivery.shared
 
     /// The tab in use, kept across a theme change (which rebuilds this view) for the rest of the session.
     private static var sessionTab: MainTab?
@@ -468,6 +470,15 @@ struct MainTabView: View {
         // Notification taps: switch to the tab (or push the screen) the deep link names.
         .onChange(of: deepLinks.pending) { _, _ in followDeepLink() }
         .onAppear(perform: followDeepLink)
+        // A nudge push's "Open ring" button routes through the same deep link the tap does.
+        .onChange(of: nudgeDelivery.pendingDeepLink) { _, link in
+            guard let link else { return }
+            nudgeDelivery.pendingDeepLink = nil
+            deepLinks.pending = link
+        }
+        // The lighter-today confirmation and the breathing sheet belong here, once, so a card and a push meet the same
+        // dialogs (Rule 10 — one confirmation, one sheet).
+        .nudgeActionHost()
         // A summary card or a notification asked for the coach: select its tab. On the tab, the coach's own state
         // decides what the user sees (the chat, or the card explaining what unblocks it).
         .onChange(of: nav.wantsCoachTab) { _, _ in openCoachTabIfRequested() }
