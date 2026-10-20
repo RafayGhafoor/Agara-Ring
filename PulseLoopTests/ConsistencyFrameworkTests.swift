@@ -276,8 +276,11 @@ final class AgaraNotificationsTests: XCTestCase {
         XCTAssertEqual(request.content.threadIdentifier, "agara.measurement")
         XCTAssertEqual(request.content.title, AgaraCopy.notificationMeasuredTitle)
         XCTAssertEqual(AgaraNotifications.deepLink(from: request.content.userInfo), .measure)
+        // The three coach-nudge categories are the 1.1 addition (docs/apps/coach-nudges.md): recovery and stress carry
+        // their own actions (Keep goal / Lighter today / Why?, Breathe 2 min / Not now), everything else is generic.
         XCTAssertEqual(Set(AgaraNotificationCategory.allCases.map(\.rawValue)),
-                       ["measurement", "sync", "firmware", "battery", "coach"])
+                       ["measurement", "sync", "firmware", "battery", "coach",
+                        "coach.recovery", "coach.stress", "coach.generic"])
     }
 }
 
