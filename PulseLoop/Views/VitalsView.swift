@@ -208,6 +208,10 @@ struct VitalsView: View {
                     displayName: { $0.reorderDisplayName },
                     symbolName: { $0.reorderSymbolName }
                 )
+            } else {
+                // Citations for the ranges on these cards (App Review 1.4.1) — always the last row.
+                HealthSourcesLinkCard()
+                    .padding(.top, 6)
             }
         }
     }

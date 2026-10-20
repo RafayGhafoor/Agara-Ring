@@ -202,6 +202,10 @@ struct SettingsView: View {
         rows.append(SettingsRowItem(icon: "lock.shield", tint: AgaraColors.success, title: "Privacy") {
             path.append(AppRoute.settingsPrivacyData)
         })
+        // Citations for the health ranges (App Review 1.4.1) — also under About and at the end of Vitals.
+        rows.append(SettingsRowItem(icon: "book.closed", tint: AgaraColors.accent, title: AgaraCopy.sourcesTitle) {
+            path.append(AppRoute.healthSources(nil))
+        })
         rows.append(SettingsRowItem(icon: "info.circle", tint: AgaraColors.textMuted, title: "About \(AgaraCopy.aboutProductName)") {
             path.append(AppRoute.settingsAbout)
         })

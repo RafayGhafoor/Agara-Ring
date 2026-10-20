@@ -36,6 +36,8 @@ enum AppRoute: Hashable {
     case pairing
     case debug
     case componentGallery
+    /// Sources & references (App Review 1.4.1); the optional `AgaraSources` section id scrolls to that group.
+    case healthSources(String?)
 }
 
 enum MainTab: String, CaseIterable, Identifiable {

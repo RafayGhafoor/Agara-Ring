@@ -155,6 +155,7 @@ struct RootAppView: View {
                     let routes: [String: AppRoute] = [
                         "about": .settingsAbout, "dataExport": .settingsDataExport, "storage": .settingsStorage, "privacy": .settingsPrivacyData,
                         "wearable": .settingsWearable, "autoMeasure": .settingsAutoMeasure, "profile": .settingsProfile,
+                        "sources": .healthSources(nil),
                     ]
                     if let route = routes[raw] { path.append(route) }
                 }
@@ -259,6 +260,8 @@ struct RootAppView: View {
                     #else
                     EmptyView()
                     #endif
+                case let .healthSources(section):
+                    HealthSourcesView(section: section)
                 } }
                 .agaraRingEnvironment()
             }
