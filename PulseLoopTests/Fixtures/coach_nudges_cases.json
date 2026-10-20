@@ -164,7 +164,7 @@
     },
     {
       "id": "b4-cancels-b1-and-b2",
-      "why": "Goal reached at 18:00: B4 fires once and B1/B2 are cancelled for the day.",
+      "why": "Goal reached at 18:00: B4 fires once and B1/B2 are cancelled for the day. (Corrected 2026-10-20: B4 is a celebration PUSH - policy clause 1 lists it with E2 and F1 - so a day with no routine pushes left still sends it. The original expectation of 0 contradicted the clause.)",
       "now": "2026-10-20T18:00:00Z",
       "signals": {
         "rhr_delta_percent": 0,
@@ -184,7 +184,7 @@
         "silent": {
           "b1": "goal reached"
         },
-        "push_count": 0
+        "push_count": 1
       }
     },
     {
@@ -212,7 +212,7 @@
     },
     {
       "id": "celebration-gets-the-extra-push",
-      "why": "A 7-day streak is a celebration: it does not consume the two routine pushes.",
+      "why": "A 7-day streak is a celebration: it does not consume the two routine pushes. (Goal lane disabled: this case is about the streak/review, not about goal-reached.)",
       "now": "2026-10-20T20:00:00Z",
       "signals": {
         "streak_days": 7,
@@ -231,6 +231,11 @@
           "f1"
         ],
         "push_count": 1
+      },
+      "settings": {
+        "disabled_topics": [
+          "goal"
+        ]
       }
     },
     {
@@ -1334,7 +1339,7 @@
     },
     {
       "id": "e2-silent-on-one-big-day",
-      "why": "Up 18% but only 7 of 14 days above the earlier average: one long walk is not progress.",
+      "why": "Up 18% but only 7 of 14 days above the earlier average: one long walk is not progress. (Goal lane disabled: this case is about the streak/review, not about goal-reached.) (Celebration lane disabled: a streak is not what this case tests.)",
       "now": "2026-10-21T20:00:00Z",
       "signals": {
         "rhr_delta_percent": 0,
@@ -1352,6 +1357,12 @@
           "e2": "only 7 of 14 days above the earlier average"
         },
         "push_count": 0
+      },
+      "settings": {
+        "disabled_topics": [
+          "goal",
+          "celebration"
+        ]
       }
     },
     {
@@ -1429,7 +1440,7 @@
     },
     {
       "id": "f1-fires-at-three",
-      "why": "Three days in a row is the first streak milestone.",
+      "why": "Three days in a row is the first streak milestone. (Goal lane disabled: this case is about the streak/review, not about goal-reached.)",
       "now": "2026-10-21T20:00:00Z",
       "signals": {
         "rhr_delta_percent": 0,
@@ -1447,11 +1458,16 @@
           "f1"
         ],
         "push_count": 1
+      },
+      "settings": {
+        "disabled_topics": [
+          "goal"
+        ]
       }
     },
     {
       "id": "f1-silent-at-four",
-      "why": "Four days is not a milestone: the next one is seven.",
+      "why": "Four days is not a milestone: the next one is seven. (Goal lane disabled: this case is about the streak/review, not about goal-reached.)",
       "now": "2026-10-21T20:00:00Z",
       "signals": {
         "rhr_delta_percent": 0,
@@ -1470,11 +1486,16 @@
           "f1": "4 is not a milestone"
         },
         "push_count": 0
+      },
+      "settings": {
+        "disabled_topics": [
+          "goal"
+        ]
       }
     },
     {
       "id": "f1-fires-at-thirty-then-every-thirty",
-      "why": "Thirty days fires, and the next milestone is sixty — so thirty-one stays quiet.",
+      "why": "Thirty days fires, and the next milestone is sixty — so thirty-one stays quiet. (Goal lane disabled: this case is about the streak/review, not about goal-reached.)",
       "now": "2026-10-21T20:00:00Z",
       "signals": {
         "rhr_delta_percent": 0,
@@ -1492,6 +1513,11 @@
           "f1"
         ],
         "push_count": 1
+      },
+      "settings": {
+        "disabled_topics": [
+          "goal"
+        ]
       }
     },
     {
@@ -1542,7 +1568,7 @@
     },
     {
       "id": "f2-silent-off-schedule",
-      "why": "Wednesday is not the review day: one push and one card a week, on the user's chosen slot.",
+      "why": "Wednesday is not the review day: one push and one card a week, on the user's chosen slot. (Goal lane disabled: this case is about the streak/review, not about goal-reached.) (Celebration lane disabled: a streak is not what this case tests.)",
       "now": "2026-10-21T18:00:00Z",
       "signals": {
         "rhr_delta_percent": 0,
@@ -1558,6 +1584,12 @@
           "f2": "not the chosen day"
         },
         "push_count": 0
+      },
+      "settings": {
+        "disabled_topics": [
+          "goal",
+          "celebration"
+        ]
       }
     },
     {
@@ -1582,7 +1614,7 @@
     },
     {
       "id": "f2-recommendation-keep-it-up",
-      "why": "Nothing needs fixing this week: the scored recommendation list is empty and the review says keep it up rather than inventing advice.",
+      "why": "Nothing needs fixing this week: the scored recommendation list is empty and the review says keep it up rather than inventing advice. (Goal lane disabled: this case is about the streak/review, not about goal-reached.) (Celebration lane disabled: a streak is not what this case tests.)",
       "now": "2026-10-25T18:00:00Z",
       "signals": {
         "rhr_delta_percent": 0,
@@ -1601,6 +1633,12 @@
         "annotations": {
           "f2_recommendation": "keep it up"
         }
+      },
+      "settings": {
+        "disabled_topics": [
+          "goal",
+          "celebration"
+        ]
       }
     },
     {
@@ -1984,7 +2022,7 @@
     },
     {
       "id": "policy-cooldown-broken-when-materially-worse",
-      "why": "The gap can be broken only by getting materially worse: 400 steps at 17:30 after 2,200 at 15:00 does not qualify, doubt is resolved by staying silent.",
+      "why": "The gap can be broken only by getting materially worse: 400 steps at 17:30 after 2,200 at 15:00 does not qualify, doubt is resolved by staying silent. (Phrase settled: one sentence for an un-widened category gap.)",
       "now": "2026-10-21T17:30:00Z",
       "signals": {
         "rhr_delta_percent": 0,
@@ -2005,7 +2043,7 @@
       "expect": {
         "emit": [],
         "silent": {
-          "b1": "inside the 6h gap and not materially worse"
+          "b1": "inside the 6h category gap"
         },
         "push_count": 0
       }
@@ -2096,14 +2134,14 @@
     },
     {
       "id": "policy-quiet-hours-never-saved",
-      "why": "A nudge dropped in quiet hours leaves no fingerprint and no queue entry: nothing arrives at 08:00.",
+      "why": "A nudge dropped in quiet hours leaves no fingerprint and no queue entry: nothing arrives at 08:00. (Streak set to 7 so the milestone gate is not the reason - this case is about quiet hours.) (Steps set above the goal so the derived streak really is 7 - the milestone gate is not this case's subject.)",
       "now": "2026-10-21T23:30:00Z",
       "signals": {
         "rhr_delta_percent": 0,
         "sleep_under_goal_hours": 0.0,
         "night_data_percent": 95,
         "baseline_nights": 21,
-        "steps_today": 2000,
+        "steps_today": 10200,
         "step_goal": 10000,
         "awake": true,
         "in_workout": false,

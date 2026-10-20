@@ -63,6 +63,8 @@ final class CoachNudgePolicyTests: XCTestCase {
             var nights_recorded_last_7: Int?
             var drift_minutes: Int?
             var improvement_percent: Double?
+            /// Which metric improved: steps | sleep | active_minutes (E2 is per metric).
+            var improvement_metric: String?
             var days_above: Int?
             /// The canonical catalog's spelling of the same fact.
             var days_above_previous: Int?
@@ -97,6 +99,8 @@ final class CoachNudgePolicyTests: XCTestCase {
             var celebration_extra: String?
             /// `["22:00", "08:00"]`: the same two bounds the settings carry.
             var quiet_hours: [String]?
+            /// E2's per-metric cooldown: metric -> when it was last celebrated.
+            var metric_celebrated: [String: String]?
         }
         var id: String
         var why: String?
@@ -227,11 +231,13 @@ final class CoachNudgePolicyTests: XCTestCase {
             let weak = earlier * 0.95
             let target = earlier * (1 + improvement / 100)
             let strong = Int((target * Double(window) - Double(window - above) * weak) / Double(max(1, above)))
+            let metric = input.improvement_metric ?? "steps"
             signals.days = (0..<window).map { index in
-                CoachSignals.DayPoint(
-                    steps: index < above ? strong : Int(earlier * 0.95),
-                    sleepMinutes: 480,
-                    activeMinutes: 40,
+                let strongDay = index < above
+                return CoachSignals.DayPoint(
+                    steps: metric == "steps" && strongDay ? strong : (metric == "steps" ? Int(earlier * 0.95) : 5_000),
+                    sleepMinutes: metric == "sleep" ? (strongDay ? 540 : 400) : 480,
+                    activeMinutes: metric == "active_minutes" ? (strongDay ? 60 : 25) : 40,
                     stepGoalMet: index < above
                 )
             } + (0..<window).map { _ in
@@ -305,6 +311,10 @@ final class CoachNudgePolicyTests: XCTestCase {
             guard let category = NudgeCategory(rawValue: raw),
                   let rule = NudgeRule.allCases.first(where: { $0.category == category })
             else { continue }
+            // Skip when sent_today already describes this delivery: one delivery, one row.
+            if ledger.sent.contains(where: { $0.category == category && abs($0.at.timeIntervalSince(date(iso))) < 60 }) {
+                continue
+            }
             ledger.sent.append(NudgeLedger.Sent(
                 rule: rule,
                 category: category,
@@ -314,6 +324,9 @@ final class CoachNudgePolicyTests: XCTestCase {
                 severity: input.category_last_severity?[raw] ?? .greatestFiniteMagnitude,
                 templateID: "\(rule.rawValue)_v1"
             ))
+        }
+        for (raw, iso) in input.metric_celebrated ?? [:] {
+            ledger.metricCelebrated[raw] = date(iso)
         }
         for (raw, iso) in input.snoozed_until ?? [:] {
             guard let category = NudgeCategory(rawValue: raw) else { continue }

@@ -71,7 +71,8 @@ extension NudgeRule {
         case .a1, .a2, .a3: return .recovery
         case .c1: return .stress
         case .b4: return .goal
-        case .b1, .b2, .b3, .f1: return .activity
+        case .b1, .b2, .b3: return .activity
+        case .f1: return .celebration
         case .e2: return .celebration
         case .e1, .f2: return .insight
         case .g1: return .activity
@@ -85,7 +86,7 @@ extension NudgeRule {
         case .a3: return NudgeDelivery(rawValue: AgaraConfig.Nudges.a3Delivery) ?? .card
         case .b1: return NudgeDelivery(rawValue: AgaraConfig.Nudges.b1Delivery) ?? .push
         case .b2: return .card
-        case .b4: return .card
+        case .b4: return .push
         default: return .push
         }
     }

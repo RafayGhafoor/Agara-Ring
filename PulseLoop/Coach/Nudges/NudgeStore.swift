@@ -99,6 +99,9 @@ struct NudgeLedger: Equatable, Sendable {
     /// appears as a Today card and in the "For you" list (policy rule 10) — the card is the product, the push is the
     /// interruption.
     var notificationsEnabled: Bool = true
+    /// E2's cooldown is per metric, not per category: the last time each metric was celebrated (`steps`, `sleep`,
+    /// `active_minutes`). The category gap cannot express "steps was celebrated nine days ago" (catalog rule 1/E2).
+    var metricCelebrated: [String: Date] = [:]
     /// Template id → last time it was shown, for the 7-day rotation.
     var templateLastUsed: [String: Date] = [:]
 

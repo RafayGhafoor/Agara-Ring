@@ -66,13 +66,21 @@ enum CoachNudgePolicy {
             let stressWon = eligible.contains { $0.category == .stress } || sentToday.contains(where: { $0.category == .stress })
             let winner = stressWon ? NudgeCategory.stress : NudgeCategory.recovery
             eligible.removeAll { [.b1, .b2, .b3].contains($0.rule) }
-            for rule in [NudgeRule.b1, .b2, .b3] {
+            for rule in [NudgeRule.b1, .b2, .b3] where !isQuietReason(plan.silent[rule]) {
                 plan.silent[rule] = winner == .stress ? "stress outranks activity" : "recovery fired today"
+            }
+        }
+        let stressFired = sentToday.contains { $0.category == .stress }
+            || eligible.contains { $0.category == .stress }
+        if stressFired, !recoveryFired {
+            eligible.removeAll { [.b1, .b2, .b3].contains($0.rule) }
+            for rule in [NudgeRule.b1, .b2, .b3] where !isQuietReason(plan.silent[rule]) {
+                plan.silent[rule] = "stress outranks activity"
             }
         }
         if goalReached {
             eligible.removeAll { [.b1, .b2, .b3].contains($0.rule) }
-            for rule in [NudgeRule.b1, .b2, .b3] { plan.silent[rule] = "goal reached" }
+            for rule in [NudgeRule.b1, .b2, .b3] where !isQuietReason(plan.silent[rule]) { plan.silent[rule] = "goal reached" }
         }
 
         // 2b. A rule still inside its own cooldown (E1 weekly, E2 per metric, C1's follow-up) is silent for THAT reason,
@@ -89,7 +97,7 @@ enum CoachNudgePolicy {
                 let metric = outcome.nudge?.evidence.first { $0.metric == "metric" }?.unit ?? "steps"
                 plan.silent[.e2] = "\(metric) celebrated \(Int((elapsed / 86_400).rounded())) days ago"
             case .c1:
-                plan.silent[.c1] = "follow-up already used today"
+                continue   // governed by the rule's own follow-up gate (one per run, >= c1FollowupHours later)
             default:
                 continue
             }
@@ -107,13 +115,25 @@ enum CoachNudgePolicy {
                 plan.silent[nudge.rule] = "category paused until wake"
                 continue
             }
-            if oncePerDay(nudge.rule), sentToday.contains(where: { $0.rule == nudge.rule }) {
-                plan.silent[nudge.rule] = nudge.isCelebration ? "already celebrated today" : "already sent today"
-                continue
-            }
+            // C1 is the one rule allowed twice a day (the nudge plus ONE follow-up), so its own budget is checked before
+            // the once-a-day gate would refuse the second.
             if nudge.rule == .c1, sentToday.filter({ $0.rule == .c1 }).count >= 2 {
                 plan.silent[nudge.rule] = "follow-up already used today"
                 continue
+            }
+            if nudge.rule != .c1, oncePerDay(nudge.rule), sentToday.contains(where: { $0.rule == nudge.rule }) {
+                plan.silent[nudge.rule] = nudge.isCelebration ? "already celebrated today" : "already sent today"
+                continue
+            }
+            if nudge.rule == .e2 {
+                let metric = nudge.evidence.first { $0.metric == "metric" }?.unit ?? "steps"
+                if let last = ledger.metricCelebrated[metric] {
+                    let days = now.timeIntervalSince(last) / 86_400
+                    if days < Double(N.e2CooldownDays) {
+                        plan.silent[.e2] = "\(metric) celebrated \(Int(days.rounded())) days ago"
+                        continue
+                    }
+                }
             }
             if nudge.rule.isIntraday, ledger.fingerprints(on: now, calendar: calendar).contains(nudge.fingerprint) {
                 plan.silent[nudge.rule] = "duplicate fingerprint today"
@@ -220,6 +240,12 @@ enum CoachNudgePolicy {
         }
     }
 
+    /// A quiet-hours silence is the user's own window and outranks a merge reason ("recovery fired today" would be
+    /// true but less useful than "quiet hours").
+    static func isQuietReason(_ reason: String?) -> Bool {
+        reason?.hasPrefix("quiet hours") == true
+    }
+
     /// 3 dismissals in 7 days double the category's gap, then double again (6 → 12 → 24 h). Any tap or action
     /// clears the dismissals, which resets the ladder.
     static func categoryGap(_ category: NudgeCategory, ledger: NudgeLedger, now: Date) -> Double {
@@ -236,7 +262,10 @@ enum CoachNudgePolicy {
         let gap = ruleGap(nudge.rule, base: base)
         let elapsed = now.timeIntervalSince(last.at)
         guard elapsed < gap else { return nil }
-        // A materially worse reading may speak inside the gap: the gap exists to stop repeats, not to hide a change.
+        // A materially different reading may speak inside the gap: the gap exists to stop repeats, not to hide a change.
+        // A new fingerprint IS a change (the rounded numbers moved), and it is the only signal available when the
+        // previous severity was never recorded.
+        guard nudge.fingerprint != last.fingerprint else { return "inside the \(Int((gap / 3600).rounded()))h category gap" }
         guard nudge.severity <= last.severity else { return nil }
         switch nudge.rule {
         case .e1:
@@ -246,7 +275,7 @@ enum CoachNudgePolicy {
             let days = Int((elapsed / 86_400).rounded())
             return "\(metric) celebrated \(days) days ago"
         case .c1:
-            return "follow-up already used today"
+            return nil   // the rule owns the follow-up window; the category gap must not double-gate it
         default:
             break
         }

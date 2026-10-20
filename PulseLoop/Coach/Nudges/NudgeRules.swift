@@ -60,7 +60,7 @@ enum NudgeRules {
         private var recoverySilence: String? {
             // A1/A2/A3 are the morning recovery set: once the day's activity check has begun the readiness reading
             // is a standing card in Today, not a nudge. The window ends at `b1CheckTime` — no extra threshold.
-            if minute >= (CoachSignals.minuteOfDay(N.b1CheckTime) ?? 15 * 60) { return "after the morning recovery window" }
+            if minute > (CoachSignals.minuteOfDay(N.b1CheckTime) ?? 15 * 60) { return "after the morning recovery window" }
             if signals.isLearningBaseline { return "learning the baseline" }
             guard let night = signals.lastNight else { return "no night recorded" }
             if !signals.nightHasEnoughData { return "night data below \(N.minDataPercent)%" }
