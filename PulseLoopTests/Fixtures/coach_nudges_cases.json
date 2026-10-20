@@ -935,7 +935,7 @@
     },
     {
       "id": "b3-silent-while-asleep",
-      "why": "Asleep at 02:00: no movement reminder, ever.",
+      "why": "Asleep at 02:00: no movement reminder, ever. (Recovery topic disabled: this case is about stillness, and a perfect night would otherwise add A3 to the expected list.)",
       "now": "2026-10-22T02:00:00Z",
       "signals": {
         "rhr_delta_percent": 0,
@@ -955,6 +955,11 @@
           "b3": "asleep"
         },
         "push_count": 0
+      },
+      "settings": {
+        "disabled_topics": [
+          "recovery"
+        ]
       }
     },
     {
@@ -1202,7 +1207,7 @@
     },
     {
       "id": "e1-fires-on-three-drifted-nights",
-      "why": "Three of the last seven nights had a bedtime more than 2 h from the user's median: a pattern, worth one push a week.",
+      "why": "Three of the last seven nights had a bedtime more than 2 h from the user's median: a pattern, worth one push a week. (Recovery topic disabled: this case is about sleep drift, and a perfect night would otherwise add A3 to the expected list.)",
       "now": "2026-10-21T09:00:00Z",
       "signals": {
         "rhr_delta_percent": 0,
@@ -1219,11 +1224,16 @@
           "e1"
         ],
         "push_count": 1
+      },
+      "settings": {
+        "disabled_topics": [
+          "recovery"
+        ]
       }
     },
     {
       "id": "e1-silent-on-two-drifted-nights",
-      "why": "Two drifted nights out of seven is a normal week: E1 needs three.",
+      "why": "Two drifted nights out of seven is a normal week: E1 needs three. (Recovery topic disabled: this case is about sleep drift, and a perfect night would otherwise add A3 to the expected list.)",
       "now": "2026-10-21T09:00:00Z",
       "signals": {
         "rhr_delta_percent": 0,
@@ -1239,11 +1249,16 @@
           "e1": "only 2 drifted nights"
         },
         "push_count": 0
+      },
+      "settings": {
+        "disabled_topics": [
+          "recovery"
+        ]
       }
     },
     {
       "id": "e1-weekly-cooldown",
-      "why": "E1 went out five days ago: a drift is a pattern, and a pattern does not need a reminder every day.",
+      "why": "E1 went out five days ago: a drift is a pattern, and a pattern does not need a reminder every day. (Recovery topic disabled: this case is about sleep drift, and a perfect night would otherwise add A3 to the expected list.)",
       "now": "2026-10-21T09:00:00Z",
       "signals": {
         "rhr_delta_percent": 0,
@@ -1263,11 +1278,16 @@
           "e1": "weekly cooldown"
         },
         "push_count": 0
+      },
+      "settings": {
+        "disabled_topics": [
+          "recovery"
+        ]
       }
     },
     {
       "id": "e1-silent-on-thin-sleep-history",
-      "why": "Only four nights recorded in the window: no median worth calling 'your usual'.",
+      "why": "Only four nights recorded in the window: no median worth calling 'your usual'. (Recovery topic disabled: this case is about sleep drift, and a perfect night would otherwise add A3 to the expected list.)",
       "now": "2026-10-21T09:00:00Z",
       "signals": {
         "rhr_delta_percent": 0,
@@ -1284,6 +1304,11 @@
           "e1": "fewer than 5 recorded nights"
         },
         "push_count": 0
+      },
+      "settings": {
+        "disabled_topics": [
+          "recovery"
+        ]
       }
     },
     {
@@ -1580,7 +1605,7 @@
     },
     {
       "id": "g1-fires-after-a-day-without-sync",
-      "why": "A paired ring with no sync for 27 hours: one push a day, and its button opens the ring screen.",
+      "why": "A paired ring with no sync for 27 hours: one push a day, and its button opens the ring screen. (Recovery topic disabled: this case is about the ring's sync state, and a perfect night would otherwise add A3 to the expected list.)",
       "now": "2026-10-21T10:00:00Z",
       "signals": {
         "rhr_delta_percent": 0,
@@ -1596,11 +1621,16 @@
           "g1"
         ],
         "push_count": 1
+      },
+      "settings": {
+        "disabled_topics": [
+          "recovery"
+        ]
       }
     },
     {
       "id": "g1-silent-while-syncing",
-      "why": "No sync for 3 hours is normal between check-ins.",
+      "why": "No sync for 3 hours is normal between check-ins. (Recovery topic disabled: this case is about the ring's sync state, and a perfect night would otherwise add A3 to the expected list.)",
       "now": "2026-10-21T10:00:00Z",
       "signals": {
         "rhr_delta_percent": 0,
@@ -1617,11 +1647,16 @@
           "g1": "synced recently"
         },
         "push_count": 0
+      },
+      "settings": {
+        "disabled_topics": [
+          "recovery"
+        ]
       }
     },
     {
       "id": "g1-silent-without-a-ring",
-      "why": "No ring is paired: there is nothing to reconnect, so G1 is not the right nudge.",
+      "why": "No ring is paired: there is nothing to reconnect, so G1 is not the right nudge. (Recovery topic disabled: this case is about the ring's sync state, and a perfect night would otherwise add A3 to the expected list.)",
       "now": "2026-10-21T10:00:00Z",
       "signals": {
         "rhr_delta_percent": 0,
@@ -1638,11 +1673,16 @@
           "g1": "no ring paired"
         },
         "push_count": 0
+      },
+      "settings": {
+        "disabled_topics": [
+          "recovery"
+        ]
       }
     },
     {
       "id": "g1-once-a-day",
-      "why": "G1 already fired at 09:00 and the ring is still out of touch: waiting a day beats a push every hour.",
+      "why": "G1 already fired at 09:00 and the ring is still out of touch: waiting a day beats a push every hour. (Recovery topic disabled: this case is about the ring's sync state, and a perfect night would otherwise add A3 to the expected list.)",
       "now": "2026-10-21T16:00:00Z",
       "signals": {
         "rhr_delta_percent": 0,
@@ -1666,6 +1706,11 @@
           "g1": "already sent today"
         },
         "push_count": 0
+      },
+      "settings": {
+        "disabled_topics": [
+          "recovery"
+        ]
       }
     },
     {
@@ -1751,7 +1796,7 @@
     },
     {
       "id": "policy-priority-recovery-first",
-      "why": "Recovery outranks activity when both are eligible at the same instant: A1 is delivered first and B1 waits.",
+      "why": "Recovery outranks activity when both are eligible at the same instant: A1 is delivered first and B1 waits. (Phrase settled 2026-10-20: \"recovery fired today\" is how every case names this merge.)",
       "now": "2026-10-21T15:00:00Z",
       "signals": {
         "rhr_delta_percent": 18,
@@ -1769,7 +1814,7 @@
           "a1"
         ],
         "silent": {
-          "b1": "recovery outranks activity"
+          "b1": "recovery fired today"
         },
         "push_count": 1
       }
