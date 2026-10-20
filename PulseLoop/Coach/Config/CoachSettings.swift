@@ -15,6 +15,10 @@ enum CoachProviderMode: String, Codable, CaseIterable, Identifiable {
     /// anyone's stored `rawValue`.
     case localOpenAICompat
     case backendProxy
+    /// The Agara Cloud coach (release 1.1): every turn goes through our proxy to a provider whose key lives on the
+    /// server (`docs/ring/coach-proxy.md`). Needs a signed-in, e-mail-verified Agara account; it is the release
+    /// default, and the release build offers it alongside the on-device model only.
+    case agaraCloud
 
     var id: String { rawValue }
 
@@ -28,7 +32,19 @@ enum CoachProviderMode: String, Codable, CaseIterable, Identifiable {
         case .userMiniMaxKey: return "MiniMax"
         case .localOpenAICompat: return "Local / self-hosted"
         case .backendProxy: return "Backend proxy"
+        case .agaraCloud: return "Agara Cloud"
         }
+    }
+
+    /// What a fresh install starts on. Release ships the Agara Cloud coach — `CoachClientResolver.effectiveMode`
+    /// falls back to on-device until the account is signed in and verified, so this default is always safe. Debug
+    /// builds keep the on-device default so a developer needs no account.
+    static var defaultForThisBuild: CoachProviderMode {
+        #if DEBUG
+        return .appleOnDevice
+        #else
+        return .agaraCloud
+        #endif
     }
 }
 
@@ -189,7 +205,7 @@ struct CoachSettings: Codable, Equatable {
     /// coach works out of the box for everyone. Users who want a more powerful hosted model can switch
     /// provider and plug in their own key. (Only applies to fresh installs / unset settings; a user's
     /// saved choice is preserved via the tolerant decode below.)
-    var providerMode: CoachProviderMode = .appleOnDevice
+    var providerMode: CoachProviderMode = CoachProviderMode.defaultForThisBuild
     /// Fallback model string used when the user switches to a keyed provider; user-configurable
     /// (never hard-coded in the client). Unused while on the Apple on-device model.
     var model: String = CoachModel.gpt54.rawValue

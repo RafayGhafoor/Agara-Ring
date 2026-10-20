@@ -83,13 +83,20 @@ struct CoachSettingsSection: View {
     private var flags: CoachFeatureFlags {
         let hasKey: Bool
         switch store.settings.providerMode {
+        // The cloud coach's readiness sentinel is its gate (signed in, verified, consented, flags on) — there is no
+        // key on this side at all (contract §2: the provider key never leaves the server).
+        case .agaraCloud: hasKey = CoachGate.cloudReady
+        #if DEBUG
         case .userGeminiKey: hasKey = hasGeminiKey
         case .userOpenRouterKey: hasKey = hasOpenRouterKey
         case .userMiniMaxKey: hasKey = hasMiniMaxKey
         // The local provider's key is optional; a usable base URL is what makes it ready. Mirrors
         // the readiness sentinel in `CoachClientResolver`, which is what actually gates a turn.
         case .localOpenAICompat: hasKey = LocalEndpoint.validate(store.settings.localBaseURL) == nil
-        default: hasKey = hasSavedKey
+        case .userOpenAIKey, .appleOnDevice, .offlineStub, .backendProxy: hasKey = hasSavedKey
+        #else
+        default: hasKey = CoachGate.cloudReady
+        #endif
         }
         return CoachFeatureFlags(settings: store.settings, hasAPIKey: hasKey)
     }
@@ -101,22 +108,25 @@ struct CoachSettingsSection: View {
     }
 
     /// Whether to offer the image-input (multimodal) toggle. Hidden on-device (no
-    /// image API) and on text-only MiniMax models — only MiniMax-M3 is multimodal,
-    /// so attaching a photo to M2.x would just error.
+    /// image API), for the Agara Cloud coach (its payload never carries an image —
+    /// `coach-proxy.md` §5) and on text-only MiniMax models — only MiniMax-M3 is
+    /// multimodal, so attaching a photo to M2.x would just error.
     private var showsImageInputToggle: Bool {
         switch store.settings.providerMode {
-        case .appleOnDevice: return false
+        case .appleOnDevice, .agaraCloud: return false
         case .userMiniMaxKey: return store.settings.model == MiniMaxModel.m3.rawValue
         default: return true
         }
     }
 
     /// Which provider's key field to surface. The on-device provider needs no
-    /// key (and has no cloud backup), so it surfaces none.
+    /// key (and has no cloud backup) and the Agara Cloud coach has none on this
+    /// side at all, so neither surfaces a key field.
     private var effectiveKeyProvider: CoachProviderMode? {
-        store.settings.providerMode == .appleOnDevice
-            ? nil
-            : store.settings.providerMode
+        switch store.settings.providerMode {
+        case .appleOnDevice, .agaraCloud: return nil
+        default: return store.settings.providerMode
+        }
     }
 
     var body: some View {
@@ -138,7 +148,9 @@ struct CoachSettingsSection: View {
             SettingsGroup(header: "Provider") {
                 FormMenuRow(title: "Provider", value: store.settings.providerMode.label) {
                     Picker("Provider", selection: providerBinding) {
-                        ForEach(CoachProviderMode.allCases) { mode in
+                        // Release offers the Agara Cloud coach and the on-device model only; the
+                        // bring-your-own-key providers are debug builds (contract decision 4).
+                        ForEach(CoachBuildChannel.current.offeredModes) { mode in
                             Text(mode.label).tag(mode)
                         }
                     }
@@ -149,6 +161,10 @@ struct CoachSettingsSection: View {
                 // model picker.
                 if store.settings.providerMode == .appleOnDevice {
                     appleOnDeviceCard
+                } else if store.settings.providerMode == .agaraCloud {
+                    // The cloud coach's model, provider and prompt are server configuration (decision 1), so there is
+                    // nothing to pick here.
+                    EmptyView()
                 } else if store.settings.providerMode == .localOpenAICompat {
                     // The model list comes from the user's own server, so it belongs with the rest
                     // of the server setup below rather than in a fixed picker here.
@@ -184,8 +200,11 @@ struct CoachSettingsSection: View {
                 }
             }
 
-            // The key field tracks the *effective* provider — the active cloud
-            // provider (none in on-device mode, which needs no key).
+            #if DEBUG
+            // Bring-your-own-key entry: debug builds only (contract decision 4 — a release build offers the Agara
+            // Cloud coach and the on-device model, and no code path there can store or use a provider key).
+            // The key field tracks the *effective* provider (none for on-device or the cloud coach, which need no
+            // key).
             if effectiveKeyProvider == .userOpenAIKey {
                 apiKeyField(
                     placeholder: "sk-…",
@@ -248,7 +267,9 @@ struct CoachSettingsSection: View {
                     onRemove: removeLocalKey
                 )
             }
+            #endif
 
+            #if DEBUG
             // OpenRouter-only routing controls. OpenRouter exposes a unified
             // reasoning-effort hint plus provider-level privacy and sort options
             // the native OpenAI/Gemini clients don't, so they only appear here.
@@ -279,6 +300,7 @@ struct CoachSettingsSection: View {
                     }
                 }
             }
+            #endif
 
             SettingsGroup(header: "Capabilities", footer: Self.environmentContextFooter) {
                 // Web search is provider-hosted. MiniMax's API exposes no web search,
@@ -289,7 +311,10 @@ struct CoachSettingsSection: View {
                    // No local engine hosts a web-search tool; `LocalOpenAICompatClient` drops the
                    // spec defensively, and offering the switch would only promise something the
                    // server can't do.
-                   store.settings.providerMode != .localOpenAICompat {
+                   store.settings.providerMode != .localOpenAICompat,
+                   // The cloud coach's tools are built by the server and its allowlist has no web-search tool
+                   // (contract §10), so the switch would promise something the proxy can't do either.
+                   store.settings.providerMode != .agaraCloud {
                     FormToggleRow(title: "Web search", isOn: webSearchBinding)
                 }
 
@@ -513,6 +538,10 @@ struct CoachSettingsSection: View {
                     // MiniMax has no web search; clear any leftover-on state so the
                     // (now hidden) toggle can't linger enabled.
                     store.settings.enableWebSearch = false
+                case .agaraCloud:
+                    // The cloud coach's model is server configuration; leave the stored BYOK model alone so
+                    // switching back to it in a debug build restores the developer's choice.
+                    break
                 default:
                     store.settings.model = CoachModel.gpt54.rawValue
                 }
