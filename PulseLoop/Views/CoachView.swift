@@ -227,25 +227,18 @@ struct CoachView: View {
     }
 
     private var header: some View {
+        VStack(alignment: .trailing, spacing: 6) {
         HStack(spacing: 12) {
             CoachOrb(size: 40)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(AgaraCopy.coachTitle).font(AgaraFont.subheadline.weight(.semibold)).foregroundStyle(AgaraColors.textPrimary)
-                Text(headerSubtitle).font(AgaraFont.caption2.weight(.regular)).foregroundStyle(AgaraColors.textMuted)
-            }
-            Spacer()
-            // The quota pill sits between the name and the actions: “24 left today”, from the last response's
-            // `X-Coach-Remaining-Day`. Hidden until the day's first response says how many are left.
-            if selectedCloudCoach, let pill = quota.pillText {
-                Text(pill)
-                    .font(AgaraFont.caption2.weight(.semibold).monospacedDigit())
-                    .foregroundStyle(AgaraColors.textSecondary)
-                    .padding(.horizontal, 9).padding(.vertical, 5)
-                    .background(AgaraColors.cardSoft, in: Capsule())
-                    .overlay(Capsule().stroke(AgaraColors.borderSubtle, lineWidth: 0.5))
-                    .accessibilityIdentifier("coach.quota")
-                    .accessibilityLabel(quota.pillSpokenText ?? pill)
-                    .accessibilityHint(CoachCopy.quotaPillHint)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(AgaraCopy.coachTitle)
+                    .font(AgaraFont.subheadline.weight(.semibold))
+                    .foregroundStyle(AgaraColors.textPrimary)
+                    .lineLimit(1)
+                Text(headerSubtitle)
+                    .font(AgaraFont.caption2.weight(.regular))
+                    .foregroundStyle(AgaraColors.textMuted)
+                    .lineLimit(2)
             }
             // Sibling glass circles share one container so their glass renders/blends together.
             HStack(spacing: 12) {
@@ -273,6 +266,21 @@ struct CoachView: View {
                 }
             }
             .agaraGlassContainer(spacing: 8)
+        }
+        if selectedCloudCoach, let pill = quota.pillText {
+            // Its own row: sharing the title's row squeezed the name to "Agara Co…", and shrinking the pill made it
+            // vanish. It reports the CLOUD quota from the last response's `X-Coach-Remaining-Day`.
+            Text(pill)
+                .font(AgaraFont.caption2.weight(.semibold).monospacedDigit())
+                .foregroundStyle(AgaraColors.textSecondary)
+                .lineLimit(1)
+                .padding(.horizontal, 8).padding(.vertical, 4)
+                .background(AgaraColors.cardSoft, in: Capsule())
+                .overlay(Capsule().stroke(AgaraColors.borderSubtle, lineWidth: 0.5))
+                .accessibilityIdentifier("coach.quota")
+                .accessibilityLabel(quota.pillSpokenText ?? pill)
+                .accessibilityHint(CoachCopy.quotaPillHint)
+        }
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
         .background(AgaraColors.secondaryBackground)

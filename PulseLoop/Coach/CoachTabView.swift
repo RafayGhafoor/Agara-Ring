@@ -25,9 +25,9 @@ struct CoachTabView: View {
             // Proactive nudges at the top of the Coach tab (policy rule 10: notifications off still means the nudges
             // appear here). Same card view as Today, compact, and only while the nudge feature is on.
             if AgaraFeatureStore.isOn(.coachNudges) {
-                ScrollView { NudgeForYouList() }
-                    .frame(maxHeight: 250)
-                    .scrollBounceBehavior(.basedOnSize)
+                // No wrapper ScrollView: it reserved up to 250 pt of empty space whenever the list had nothing to show
+                // (which is most of the time — the list is empty until a rule fires).
+                NudgeForYouList()
             }
             Group {
                 if state == .ready {

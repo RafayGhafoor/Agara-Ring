@@ -158,6 +158,9 @@ struct NudgeForYouList: View {
 
     var body: some View {
         if !feed.nudges.isEmpty {
+            // The scroll view lives here, inside the "there is something to show" branch, so an empty list occupies no
+            // space at all (it used to reserve 250 pt at the top of the Coach tab).
+            ScrollView {
             VStack(alignment: .leading, spacing: 8) {
                 Text("For you")
                     .font(AgaraFont.caption.weight(.semibold))
@@ -170,6 +173,9 @@ struct NudgeForYouList: View {
             }
             .padding(.horizontal, 12)
             .padding(.top, 10)
+            }
+            .frame(maxHeight: 250)
+            .scrollBounceBehavior(.basedOnSize)
             .accessibilityIdentifier("nudge.forYou")
             .task { feed.refresh(context: modelContext) }
             .onChange(of: NudgeLedgerStore.shared.revision) { _, _ in feed.refresh(context: modelContext) }
