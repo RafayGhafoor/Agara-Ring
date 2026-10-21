@@ -96,6 +96,27 @@ struct CoachView: View {
                                 onDismiss: { nav.requestedSeed = nil }
                             )
                         }
+                        if showColdStart(messages) {
+                        // Stacked, not a horizontal strip: a strip clipped the third prompt off-screen, so it could be
+                        // neither read nor tapped (a real user hits the same wall, not just the UI test).
+                        VStack(alignment: .leading, spacing: 6) {
+                            ForEach(starterPrompts, id: \.self) { prompt in
+                                Button { send(prompt) } label: {
+                                    Text(prompt)
+                                        .font(AgaraFont.caption.weight(.regular))
+                                        .foregroundStyle(AgaraColors.textSecondary)
+                                        .multilineTextAlignment(.leading)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(.horizontal, 12).padding(.vertical, 7)
+                                        .agaraGlass(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityIdentifier("coach.starter")
+                            }
+                        }
+                        .padding(.horizontal, 12).padding(.vertical, 8)
+                        .agaraGlassContainer(spacing: 6)
+                        }
                         ForEach(messages) { message in
                             CoachBubble(
                                 message: message,
@@ -127,27 +148,6 @@ struct CoachView: View {
             }
 
             VStack(spacing: 0) {
-                if showColdStart(messages) {
-                    // Stacked, not a horizontal strip: a strip clipped the third prompt off-screen, so it could be
-                    // neither read nor tapped (a real user hits the same wall, not just the UI test).
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(starterPrompts, id: \.self) { prompt in
-                            Button { send(prompt) } label: {
-                                Text(prompt)
-                                    .font(AgaraFont.caption.weight(.regular))
-                                    .foregroundStyle(AgaraColors.textSecondary)
-                                    .multilineTextAlignment(.leading)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.horizontal, 12).padding(.vertical, 7)
-                                    .agaraGlass(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityIdentifier("coach.starter")
-                        }
-                    }
-                    .padding(.horizontal, 12).padding(.vertical, 8)
-                    .agaraGlassContainer(spacing: 6)
-                }
                 composer
             }
             // Clears the nav bar when idle; rises above the keyboard when typing.
@@ -352,6 +352,7 @@ struct CoachView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Send")
+                .accessibilityIdentifier("coach.send")
                 .disabled(!canSend)
             }
             // Camera / field / send glass share one container so they render/blend together.

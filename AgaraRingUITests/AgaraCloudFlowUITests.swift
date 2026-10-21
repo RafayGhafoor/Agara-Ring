@@ -11,6 +11,58 @@ final class AgaraCloudFlowUITests: AgaraUITestCase {
         openTab("Settings")
     }
 
+    /// REAL coach answer against STAGING: signs in, opens the Coach tab and lets the model answer with the synced data.
+    /// Runs only with credentials (`TEST_RUNNER_AGARA_E2E_EMAIL/PASSWORD` + the staging tunnel on 127.0.0.1:18091):
+    ///
+    ///   ssh -N -L 18091:127.0.0.1:8091 hayden &
+    ///   TEST_RUNNER_AGARA_E2E_EMAIL=… TEST_RUNNER_AGARA_E2E_PASSWORD=… \
+    ///     xcodebuild test … -only-testing:AgaraRingUITests/AgaraCloudFlowUITests/testLiveCoachAnswer
+    ///
+    /// It attaches the answer and the trend answer, so a screenshot of a real turn exists instead of a scripted one.
+    func testLiveCoachAnswer() throws {
+        let env = ProcessInfo.processInfo.environment
+        guard let mail = env["AGARA_E2E_EMAIL"], let pass = env["AGARA_E2E_PASSWORD"] else {
+            throw XCTSkip("no staging credentials in the environment")
+        }
+        launchCloud(extra: ["-cloudBaseUrl", "http://127.0.0.1:18091", "-coachProvider", "agaraCloud"])
+        openCloudRow()
+        if !element("cloud.syncNow").waitForExistence(timeout: 5) {
+            let agree = element("cloud.consent.agree")
+            scrollTo(agree)
+            waitFor(agree).tap()
+            let mode = element("cloud.mode")
+            if mode.exists { let si = mode.buttons["Sign in"]; if si.exists { si.tap() } }
+            let email = waitFor(element("cloud.email"), "email field missing")
+            email.tap(); email.typeText(mail)
+            let password = waitFor(element("cloud.password"))
+            password.tap(); password.typeText(pass)
+            let submit = element("cloud.submit")
+            scrollTo(submit)
+            waitFor(submit).tap()
+        }
+        waitFor(element("cloud.syncNow"), timeout: 90, "did not reach the signed-in screen")
+
+        openTab("Coach")
+        let composer = waitFor(app.textFields.firstMatch, timeout: 30, "the coach composer is missing")
+        composer.tap()
+        composer.typeText("How did I sleep last night, and what should I do today?")
+        app.buttons["coach.send"].firstMatch.tap()
+
+        // A real turn: the model calls tools on this device, then answers with the numbers it read.
+        let chips = app.buttons.matching(identifier: "coach.chip")
+        waitFor(chips.firstMatch, timeout: 150, "the coach did not answer")
+        attachScreenshot("live-1-answer-with-data")
+
+        // A second turn asks for a trend, which must come back with a chart.
+        composer.tap()
+        composer.typeText("How has my sleep trended this week?")
+        app.buttons["coach.send"].firstMatch.tap()
+        eventually(timeout: 150, "no chart in the trend answer") {
+            self.app.otherElements.matching(identifier: "coach.chart").firstMatch.exists
+        }
+        attachScreenshot("live-2-trend-with-chart")
+    }
+
     private func openCloudRow() {
         let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Agara Cloud")).firstMatch
         scrollTo(row)

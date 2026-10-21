@@ -33,7 +33,9 @@ struct CoachChartView: View {
         AgaraChartEmpty(text: "No data to plot for this range.", minimumPoints: 1, minHeight: height)
     }
 
-    var body: some View {
+    var body: some View { chartBody.accessibilityIdentifier("coach.chart") }
+
+    private var chartBody: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(chart.title)
                 .font(AgaraFont.caption)
