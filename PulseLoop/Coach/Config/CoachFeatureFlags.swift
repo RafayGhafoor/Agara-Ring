@@ -36,7 +36,16 @@ enum CoachGate {
     }
 
     /// The cloud coach may run.
-    static var cloudReady: Bool { cloudReady(facts: .live) }
+    static var cloudReady: Bool {
+        #if DEBUG
+        // Screenshot / UI-test hook: `-coachGateOpen YES` selects the cloud coach regardless of the local gate. The
+        // SERVER still enforces the real gate (token, verified email, consent version), so this cannot send a turn that
+        // would otherwise be refused — it only stops the app from silently falling back to its local answer during a
+        // capture run, which is what made the first "live" screenshot look real when no turn had been sent at all.
+        if DebugLaunch.bool("coachGateOpen") { return true }
+        #endif
+        return cloudReady(facts: .live)
+    }
 
     /// Everything the gate reads, as one value: injectable so the routing table can be tested for every combination
     /// without a Keychain, a signed-in account or the Firebase network.

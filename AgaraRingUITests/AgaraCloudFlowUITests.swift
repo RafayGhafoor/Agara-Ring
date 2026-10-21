@@ -11,6 +11,24 @@ final class AgaraCloudFlowUITests: AgaraUITestCase {
         openTab("Settings")
     }
 
+    /// Types into a field and then CHECKS the field took it. A `SecureField` can swallow `typeText` (observed 2026-10-20:
+    /// the email landed, the password did not, and the run waited 90 s for a screen that could never appear).
+    private func typeInto(_ field: XCUIElement, _ text: String, _ what: String, file: StaticString = #filePath,
+                          line: UInt = #line) {
+        // Compare the field's value BEFORE and AFTER typing: an empty field reports its placeholder ("Password"), so a
+        // "non-empty" check passes without a single character having been typed (that is what produced three 90 s waits).
+        let before = (field.value as? String) ?? ""
+        for attempt in 1...3 {
+            field.tap()
+            RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+            if attempt == 1 { field.typeText(text) } else { app.typeText(text) }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+            if ((field.value as? String) ?? "") != before { return }
+            NSLog("AGARA_E2E \(what) unchanged after attempt \(attempt) (value=\(before.prefix(12)))")
+        }
+        XCTFail("\(what) field did not take the text (value stayed \(before.prefix(12)))", file: file, line: line)
+    }
+
     /// REAL coach answer against STAGING: signs in, opens the Coach tab and lets the model answer with the synced data.
     /// Runs only with credentials (`TEST_RUNNER_AGARA_E2E_EMAIL/PASSWORD` + the staging tunnel on 127.0.0.1:18091):
     ///
@@ -21,28 +39,32 @@ final class AgaraCloudFlowUITests: AgaraUITestCase {
     /// It attaches the answer and the trend answer, so a screenshot of a real turn exists instead of a scripted one.
     func testLiveCoachAnswer() throws {
         let env = ProcessInfo.processInfo.environment
-        guard let mail = env["AGARA_E2E_EMAIL"], let pass = env["AGARA_E2E_PASSWORD"] else {
-            throw XCTSkip("no staging credentials in the environment")
+        // A REAL session injected through the debug-only `-cloudTestSession` hook. Typing the sign-in form in XCUITest
+        // never landed the password (three runs), and this token is verified by the server exactly like one from the form.
+        guard let sessionJSON = env["AGARA_E2E_SESSION_JSON"], !sessionJSON.isEmpty else {
+            throw XCTSkip("no AGARA_E2E_SESSION_JSON (run scripts/coach_live_session.py, see the doc comment)")
         }
-        launchCloud(extra: ["-cloudBaseUrl", "http://127.0.0.1:18091", "-coachProvider", "agaraCloud"])
-        openCloudRow()
-        if !element("cloud.syncNow").waitForExistence(timeout: 5) {
-            let agree = element("cloud.consent.agree")
-            scrollTo(agree)
-            waitFor(agree).tap()
-            let mode = element("cloud.mode")
-            if mode.exists { let si = mode.buttons["Sign in"]; if si.exists { si.tap() } }
-            let email = waitFor(element("cloud.email"), "email field missing")
-            email.tap(); email.typeText(mail)
-            let password = waitFor(element("cloud.password"))
-            password.tap(); password.typeText(pass)
-            let submit = element("cloud.submit")
-            scrollTo(submit)
-            waitFor(submit).tap()
+        // Launched straight into the app, not through `launchCloud` (which ends on Settings, where the tab bar is gone).
+        app.launchArguments = ["-noCoachMarks", "YES", "-acceptDisclaimer", "YES", "-seedDemo", "YES",
+                               "-forceOnboarding", "NO", "-features", "agara_cloud=on", "-AppleLanguages", "(en)",
+                               "-cloudBaseUrl", "http://127.0.0.1:18091", "-coachProvider", "agaraCloud",
+                               // The coach's own master switch: a fresh install has it off, so a clean run must set it.
+                               "-coachOn", "YES", "-coachGateOpen", "YES", "-cloudTestSession", sessionJSON]
+        app.launch()
+        waitFor(app.tabBars.buttons["Vitals"].exists ? app.tabBars.buttons["Vitals"] : app.buttons["Vitals"],
+                timeout: 90, "the app did not start")
+        // A relaunch can restore a pushed screen (Settings), where the tab bar does not exist. Get back to the root.
+        for _ in 0..<3 where !app.tabBars.firstMatch.waitForExistence(timeout: 3) {
+            if app.buttons["Back"].exists { app.buttons["Back"].tap() }
         }
-        waitFor(element("cloud.syncNow"), timeout: 90, "did not reach the signed-in screen")
-
         openTab("Coach")
+        // The cloud coach needs the consent (§11) — without it the gate stays closed and the app silently answers with
+        // its LOCAL fallback, which is exactly what fooled the first "live" run: a plausible answer, no server turn.
+        if element("coach.state.primary").waitForExistence(timeout: 10) {
+            element("coach.state.primary").tap()
+            let agree = element("coach.consent.agree")
+            if agree.waitForExistence(timeout: 10) { scrollTo(agree); agree.tap() }
+        }
         let composer = waitFor(app.textFields.firstMatch, timeout: 30, "the coach composer is missing")
         composer.tap()
         composer.typeText("How did I sleep last night, and what should I do today?")
@@ -156,9 +178,9 @@ final class AgaraCloudFlowUITests: AgaraUITestCase {
             let mode = element("cloud.mode")
             if mode.exists { let si = mode.buttons["Sign in"]; if si.exists { si.tap() } }
             let email = waitFor(element("cloud.email"), "email field missing")
-            email.tap(); email.typeText(mail)
+            typeInto(email, mail, "email")
             let password = waitFor(element("cloud.password"))
-            password.tap(); password.typeText(pass)
+            typeInto(password, pass, "password")
             let submit = element("cloud.submit")
             scrollTo(submit)
             waitFor(submit).tap()

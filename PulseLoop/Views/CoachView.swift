@@ -15,6 +15,10 @@ struct CoachView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(RingSyncCoordinator.self) private var coordinator
     @Query(sort: \CoachConversation.updatedAt, order: .reverse) private var conversations: [CoachConversation]
+    /// The one cloud account, observed so the header's privacy sentence follows it. Without this the header kept
+    /// whatever it computed before the session resolved — a real staging answer arrived from the cloud while the header
+    /// still said "nothing is sent" (captured in captures/coach-ui/live-1-answer-with-data.png).
+    @State private var cloud = AgaraCloud.shared
     @State private var draft = ""
     @State private var viewModel = CoachViewModel()
     @State private var activeConversationId: UUID?
@@ -293,8 +297,11 @@ struct CoachView: View {
     /// bring-your-own-key or on-device choice is reported as what it is. (It compared `.backendProxy`, a case the cloud
     /// coach replaced with `.agaraCloud` — which meant a cloud-coach user was told "nothing is sent".)
     private var usesCloudCoach: Bool {
-        CoachClientResolver.effectiveMode(for: settingsStore.settings.providerMode,
-                                          cloudReady: CoachGate.cloudReady) == .agaraCloud
+        // `cloud.phase` is read so the header re-renders when the account resolves (sign-in, verification, consent) —
+        // otherwise it keeps saying "nothing is sent" while a turn is answered by the cloud.
+        _ = cloud.phase
+        return CoachClientResolver.effectiveMode(for: settingsStore.settings.providerMode,
+                                                cloudReady: CoachGate.cloudReady) == .agaraCloud
     }
 
     /// The user's *stored* choice. The quota pill belongs to the cloud coach, so it follows the selection rather than the

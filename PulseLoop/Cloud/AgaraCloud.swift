@@ -117,7 +117,10 @@ final class AgaraCloud {
         let config = config ?? .current
         self.config = config
         self.transport = transport
-        self.sessionStore = sessionStore
+        // One store for both readers: `refresh()` (which decides isSignedIn/phase, and so the coach gate) and the auth
+        // client. Wrapping only the client's copy made an injected session invisible to `refresh()`.
+        let store = AgaraLaunchArgumentSessionStore(inner: sessionStore)
+        self.sessionStore = store
         self.state = state
         self.now = now
         self.sleep = sleep
@@ -125,7 +128,7 @@ final class AgaraCloud {
         self.isEnabled = isEnabled
         self.engineLimits = limits ?? .catalog
         self.progressSink = progress ?? { SyncProgress.shared.updateCloud($0) }
-        let auth = AgaraAuthClient(config: config, transport: transport, store: sessionStore, now: { AppClock.now })
+        let auth = AgaraAuthClient(config: config, transport: transport, store: store, now: { AppClock.now })
         self.auth = auth
         self.api = AgaraCloudAPI(config: config, transport: transport, auth: auth)
         refresh()

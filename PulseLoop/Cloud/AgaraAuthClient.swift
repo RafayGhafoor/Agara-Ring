@@ -23,6 +23,39 @@ nonisolated protocol AgaraAuthSessionStore: Sendable {
     func clear()
 }
 
+
+/// DEBUG ONLY: seed a session from launch arguments so a UI test or screenshot run can be signed in without typing into
+/// the form. XCUITest's `typeText` proved unable to fill this screen's secure field (2026-10-20: three runs went out with
+/// an empty password), and a live screenshot of a real coach answer is worth more than a typing workaround.
+///
+///   -cloudTestSession "<json>"   the AgaraAuthSession JSON, minified, produced by scripts/coach_live_session.py
+///
+/// Never compiled into a release build, and it does not bypass anything server-side: the token is a real Firebase ID
+/// token and the server verifies it like any other.
+nonisolated struct AgaraLaunchArgumentSessionStore: AgaraAuthSessionStore {
+    private let inner: AgaraAuthSessionStore
+    private let injected: AgaraAuthSession?
+
+    init(inner: AgaraAuthSessionStore) {
+        self.inner = inner
+        #if DEBUG
+        if let raw = DebugLaunch.string("cloudTestSession"), let data = raw.data(using: .utf8),
+           let session = try? JSONDecoder().decode(AgaraAuthSession.self, from: data) {
+            injected = session
+            inner.save(session)
+        } else {
+            injected = nil
+        }
+        #else
+        injected = nil
+        #endif
+    }
+
+    func load() -> AgaraAuthSession? { injected ?? inner.load() }
+    func save(_ session: AgaraAuthSession) { inner.save(session) }
+    func clear() { inner.clear() }
+}
+
 /// The Keychain (`AfterFirstUnlockThisDeviceOnly`, see `KeychainItem`): one item holding the session as JSON, so a
 /// save is atomic and a wipe is one delete. The service name is install-bound.
 nonisolated struct AgaraKeychainAuthStore: AgaraAuthSessionStore {
