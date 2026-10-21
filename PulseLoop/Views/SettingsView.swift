@@ -178,7 +178,9 @@ struct SettingsView: View {
         // Hidden until unlocked by tapping the version 7× in About (like Android's developer options).
         // Debug builds only: a release build has no hidden menu (store launch, App Store 2.3.1(a)).
         #if DEBUG
-        if developerUnlocked, StoreCapture.showsDebugChrome {
+        // `-developerUnlocked YES` is the UI-test hook. `@AppStorage` reads a `Bool` and a launch argument lands in
+        // NSArgumentDomain as a STRING, so the stored flag alone ignores it — the hook has to be read explicitly.
+        if developerUnlocked || DebugLaunch.bool("developerUnlocked"), StoreCapture.showsDebugChrome {
             rows.append(SettingsRowItem(icon: "ladybug", tint: AgaraColors.danger, title: "Developer") {
                 path.append(AppRoute.debug)
             })

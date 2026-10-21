@@ -76,7 +76,7 @@ struct DebugView: View {
         }
         .id(refreshToken)
         .background(AgaraColors.background)
-        .pageChrome("Debug")
+        .pageChrome("Developer")
     }
 
     /// Settings › Developer › Tips: "Show tips again" clears the seen one-time hints
