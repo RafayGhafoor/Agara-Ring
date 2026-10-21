@@ -115,14 +115,18 @@ final class CoachTabUITests: AgaraUITestCase {
     }
 
     func testOutOfQuotaNamesTheResetTime() {
-        launchCoach(extra: ["-coachState", "quota",
+        launchCoach(extra: ["-coachState", "quota", "-coachProvider", "agaraCloud",
                             "-coachQuotaRemaining", "0",
                             "-coachQuotaResetsAt", "2026-10-21T00:00:00Z"])
         openTab("Coach")
         waitFor(element("coach.state.quota"), timeout: 20, "the out-of-quota card never appeared")
         // "Your daily cloud questions reset 21 Oct 2026 at 00:00…" — the sentence carries the date the header sent.
-        XCTAssertTrue(anyElement(labelContains: "21 Oct").exists || anyElement(labelContains: "Oct 21").exists,
-                      "the card does not say when the quota resets")
+        // Locale-agnostic: the card renders a DateFormatter date, which is "21 Oct 2026" in en_US and "21. Okt. 2026"
+        // in de_DE, so assert on the DAY and the fact that a reset time is named at all.
+        XCTAssertTrue(anyElement(labelContains: "21").exists,
+                      "the card does not say which day the quota resets")
+        XCTAssertTrue(anyElement(labelContains: "reset").exists,
+                      "the card does not name a reset at all")
         XCTAssertTrue(anyElement(labelContains: "on-device coach").exists)
     }
 
@@ -168,7 +172,9 @@ final class CoachTabUITests: AgaraUITestCase {
     // MARK: - 4. Ready: quota pill, starter prompts, three follow-ups, history
 
     func testReadyStateShowsQuotaPillStarterPromptsThreeFollowUpsAndHistory() {
-        launchCoach(extra: ["-coachOn", "YES", "-coachProvider", "offlineStub",
+        // The pill reports the CLOUD quota, so the test must select the cloud coach - with `offlineStub` the header
+        // correctly says "nothing is sent" and there is no quota to report.
+        launchCoach(extra: ["-coachOn", "YES", "-coachProvider", "agaraCloud",
                             "-coachQuotaRemaining", "24",
                             "-coachQuotaResetsAt", "2026-10-21T00:00:00Z"])
         openTab("Coach")
@@ -223,7 +229,7 @@ final class CoachTabUITests: AgaraUITestCase {
         for (id, screen) in [("off", "state-off"), ("signedOut", "state-signed-out"),
                              ("unverified", "state-unverified"), ("consent", "state-consent"),
                              ("busy", "state-busy"), ("quota", "state-quota")] {
-            launchCoach(extra: ["-theme", theme, "-coachState", id,
+            launchCoach(extra: ["-theme", theme, "-coachState", id, "-coachProvider", "agaraCloud",
                                 "-coachQuotaRemaining", "0",
                                 "-coachQuotaResetsAt", "2026-10-21T00:00:00Z",
                                 "-coachBusy", "YES"])
@@ -242,7 +248,7 @@ final class CoachTabUITests: AgaraUITestCase {
         app.terminate()
 
         // Ready: quota pill, starter prompts and the empty thread.
-        launchCoach(extra: ["-theme", theme, "-coachOn", "YES", "-coachProvider", "offlineStub",
+        launchCoach(extra: ["-theme", theme, "-coachOn", "YES", "-coachProvider", "agaraCloud",
                             "-coachQuotaRemaining", "24", "-coachQuotaResetsAt", "2026-10-21T00:00:00Z"])
         openTab("Coach")
         waitFor(element("coach.quota"), timeout: 20, "quota pill missing for the screenshot")

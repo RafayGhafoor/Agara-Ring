@@ -128,24 +128,25 @@ struct CoachView: View {
 
             VStack(spacing: 0) {
                 if showColdStart(messages) {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 6) {
-                            ForEach(starterPrompts, id: \.self) { prompt in
-                                Button { send(prompt) } label: {
-                                    Text(prompt)
-                                        .font(AgaraFont.caption.weight(.regular))
-                                        .foregroundStyle(AgaraColors.textSecondary)
-                                        .padding(.horizontal, 12).padding(.vertical, 7)
-                                        .agaraGlass(Capsule())
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityIdentifier("coach.starter")
+                    // Stacked, not a horizontal strip: a strip clipped the third prompt off-screen, so it could be
+                    // neither read nor tapped (a real user hits the same wall, not just the UI test).
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(starterPrompts, id: \.self) { prompt in
+                            Button { send(prompt) } label: {
+                                Text(prompt)
+                                    .font(AgaraFont.caption.weight(.regular))
+                                    .foregroundStyle(AgaraColors.textSecondary)
+                                    .multilineTextAlignment(.leading)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, 12).padding(.vertical, 7)
+                                    .agaraGlass(RoundedRectangle(cornerRadius: 14, style: .continuous))
                             }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("coach.starter")
                         }
-                        .padding(.horizontal, 12).padding(.vertical, 8)
-                        // Prompt chips share one container so their glass renders/blends together.
-                        .agaraGlassContainer(spacing: 6)
                     }
+                    .padding(.horizontal, 12).padding(.vertical, 8)
+                    .agaraGlassContainer(spacing: 6)
                 }
                 composer
             }
@@ -235,7 +236,7 @@ struct CoachView: View {
             Spacer()
             // The quota pill sits between the name and the actions: “24 left today”, from the last response's
             // `X-Coach-Remaining-Day`. Hidden until the day's first response says how many are left.
-            if let pill = quota.pillText {
+            if selectedCloudCoach, let pill = quota.pillText {
                 Text(pill)
                     .font(AgaraFont.caption2.weight(.semibold).monospacedDigit())
                     .foregroundStyle(AgaraColors.textSecondary)
@@ -280,10 +281,25 @@ struct CoachView: View {
 
     /// Where the answer comes from — the cloud proxy or this phone — under the coach's name. It is the one place the
     /// user is told, without opening Settings, whether their data is leaving the device.
+    /// Whether this turn actually goes through the Agara cloud coach. Uses the resolver's *effective* mode, so a stored
+    /// bring-your-own-key or on-device choice is reported as what it is. (It compared `.backendProxy`, a case the cloud
+    /// coach replaced with `.agaraCloud` — which meant a cloud-coach user was told "nothing is sent".)
+    private var usesCloudCoach: Bool {
+        CoachClientResolver.effectiveMode(for: settingsStore.settings.providerMode,
+                                          cloudReady: CoachGate.cloudReady) == .agaraCloud
+    }
+
+    /// The user's *stored* choice. The quota pill belongs to the cloud coach, so it follows the selection rather than the
+    /// effective mode (a closed gate still shows the pill; the state card explains why it is not being used).
+    private var selectedCloudCoach: Bool {
+        switch settingsStore.settings.providerMode {
+        case .agaraCloud, .backendProxy: return true
+        default: return false
+        }
+    }
+
     private var headerSubtitle: String {
-        settingsStore.settings.providerMode == .backendProxy
-            ? CoachCopy.headerCloudSubtitle
-            : CoachCopy.headerOnDeviceSubtitle
+        usesCloudCoach ? CoachCopy.headerCloudSubtitle : CoachCopy.headerOnDeviceSubtitle
     }
 
     /// Rebuild the empty thread's chips from the current data (cheap: one context packet, no model call).
