@@ -193,7 +193,10 @@ final class CoachTabUITests: AgaraUITestCase {
         starters.firstMatch.tap()
 
         // One answer, exactly three follow-ups (the scripted answer carries two; the third comes from the prompts).
+        // The answer now lands at its FIRST line (reading order), so a long answer's chips start below the fold and
+        // SwiftUI drops fully-clipped views from the accessibility tree: scroll to them before asserting.
         let chips = app.buttons.matching(identifier: "coach.chip")
+        for _ in 0..<5 where !chips.firstMatch.exists { app.swipeUp() }
         waitFor(chips.firstMatch, timeout: 60, "no answer / no follow-up chips")
         XCTAssertEqual(chips.count, 3, "an answer must show exactly three follow-ups")
 
@@ -201,11 +204,17 @@ final class CoachTabUITests: AgaraUITestCase {
         waitFor(app.buttons["New conversation"], "new-conversation button missing").tap()
         waitFor(element("coach.history"), "history button missing").tap()
         waitFor(app.staticTexts["Conversations"], timeout: 20, "the history sheet did not open")
-        let past = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", String(firstPrompt.prefix(18)))).firstMatch
-        waitFor(past, "the past conversation is not listed").tap()
-        eventually(timeout: 20, "the reopened conversation shows no messages") {
-            app.buttons.matching(identifier: "coach.chip").count == 3
-        }
+        // Rows are newest-first, so the first one is the empty "New chat" this test just created. A conversation's title
+        // is the answer's title, NOT the prompt, so pick positionally: the oldest row is the chat that was actually had.
+        // Rows are newest-first, so the first is the empty "New chat" this test just created; the last is the chat that
+        // was actually had. Tap the title (a `List` row's own identifier never reaches the accessibility tree).
+        let titles = app.staticTexts.matching(identifier: "coach.history.title")
+        waitFor(titles.firstMatch, timeout: 20, "the past conversation is not listed (\(titles.count) titles)")
+        XCTAssertGreaterThanOrEqual(titles.count, 2, "history lists only \(titles.count) conversation(s)")
+        titles.element(boundBy: titles.count - 1).tap()
+        // The reopened thread also starts at its first line, so scroll to its chips before counting them.
+        for _ in 0..<5 where chips.count == 0 { app.swipeUp() }
+        eventually(timeout: 20, "the reopened conversation shows no messages") { chips.count == 3 }
     }
 
     // MARK: - 5. Screenshots (light and dark)

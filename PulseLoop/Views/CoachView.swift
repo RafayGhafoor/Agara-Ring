@@ -78,18 +78,32 @@ struct CoachView: View {
         CoachMessagesReader(conversationId: activeConversationId) { messages in
             content(messages)
         }
+
     }
 
     @ViewBuilder
     private func content(_ messages: [CoachMessage]) -> some View {
         VStack(spacing: 0) {
-            header
 
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(spacing: 12) {
                         // A nudge's seeded answer (tap on a nudge or "Why?"): already written, with its numbers, its
                         // chart and three questions. No model call until the user sends one.
+                        // The privacy promise sits IN the thread: prominent before the first question, gone once the
+                        // conversation has started (where the info sheet carries it). As chrome it cost reading area
+                        // forever and made the header look bolted on.
+                        // Until the USER has asked something. A fresh thread can already hold the daily briefing, so
+                        // `messages.isEmpty` hid the promise exactly when it was still doing its job.
+                        if !messages.contains(where: { $0.role == "user" }) && nav.requestedSeed == nil {
+                            Text(headerSubtitle)
+                                .font(AgaraFont.caption2.weight(.regular))
+                                .foregroundStyle(AgaraColors.textMuted)
+                                .multilineTextAlignment(.center)
+                                .frame(maxWidth: .infinity)
+                                .padding(.bottom, 2)
+                                .accessibilityIdentifier("coach.promise")
+                        }
                         if let seed = nav.requestedSeed {
                             CoachSeedCard(
                                 seed: seed,
@@ -137,15 +151,25 @@ struct CoachView: View {
                         }
                     }
                     .padding(.horizontal, 12)
-                    .padding(.top, 12)
                     .padding(.bottom, 8)
                 }
                 .onChange(of: messages.count) {
-                    if let last = messages.last { withAnimation { proxy.scrollTo(last.id, anchor: .bottom) } }
+                    guard let last = messages.last else { return }
+                    // An ANSWER is read from its first line, so it lands at the TOP of the viewport. Anchoring to the
+                    // bottom (the chat default) put a long answer's beginning off-screen and left only its tail visible,
+                    // which read as the header cutting the answer in half. The user's own message still tracks the
+                    // bottom, which is what a chat expects.
+                    withAnimation {
+                        proxy.scrollTo(last.id, anchor: last.role == "assistant" ? .top : .bottom)
+                    }
                 }
                 .onChange(of: viewModel.traceEvents.count) {
                     withAnimation { proxy.scrollTo("trace", anchor: .bottom) }
                 }
+                // The scroll margin (not padding) is what makes the capsule feel submerged: content passes beneath it
+                // while scrolling, and `scrollTo(.top)` still lands an answer below it, never behind it.
+                // 4 (top padding) + 32 (the circles) + 20 (the fade) — exactly clears the floating chrome at rest.
+                .contentMargins(.top, 56, for: .scrollContent)
                 .scrollDismissesKeyboard(.immediately)
                 .simultaneousGesture(TapGesture().onEnded { composerFocused = false })
                 .agaraScrollEdges(.top)
@@ -159,6 +183,7 @@ struct CoachView: View {
             .background(AgaraColors.secondaryBackground)
         }
         .background(AgaraColors.background)
+        .overlay(alignment: .top) { floatingHeader(compact: !messages.isEmpty) }
         // Pin the keyboard safe area so only our manual lift moves the composer —
         // otherwise the sheet's native avoidance double-lifts it.
         .ignoresSafeArea(.keyboard)
@@ -236,65 +261,66 @@ struct CoachView: View {
         onOpenMeal?(id)
     }
 
-    private var header: some View {
-        VStack(alignment: .trailing, spacing: 6) {
-        HStack(spacing: 12) {
-            CoachOrb(size: 40)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(AgaraCopy.coachTitle)
-                    .font(AgaraFont.subheadline.weight(.semibold))
-                    .foregroundStyle(AgaraColors.textPrimary)
-                    .lineLimit(1)
-                Text(headerSubtitle)
-                    .font(AgaraFont.caption2.weight(.regular))
-                    .foregroundStyle(AgaraColors.textMuted)
-                    .lineLimit(2)
-            }
-            // Sibling glass circles share one container so their glass renders/blends together.
-            HStack(spacing: 12) {
-                Button { composerFocused = false; showUsage = true } label: {
-                    Image(systemName: "info.circle").font(AgaraFont.body).foregroundStyle(AgaraColors.textSecondary)
-                        .frame(width: 36, height: 36).agaraGlass(Circle(), interactive: true)
-                        .minTapTarget(visualSize: 36)
+    /// The coach's three actions, floating over the thread: a right-aligned row of glass circles, no title and no
+    /// container. "Agara Coach" was redundant above a screen whose tab is already Coach, and a titled capsule spent a
+    /// row on words the user does not need to read twice. What is left is the chrome you actually press.
+    ///
+    /// The scrim behind it is not decoration: content scrolls UNDER these circles, and without a fade the answer's text
+    /// collides with them. It is not hit-testable, so it never steals a scroll.
+    private func floatingHeader(compact: Bool) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Spacer(minLength: 0)
+                // The cloud quota, from the last response's `X-Coach-Remaining-Day`. Text-only chip: the number is the
+                // one thing worth reading here, and it keeps its own ground so it stays legible over the thread.
+                if selectedCloudCoach, let pill = quota.pillText {
+                    Text(pill)
+                        .font(AgaraFont.caption2.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(AgaraColors.textSecondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                        .padding(.horizontal, 9).padding(.vertical, 4)
+                        .background(AgaraColors.secondaryBackground, in: Capsule())
+                        .overlay(Capsule().stroke(AgaraColors.borderSubtle, lineWidth: 0.5))
+                        .accessibilityIdentifier("coach.quota")
+                        .accessibilityLabel(quota.pillSpokenText ?? pill)
+                        .accessibilityHint(CoachCopy.quotaPillHint)
                 }
-                .accessibilityLabel("Usage and privacy")
-                Button { newConversation() } label: {
-                    Image(systemName: "plus").font(AgaraFont.body).foregroundStyle(AgaraColors.textSecondary)
-                        .frame(width: 36, height: 36).agaraGlass(Circle(), interactive: true)
-                        .minTapTarget(visualSize: 36)
-                }
-                .accessibilityLabel("New conversation")
-                // Conversation history: flag `coach_history` (iOS only today; Android port pending).
-                if CoachGate.historyOn {
-                    Button { composerFocused = false; showHistory = true } label: {
-                        Image(systemName: "clock.arrow.circlepath").font(AgaraFont.body).foregroundStyle(AgaraColors.textSecondary)
-                            .frame(width: 36, height: 36).agaraGlass(Circle(), interactive: true)
-                            .minTapTarget(visualSize: 36)
+                // Sibling glass circles share one container so their glass renders/blends together.
+                HStack(spacing: 10) {
+                    Button { composerFocused = false; showUsage = true } label: {
+                        Image(systemName: "info.circle").font(AgaraFont.footnote).foregroundStyle(AgaraColors.textSecondary)
+                            .frame(width: 32, height: 32).agaraGlass(Circle(), interactive: true)
+                            .minTapTarget(visualSize: 32)
                     }
-                    .accessibilityLabel(CoachCopy.historyButton)
-                    .accessibilityIdentifier("coach.history")
+                    .accessibilityLabel("Usage and privacy")
+                    Button { newConversation() } label: {
+                        Image(systemName: "plus").font(AgaraFont.footnote).foregroundStyle(AgaraColors.textSecondary)
+                            .frame(width: 32, height: 32).agaraGlass(Circle(), interactive: true)
+                            .minTapTarget(visualSize: 32)
+                    }
+                    .accessibilityLabel("New conversation")
+                    // Conversation history: flag `coach_history` (iOS only today; Android port pending).
+                    if CoachGate.historyOn {
+                        Button { composerFocused = false; showHistory = true } label: {
+                            Image(systemName: "clock.arrow.circlepath").font(AgaraFont.footnote).foregroundStyle(AgaraColors.textSecondary)
+                                .frame(width: 32, height: 32).agaraGlass(Circle(), interactive: true)
+                                .minTapTarget(visualSize: 32)
+                        }
+                        .accessibilityLabel(CoachCopy.historyButton)
+                        .accessibilityIdentifier("coach.history")
+                    }
                 }
+                .agaraGlassContainer(spacing: 8)
             }
-            .agaraGlassContainer(spacing: 8)
+            .padding(.horizontal, 12)
+            // The fade the answer dissolves into while scrolling. 20 pt: it softens the top edge without washing out the
+            // first line of content at rest (the scroll margin below is sized to clear it exactly).
+            LinearGradient(colors: [AgaraColors.background, AgaraColors.background.opacity(0)], startPoint: .top, endPoint: .bottom)
+                .frame(height: 20)
+                .allowsHitTesting(false)
         }
-        if selectedCloudCoach, let pill = quota.pillText {
-            // Its own row: sharing the title's row squeezed the name to "Agara Co…", and shrinking the pill made it
-            // vanish. It reports the CLOUD quota from the last response's `X-Coach-Remaining-Day`.
-            Text(pill)
-                .font(AgaraFont.caption2.weight(.semibold).monospacedDigit())
-                .foregroundStyle(AgaraColors.textSecondary)
-                .lineLimit(1)
-                .padding(.horizontal, 8).padding(.vertical, 4)
-                .background(AgaraColors.cardSoft, in: Capsule())
-                .overlay(Capsule().stroke(AgaraColors.borderSubtle, lineWidth: 0.5))
-                .accessibilityIdentifier("coach.quota")
-                .accessibilityLabel(quota.pillSpokenText ?? pill)
-                .accessibilityHint(CoachCopy.quotaPillHint)
-        }
-        }
-        .padding(.horizontal, 16).padding(.vertical, 12)
-        .background(AgaraColors.secondaryBackground)
-        .overlay(alignment: .bottom) { Rectangle().fill(AgaraColors.borderSubtle).frame(height: 1) }
+        .padding(.top, 4)
     }
 
     /// Where the answer comes from — the cloud proxy or this phone — under the coach's name. It is the one place the
@@ -564,6 +590,9 @@ struct CoachHistorySheet: View {
                                         Text(convo.title)
                                             .font(AgaraFont.callout)
                                             .foregroundStyle(AgaraColors.textPrimary)
+                                            // On the TITLE, not the row: a `List` row's own identifier does not reach the
+                                            // accessibility tree (so a UI test cannot find or tap it by id).
+                                            .accessibilityIdentifier("coach.history.title")
                                         Text(Self.dateFormatter.string(from: convo.updatedAt))
                                             .font(AgaraFont.caption2.weight(.regular))
                                             .foregroundStyle(AgaraColors.textMuted)
