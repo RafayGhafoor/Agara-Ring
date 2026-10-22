@@ -11,7 +11,7 @@ enum RetrievalTools {
          syncStatus, dataAvailability, sleepTrends, goalProgress, recentAnomalies]
     }
 
-    private static let metricEnum = ["steps", "hr", "spo2", "sleep", "active_minutes", "calories", "distance"]
+    private static var metricEnum: [String] { CoachChartMetric.toolEnum }
 
     // MARK: get_profile_context
 
@@ -373,16 +373,8 @@ enum RetrievalTools {
 }
 
 extension CoachChartMetric {
-    static func from(_ s: String) -> CoachChartMetric? {
-        switch s {
-        case "steps": return .steps
-        case "hr": return .hr
-        case "spo2": return .spo2
-        case "sleep": return .sleep
-        case "active_minutes": return .activeMinutes
-        case "calories": return .calories
-        case "distance": return .distance
-        default: return nil
-        }
-    }
+    static func from(_ s: String) -> CoachChartMetric? { CoachChartMetric(rawValue: s) }
+
+    /// The tools' metric enum — one list (`CoachChartMetric.allCases`).
+    static var toolEnum: [String] { allCases.map(\.rawValue) }
 }

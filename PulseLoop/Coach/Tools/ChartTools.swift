@@ -32,7 +32,7 @@ enum ChartTools {
             parameters: JSONSchema.object([
                 "chart_type": JSONSchema.enumString(["line", "bar", "dot", "sleep_stage", "sparkline"]),
                 "title": JSONSchema.string,
-                "metric": JSONSchema.enumString(["steps", "hr", "spo2", "sleep", "active_minutes", "calories", "distance"]),
+                "metric": JSONSchema.enumString(CoachChartMetric.toolEnum),
                 "start": JSONSchema.string,
                 "end": JSONSchema.string,
                 "granularity": JSONSchema.enumString(["raw", "hour", "day"]),

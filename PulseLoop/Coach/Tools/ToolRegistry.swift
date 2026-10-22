@@ -10,9 +10,9 @@ struct ToolRegistry {
 
     init(flags: CoachFeatureFlags) {
         self.flags = flags
-        var all = RetrievalTools.all + ChartTools.all + AnalysisTools.all
+        var all = RetrievalTools.all + ChartTools.all + AnalysisTools.all + InsightTools.readTools
         if flags.writeToolsEnabled {
-            all += MemoryTools.all + ActionTools.writeTools
+            all += MemoryTools.all + ActionTools.writeTools + InsightTools.writeTools
         }
         if flags.liveMeasurementsEnabled {
             all += ActionTools.measurementTools

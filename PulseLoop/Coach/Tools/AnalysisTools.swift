@@ -9,7 +9,7 @@ enum AnalysisTools {
         [analyzeTrend, comparePeriods, computeCorrelation, detectOutliers, summarizeDistribution]
     }
 
-    private static let metricEnum = ["steps", "hr", "spo2", "sleep", "active_minutes", "calories", "distance"]
+    private static var metricEnum: [String] { CoachChartMetric.toolEnum }
 
     private struct MetricRangeArg: Decodable { let metric: String, start: String, end: String }
 
@@ -26,7 +26,8 @@ enum AnalysisTools {
         ) { args, ctx in
             guard let metric = CoachChartMetric.from(args.metric) else { return .error("unknown metric '\(args.metric)'") }
             let series = CoachDataAccess.dailySeries(metric: metric, start: args.start, end: args.end, context: ctx.modelContext)
-            return .encoding(AnalysisEngine.trend(series))
+            return .encoding(Covered(result: AnalysisEngine.trend(series), coverage: [
+                "coverage": CoachDataAccess.coverage(metric: metric, start: args.start, end: args.end, context: ctx.modelContext)]))
         }
     }
 
@@ -56,7 +57,9 @@ enum AnalysisTools {
             guard let metric = CoachChartMetric.from(args.metric) else { return .error("unknown metric '\(args.metric)'") }
             let a = CoachDataAccess.dailySeries(metric: metric, start: args.periodAStart, end: args.periodAEnd, context: ctx.modelContext).map(\.value)
             let b = CoachDataAccess.dailySeries(metric: metric, start: args.periodBStart, end: args.periodBEnd, context: ctx.modelContext).map(\.value)
-            return .encoding(AnalysisEngine.comparePeriods(a: a, b: b))
+            return .encoding(Covered(result: AnalysisEngine.comparePeriods(a: a, b: b), coverage: [
+                "coverage_a": CoachDataAccess.coverage(metric: metric, start: args.periodAStart, end: args.periodAEnd, context: ctx.modelContext),
+                "coverage_b": CoachDataAccess.coverage(metric: metric, start: args.periodBStart, end: args.periodBEnd, context: ctx.modelContext)]))
         }
     }
 
@@ -90,7 +93,9 @@ enum AnalysisTools {
                 guard let bv = mapB[cal.startOfDay(for: item.date)] else { return nil }
                 return (item.value, bv)
             }
-            return .encoding(AnalysisEngine.correlation(pairs))
+            return .encoding(Covered(result: AnalysisEngine.correlation(pairs), coverage: [
+                "coverage_a": CoachDataAccess.coverage(metric: ma, start: args.start, end: args.end, context: ctx.modelContext),
+                "coverage_b": CoachDataAccess.coverage(metric: mb, start: args.start, end: args.end, context: ctx.modelContext)]))
         }
     }
 
@@ -107,9 +112,11 @@ enum AnalysisTools {
         ) { args, ctx in
             guard let metric = CoachChartMetric.from(args.metric) else { return .error("unknown metric '\(args.metric)'") }
             let series = CoachDataAccess.dailySeries(metric: metric, start: args.start, end: args.end, context: ctx.modelContext)
+            let coverage = CoachDataAccess.coverage(metric: metric, start: args.start, end: args.end, context: ctx.modelContext)
             return .object(["metric": args.metric, "outliers": AnalysisEngine.outliers(series).map {
                 ["date": $0.date, "value": $0.value, "z": $0.zScore]
-            }])
+            }, "coverage": ["days_in_range": coverage.daysInRange, "days_with_data": coverage.daysWithData,
+                            "readings": coverage.readings, "sparse": coverage.sparse]])
         }
     }
 
@@ -126,7 +133,29 @@ enum AnalysisTools {
         ) { args, ctx in
             guard let metric = CoachChartMetric.from(args.metric) else { return .error("unknown metric '\(args.metric)'") }
             let values = CoachDataAccess.dailySeries(metric: metric, start: args.start, end: args.end, context: ctx.modelContext).map(\.value)
-            return .encoding(AnalysisEngine.distribution(values))
+            return .encoding(Covered(result: AnalysisEngine.distribution(values), coverage: [
+                "coverage": CoachDataAccess.coverage(metric: metric, start: args.start, end: args.end, context: ctx.modelContext)]))
         }
+    }
+}
+
+/// An analysis result with its coverage beside it: the result's own fields stay where they were, plus `coverage`
+/// (or `coverage_a` / `coverage_b`), so the coach always knows how much data stood behind the number (use case 12).
+struct Covered<T: Encodable>: Encodable {
+    let result: T
+    let coverage: [String: CoachDataAccess.Coverage]
+
+    private struct Key: CodingKey {
+        let stringValue: String
+        var intValue: Int? { nil }
+        init(_ s: String) { stringValue = s }
+        init?(stringValue: String) { self.stringValue = stringValue }
+        init?(intValue: Int) { nil }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        try result.encode(to: encoder)
+        var container = encoder.container(keyedBy: Key.self)
+        for (key, value) in coverage { try container.encode(value, forKey: Key(key)) }
     }
 }

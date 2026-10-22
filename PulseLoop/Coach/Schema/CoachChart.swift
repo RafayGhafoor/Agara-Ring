@@ -59,8 +59,31 @@ enum CoachChartType: String, Codable {
     case line, bar, dot, sleepStage = "sleep_stage", sparkline
 }
 
-enum CoachChartMetric: String, Codable {
+/// Every metric the coach can fetch, analyse and chart — ONE list (the tools' enums, `from(_:)`, the server's
+/// `tools.json` and `response_schema.json` all derive from it; `CoachToolCatalogTests` keeps the server in step).
+/// Coach insights (2026-10-22) added the series the ring records but the coach could not see. Not here on purpose:
+/// HRV (decoding unvalidated), blood pressure, glucose and blood components (optical estimates, owner decision D1).
+enum CoachChartMetric: String, Codable, CaseIterable {
     case steps, hr, spo2, sleep, activeMinutes = "active_minutes", calories, distance
+    /// Daily mean of the ring's stress readings (0–100).
+    case stress
+    /// Per night: the lowest heart rate during the main sleep (the nudge engine's rule).
+    case restingHr = "resting_hr"
+    /// Daily mean of the sampled respiration rate (breaths/min).
+    case respRate = "resp_rate"
+    /// Minutes at MET ≥ 3 (5-minute records).
+    case intensityMinutes = "intensity_minutes"
+    /// The day's sleep score (night + naps).
+    case sleepScore = "sleep_score"
+    /// Main sleep start, minutes from midnight (negative = the evening before).
+    case bedtime
+    /// Main sleep end, minutes after midnight.
+    case wakeTime = "wake_time"
+    /// Awake minutes inside the day's sleep (night + naps).
+    case sleepAwake = "sleep_awake"
+
+    /// Metrics whose value is a clock time (minutes from midnight).
+    var isClockTime: Bool { self == .bedtime || self == .wakeTime }
 }
 
 struct CoachChartRange: Codable, Equatable {

@@ -32,7 +32,11 @@ final class StorageCenterTests: XCTestCase {
 
     /// Readings every `stepSeconds` for `days` days ending `daysAgo` days before now.
     private func seed(daysAgo: Int, days: Int = 1, perDay: Int = 400, kind: MeasurementKind = .heartRate) {
-        let start = Date().addingTimeInterval(-Double(daysAgo + days) * 86_400)
+        // Anchored at 10:00 UTC: blocks are keyed by UTC day, and a window starting "an hour from now" crossed UTC
+        // midnight in the evening (UTC+5 after 00:00 local → 6 blocks for 5 days; found 2026-10-23 00:45).
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = TimeZone(identifier: "UTC")!
+        let start = utc.startOfDay(for: Date().addingTimeInterval(-Double(daysAgo + days) * 86_400)).addingTimeInterval(9 * 3_600)
         for d in 0..<days {
             for i in 0..<perDay {
                 context.insert(Measurement(kind: kind, value: Double(55 + (i + d) % 60), unit: kind.unit,

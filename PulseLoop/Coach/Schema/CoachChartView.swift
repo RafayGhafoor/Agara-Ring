@@ -25,6 +25,11 @@ struct CoachChartView: View {
         case .activeMinutes: return AgaraColors.accent
         case .calories: return AgaraColors.calories
         case .distance: return AgaraColors.distance
+        case .stress: return AgaraColors.stress
+        case .restingHr: return AgaraColors.heartRate
+        case .respRate: return AgaraColors.respiration
+        case .intensityMinutes: return AgaraColors.met
+        case .sleepScore, .bedtime, .wakeTime, .sleepAwake: return AgaraColors.sleep
         }
     }
 
@@ -187,9 +192,17 @@ struct CoachChartView: View {
             return value >= 1000 ? "\(Int((value / 1000).rounded()))k" : "\(Int(value.rounded()))"
         case .spo2:
             return "\(Int(value.rounded()))%"
+        case .bedtime, .wakeTime:
+            return clock(value)
         default:
             return "\(Int(value.rounded()))"
         }
+    }
+
+    /// Minutes from midnight (negative = the evening before) as a clock time: -75 → "22:45", 420 → "07:00".
+    static func clock(_ minutes: Double) -> String {
+        let m = ((Int(minutes.rounded()) % 1440) + 1440) % 1440
+        return String(format: "%02d:%02d", m / 60, m % 60)
     }
 
     private static func isoDate(_ raw: String) -> Date? {
@@ -232,6 +245,13 @@ struct CoachChartView: View {
         case .activeMinutes: return "\(Int(value.rounded())) min"
         case .calories: return "\(Int(value.rounded())) kcal"
         case .distance: return String(format: "%.1f km", value)
+        case .stress: return "stress \(Int(value.rounded()))"
+        case .restingHr: return "\(Int(value.rounded())) bpm resting"
+        case .respRate: return String(format: "%.1f /min", value)
+        case .intensityMinutes: return "\(Int(value.rounded())) min"
+        case .sleepScore: return "score \(Int(value.rounded()))"
+        case .bedtime, .wakeTime: return clock(value)
+        case .sleepAwake: return "\(Int(value.rounded())) min awake"
         }
     }
 
@@ -250,7 +270,7 @@ struct CoachChartView: View {
         guard let lo = finite.min(), let hi = finite.max() else { return 0...1 }
 
         let magnitudeBar = chartType == .bar
-            && [.steps, .calories, .distance, .activeMinutes, .sleep].contains(metric)
+            && [.steps, .calories, .distance, .activeMinutes, .sleep, .intensityMinutes, .sleepAwake].contains(metric)
 
         var lower: Double
         var upper: Double

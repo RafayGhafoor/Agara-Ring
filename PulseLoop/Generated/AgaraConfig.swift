@@ -114,6 +114,8 @@ enum AgaraConfig {
         static let turnTtlSeconds: Int = 120
         static let followups: Int = 3
         static let historyTurns: Int = 10
+        static let sparseMinDays: Int = 3
+        static let sparseMinPercent: Int = 50
         static let summaryEveryTurns: Int = 10
         static let requestMaxBytes: Int = 65536
         static let messageMaxChars: Int = 1500
