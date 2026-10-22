@@ -165,6 +165,25 @@ final class StoreLaunchPhase1Tests: XCTestCase {
         })
         XCTAssertEqual(Set(byCategory["NSPrivacyAccessedAPICategoryUserDefaults"] ?? []), ["CA92.1", "1C8F.1"])
         XCTAssertEqual(byCategory["NSPrivacyAccessedAPICategorySystemBootTime"], ["35F9.1"])
+        // StorageUsage reads free disk space to SHOW it (85F4.1) and to stop writing when it is low (E174.1) — missing
+        // since 1.0 (ITMS-91053 risk), added in the 1.1 pre-TestFlight audit.
+        XCTAssertEqual(Set(byCategory["NSPrivacyAccessedAPICategoryDiskSpace"] ?? []), ["85F4.1", "E174.1"])
+        // 1.1 (Agara Cloud, opt-in): the manifest declares what the cloud collects, all linked, none for tracking.
+        // The AI coach is NOT collection in Apple's sense: turns are processed in memory, never stored (contract §12).
+        let collected = try XCTUnwrap(plist["NSPrivacyCollectedDataTypes"] as? [[String: Any]])
+        XCTAssertEqual(Set(collected.compactMap { $0["NSPrivacyCollectedDataType"] as? String }),
+                       ["NSPrivacyCollectedDataTypeEmailAddress", "NSPrivacyCollectedDataTypeHealth",
+                        "NSPrivacyCollectedDataTypeFitness", "NSPrivacyCollectedDataTypeUserID"])
+        XCTAssertTrue(collected.allSatisfy {
+            ($0["NSPrivacyCollectedDataTypeLinked"] as? Bool) == true && ($0["NSPrivacyCollectedDataTypeTracking"] as? Bool) == false
+                && ($0["NSPrivacyCollectedDataTypePurposes"] as? [String]) == ["NSPrivacyCollectedDataTypePurposeAppFunctionality"]
+        })
+    }
+
+    /// The next TestFlight build of the 1.1 train (App Store Connect holds 1.1.0 builds 1–2 as of 2026-10-22).
+    func testThisIsTheOneOneBuild() {
+        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String, "1.1.0")
+        XCTAssertGreaterThanOrEqual(Int(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0") ?? 0, 3)
     }
 
     func testBackgroundModesAreBluetoothLocationAndFetchOnly() {
