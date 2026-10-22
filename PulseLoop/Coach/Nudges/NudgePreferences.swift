@@ -220,6 +220,16 @@ final class NudgeLedgerStore {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         self.cached = Self.decode([NudgeLedgerEntry].self, from: defaults.data(forKey: Key.entries)) ?? []
+        #if DEBUG
+        // `-nudgeFixtureReset YES`: start each UI-test launch with an empty ledger and no snoozes. The tests always
+        // passed it, but nothing read it — harmless until the fixture honoured "Not now", after which one test's
+        // snooze hid the next test's card. Here, in the shared store's one-time init, it runs once per launch.
+        if defaults === UserDefaults.standard, DebugLaunch.bool("nudgeFixtureReset") {
+            cached = []
+            defaults.removeObject(forKey: Key.entries)
+            defaults.removeObject(forKey: Key.snoozes)
+        }
+        #endif
     }
 
     private static func decode<T: Decodable>(_ type: T.Type, from data: Data?) -> T? {
@@ -357,6 +367,14 @@ final class DailyGoalOverrideStore {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        #if DEBUG
+        // `-nudgeFixtureReset YES` also clears today's "Lighter today" override: one test's confirmation otherwise
+        // showed "Today's step goal is 9,000 — 10% lighter" on every later launch of the day.
+        if defaults === UserDefaults.standard, DebugLaunch.bool("nudgeFixtureReset") {
+            defaults.removeObject(forKey: Key.percent)
+            defaults.removeObject(forKey: Key.day)
+        }
+        #endif
     }
 
     /// The override in force right now, or nil (none set, or it expired at midnight).

@@ -156,9 +156,17 @@ extension CoachNudge {
     }
 
     /// A push needs a title; the catalog has none, so it is the first sentence of the wording — never new copy.
+    /// The first sentence: up to the first `.`, `!` or `?` that ENDS a sentence — followed by whitespace or the end of
+    /// the text. It used to stop at any dot, so "2.400 steps to go today." (a thousands separator in many locales) became
+    /// the title "2." on the push and in Settings' ledger, and "1.5 km" broke it in every locale.
     static func title(from body: String) -> String {
-        if let end = body.firstIndex(where: { ".!?".contains($0) }) {
-            return String(body[...end]).trimmingCharacters(in: .whitespaces)
+        var index = body.startIndex
+        while index < body.endIndex {
+            let next = body.index(after: index)
+            if ".!?".contains(body[index]), next == body.endIndex || body[next].isWhitespace {
+                return String(body[...index]).trimmingCharacters(in: .whitespaces)
+            }
+            index = next
         }
         return body
     }
@@ -285,7 +293,7 @@ extension CoachNudge {
     /// The seed message the Coach tab opens with (the engine calls it `seed`).
     var seedMessage: String { seed }
     /// Accessibility identifier for the card (the UI tests find it by rule).
-    var cardIdentifier: String { "nudge.card \(rule.rawValue)" }
+    var cardIdentifier: String { "nudge.card.\(rule.rawValue)" }
     /// Accessibility identifier for one of its buttons.
     func actionIdentifier(_ button: NudgeButton) -> String { "nudge.\(rule.rawValue).\(button.rawValue)" }
 
@@ -369,54 +377,56 @@ struct SilentNudgeProvider: NudgeProviding, NudgeStatusProviding {
     func status(now: Date, context: ModelContext) -> NudgeStatus { .ready }
 }
 
-/// Scripted nudges for UI tests and screenshots (`-nudgeFixture a1|b1|f1|learning`), built from the engine's own model
+/// Scripted nudges for UI tests and screenshots (`-nudgeFixture a1|b1|c1|f1|g1|learning`), built from the engine's own model
 /// so the card, the buttons and the seed render exactly what a real nudge renders. Debug builds only.
 struct NudgeFixtureProvider: NudgeProviding, NudgeStatusProviding {
     let fixture: String
 
     func pending(now: Date, context: ModelContext) -> [CoachNudge] {
-        Self.nudge(fixture, now: now).map { [$0] } ?? []
+        // Honour "Not now" the way the policy does (`snoozedUntil` in `CoachNudgePolicy.decide`): without this the
+        // fixture card ignored the snooze and the UI test could not see the card leave.
+        guard let nudge = Self.nudge(fixture, now: now),
+              !NudgeLedgerStore.shared.isSnoozed(nudge.category, now: now) else { return [] }
+        return [nudge]
     }
 
     func status(now: Date, context: ModelContext) -> NudgeStatus {
         fixture == "learning" ? NudgeStatus(learningBaseline: true, nightsRecorded: 3) : .ready
     }
 
+    /// Built through `CoachNudge.make` with the catalog's templates — the same path a real nudge takes — so a screenshot
+    /// or a UI test shows shipped wording, not a hand-written stand-in. Only the numbers are invented.
     static func nudge(_ rule: String, now: Date) -> CoachNudge? {
+        func make(_ rule: NudgeRule, _ slots: [NudgeSlot: NudgeSlotValue], _ evidence: [CoachNudgeEvidence],
+                  severity: Double) -> CoachNudge? {
+            CoachNudge.make(rule: rule, slots: slots, evidence: evidence, severity: severity,
+                            fingerprint: "fixture-\(rule.rawValue)", lastUsed: [:], now: now)
+        }
         switch rule {
         case "a1":
-            return CoachNudge(
-                rule: .a1, category: .recovery, delivery: .push,
-                title: "Rough night",
-                body: "Rough night: your resting heart rate is 9 bpm above your usual and you slept 1 h 30 min under goal.",
-                seed: "My resting heart rate is 9 bpm above my baseline and I slept 1 h 30 min less than my goal. What should today look like?",
-                evidence: [
-                    CoachNudgeEvidence(metric: "resting_heart_rate_delta_percent", value: 12, unit: "%"),
-                    CoachNudgeEvidence(metric: "sleep_short_minutes", value: 90, unit: "min"),
-                ],
-                buttons: [.keepGoal, .lighterToday, .why],
-                fingerprint: "fixture-a1", severity: 0.8, templateID: "nudge_a1_v1", isCelebration: false)
+            return make(.a1, [.rhrDelta: .percent(12), .sleepShort: .duration(minutes: 90)], [
+                CoachNudgeEvidence(metric: "resting_heart_rate_delta_percent", value: 12, unit: "%"),
+                CoachNudgeEvidence(metric: "sleep_short_minutes", value: 90, unit: "min"),
+            ], severity: 0.8)
         case "b1":
-            return CoachNudge(
-                rule: .b1, category: .activity, delivery: .push,
-                title: "Behind on steps",
-                body: "2 400 steps to go today. A 20-minute walk would close a good part of it.",
-                seed: "I'm at 7 600 steps with 2 400 to go. What is the most efficient way to close it?",
-                evidence: [
-                    CoachNudgeEvidence(metric: "steps_today", value: 7600, unit: "steps"),
-                    CoachNudgeEvidence(metric: "step_goal", value: 10000, unit: "steps"),
-                ],
-                buttons: [.why, .notNow],
-                fingerprint: "fixture-b1", severity: 0.4, templateID: "nudge_b1_v1", isCelebration: false)
+            return make(.b1, [.stepsLeft: .count(2_400, unit: .step), .stepsDone: .count(7_600, unit: .step),
+                              .goalSteps: .count(10_000, unit: .step), .walkMin: .number(20)], [
+                CoachNudgeEvidence(metric: "steps_today", value: 7_600, unit: "steps"),
+                CoachNudgeEvidence(metric: "step_goal", value: 10_000, unit: "steps"),
+            ], severity: 24)
+        case "c1":
+            return make(.c1, [.stressMinutes: .count(45, unit: .minute)], [
+                CoachNudgeEvidence(metric: "stress_minutes_high", value: 45, unit: "min"),
+                CoachNudgeEvidence(metric: "stress_steps_during", value: 120, unit: "steps"),
+            ], severity: 2)
         case "f1":
-            return CoachNudge(
-                rule: .f1, category: .celebration, delivery: .push,
-                title: "7-day streak",
-                body: "7 days in a row on your step goal.",
-                seed: "I'm on a 7-day streak. What would help me keep it going without overdoing it?",
-                evidence: [CoachNudgeEvidence(metric: "streak_days", value: 7, unit: "days")],
-                buttons: [],
-                fingerprint: "fixture-f1", severity: 0.2, templateID: "nudge_f1_v1", isCelebration: true)
+            return make(.f1, [.streakDays: .number(7)], [
+                CoachNudgeEvidence(metric: "streak_days", value: 7, unit: "days"),
+            ], severity: 7)
+        case "g1":
+            return make(.g1, [.hoursSinceSync: .count(26, unit: .hour), .ringName: .text("Agara Ring")], [
+                CoachNudgeEvidence(metric: "hours_since_sync", value: 26, unit: "h"),
+            ], severity: 26)
         default:
             return nil
         }

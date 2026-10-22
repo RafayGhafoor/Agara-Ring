@@ -12,19 +12,23 @@ struct NudgeCardView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
+            // The topic, then the message. The title is the body's first sentence (`CoachNudge.title(from:)`) — a push
+            // needs it as its bold line, but on a card it printed the same sentence twice, and most templates are one
+            // sentence long.
+            HStack(spacing: 6) {
                 Image(systemName: symbol)
-                    .font(AgaraFont.caption)
+                    .font(AgaraFont.caption.weight(.semibold))
                     .foregroundStyle(tint)
-                Text(nudge.title)
-                    .font(compact ? AgaraFont.subheadline.weight(.semibold) : AgaraFont.headline)
-                    .foregroundStyle(AgaraColors.textPrimary)
+                Text(topicLabel)
+                    .font(AgaraFont.caption.weight(.semibold))
+                    .foregroundStyle(tint)
                 Spacer(minLength: 0)
             }
 
             Text(nudge.body)
-                .font(compact ? AgaraFont.footnote : AgaraFont.body)
-                .foregroundStyle(AgaraColors.textSecondary)
+                .font(compact ? AgaraFont.subheadline.weight(.medium) : AgaraFont.body.weight(.medium))
+                .foregroundStyle(AgaraColors.textPrimary)
+                .lineSpacing(2)
                 .fixedSize(horizontal: false, vertical: true)
 
             if !facts.isEmpty, !compact {
@@ -79,6 +83,12 @@ struct NudgeCardView: View {
         .accessibilityIdentifier(nudge.actionIdentifier(action))
     }
 
+    /// What the card is about, in the words of the Notifications settings (the same topics the user can turn off).
+    /// The sync check lives under "Patterns" there, which would read oddly on its card.
+    private var topicLabel: String {
+        nudge.rule == .g1 ? "Your ring" : NudgeTopic.topic(forRule: nudge.rule.rawValue, category: nudge.category).title
+    }
+
     private var tint: Color {
         switch nudge.category {
         case .recovery: AgaraColors.readiness
@@ -90,7 +100,9 @@ struct NudgeCardView: View {
     }
 
     private var symbol: String {
-        switch nudge.category {
+        // The sync check rides the activity category but is about the ring, not about moving.
+        if nudge.rule == .g1 { return "arrow.triangle.2.circlepath" }
+        return switch nudge.category {
         case .recovery: "battery.50percent"
         case .stress: "wind"
         case .goal, .activity: "figure.walk"
@@ -139,6 +151,9 @@ struct NudgeTodaySection: View {
                 .padding(14)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(AgaraColors.cardSoft))
+                // One element: a bare VStack carries no identifier (the UI test could not find the card) and VoiceOver
+                // read the title and body as two stops.
+                .accessibilityElement(children: .combine)
                 .accessibilityIdentifier("nudge.learningBaseline")
             }
             ForEach(feed.nudges) { nudge in
@@ -157,28 +172,29 @@ struct NudgeForYouList: View {
     @State private var feed = NudgeFeed()
 
     var body: some View {
-        if !feed.nudges.isEmpty {
-            // The scroll view lives here, inside the "there is something to show" branch, so an empty list occupies no
-            // space at all (it used to reserve 250 pt at the top of the Coach tab).
-            ScrollView {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("For you")
-                    .font(AgaraFont.caption.weight(.semibold))
-                    .tracking(0.8)
-                    .foregroundStyle(AgaraColors.textMuted)
-                    .accessibilityAddTraits(.isHeader)
-                ForEach(feed.nudges.prefix(3)) { nudge in
-                    NudgeCardView(nudge: nudge, compact: true)
+        // The loader sits OUTSIDE the "there is something to show" branch, on a real zero-height view. When the
+        // empty-list fix moved the scroll view into that branch, `.task` went with it: the list started empty, so the
+        // branch never rendered, so the refresh never ran. (A `Group` around a false `if` is no anchor either — it has
+        // no view for `.task` to attach to.)
+        VStack(spacing: 0) {
+            Color.clear.frame(height: 0)
+                .task { feed.refresh(context: modelContext) }
+                .onChange(of: NudgeLedgerStore.shared.revision) { _, _ in feed.refresh(context: modelContext) }
+            if let top = feed.nudges.first {
+                // The single most important nudge (the policy already ordered them), above the chat. Today lists all of
+                // them; here the chat needs the room. It used to be a 250 pt scroll view — a blank gap under one card —
+                // on the system's white instead of the page colour.
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("For you")
+                        .font(AgaraFont.caption.weight(.semibold))
+                        .foregroundStyle(AgaraColors.textMuted)
+                        .accessibilityAddTraits(.isHeader)
+                    NudgeCardView(nudge: top, compact: true)
                 }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .accessibilityIdentifier("nudge.forYou")
             }
-            .padding(.horizontal, 12)
-            .padding(.top, 10)
-            }
-            .frame(maxHeight: 250)
-            .scrollBounceBehavior(.basedOnSize)
-            .accessibilityIdentifier("nudge.forYou")
-            .task { feed.refresh(context: modelContext) }
-            .onChange(of: NudgeLedgerStore.shared.revision) { _, _ in feed.refresh(context: modelContext) }
         }
     }
 }

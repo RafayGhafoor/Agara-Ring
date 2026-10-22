@@ -113,26 +113,17 @@ struct CoachSeedCard: View {
             }
 
             if !seed.suggestions.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
-                    ForEach(seed.suggestions, id: \.self) { question in
-                        Button { onAsk(question) } label: {
-                            Text(question)
-                                .font(AgaraFont.footnote)
-                                .foregroundStyle(AgaraColors.accent)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.vertical, 7)
-                                .padding(.horizontal, 10)
-                                .background(Capsule().fill(AgaraColors.accent.opacity(0.12)))
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("coach.seed.question")
-                    }
-                }
+                // The coach's one "ask this next" component (Rule 10), like every answer's follow-ups: orange pills here
+                // made the same job look like a different thing.
+                CoachSuggestionList(questions: seed.suggestions, identifier: "coach.seed.question") { onAsk($0) }
             }
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(AgaraColors.card))
+        // A container, not one element: without this the card's identifier was pushed down onto every child and
+        // overwrote `coach.seed.message` (and VoiceOver could not reach the questions one by one).
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("coach.seed.card")
     }
 }

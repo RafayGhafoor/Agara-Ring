@@ -238,3 +238,24 @@ final class CoachTextTests: XCTestCase {
         XCTAssertEqual(CoachText.keepUnitsTogether("2 hours"), "2 hours")
     }
 }
+
+/// A nudge's title is its first sentence; it is the push's bold line and the Settings ledger's label.
+final class NudgeTitleTests: XCTestCase {
+    func testAThousandsSeparatorIsNotTheEndOfASentence() {
+        XCTAssertEqual(CoachNudge.title(from: "2.400 steps to go today. A 20-minute walk would close it."),
+                       "2.400 steps to go today.")
+    }
+
+    func testADecimalIsNotTheEndOfASentence() {
+        XCTAssertEqual(CoachNudge.title(from: "You covered 1.5 km more than last week! Nice."),
+                       "You covered 1.5 km more than last week!")
+    }
+
+    func testASingleSentenceIsItsOwnTitle() {
+        XCTAssertEqual(CoachNudge.title(from: "7 days in a row on your step goal."), "7 days in a row on your step goal.")
+    }
+
+    func testNoTerminatorReturnsTheWholeText() {
+        XCTAssertEqual(CoachNudge.title(from: "No data from Agara Ring for 26 hours"), "No data from Agara Ring for 26 hours")
+    }
+}

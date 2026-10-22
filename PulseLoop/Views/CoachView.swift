@@ -68,7 +68,9 @@ struct CoachView: View {
     /// And only when the coach's last message is not already offering questions: a structured briefing carries three
     /// follow-ups (topped up from these same starters), and the thread then showed the same three questions twice.
     private func showColdStart(_ messages: [CoachMessage]) -> Bool {
-        guard !viewModel.isSending, !messages.contains(where: { $0.role == "user" }) else { return false }
+        // A nudge's seeded answer brings its own three questions; the starters under it made six.
+        guard !viewModel.isSending, nav.requestedSeed == nil,
+              !messages.contains(where: { $0.role == "user" }) else { return false }
         if let last = messages.last, last.role == "assistant", CoachResponse.decode(fromJSON: last.cardsJSON) != nil {
             return false
         }

@@ -24,7 +24,8 @@ struct CoachTabView: View {
         VStack(spacing: 0) {
             // Proactive nudges at the top of the Coach tab (policy rule 10: notifications off still means the nudges
             // appear here). Same card view as Today, compact, and only while the nudge feature is on.
-            if AgaraFeatureStore.isOn(.coachNudges) {
+            // Not while a nudge's seeded answer is open: the same nudge showed twice, as the card and as its answer.
+            if AgaraFeatureStore.isOn(.coachNudges), CoachNavigation.shared.requestedSeed == nil {
                 // No wrapper ScrollView: it reserved up to 250 pt of empty space whenever the list had nothing to show
                 // (which is most of the time — the list is empty until a rule fires).
                 NudgeForYouList()
@@ -43,6 +44,8 @@ struct CoachTabView: View {
             }
             .animation(.easeInOut(duration: 0.2), value: state)
         }
+        // The page colour behind everything the tab draws, the "For you" nudge included (it sat on the system's white).
+        .background(AgaraColors.background)
         .sheet(isPresented: $showConsent) {
             CoachConsentSheet()
                 // The sheet's agree button records the consent and closes the sheet; the body then re-resolves to

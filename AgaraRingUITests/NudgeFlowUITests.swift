@@ -33,8 +33,12 @@ final class NudgeFlowUITests: AgaraUITestCase {
                        "the \(rule) card never appeared on Today", file: file, line: line)
     }
 
+    /// The app's button identifiers are `nudge.<rule>.<button raw value>`: unique when several cards are on screen.
+    private static let buttonRaw = ["keepGoal": "keep_goal", "lighterToday": "lighter_today", "why": "why",
+                                    "notNow": "not_now", "breathe": "breathe", "openRing": "open_ring"]
+
     private func tap(_ action: String, on rule: String, file: StaticString = #filePath, line: UInt = #line) {
-        let element = app.descendants(matching: .any)["nudge.action.\(action)"]
+        let element = app.descendants(matching: .any)["nudge.\(rule).\(Self.buttonRaw[action] ?? action)"]
         scrollTo(element, maxSwipes: 6)
         waitFor(element, timeout: 20, "the \(action) button on \(rule) is missing", file: file, line: line).tap()
     }
@@ -67,7 +71,8 @@ final class NudgeFlowUITests: AgaraUITestCase {
         tap("lighterToday", on: "a1")
 
         // The one confirmation (Rule 10) comes first; only its confirm button changes the goal.
-        let confirm = app.buttons[AgaraCopyStrings.nudgeConfirmLighter]
+        // Inside the alert: the confirm button has the same label as the card's own "Lighter today" button.
+        let confirm = app.alerts.buttons[AgaraCopyStrings.nudgeConfirmLighter]
         XCTAssertTrue(confirm.waitForExistence(timeout: 10), "the lighter-today confirmation never appeared")
         confirm.tap()
 
@@ -124,6 +129,74 @@ final class NudgeFlowUITests: AgaraUITestCase {
                       "Open ring did not reach the Wearable screen")
         goBack()
         assertLedger("g1", "openedRing")
+    }
+
+    // MARK: - Demo screenshots
+
+    /// The nudge demo set: every card type on Today, what each action leads to, the Coach tab's "For you" list, the
+    /// learning state and Settings › Notifications. Named `demo-NN-…`; export with `scripts/coach_demo_shots.sh nudges`.
+    /// Cards come from `-nudgeFixture` (the catalog's own templates through `CoachNudge.make`, only the numbers invented).
+    func testNudgeDemoScreenshots() {
+        var frame = 0
+        func snap(_ name: String) {
+            RunLoop.current.run(until: Date().addingTimeInterval(1.5))
+            frame += 1
+            let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+            shot.name = String(format: "demo-%02d-%@", frame, name)
+            shot.lifetime = .keepAlways
+            add(shot)
+        }
+        func launch(_ fixture: String, theme: String = "light", extra: [String] = []) {
+            app.terminate()
+            app.launchArguments = ["-noCoachMarks", "YES", "-acceptDisclaimer", "YES", "-seedDemo", "YES",
+                                   "-forceOnboarding", "NO", "-features", Self.nudgeFeatures,
+                                   "-nudgeFixture", fixture, "-nudgeFixtureReset", "YES",
+                                   "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-coachOn", "YES",
+                                   "-theme", theme] + extra
+            app.launch()
+            waitFor(app.tabBars.firstMatch, timeout: 90, "tabs never appeared")
+            openTab("Today")
+        }
+
+        // Recovery: the card, then each of its three answers.
+        launch("a1"); _ = card("a1"); snap("today-recovery")
+        tap("lighterToday", on: "a1")
+        waitFor(app.alerts.firstMatch, timeout: 10, "no confirmation"); snap("lighter-today-confirm")
+        app.alerts.buttons[AgaraCopyStrings.nudgeConfirmLighter].tap()
+        // The lowered goal shows in place of the card, right under the hero — no scrolling.
+        _ = app.descendants(matching: .any)["nudge.goalOverride"].waitForExistence(timeout: 15)
+        snap("lighter-goal-applied")
+        launch("a1"); _ = card("a1"); tap("why", on: "a1")
+        _ = app.descendants(matching: .any)["coach.seed.card"].waitForExistence(timeout: 15); snap("why-seeded-answer")
+
+        // Stress, and the two-minute session it offers.
+        launch("c1"); _ = card("c1"); snap("today-stress")
+        tap("breathe", on: "c1")
+        _ = app.descendants(matching: .any)["breathing.session"].waitForExistence(timeout: 10); snap("breathing-session")
+
+        // Activity, ring sync, celebration.
+        launch("b1"); _ = card("b1"); snap("today-activity")
+        launch("g1"); _ = card("g1"); snap("today-ring-sync")
+        launch("f1"); _ = card("f1"); snap("today-streak")
+
+        // The same card in the Coach tab's "For you" list.
+        launch("a1"); openTab("Coach")
+        _ = app.descendants(matching: .any)["nudge.card.a1"].waitForExistence(timeout: 15); snap("coach-for-you")
+
+        // Before 21 nights of baseline: the honest "still learning" state instead of guesses.
+        launch("learning")
+        let learning = app.descendants(matching: .any)["nudge.learningBaseline"]
+        scrollTo(learning, maxSwipes: 6); snap("learning-baseline")
+
+        // Settings › Notifications after a few actions.
+        launch("b1"); _ = card("b1"); tap("notNow", on: "b1")
+        openSettingsNotifications(); RunLoop.current.run(until: Date().addingTimeInterval(1)); snap("settings-notifications")
+        let ledger = app.descendants(matching: .any)["nudges.ledger.b1.notNow"]
+        scrollTo(ledger, maxSwipes: 8); snap("settings-last-7-days")
+
+        // Dark.
+        launch("a1", theme: "dark"); _ = card("a1"); snap("today-recovery-dark")
+        launch("c1", theme: "dark"); _ = card("c1"); snap("today-stress-dark")
     }
 
     // MARK: - Helpers
