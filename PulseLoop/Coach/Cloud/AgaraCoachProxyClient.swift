@@ -262,9 +262,10 @@ nonisolated enum CoachCloudRequest {
     static func continuationBody(turnID: String, round: Int, input: [[String: Any]]) throws -> Data {
         let results: [[String: Any]] = toolOutputs(in: input).map { item in
             let output = item["output"] as? String ?? ""
+            // §5 holds for tool results too: no name, notes, places or identifiers (`CloudToolOutputFilter`).
             return [
                 "call_id": item["call_id"] as? String ?? "",
-                "output": parsedJSON(output) ?? output,
+                "output": parsedJSON(output).map(CloudToolOutputFilter.sanitize) ?? output,
             ]
         }
         return try JSONSerialization.data(withJSONObject: [

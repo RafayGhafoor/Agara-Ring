@@ -254,3 +254,39 @@ enum CloudContextTrimmer {
         return encoder
     }
 }
+
+/// Contract §5 applied to **tool results** — the second channel to the server. The packet above is trimmed by
+/// construction; a tool result is whatever a tool returns, and tools are written for the on-device coach too
+/// (`get_profile_context` returns the profile name; activity tools return the user's free-text notes). Every tool
+/// result on its way to the Agara proxy passes through `sanitize` (`CoachCloudRequest.continuationBody`), so a tool
+/// added later cannot reopen the hole. Found and fixed 2026-10-22 (pre-TestFlight wire audit).
+nonisolated enum CloudToolOutputFilter {
+    /// Keys never sent, at any depth (§5: email, city/region, coordinates, free-text notes, account identifiers).
+    /// `note` (singular) is NOT here: the tools use it for system remarks ("experimental decoder (no REM)").
+    static let neverKeys: Set<String> = [
+        "notes", "email", "city", "region", "latitude", "longitude", "coordinates",
+        "uid", "user_id", "firebase_uid",
+    ]
+
+    static func sanitize(_ value: Any) -> Any { sanitize(value, parent: nil) }
+
+    private static func sanitize(_ value: Any, parent: String?) -> Any {
+        if let object = value as? [String: Any] {
+            var out: [String: Any] = [:]
+            for (key, child) in object where !neverKeys.contains(key) {
+                if parent == "profile" {
+                    // The person's name never leaves; the weight leaves at half-kilo resolution like the packet's.
+                    if key == "name" { continue }
+                    if key == "weight_kg", let kg = (child as? NSNumber)?.doubleValue {
+                        out[key] = (kg * 2).rounded() / 2
+                        continue
+                    }
+                }
+                out[key] = sanitize(child, parent: key)
+            }
+            return out
+        }
+        if let array = value as? [Any] { return array.map { sanitize($0, parent: parent) } }
+        return value
+    }
+}

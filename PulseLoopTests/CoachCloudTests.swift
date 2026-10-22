@@ -720,3 +720,127 @@ extension CoachTurnError.Kind {
          .quotaMinute, .quotaDay, .quotaMonth, .costCap, .ipLimit, .breaker, .upstream, .badAnswer]
     }
 }
+
+// MARK: - What leaves the phone (contract §5), measured on the wire
+
+/// §5 lists what the server must never receive. The context packet was trimmed and tested, but tool RESULTS went out
+/// as the tools produced them — and `get_profile_context` returns the profile **name**, `get_activity_sessions` /
+/// `summarize_activity_session` the user's free-text workout **notes** (found 2026-10-22, pre-TestFlight audit).
+/// `CloudToolOutputFilter` is the one choke point every tool result passes on the way to the proxy.
+final class CloudToolOutputFilterTests: XCTestCase {
+    private func filtered(_ json: String) throws -> [String: Any] {
+        let object = try JSONSerialization.jsonObject(with: Data(json.utf8))
+        return try XCTUnwrap(CloudToolOutputFilter.sanitize(object) as? [String: Any])
+    }
+
+    func testTheProfileLosesItsNameAndKeepsAHalfKiloWeight() throws {
+        let out = try filtered(#"{"profile":{"name":"Zebulon","age":34,"weight_kg":72.3,"height_cm":180},"timezone":"Europe/Berlin"}"#)
+        let profile = try XCTUnwrap(out["profile"] as? [String: Any])
+        XCTAssertNil(profile["name"])
+        XCTAssertEqual(profile["weight_kg"] as? Double, 72.5)
+        XCTAssertEqual(profile["age"] as? Int, 34)
+        XCTAssertEqual(profile["height_cm"] as? Int, 180)
+        XCTAssertEqual(out["timezone"] as? String, "Europe/Berlin")
+    }
+
+    func testUserNotesAreDroppedAtAnyDepthButSystemNotesStay() throws {
+        let out = try filtered(#"""
+        {"sessions":[{"id":"s1","type":"run","notes":"met Zebulon at Hyde Park","duration_min":31}],
+         "sleep":{"confidence":"medium","note":"experimental decoder (no REM)"}}
+        """#)
+        let session = try XCTUnwrap((out["sessions"] as? [[String: Any]])?.first)
+        XCTAssertNil(session["notes"], "free text the user typed (§5)")
+        XCTAssertEqual(session["duration_min"] as? Int, 31)
+        XCTAssertEqual((out["sleep"] as? [String: Any])?["note"] as? String, "experimental decoder (no REM)",
+                       "a system remark the coach needs is not user text")
+    }
+
+    func testOtherNamesStay_onlyThePersonsNameIsPrivate() throws {
+        let out = try filtered(#"{"ok":true,"name":"Oat porridge","device":{"name":"Agara Ring"}}"#)
+        XCTAssertEqual(out["name"] as? String, "Oat porridge", "a meal's name is what the coach talks about")
+        XCTAssertEqual((out["device"] as? [String: Any])?["name"] as? String, "Agara Ring", "§5 sends the device name")
+    }
+
+    func testIdentifiersAndPlacesNeverLeave() throws {
+        let out = try filtered(#"""
+        {"email":"z@example.com","city":"London","region":"England","latitude":51.5,"longitude":-0.1,
+         "coordinates":[[51.5,-0.1]],"uid":"u","user_id":"u","firebase_uid":"u","steps":10432}
+        """#)
+        XCTAssertEqual(Set(out.keys), ["steps"])
+    }
+
+    func testPlainTextAndScalarsPassThrough() {
+        XCTAssertEqual(CloudToolOutputFilter.sanitize("plain") as? String, "plain")
+        XCTAssertEqual(CloudToolOutputFilter.sanitize(3) as? Int, 3)
+    }
+}
+
+@MainActor
+final class CoachCloudWirePrivacyTests: XCTestCase {
+    /// The whole chain, nothing hand-built: a store holding a named profile and a workout with a note → the real
+    /// context builder → the real orchestrator and tools → `AgaraCoachProxyClient` → the transport. Every byte and
+    /// header that would reach the server is searched for the planted strings.
+    func testNoNameNoteOrPlaceReachesTheServerInAnyRound() async throws {
+        let c = try TestSupport.makeContext()
+        c.insert(UserProfile(name: "Zebulon Quartz", age: 34, sex: "male", heightCm: 180, weightKg: 72.3))
+        let start = Date().addingTimeInterval(-3 * 3600)
+        let session = ActivitySession(type: "run", status: .finished, startedAt: start,
+                                      endedAt: start.addingTimeInterval(1860), distanceMeters: 5200,
+                                      notes: "CANARY-NOTE met Zebulon at Hyde Park", useGps: false)
+        c.insert(session)
+        try c.save()
+        let today = CoachDataAccess.localDateString(Date())
+
+        let transport = CoachProxyTransport([
+            .init(status: 200, body: """
+            {"turn_id":"t9","round":1,"status":"tool_calls","remaining_rounds":3,"answer":null,"tool_calls":[\
+            {"call_id":"c1","name":"get_profile_context","arguments":{}},\
+            {"call_id":"c2","name":"get_activity_sessions","arguments":{"start_date":"\(today)","end_date":"\(today)",\
+            "include_samples":true,"include_gps":true}},\
+            {"call_id":"c3","name":"summarize_activity_session","arguments":{"activity_id":"\(session.id.uuidString)"}}]}
+            """),
+            .init(status: 200, body: """
+            {"turn_id":"t9","round":2,"status":"answer","remaining_rounds":2,"tool_calls":[],"answer":\(answerJSON())}
+            """),
+        ])
+        let client = AgaraCoachProxyClient(config: coachConfig, auth: signedInAuth(transport),
+                                           transport: transport, appVersion: "1.1.0", appBuild: "1010010")
+        let flags = CoachFeatureFlags(settings: TestSupport.enabledCoachSettings(), hasAPIKey: true)
+        let orchestrator = CoachOrchestrator(client: client, registry: ToolRegistry(flags: flags), flags: flags,
+                                             toolContext: ToolExecutionContext(modelContext: c, flags: flags))
+        let result = await orchestrator.runTurn(userText: "how was my run?",
+                                                packet: CoachContextBuilder.build(context: c), recentMessages: [])
+        XCTAssertNil(result.error, "the turn completed")
+
+        let sent = transport.coachRequests
+        XCTAssertEqual(sent.count, 2, "round 1 (context) + round 2 (tool results)")
+        let wire = sent.map { request -> String in
+            let headers = request.headers.map { "\($0.key): \($0.value)" }.joined(separator: "\n")
+            return headers + "\n" + request.url.absoluteString + "\n" + String(decoding: request.body ?? Data(), as: UTF8.self)
+        }.joined(separator: "\n----\n")
+
+        for canary in ["Zebulon", "Quartz", "CANARY-NOTE", "Hyde Park"] {
+            XCTAssertFalse(wire.contains(canary), "'\(canary)' reached the server")
+        }
+        XCTAssertFalse(wire.contains("72.3"), "the scale reading itself leaves only at half-kilo resolution")
+
+        // Not vacuous: the three tools really ran and their data went out.
+        let round2 = try json(try XCTUnwrap(sent[1].body))
+        let results = try XCTUnwrap(round2["tool_results"] as? [[String: Any]])
+        XCTAssertEqual(results.compactMap { $0["call_id"] as? String }, ["c1", "c2", "c3"])
+        let profile = try XCTUnwrap((results[0]["output"] as? [String: Any])?["profile"] as? [String: Any])
+        XCTAssertEqual(profile["weight_kg"] as? Double, 72.5)
+        XCTAssertEqual(profile["age"] as? Int, 34)
+        let summary = try XCTUnwrap(results[2]["output"] as? [String: Any])
+        XCTAssertEqual(summary["type"] as? String, "run")
+        XCTAssertEqual(summary["distance_km"] as? Double, 5.2)
+        XCTAssertNil(summary["error"])
+
+        // Headers: only what the contract needs — no device or account identifiers beyond the bearer token.
+        for request in sent {
+            let names = Set(request.headers.keys.map { $0.lowercased() })
+            let allowed: Set<String> = ["authorization", "content-type", "accept", CoachCloudRequest.versionHeader.lowercased()]
+            XCTAssertTrue(names.isSubset(of: allowed), "unexpected header(s): \(names.subtracting(allowed))")
+        }
+    }
+}
