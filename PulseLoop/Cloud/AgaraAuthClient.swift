@@ -39,12 +39,24 @@ nonisolated struct AgaraLaunchArgumentSessionStore: AgaraAuthSessionStore {
     init(inner: AgaraAuthSessionStore) {
         self.inner = inner
         #if DEBUG
-        if let raw = DebugLaunch.string("cloudTestSession"), let data = raw.data(using: .utf8),
-           let session = try? JSONDecoder().decode(AgaraAuthSession.self, from: data) {
-            injected = session
-            inner.save(session)
+        // The ENVIRONMENT first: a 1.2 KB JSON passed as a `-key value` launch argument did not survive UserDefaults'
+        // argument-domain parsing (the app logged "no -cloudTestSession argument" while the test had passed it), and an
+        // environment variable has no such quirk. `app.launchEnvironment` sets it from the UI test.
+        let raw = DebugLaunch.environment("AGARA_TEST_SESSION") ?? DebugLaunch.string("cloudTestSession")
+        if let raw, let data = raw.data(using: .utf8) {
+            do {
+                let session = try JSONDecoder().decode(AgaraAuthSession.self, from: data)
+                injected = session
+                inner.save(session)
+                NSLog("AGARA_COACH injected session accepted (uid %@…, expires %@)",
+                      String(session.uid.prefix(6)), "\(session.expiresAt)")
+            } catch {
+                injected = nil
+                NSLog("AGARA_COACH injected session REJECTED: %@ (bytes %d)", "\(error)", data.count)
+            }
         } else {
             injected = nil
+            NSLog("AGARA_COACH no -cloudTestSession argument")
         }
         #else
         injected = nil

@@ -49,7 +49,9 @@ final class AgaraCloudFlowUITests: AgaraUITestCase {
                                "-forceOnboarding", "NO", "-features", "agara_cloud=on", "-AppleLanguages", "(en)",
                                "-cloudBaseUrl", "http://127.0.0.1:18091", "-coachProvider", "agaraCloud",
                                // The coach's own master switch: a fresh install has it off, so a clean run must set it.
-                               "-coachOn", "YES", "-coachGateOpen", "YES", "-cloudTestSession", sessionJSON]
+                               "-coachOn", "YES", "-coachGateOpen", "YES"]
+        // The session travels as an ENVIRONMENT variable: as a launch argument the 1.2 KB JSON did not reach the app.
+        app.launchEnvironment["AGARA_TEST_SESSION"] = sessionJSON
         app.launch()
         waitFor(app.tabBars.buttons["Vitals"].exists ? app.tabBars.buttons["Vitals"] : app.buttons["Vitals"],
                 timeout: 90, "the app did not start")
