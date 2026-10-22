@@ -2,7 +2,7 @@ import XCTest
 
 /// Owner feedback before release (2026-09-26, `docs/process/plans/consistency-framework.md`), on the real app
 /// against the naps emulator (`--sleep-sessions 2`: a night plus a 40-minute nap at 13:00 each day):
-/// 1. Today's sleep tile shows the day's main sleep with the nap added to the total and a "+ nap 40 m" line.
+/// 1. Today's sleep tile shows the day's total (night + nap) with a "Night … · nap 40m" breakdown line.
 /// 2. A reconnect asks the ring only for day 0, from the record after the last one stored (`SyncPlan`) — read
 ///    from the emulator's own log of the DF requests it served.
 final class SleepDayAndSyncPlanTests: AgaraUITestCase {
@@ -49,9 +49,19 @@ final class SleepDayAndSyncPlanTests: AgaraUITestCase {
 
         let nap = element("today.sleep.nap")
         scrollTo(nap)
-        eventually(timeout: 60, "no nap line on the Today sleep tile") { nap.exists && nap.label == "+ nap 40 m" }
+        // The line under the total breaks it down (owner 2026-10-22): "Night 6h 45m · nap 40m" — it used to read
+        // "+ nap 40 m", as if the nap were on top of the total that already included it.
+        eventually(timeout: 60, "no night/nap breakdown on the Today sleep tile") {
+            nap.exists && nap.label.hasPrefix("Night ") && nap.label.hasSuffix("· nap 40m")
+        }
         // The headline is the night (as the emulator logged it) plus the nap.
         let night = linesOfLastConnection(log).first { $0.contains("day 0: sleep") }.flatMap(Self.minutes(ofLogDuration:))
+        if let night {
+            // Written out here rather than calling the app's formatter: the test should not trust the code under test.
+            let h = night / 60, m = night % 60
+            XCTAssertEqual(nap.label, "Night \(h > 0 ? "\(h)h \(m)m" : "\(m)m") · nap 40m",
+                           "the breakdown names the night the emulator logged")
+        }
         let total = element("today.sleep.total")
         XCTAssertTrue(total.exists, "no sleep total on the Today tile")
         if let night {

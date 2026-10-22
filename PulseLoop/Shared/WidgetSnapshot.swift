@@ -130,7 +130,7 @@ struct WidgetSleepPayload: Codable {
     var durationText: String
     var score: Int
     var segments: [Segment]
-    /// "+ nap 40 m" when the day had naps. Optional so snapshots written before it still decode.
+    /// "Night 6h 45m · nap 40m" when the day had naps (`SleepDay.breakdownCaption`). Optional so snapshots written before it still decode.
     var napText: String? = nil
 }
 

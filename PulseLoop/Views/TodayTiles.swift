@@ -231,7 +231,7 @@ struct NutritionTileView: View {
 // MARK: - Sleep tile (duration + stage distribution bar + score)
 
 /// A single stacked bar of proportional deep/light/REM/awake segments (sleep-page colors), the day's
-/// asleep total above it (main sleep + naps, `SleepDayRule`, with a "+ nap 40 m" line when there was one),
+/// asleep total above it (main sleep + naps, `SleepDayRule`, with a "Night 6h 45m · nap 40m" line when there was one),
 /// and the main sleep's score below. No percentages or per-segment labels — the bar reads distribution at
 /// a glance.
 struct SleepTileView: View {
