@@ -636,27 +636,29 @@ struct AppHeader: View {
             // six tabs made iOS collapse the bar into "More", and Settings belongs one tap away from every tab
             // rather than beside them (AGENTS: the gear is on the top bar of all five tabs).
             // Tap the ring chip → Wearable settings (add-a-ring / status).
-            // On the Coach tab the row carries five buttons, so the chip shows only its glyph (the dot's colour and pulse
-            // still say "connecting"; VoiceOver still reads the status).
-            RingStatusChip(state: effectiveState, batteryPercent: effectiveBattery,
-                           isCharging: AgaraFeatureStore.shared.isOn(.chargingState) && ble.isCharging,
-                           chargeEstimate: ble.chargeEstimate,
-                           ringName: devices.first?.displayName,
-                           showsLabel: !coach) {
-                path.append(AppRoute.settingsWearable)
+            // The Coach tab keeps its bar to the conversation: no ring chip, no gear (owner 2026-10-23 — it reads
+            // better). The ring status and Settings stay one tap away on every other tab.
+            if !coach {
+                // Tap the ring chip → Wearable settings (add-a-ring / status).
+                RingStatusChip(state: effectiveState, batteryPercent: effectiveBattery,
+                               isCharging: AgaraFeatureStore.shared.isOn(.chargingState) && ble.isCharging,
+                               chargeEstimate: ble.chargeEstimate,
+                               ringName: devices.first?.displayName) {
+                    path.append(AppRoute.settingsWearable)
+                }
+                .coachMark(CoachMarkStore.ringChip, text: AgaraHelp.hintRingChip)
+                Button {
+                    path.append(AppRoute.settings)
+                } label: {
+                    Image(systemName: "gearshape")
+                        .font(AgaraFont.body.weight(.regular))
+                        .foregroundStyle(AgaraColors.textSecondary)
+                        .frame(width: 40, height: 40)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("settingsGear")
+                .accessibilityLabel("Settings")
             }
-            .coachMark(CoachMarkStore.ringChip, text: AgaraHelp.hintRingChip)
-            Button {
-                path.append(AppRoute.settings)
-            } label: {
-                Image(systemName: "gearshape")
-                    .font(AgaraFont.body.weight(.regular))
-                    .foregroundStyle(AgaraColors.textSecondary)
-                    .frame(width: 40, height: 40)
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("settingsGear")
-            .accessibilityLabel("Settings")
         }
         .padding(.horizontal, 20)
         .padding(.top, 8)
@@ -691,15 +693,13 @@ struct RingStatusChip: View {
     var chargeEstimate: ChargeEstimator.Estimate? = nil
     /// The ring's name (nickname, else model name) spoken by VoiceOver; nil → "Ring".
     var ringName: String? = nil
-    /// The status words ("Connecting…") beside the glyph; off where the row has no room (the Coach tab).
-    var showsLabel: Bool = true
     var action: () -> Void = {}
     @State private var pulse = false
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
-                if showsLabel && status != .connected {
+                if status != .connected {
                     Text(status.label)
                         .font(AgaraFont.caption.weight(.semibold))
                         .foregroundStyle(status.color)

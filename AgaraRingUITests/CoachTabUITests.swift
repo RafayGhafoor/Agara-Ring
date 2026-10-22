@@ -29,6 +29,8 @@ final class CoachTabUITests: AgaraUITestCase {
     }
 
     private func openSettingsViaGear(file: StaticString = #filePath, line: UInt = #line) {
+        // The Coach tab's bar has no gear (owner 2026-10-23): Settings is reached from any other tab.
+        if !app.buttons["settingsGear"].waitForExistence(timeout: 3) { openTab("Today") }
         waitFor(app.buttons["settingsGear"], "the gear that opens Settings is missing", file: file, line: line).tap()
         waitFor(app.staticTexts["Settings"], timeout: 20, "Settings did not open from the gear", file: file, line: line)
     }
@@ -246,6 +248,12 @@ final class CoachTabUITests: AgaraUITestCase {
         XCTAssertGreaterThanOrEqual(title.frame.width, 50, "the title was squeezed to \(title.frame.width) pt")
         XCTAssertGreaterThanOrEqual(status.frame.width, 90, "the status line was squeezed to \(status.frame.width) pt")
         XCTAssertLessThanOrEqual(title.frame.maxX, app.buttons["coach.history"].frame.minX + 1, "the title runs under the buttons")
+        // Owner 2026-10-23: the Coach tab's bar carries no ring chip and no gear; the other tabs keep both.
+        XCTAssertFalse(app.buttons["ringChip"].exists, "the ring chip is hidden on the Coach tab")
+        XCTAssertFalse(app.buttons["settingsGear"].exists, "the gear is hidden on the Coach tab")
+        openTab("Today")
+        XCTAssertTrue(app.buttons["settingsGear"].waitForExistence(timeout: 10), "Today keeps the gear")
+        XCTAssertTrue(app.buttons["ringChip"].exists, "Today keeps the ring chip")
     }
 
     /// Owner 2026-10-22: if an update skipped the cloud coach consent, the header line itself must lead to it.

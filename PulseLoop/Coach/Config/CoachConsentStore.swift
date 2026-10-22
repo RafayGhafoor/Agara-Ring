@@ -16,7 +16,8 @@ final class CoachConsentStore {
     nonisolated deinit {}   // skip the main-actor isolated-deinit hop (crashes on older sim runtimes)
 
     /// Bump when the disclosure changes materially — the provider, the retention window, or what is sent (§5).
-    static let version = 1
+    /// 2 (2026-10-22, coach insights): stress, breathing rate, intensity, resting HR and sleep timing summaries are sent.
+    static let version = 2
 
     static let shared = CoachConsentStore()
 

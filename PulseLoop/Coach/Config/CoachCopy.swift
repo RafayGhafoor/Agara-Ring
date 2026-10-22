@@ -82,6 +82,7 @@ enum CoachCopy {
         "Age, sex, height and weight",
         "Your goals, today's totals and the last seven days",
         "Your latest vitals, last night's sleep and recent workouts",
+        "When the coach needs them: daily and hourly summaries of stress, breathing rate, activity intensity, resting heart rate and sleep timing",
         "The questions you type and the answers you get",
     ]
 
