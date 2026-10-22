@@ -140,3 +140,29 @@ final class AgaraCloudGoldenTests: XCTestCase {
         }
     }
 }
+
+/// Pre-TestFlight wire audit (2026-10-22): sync carries numbers only (the upload bytes are pinned above); the one
+/// device-derived field is `sensor_id`, which must never carry the ring's Bluetooth MAC.
+final class SyncIdentityPrivacyTests: XCTestCase {
+    func testSensorIdIsADigestNotTheMac() throws {
+        let mac = "F8:2A:9C:11:4B:E0"
+        let id = try XCTUnwrap(AGB.sensorId(ringMac: mac))
+        XCTAssertEqual(id.count, 16, "8 bytes of SHA-256, hex")
+        for fragment in ["F82A9C114BE0", "f82a9c114be0", "F8:2A", "9C:11", "4B:E0"] {
+            XCTAssertFalse(id.contains(fragment), "the MAC leaks through sensor_id")
+        }
+        XCTAssertEqual(AGB.sensorId(ringMac: "f8-2a-9c-11-4b-e0"), id, "normalised: one ring, one id")
+        XCTAssertNotEqual(AGB.sensorId(ringMac: "F8:2A:9C:11:4B:E1"), id)
+    }
+
+    func testAWireBlockSpellsOnlyTheContractsFields() throws {
+        let day: Int64 = 20_383
+        let points = (0..<10).map { AGBPoint(ts: day * AGB.dayMs + Int64($0) * 60_000, value: Double(70 + $0)) }
+        let block = makeWireBlock(day: day, points: points)
+        let object = try XCTUnwrap(try JSONSerialization.jsonObject(with: try JSONEncoder().encode(block)) as? [String: Any])
+        XCTAssertTrue(Set(object.keys).isSubset(of: [
+            "block_key", "metric", "source", "sensor_id", "utc_day", "revision", "sealed", "fmt",
+            "content_hash", "summary", "tombstones", "data",
+        ]), "unexpected field(s): \(Set(object.keys))")
+    }
+}
