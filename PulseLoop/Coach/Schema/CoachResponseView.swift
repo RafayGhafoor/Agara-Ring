@@ -86,7 +86,7 @@ struct CoachResponseView: View {
 
     @ViewBuilder
     private func sourceLink(_ source: CoachSource) -> some View {
-        if let url = URL(string: source.url) {
+        if let url = CoachLinkPolicy.safeURL(source.url) {
             Link(destination: url) {
                 Text("\(source.title) — \(source.publisher)")
                     .font(AgaraFont.caption2.weight(.regular))
@@ -217,14 +217,42 @@ extension Text {
     /// literal string if parsing fails. `inlineOnlyPreservingWhitespace` keeps
     /// line breaks intact for multi-line summaries/bullets.
     init(coachMarkdown raw: String) {
-        let string = CoachText.keepUnitsTogether(raw)
-        if let attributed = try? AttributedString(
-            markdown: string,
-            options: AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
-        ) {
+        if let attributed = CoachLinkPolicy.markdown(raw) {
             self.init(attributed)
         } else {
-            self.init(verbatim: string)
+            self.init(verbatim: CoachText.keepUnitsTogether(raw))
         }
+    }
+}
+
+/// What a coach answer may make tappable. The answer is model output, and the model reads data that re-enters the
+/// prompt (memories, meal names, tool output) — so a link in an answer is untrusted input. Only `https` links to a real
+/// host survive; `tel:`, `sms:`, other apps' URL schemes, `http:`, `data:`/`file:` and `https://user:pass@host`
+/// disguises keep their text and lose the tap. Pre-TestFlight audit, 2026-10-22.
+enum CoachLinkPolicy {
+    static func safeURL(_ raw: String) -> URL? {
+        guard let url = URL(string: raw.trimmingCharacters(in: .whitespacesAndNewlines)) else { return nil }
+        return isSafe(url) ? url : nil
+    }
+
+    static func isSafe(_ url: URL) -> Bool {
+        guard url.scheme?.lowercased() == "https",
+              let host = url.host, !host.isEmpty, host.contains("."),
+              url.user == nil, url.password == nil
+        else { return false }
+        return true
+    }
+
+    /// The answer's inline markdown with every unsafe link removed (the words stay). `nil` when it does not parse.
+    static func markdown(_ raw: String) -> AttributedString? {
+        let string = CoachText.keepUnitsTogether(raw)
+        guard var attributed = try? AttributedString(
+            markdown: string,
+            options: AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+        ) else { return nil }
+        for run in attributed.runs {
+            if let link = run.link, !isSafe(link) { attributed[run.range].link = nil }
+        }
+        return attributed
     }
 }

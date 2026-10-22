@@ -38,8 +38,20 @@ struct CoachChart: Codable, Equatable {
         title = try c.decode(String.self, forKey: .title)
         metric = try c.decode(CoachChartMetric.self, forKey: .metric)
         range = try c.decode(CoachChartRange.self, forKey: .range)
-        data = try c.decodeIfPresent([CoachChartPoint].self, forKey: .data) ?? []
-        annotations = try c.decodeIfPresent([CoachChartAnnotation].self, forKey: .annotations) ?? []
+        data = Self.plausible(try c.decodeIfPresent([CoachChartPoint].self, forKey: .data) ?? [])
+        annotations = Array((try c.decodeIfPresent([CoachChartAnnotation].self, forKey: .annotations) ?? [])
+            .prefix(Self.maxPoints))
+    }
+
+    /// The chart is model output (copied from `prepare_chart` by the model), and fresh answers and stored
+    /// conversations both decode here. Rendering converts values with `Int(_:)`, which TRAPS beyond ±9.2e18 or on a
+    /// non-finite value, so a single `1e308` would crash the app every time that conversation opened. No metric we
+    /// chart comes near 10 million; 1,500 points is ~5× a raw heart-rate day. Pre-TestFlight audit, 2026-10-22.
+    static let maxAbsValue = 10_000_000.0
+    static let maxPoints = 1_500
+
+    static func plausible(_ points: [CoachChartPoint]) -> [CoachChartPoint] {
+        Array(points.lazy.filter { $0.y.isFinite && abs($0.y) <= maxAbsValue }.prefix(maxPoints))
     }
 }
 

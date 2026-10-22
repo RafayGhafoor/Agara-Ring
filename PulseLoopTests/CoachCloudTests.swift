@@ -844,3 +844,96 @@ final class CoachCloudWirePrivacyTests: XCTestCase {
         }
     }
 }
+
+// MARK: - What comes back from the server (data in), hostile cases
+
+@MainActor
+final class CoachHostileAnswerTests: XCTestCase {
+    func testOnlyHttpsLinksToARealHostAreTappable() {
+        XCTAssertNotNil(CoachLinkPolicy.safeURL("https://www.nhs.uk/conditions/insomnia/"))
+        for unsafe in ["http://example.com", "tel:+441234567", "sms:123", "shortcuts://run-shortcut?name=x",
+                       "javascript:alert(1)", "data:text/html,hi", "file:///etc/passwd", "mailto:a@b.c",
+                       "https://user:pass@evil.example", "https://localhost/x", "https:///nohost", "agara://open"] {
+            XCTAssertNil(CoachLinkPolicy.safeURL(unsafe), unsafe)
+        }
+    }
+
+    func testUnsafeMarkdownLinksKeepTheirWordsButLoseTheTap() throws {
+        let text = "Read [the guide](https://www.nhs.uk/x) or [call now](tel:+44123) or [verify](https://u:p@evil.example/)."
+        let attributed = try XCTUnwrap(CoachLinkPolicy.markdown(text))
+        let links = attributed.runs.compactMap(\.link)
+        XCTAssertEqual(links, [URL(string: "https://www.nhs.uk/x")!])
+        XCTAssertEqual(String(attributed.characters), "Read the guide or call now or verify.")
+    }
+
+    func testAChartWithAbsurdValuesDecodesWithoutThemAndRendersSafely() throws {
+        let points = (0..<2_000).map { #"{"x":"2026-10-\#($0 % 28 + 1)","y":\#(7000 + $0)}"# }.joined(separator: ",")
+        let json = """
+        {"chart_type":"bar","title":"Steps","metric":"steps","range":{"start":"2026-10-01","end":"2026-10-28"},\
+        "data":[{"x":"a","y":1e308},{"x":"b","y":-1e308},{"x":"c","y":9.3e18},\(points)],"annotations":[]}
+        """
+        let chart = try JSONDecoder().decode(CoachChart.self, from: Data(json.utf8))
+        XCTAssertEqual(chart.data.count, CoachChart.maxPoints)
+        XCTAssertTrue(chart.data.allSatisfy { abs($0.y) <= CoachChart.maxAbsValue })
+        XCTAssertFalse(chart.data.contains { ["a", "b", "c"].contains($0.x) })
+        // The label code that used to trap now only ever sees plausible values: exercise its extremes.
+        for metric in [CoachChartMetric.steps, .hr, .spo2, .sleep, .activeMinutes, .calories, .distance] {
+            _ = CoachChartView.valueLabel(CoachChart.maxAbsValue, metric: metric)
+            _ = CoachChartView.yAxisLabel(-CoachChart.maxAbsValue, metric: metric)
+        }
+    }
+
+    /// A broken or hostile body with status 200 (a captive portal's HTML, a truncated proxy reply, wrong types, an
+    /// unknown status) must end the turn with an error the user can see — never a crash, never a hang.
+    func testHostileProxyRepliesEndTheTurnWithAnError() async throws {
+        let bodies = [
+            "<html><body>Hotel Wi-Fi login</body></html>",
+            "",
+            "null",
+            "[]",
+            #"{"turn_id":"t1","round":1,"status":"answer""#,
+            #"{"turn_id":5,"status":"answer"}"#,
+            #"{"turn_id":"t1","round":1,"status":"answer","answer":"not an object"}"#,
+            #"{"turn_id":"t1","round":1,"status":"tool_calls","tool_calls":"nope"}"#,
+            #"{"turn_id":"t1","round":1,"status":"launch_missiles"}"#,
+        ]
+        let c = try TestSupport.makeContext()
+        let flags = CoachFeatureFlags(settings: TestSupport.enabledCoachSettings(), hasAPIKey: true)
+        for body in bodies {
+            // Each body is served for every attempt the client makes (retries included).
+            let transport = CoachProxyTransport(Array(repeating: .init(status: 200, body: body), count: 8))
+            let client = AgaraCoachProxyClient(config: coachConfig, auth: signedInAuth(transport),
+                                               transport: transport, appVersion: "1.1.0", appBuild: "1010010")
+            let orchestrator = CoachOrchestrator(client: client, registry: ToolRegistry(flags: flags), flags: flags,
+                                                 toolContext: ToolExecutionContext(modelContext: c, flags: flags))
+            let result = await orchestrator.runTurn(userText: "hi", packet: CoachContextBuilder.build(context: c),
+                                                    recentMessages: [])
+            XCTAssertNotNil(result.error, "no error surfaced for body: \(body.prefix(60))")
+            XCTAssertLessThanOrEqual(transport.coachRequests.count, 8, "no retry storm for: \(body.prefix(60))")
+        }
+    }
+
+    /// A server that asks for far more tool calls than the budget, or for a tool the app does not have.
+    func testAFloodOfToolCallsIsCappedAndUnknownToolsAreRefused() async throws {
+        let c = try TestSupport.makeContext()
+        let flags = CoachFeatureFlags(settings: TestSupport.enabledCoachSettings(), hasAPIKey: true)
+        let calls = (0..<200).map { #"{"call_id":"c\#($0)","name":"\#($0 == 0 ? "rm_rf_everything" : "get_sync_status")","arguments":{}}"# }
+        let transport = CoachProxyTransport([
+            .init(status: 200, body: #"{"turn_id":"t1","round":1,"status":"tool_calls","remaining_rounds":3,"answer":null,"tool_calls":[\#(calls.joined(separator: ","))]}"#),
+            .init(status: 200, body: #"{"turn_id":"t1","round":2,"status":"answer","remaining_rounds":2,"tool_calls":[],"answer":\#(answerJSON())}"#),
+        ])
+        let client = AgaraCoachProxyClient(config: coachConfig, auth: signedInAuth(transport),
+                                           transport: transport, appVersion: "1.1.0", appBuild: "1010010")
+        let orchestrator = CoachOrchestrator(client: client, registry: ToolRegistry(flags: flags), flags: flags,
+                                             toolContext: ToolExecutionContext(modelContext: c, flags: flags))
+        let result = await orchestrator.runTurn(userText: "hi", packet: CoachContextBuilder.build(context: c),
+                                                recentMessages: [])
+        XCTAssertNil(result.error)
+        let round2 = try json(try XCTUnwrap(transport.coachRequests.last?.body))
+        let outputs = try XCTUnwrap(round2["tool_results"] as? [[String: Any]]).map { $0["output"] as? [String: Any] ?? [:] }
+        XCTAssertEqual(outputs.count, 200, "every call is answered, so the turn can close")
+        XCTAssertNotNil(outputs[0]["error"], "an unknown tool is refused, not run")
+        let ran = outputs.filter { $0["error"] == nil }.count
+        XCTAssertLessThanOrEqual(ran, flags.maxToolCalls, "the budget caps real executions")
+    }
+}
