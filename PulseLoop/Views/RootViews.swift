@@ -396,7 +396,7 @@ struct MainTabView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            AppHeader(path: $path)
+            AppHeader(path: $path, coach: selected == .coach)
             // "Explore without ring": one persistent banner on every tab; tapping it opens ring pairing.
             if sampleData.isActive {
                 SampleDataBanner { path.append(AppRoute.pairing) }
@@ -499,6 +499,9 @@ struct MainTabView: View {
 /// time-based greeting on the left; a connection-status pill plus quick nav icons on the right.
 struct AppHeader: View {
     @Binding var path: NavigationPath
+    /// On the Coach tab the greeting's two lines become the coach's status and title, and the coach's thread actions
+    /// join this row — one top bar for the screen instead of the app's header plus a coach header under it.
+    var coach: Bool = false
     @Environment(RingBLEClient.self) private var ble
     @Query private var devices: [Device]
     @Query private var profiles: [UserProfile]
@@ -575,6 +578,9 @@ struct AppHeader: View {
                 .frame(maxWidth: .infinity, alignment: .center)
                 .accessibilityHidden(true)
         HStack(alignment: .center, spacing: 12) {
+            if coach {
+                CoachHeaderTitle()
+            } else {
             VStack(alignment: .leading, spacing: 1) {
                 if let firstName {
                     // Two lines: greeting on top, name below — avoids truncating a long name.
@@ -592,7 +598,9 @@ struct AppHeader: View {
                         .lineLimit(1)
                 }
             }
+            }
             Spacer(minLength: 8)
+            if coach { CoachHeaderActions() }
             // The live connection status, then Settings behind a gear. Settings has no tab of its own any more:
             // six tabs made iOS collapse the bar into "More", and Settings belongs one tap away from every tab
             // rather than beside them (AGENTS: the gear is on the top bar of all five tabs).

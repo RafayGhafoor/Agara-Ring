@@ -7,6 +7,8 @@ struct CoachUsageSheet: View {
     let conversation: CoachConversation?
     let messages: [CoachMessage]
     let settings: CoachSettings
+    /// The effective provider: the privacy section describes what actually happens to this conversation.
+    var usesCloud: Bool = false
     @Environment(\.dismiss) private var dismiss
 
     /// Assistant/error rows that carried token accounting.
@@ -36,7 +38,9 @@ struct CoachUsageSheet: View {
         for m in messages {
             if let model = m.modelUsed, !model.isEmpty, !seen.contains(model) { seen.append(model) }
         }
-        if seen.isEmpty { seen.append(settings.model) }
+        // No recorded turn yet: name what WILL answer. `settings.model` is the bring-your-own-key field and was shown
+        // for the cloud coach ("gpt-5.4").
+        if seen.isEmpty { seen.append(usesCloud ? CoachCopy.cloudModelLabel : settings.model) }
         return seen
     }
 
@@ -71,21 +75,52 @@ struct CoachUsageSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 12) {
+                    // What the status line promised: where the answers come from and what leaves the phone. The
+                    // sentences are the consent sheet's, verbatim — no new claims.
+                    privacySection
                     summaryCard
-                    if showsCostNote { costNote }
+                    if showsCostNote && totalInputTokens + totalOutputTokens > 0 { costNote }
                     if !accountedMessages.isEmpty { breakdownCard }
                 }
                 .padding(16)
             }
             .scrollContentBackground(.hidden)
             .background(AgaraColors.background)
-            .navigationTitle("Usage & cost")
+            .navigationTitle(CoachCopy.privacySheetTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } }
             }
         }
         .presentationDetents([.medium, .large])
+    }
+
+    private var privacySection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: usesCloud ? "cloud" : "iphone")
+                    .font(AgaraFont.subheadline.weight(.semibold))
+                    .foregroundStyle(usesCloud ? AgaraColors.accent : AgaraColors.success)
+                Text(usesCloud ? CoachCopy.headerCloudSubtitle : CoachCopy.headerOnDeviceSubtitle)
+                    .font(AgaraFont.subheadline.weight(.semibold))
+                    .foregroundStyle(AgaraColors.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if usesCloud {
+                ForEach([CoachCopy.consentNeverSent, CoachCopy.consentStoredBody, CoachCopy.consentProviderRetention],
+                        id: \.self) { line in
+                    Text(line)
+                        .font(AgaraFont.footnote.weight(.regular))
+                        .foregroundStyle(AgaraColors.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 4)
+        .padding(.bottom, 4)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("coach.privacy")
     }
 
     private var summaryCard: some View {

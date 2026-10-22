@@ -84,7 +84,7 @@ struct CoachChartView: View {
                        empty: emptyState,
                        accessibilityTitle: chart.title,
                        valueLabel: { Self.valueLabel($0, metric: chart.metric) },
-                       xLabel: { index in chart.data.indices.contains(index) ? chart.data[index].x : "" }) {
+                       xLabel: { index in chart.data.indices.contains(index) ? Self.xDetailLabel(chart.data[index].x) : "" }) {
                 ForEach(Array(chart.data.enumerated()), id: \.offset) { index, point in
                     switch chart.chartType {
                     case .line:
@@ -124,17 +124,25 @@ struct CoachChartView: View {
                        empty: emptyState,
                        accessibilityTitle: chart.title,
                        valueLabel: { Self.valueLabel($0, metric: chart.metric) },
-                       xLabel: { $0 }) {
+                       xLabel: { Self.xDetailLabel($0) }) {
+                // When the answer annotates a point ("Friday: the shortest night"), that bar keeps the full colour and
+                // the others step back, so the chart points at what the text is talking about.
+                let marked = Set(chart.annotations.map(\.x))
                 ForEach(chart.data, id: \.id) { point in
                     BarMark(x: .value("x", point.x), y: .value("y", point.y))
                         .clipShape(UnevenRoundedRectangle(topLeadingRadius: 6, topTrailingRadius: 6))
-                        .foregroundStyle(color.opacity(0.85))
+                        .foregroundStyle(color.opacity(marked.isEmpty || marked.contains(point.x) ? 0.9 : 0.38))
                 }
             }
             .chartYScale(domain: yDomain)
             .chartXAxis {
-                AxisMarks(values: .automatic(desiredCount: min(6, chart.data.count))) { _ in
-                    AxisValueLabel().font(AgaraFont.nano.weight(.regular)).foregroundStyle(AgaraColors.textMuted)
+                AxisMarks(values: .automatic(desiredCount: min(7, chart.data.count))) { value in
+                    AxisValueLabel {
+                        if let raw = value.as(String.self) {
+                            Text(Self.xAxisLabel(raw, pointCount: chart.data.count))
+                        }
+                    }
+                    .font(AgaraFont.nano.weight(.regular)).foregroundStyle(AgaraColors.textMuted)
                 }
             }
             .chartYAxis { axisMarks }
@@ -145,10 +153,73 @@ struct CoachChartView: View {
     }
 
     private var axisMarks: some AxisContent {
-        AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { _ in
+        AxisMarks(position: .leading, values: Self.yAxisValues(domain: yDomain, metric: chart.metric)) { value in
             AxisGridLine().foregroundStyle(AgaraColors.borderSubtle)
-            AxisValueLabel().font(AgaraFont.nano.weight(.regular)).foregroundStyle(AgaraColors.textMuted)
+            AxisValueLabel {
+                if let v = value.as(Double.self) { Text(Self.yAxisLabel(v, metric: chart.metric)) }
+            }
+            .font(AgaraFont.nano.weight(.regular)).foregroundStyle(AgaraColors.textMuted)
         }
+    }
+
+    // MARK: - Axis and tooltip labels (pure, unit-tested in CoachActionTests)
+
+    /// Grid values. Sleep arrives in minutes, so its grid sits on whole hours (every 2 h over a wide range); everything
+    /// else lets Charts choose about four.
+    static func yAxisValues(domain: ClosedRange<Double>, metric: CoachChartMetric) -> AxisMarkValues {
+        guard metric == .sleep else { return .automatic(desiredCount: 4) }
+        return .stride(by: sleepGridStep(domain: domain))
+    }
+
+    /// Minutes between sleep grid lines: hourly over a narrow range, every two hours over a wide one (a bar chart from
+    /// zero to nine hours would otherwise draw ten lines).
+    static func sleepGridStep(domain: ClosedRange<Double>) -> Double {
+        domain.upperBound - domain.lowerBound > 300 ? 120 : 60
+    }
+
+    /// An axis tick in the metric's unit, kept short: "6h", "12k", "72".
+    static func yAxisLabel(_ value: Double, metric: CoachChartMetric) -> String {
+        switch metric {
+        case .sleep:
+            let hours = value / 60
+            return hours == hours.rounded() ? "\(Int(hours))h" : String(format: "%.1fh", hours)
+        case .steps:
+            return value >= 1000 ? "\(Int((value / 1000).rounded()))k" : "\(Int(value.rounded()))"
+        case .spo2:
+            return "\(Int(value.rounded()))%"
+        default:
+            return "\(Int(value.rounded()))"
+        }
+    }
+
+    private static func isoDate(_ raw: String) -> Date? {
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC")
+        f.dateFormat = "yyyy-MM-dd"
+        return raw.count == 10 ? f.date(from: raw) : nil
+    }
+
+    private static func format(_ date: Date, template: String, locale: Locale) -> String {
+        let f = DateFormatter()
+        f.locale = locale
+        f.timeZone = TimeZone(identifier: "UTC")
+        f.setLocalizedDateFormatFromTemplate(template)
+        return f.string(from: date)
+    }
+
+    /// The x tick for a date label: a weekday when the range is a week or less, otherwise "13 Oct". Anything that is
+    /// not an ISO date (a minute label, a stage name) passes through unchanged.
+    static func xAxisLabel(_ raw: String, pointCount: Int, locale: Locale = .current) -> String {
+        guard let date = isoDate(raw) else { return raw }
+        return format(date, template: pointCount <= 7 ? "EEE" : "dMMM", locale: locale)
+    }
+
+    /// The tooltip's date line: "Fri 16 Oct".
+    static func xDetailLabel(_ raw: String, locale: Locale = .current) -> String {
+        guard let date = isoDate(raw) else { return raw }
+        return format(date, template: "EEEdMMM", locale: locale)
     }
 
     /// The tooltip's value line, in the metric's unit ("7,912" steps, "62 bpm", "7h 12m").

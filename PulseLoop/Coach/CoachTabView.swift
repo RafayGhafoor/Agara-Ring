@@ -100,3 +100,105 @@ struct CoachTabView: View {
         if !settingsStore.settings.coachMasterEnabled { settingsStore.settings.coachMasterEnabled = true }
     }
 }
+
+// MARK: - The Coach tab's header content
+
+/// What the app header says on the Coach tab, in the space the other tabs give the greeting: a short status line —
+/// where the answers come from, and the cloud quota — over the title. Same two lines as the greeting, so switching tabs
+/// does not move anything; but on this tab both lines carry information.
+///
+/// It replaced a second header that the coach drew under the app's (orb, name, a two-line privacy sentence and a row
+/// of buttons). The privacy promise is still one tap away: the status line opens Usage and privacy, and its VoiceOver
+/// label is the full sentence.
+struct CoachHeaderTitle: View {
+    @State private var settingsStore = CoachSettingsStore.shared
+    @State private var quota = CoachQuotaStore.shared
+    @State private var cloud = AgaraCloud.shared
+    @State private var nav = CoachNavigation.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            if CoachTabStateInput.currentState() == .ready {
+                Button { nav.requestUsage() } label: {
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(usesCloud ? AgaraColors.accent : AgaraColors.success)
+                            .frame(width: 6, height: 6)
+                        Text(statusLine)
+                            .font(AgaraFont.footnote)
+                            .foregroundStyle(AgaraColors.textMuted)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier(quotaText == nil ? "coach.promise" : "coach.quota")
+                .accessibilityLabel(spokenLine)
+                .accessibilityHint(CoachCopy.headerStatusHint)
+            }
+            Text(CoachCopy.tabTitle)
+                .font(AgaraFont.title2.weight(.semibold))
+                .foregroundStyle(AgaraColors.textPrimary)
+                .lineLimit(1)
+                .accessibilityAddTraits(.isHeader)
+        }
+    }
+
+    /// The effective provider, not the stored one: a stored cloud choice that is not ready yet answers on the phone,
+    /// and the line must say so (the header once told a cloud user "nothing is sent").
+    private var usesCloud: Bool {
+        _ = cloud.phase
+        return CoachClientResolver.effectiveMode(for: settingsStore.settings.providerMode,
+                                                cloudReady: CoachGate.cloudReady) == .agaraCloud
+    }
+
+    /// The cloud's quota, shown only while the cloud is what answers: "On this phone · 24 left" mixed the on-device
+    /// coach with a count that does not apply to it (seen when the cloud choice was stored but not ready).
+    private var quotaText: String? {
+        usesCloud ? quota.remainingTurnsToday.map(CoachCopy.quotaShort(remaining:)) : nil
+    }
+
+    private var statusLine: String {
+        let base = usesCloud ? CoachCopy.headerStatusCloud : CoachCopy.headerStatusOnDevice
+        return quotaText.map { "\(base) · \($0)" } ?? base
+    }
+
+    private var spokenLine: String {
+        let base = usesCloud ? CoachCopy.headerCloudSubtitle : CoachCopy.headerOnDeviceSubtitle
+        guard let spoken = quota.pillSpokenText, quotaText != nil else { return base }
+        return "\(base). \(spoken)"
+    }
+}
+
+/// The coach's two thread actions, in the app header's control row beside the ring and the gear. Plain glyphs at the
+/// gear's size and weight: they are peers of the gear, so they look like it. Glass circles here made five controls
+/// compete in one row.
+struct CoachHeaderActions: View {
+    @State private var nav = CoachNavigation.shared
+
+    var body: some View {
+        if CoachTabStateInput.currentState() == .ready {
+            HStack(spacing: 0) {
+                if CoachGate.historyOn {
+                    glyph("clock.arrow.circlepath") { nav.requestHistory() }
+                        .accessibilityLabel(CoachCopy.historyButton)
+                        .accessibilityIdentifier("coach.history")
+                }
+                glyph("square.and.pencil") { nav.requestNewChat() }
+                    .accessibilityLabel("New conversation")
+            }
+        }
+    }
+
+    private func glyph(_ name: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: name)
+                .font(AgaraFont.body.weight(.regular))
+                .foregroundStyle(AgaraColors.textSecondary)
+                .frame(width: 40, height: 40)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}

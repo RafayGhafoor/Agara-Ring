@@ -174,15 +174,23 @@ final class CoachTabUITests: AgaraUITestCase {
     func testReadyStateShowsQuotaPillStarterPromptsThreeFollowUpsAndHistory() {
         // The pill reports the CLOUD quota, so the test must select the cloud coach - with `offlineStub` the header
         // correctly says "nothing is sent" and there is no quota to report.
-        launchCoach(extra: ["-coachOn", "YES", "-coachProvider", "agaraCloud",
-                            "-coachQuotaRemaining", "24",
-                            "-coachQuotaResetsAt", "2026-10-21T00:00:00Z"])
-        openTab("Coach")
+        let quotaArgs = ["-coachOn", "YES", "-coachProvider", "agaraCloud",
+                         "-coachQuotaRemaining", "24", "-coachQuotaResetsAt", "2026-10-21T00:00:00Z"]
 
-        // The pill is fed by the last response's X-Coach-Remaining-Day.
-        let pill = waitFor(element("coach.quota"), timeout: 20, "the quota pill is missing")
-        XCTAssertEqual(pill.label.contains("24") || pill.label.contains("24 left today"), true,
-                       "pill reads: \(pill.label)")
+        // While the cloud answers, the header's status line carries the count (fed by X-Coach-Remaining-Day).
+        launchCoach(extra: quotaArgs + ["-coachGateOpen", "YES"])
+        openTab("Coach")
+        let pill = waitFor(element("coach.quota"), timeout: 20, "the quota is missing while the cloud answers")
+        XCTAssertTrue(pill.label.contains("24"), "status reads: \(pill.label)")
+        app.terminate()
+
+        // Cloud chosen but not ready (no account here): the phone answers, so the line says so and shows NO count —
+        // "On this phone · 24 left" mixed the two coaches.
+        launchCoach(extra: quotaArgs)
+        openTab("Coach")
+        let promise = waitFor(element("coach.promise"), timeout: 20, "the on-device status line is missing")
+        XCTAssertFalse(promise.label.contains("24"), "an on-device status must not carry the cloud count: \(promise.label)")
+        XCTAssertFalse(element("coach.quota").exists, "no cloud quota while the phone answers")
 
         // The empty thread offers prompts built from the seeded data, not a fixed list.
         let starters = app.buttons.matching(identifier: "coach.starter")
@@ -224,6 +232,75 @@ final class CoachTabUITests: AgaraUITestCase {
 
     /// Every coach screen, in the theme named by the test, as an attachment named `<theme>-NN-<screen>`. `scripts/`
     /// extracts them into `captures/coach-ui/` (see `scripts/coach_ui_shots.sh`).
+    // MARK: - 6. The demo set (one run, the screens a reviewer needs)
+
+    /// The coach's demo screenshots: asking, an answer with a chart, its follow-ups, history, the privacy sheet, the
+    /// consent sheet, and the answer again in dark. Attachments are named `demo-NN-…`; export them with
+    /// `scripts/coach_demo_shots.sh`, which also wipes the old set. The answer is the DEBUG `-coachDemoChart` seed — the
+    /// same `coach_response` JSON a cloud answer carries, through the production renderer.
+    func testDemoScreenshots() {
+        var frame = 0
+        func snap(_ name: String) {
+            RunLoop.current.run(until: Date().addingTimeInterval(1.5))
+            frame += 1
+            let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+            shot.name = String(format: "demo-%02d-%@", frame, name)
+            shot.lifetime = .keepAlways
+            add(shot)
+        }
+        // `-coachGateOpen` (DEBUG): the cloud coach is the one that answers, so the header says so. Without an account
+        // the effective coach is the on-device one, and the header correctly says "On this phone".
+        let cloud = ["-coachOn", "YES", "-coachProvider", "agaraCloud", "-coachGateOpen", "YES",
+                     "-coachQuotaRemaining", "24", "-coachQuotaResetsAt", "2026-10-23T00:00:00Z"]
+
+        // 1. Ask: the briefing, then three questions built from the user's own numbers.
+        launchCoach(extra: ["-theme", "light"] + cloud)
+        openTab("Coach")
+        waitFor(app.buttons.matching(identifier: "coach.starter").firstMatch, timeout: 20, "no starter prompts")
+        snap("ask")
+        app.terminate()
+
+        // 2–5. A conversation.
+        launchCoach(extra: ["-theme", "light", "-coachDemoChart", "YES"] + cloud)
+        openTab("Coach")
+        waitFor(element("coach.chart"), timeout: 30, "the answer's chart is missing")
+        snap("answer-with-chart")
+        let chips = app.buttons.matching(identifier: "coach.chip")
+        // Drag from the prose above the chart: a synthetic swipe from the screen centre starts on the chart's overlay.
+        for _ in 0..<3 where !(chips.element(boundBy: 2).exists && chips.element(boundBy: 2).isHittable) {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.42))
+                .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.12)))
+        }
+        snap("follow-ups")
+        waitFor(element("coach.history"), "history button missing").tap()
+        waitFor(app.staticTexts["Conversations"], timeout: 20, "the history sheet did not open")
+        snap("history")
+        app.buttons["Done"].tap()
+        waitFor(element("coach.quota"), timeout: 20, "the status line is missing").tap()
+        RunLoop.current.run(until: Date().addingTimeInterval(1.0))
+        snap("usage-and-privacy")
+        app.terminate()
+
+        // 6. Before the first cloud question: the third-party disclosure.
+        launchCoach(extra: ["-theme", "light", "-coachState", "consent", "-coachOn", "YES"])
+        openTab("Coach")
+        waitFor(element("coach.state.primary"), "consent card missing").tap()
+        waitFor(element("coach.consent.intro"), timeout: 20, "consent sheet missing")
+        snap("consent")
+        app.terminate()
+
+        // 7–8. Dark.
+        launchCoach(extra: ["-theme", "dark", "-coachDemoChart", "YES"] + cloud)
+        openTab("Coach")
+        waitFor(element("coach.chart"), timeout: 30, "the answer's chart is missing (dark)")
+        snap("answer-with-chart-dark")
+        app.terminate()
+        launchCoach(extra: ["-theme", "dark"] + cloud)
+        openTab("Coach")
+        waitFor(app.buttons.matching(identifier: "coach.starter").firstMatch, timeout: 20, "no starter prompts (dark)")
+        snap("ask-dark")
+    }
+
     private func walkScreens(theme: String) {
         var frame = 0
         func snap(_ name: String) {
@@ -257,7 +334,7 @@ final class CoachTabUITests: AgaraUITestCase {
         app.terminate()
 
         // Ready: quota pill, starter prompts and the empty thread.
-        launchCoach(extra: ["-theme", theme, "-coachOn", "YES", "-coachProvider", "agaraCloud",
+        launchCoach(extra: ["-theme", theme, "-coachOn", "YES", "-coachProvider", "agaraCloud", "-coachGateOpen", "YES",
                             "-coachQuotaRemaining", "24", "-coachQuotaResetsAt", "2026-10-21T00:00:00Z"])
         openTab("Coach")
         waitFor(element("coach.quota"), timeout: 20, "quota pill missing for the screenshot")

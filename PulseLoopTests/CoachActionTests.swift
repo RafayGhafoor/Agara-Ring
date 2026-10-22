@@ -182,3 +182,59 @@ final class CoachChartDomainTests: XCTestCase {
         }
     }
 }
+
+/// The coach chart's labels: model output carries ISO dates and sleep arrives in minutes, and both used to reach the
+/// screen raw ("2026-10-13" under a bar, "350 … 425" on a sleep axis).
+final class CoachChartLabelTests: XCTestCase {
+    private let en = Locale(identifier: "en_US_POSIX")
+
+    func testSleepAxisReadsInHours() {
+        XCTAssertEqual(CoachChartView.yAxisLabel(480, metric: .sleep), "8h")
+        XCTAssertEqual(CoachChartView.yAxisLabel(450, metric: .sleep), "7.5h")
+        XCTAssertEqual(CoachChartView.yAxisLabel(0, metric: .sleep), "0h")
+    }
+
+    func testStepsAxisIsCompact() {
+        XCTAssertEqual(CoachChartView.yAxisLabel(12000, metric: .steps), "12k")
+        XCTAssertEqual(CoachChartView.yAxisLabel(800, metric: .steps), "800")
+    }
+
+    func testSleepGridIsHourlyWhenNarrowAndTwoHourlyWhenWide() {
+        XCTAssertEqual(CoachChartView.sleepGridStep(domain: 340...500), 60)
+        XCTAssertEqual(CoachChartView.sleepGridStep(domain: 0...562), 120)
+    }
+
+    func testAWeekOfDatesReadsAsWeekdays() {
+        XCTAssertEqual(CoachChartView.xAxisLabel("2026-10-16", pointCount: 7, locale: en), "Fri")
+    }
+
+    func testALongerRangeReadsAsDayAndMonth() {
+        XCTAssertEqual(CoachChartView.xAxisLabel("2026-10-16", pointCount: 14, locale: en), "Oct 16")
+    }
+
+    func testNonDateLabelsPassThrough() {
+        XCTAssertEqual(CoachChartView.xAxisLabel("22:00", pointCount: 7, locale: en), "22:00")
+        XCTAssertEqual(CoachChartView.xDetailLabel("deep", locale: en), "deep")
+    }
+
+    func testTooltipNamesTheDay() {
+        XCTAssertEqual(CoachChartView.xDetailLabel("2026-10-16", locale: en), "Fri, Oct 16")
+    }
+}
+
+final class CoachTextTests: XCTestCase {
+    private let nb = "\u{00A0}"
+
+    func testCompoundDurationNeverBreaks() {
+        XCTAssertEqual(CoachText.keepUnitsTogether("at 5 h 56 m, and"), "at 5\(nb)h\(nb)56\(nb)m, and")
+    }
+
+    func testUnitsStayWithTheirNumbers() {
+        XCTAssertEqual(CoachText.keepUnitsTogether("49 min under, 62 bpm, 98 %"), "49\(nb)min under, 62\(nb)bpm, 98\(nb)%")
+    }
+
+    func testWordsThatStartLikeUnitsAreLeftAlone() {
+        XCTAssertEqual(CoachText.keepUnitsTogether("3 more nights"), "3 more nights")
+        XCTAssertEqual(CoachText.keepUnitsTogether("2 hours"), "2 hours")
+    }
+}

@@ -15,10 +15,6 @@ struct CoachView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(RingSyncCoordinator.self) private var coordinator
     @Query(sort: \CoachConversation.updatedAt, order: .reverse) private var conversations: [CoachConversation]
-    /// The one cloud account, observed so the header's privacy sentence follows it. Without this the header kept
-    /// whatever it computed before the session resolved — a real staging answer arrived from the cloud while the header
-    /// still said "nothing is sent" (captured in captures/coach-ui/live-1-answer-with-data.png).
-    @State private var cloud = AgaraCloud.shared
     @State private var draft = ""
     @State private var viewModel = CoachViewModel()
     @State private var activeConversationId: UUID?
@@ -27,7 +23,6 @@ struct CoachView: View {
     @State private var keyboardHeight: CGFloat = 0
     @State private var nav = CoachNavigation.shared
     @State private var settingsStore = CoachSettingsStore.shared
-    @State private var quota = CoachQuotaStore.shared
     /// Coalesced "rows changed" signal, so the empty thread's prompts follow the last sync.
     @State private var dataChange = AgaraDataChange.shared
     @FocusState private var composerFocused: Bool
@@ -68,8 +63,16 @@ struct CoachView: View {
             .first(where: \.isKeyWindow)?.safeAreaInsets.bottom ?? 0
     }
 
+    /// The opening questions belong to a thread the user has not spoken in yet. (It used to be "the last message is the
+    /// assistant's", which is true after every answer — so the starters came back at the top of each conversation.)
+    /// And only when the coach's last message is not already offering questions: a structured briefing carries three
+    /// follow-ups (topped up from these same starters), and the thread then showed the same three questions twice.
     private func showColdStart(_ messages: [CoachMessage]) -> Bool {
-        !viewModel.isSending && (messages.isEmpty || messages.last?.role == "assistant")
+        guard !viewModel.isSending, !messages.contains(where: { $0.role == "user" }) else { return false }
+        if let last = messages.last, last.role == "assistant", CoachResponse.decode(fromJSON: last.cardsJSON) != nil {
+            return false
+        }
+        return true
     }
 
     /// Only the active conversation's messages are queried (it used to query every message of every
@@ -87,23 +90,9 @@ struct CoachView: View {
 
             ScrollViewReader { proxy in
                 ScrollView {
-                    VStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 22) {
                         // A nudge's seeded answer (tap on a nudge or "Why?"): already written, with its numbers, its
                         // chart and three questions. No model call until the user sends one.
-                        // The privacy promise sits IN the thread: prominent before the first question, gone once the
-                        // conversation has started (where the info sheet carries it). As chrome it cost reading area
-                        // forever and made the header look bolted on.
-                        // Until the USER has asked something. A fresh thread can already hold the daily briefing, so
-                        // `messages.isEmpty` hid the promise exactly when it was still doing its job.
-                        if !messages.contains(where: { $0.role == "user" }) && nav.requestedSeed == nil {
-                            Text(headerSubtitle)
-                                .font(AgaraFont.caption2.weight(.regular))
-                                .foregroundStyle(AgaraColors.textMuted)
-                                .multilineTextAlignment(.center)
-                                .frame(maxWidth: .infinity)
-                                .padding(.bottom, 2)
-                                .accessibilityIdentifier("coach.promise")
-                        }
                         if let seed = nav.requestedSeed {
                             CoachSeedCard(
                                 seed: seed,
@@ -113,27 +102,6 @@ struct CoachView: View {
                                 },
                                 onDismiss: { nav.requestedSeed = nil }
                             )
-                        }
-                        if showColdStart(messages) {
-                        // Stacked, not a horizontal strip: a strip clipped the third prompt off-screen, so it could be
-                        // neither read nor tapped (a real user hits the same wall, not just the UI test).
-                        VStack(alignment: .leading, spacing: 6) {
-                            ForEach(starterPrompts, id: \.self) { prompt in
-                                Button { send(prompt) } label: {
-                                    Text(prompt)
-                                        .font(AgaraFont.caption.weight(.regular))
-                                        .foregroundStyle(AgaraColors.textSecondary)
-                                        .multilineTextAlignment(.leading)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .padding(.horizontal, 12).padding(.vertical, 7)
-                                        .agaraGlass(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityIdentifier("coach.starter")
-                            }
-                        }
-                        .padding(.horizontal, 12).padding(.vertical, 8)
-                        .agaraGlassContainer(spacing: 6)
                         }
                         ForEach(messages) { message in
                             CoachBubble(
@@ -146,12 +114,19 @@ struct CoachView: View {
                                 onOpenMeal: { openMeal($0) }
                             ).id(message.id)
                         }
+                        // The opening questions follow whatever the coach has already said (the daily briefing), and
+                        // stand alone on an empty thread. Once the user has asked something, each answer's own three
+                        // follow-ups take over — these used to come back at the TOP of every finished conversation.
+                        if showColdStart(messages) && !starterPrompts.isEmpty {
+                            CoachSuggestionList(questions: starterPrompts, identifier: "coach.starter") { send($0) }
+                        }
                         if viewModel.isSending {
                             CoachTraceStrip(events: viewModel.traceEvents).id("trace")
                         }
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 8)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .padding(.bottom, 12)
                 }
                 .onChange(of: messages.count) {
                     guard let last = messages.last else { return }
@@ -159,31 +134,41 @@ struct CoachView: View {
                     // bottom (the chat default) put a long answer's beginning off-screen and left only its tail visible,
                     // which read as the header cutting the answer in half. The user's own message still tracks the
                     // bottom, which is what a chat expects.
+                    // Refined: the answer's QUESTION goes to the top, with the answer starting right under it — the
+                    // pair reads as one exchange, and the answer still starts at its first line.
+                    let target: UUID
+                    if last.role == "assistant",
+                       let question = messages.dropLast().last(where: { $0.role == "user" }) {
+                        target = question.id
+                    } else {
+                        target = last.id
+                    }
                     withAnimation {
-                        proxy.scrollTo(last.id, anchor: last.role == "assistant" ? .top : .bottom)
+                        proxy.scrollTo(target, anchor: last.role == "assistant" ? .top : .bottom)
                     }
                 }
                 .onChange(of: viewModel.traceEvents.count) {
                     withAnimation { proxy.scrollTo("trace", anchor: .bottom) }
                 }
-                // The scroll margin (not padding) is what makes the capsule feel submerged: content passes beneath it
-                // while scrolling, and `scrollTo(.top)` still lands an answer below it, never behind it.
-                // 4 (top padding) + 32 (the circles) + 20 (the fade) — exactly clears the floating chrome at rest.
-                .contentMargins(.top, 56, for: .scrollContent)
                 .scrollDismissesKeyboard(.immediately)
                 .simultaneousGesture(TapGesture().onEnded { composerFocused = false })
-                .agaraScrollEdges(.top)
+                // Soft edges top and bottom: the thread fades under the app header and under the composer instead of
+                // meeting them at a hard line.
+                .agaraScrollEdges(.vertical)
             }
 
-            VStack(spacing: 0) {
-                composer
-            }
-            // Clears the nav bar when idle; rises above the keyboard when typing.
-            .padding(.bottom, composerBottomInset)
-            .background(AgaraColors.secondaryBackground)
+            composer
+                // Clears the nav bar when idle; rises above the keyboard when typing.
+                .padding(.bottom, composerBottomInset)
+                // The page's own colour: a tinted band made the composer read as a separate strip under the chat.
+                .background(AgaraColors.background)
         }
         .background(AgaraColors.background)
-        .overlay(alignment: .top) { floatingHeader(compact: !messages.isEmpty) }
+        // The coach's actions are in the app header now (`CoachHeaderActions`, `CoachHeaderTitle`); they post requests
+        // and this view, which owns the thread, answers them.
+        .onChange(of: nav.newChatRequests) { _, _ in newConversation() }
+        .onChange(of: nav.historyRequests) { _, _ in composerFocused = false; showHistory = true }
+        .onChange(of: nav.usageRequests) { _, _ in composerFocused = false; showUsage = true }
         // Pin the keyboard safe area so only our manual lift moves the composer —
         // otherwise the sheet's native avoidance double-lifts it.
         .ignoresSafeArea(.keyboard)
@@ -224,7 +209,9 @@ struct CoachView: View {
             CoachUsageSheet(
                 conversation: activeConversation,
                 messages: messages,
-                settings: settingsStore.settings
+                settings: settingsStore.settings,
+                usesCloud: CoachClientResolver.effectiveMode(for: settingsStore.settings.providerMode,
+                                                             cloudReady: CoachGate.cloudReady) == .agaraCloud
             )
         }
     }
@@ -259,94 +246,6 @@ struct CoachView: View {
     private func openMeal(_ id: UUID) {
         composerFocused = false
         onOpenMeal?(id)
-    }
-
-    /// The coach's three actions, floating over the thread: a right-aligned row of glass circles, no title and no
-    /// container. "Agara Coach" was redundant above a screen whose tab is already Coach, and a titled capsule spent a
-    /// row on words the user does not need to read twice. What is left is the chrome you actually press.
-    ///
-    /// The scrim behind it is not decoration: content scrolls UNDER these circles, and without a fade the answer's text
-    /// collides with them. It is not hit-testable, so it never steals a scroll.
-    private func floatingHeader(compact: Bool) -> some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                Spacer(minLength: 0)
-                // The cloud quota, from the last response's `X-Coach-Remaining-Day`. Text-only chip: the number is the
-                // one thing worth reading here, and it keeps its own ground so it stays legible over the thread.
-                if selectedCloudCoach, let pill = quota.pillText {
-                    Text(pill)
-                        .font(AgaraFont.caption2.weight(.semibold).monospacedDigit())
-                        .foregroundStyle(AgaraColors.textSecondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.85)
-                        .padding(.horizontal, 9).padding(.vertical, 4)
-                        .background(AgaraColors.secondaryBackground, in: Capsule())
-                        .overlay(Capsule().stroke(AgaraColors.borderSubtle, lineWidth: 0.5))
-                        .accessibilityIdentifier("coach.quota")
-                        .accessibilityLabel(quota.pillSpokenText ?? pill)
-                        .accessibilityHint(CoachCopy.quotaPillHint)
-                }
-                // Sibling glass circles share one container so their glass renders/blends together.
-                HStack(spacing: 10) {
-                    Button { composerFocused = false; showUsage = true } label: {
-                        Image(systemName: "info.circle").font(AgaraFont.footnote).foregroundStyle(AgaraColors.textSecondary)
-                            .frame(width: 32, height: 32).agaraGlass(Circle(), interactive: true)
-                            .minTapTarget(visualSize: 32)
-                    }
-                    .accessibilityLabel("Usage and privacy")
-                    Button { newConversation() } label: {
-                        Image(systemName: "plus").font(AgaraFont.footnote).foregroundStyle(AgaraColors.textSecondary)
-                            .frame(width: 32, height: 32).agaraGlass(Circle(), interactive: true)
-                            .minTapTarget(visualSize: 32)
-                    }
-                    .accessibilityLabel("New conversation")
-                    // Conversation history: flag `coach_history` (iOS only today; Android port pending).
-                    if CoachGate.historyOn {
-                        Button { composerFocused = false; showHistory = true } label: {
-                            Image(systemName: "clock.arrow.circlepath").font(AgaraFont.footnote).foregroundStyle(AgaraColors.textSecondary)
-                                .frame(width: 32, height: 32).agaraGlass(Circle(), interactive: true)
-                                .minTapTarget(visualSize: 32)
-                        }
-                        .accessibilityLabel(CoachCopy.historyButton)
-                        .accessibilityIdentifier("coach.history")
-                    }
-                }
-                .agaraGlassContainer(spacing: 8)
-            }
-            .padding(.horizontal, 12)
-            // The fade the answer dissolves into while scrolling. 20 pt: it softens the top edge without washing out the
-            // first line of content at rest (the scroll margin below is sized to clear it exactly).
-            LinearGradient(colors: [AgaraColors.background, AgaraColors.background.opacity(0)], startPoint: .top, endPoint: .bottom)
-                .frame(height: 20)
-                .allowsHitTesting(false)
-        }
-        .padding(.top, 4)
-    }
-
-    /// Where the answer comes from — the cloud proxy or this phone — under the coach's name. It is the one place the
-    /// user is told, without opening Settings, whether their data is leaving the device.
-    /// Whether this turn actually goes through the Agara cloud coach. Uses the resolver's *effective* mode, so a stored
-    /// bring-your-own-key or on-device choice is reported as what it is. (It compared `.backendProxy`, a case the cloud
-    /// coach replaced with `.agaraCloud` — which meant a cloud-coach user was told "nothing is sent".)
-    private var usesCloudCoach: Bool {
-        // `cloud.phase` is read so the header re-renders when the account resolves (sign-in, verification, consent) —
-        // otherwise it keeps saying "nothing is sent" while a turn is answered by the cloud.
-        _ = cloud.phase
-        return CoachClientResolver.effectiveMode(for: settingsStore.settings.providerMode,
-                                                cloudReady: CoachGate.cloudReady) == .agaraCloud
-    }
-
-    /// The user's *stored* choice. The quota pill belongs to the cloud coach, so it follows the selection rather than the
-    /// effective mode (a closed gate still shows the pill; the state card explains why it is not being used).
-    private var selectedCloudCoach: Bool {
-        switch settingsStore.settings.providerMode {
-        case .agaraCloud, .backendProxy: return true
-        default: return false
-        }
-    }
-
-    private var headerSubtitle: String {
-        usesCloudCoach ? CoachCopy.headerCloudSubtitle : CoachCopy.headerOnDeviceSubtitle
     }
 
     /// Rebuild the empty thread's chips from the current data (cheap: one context packet, no model call).
@@ -451,30 +350,37 @@ struct CoachView: View {
         let existing = (try? context.fetch(FetchDescriptor<CoachMessage>(
             predicate: #Predicate { $0.conversationId == conversationId }))) ?? []
         guard !existing.contains(where: { $0.cardsJSON?.contains("\"chart\"") == true }) else { return }
+        // Numbers computed, not written: 7 nights of 452/418/431/356/402/467/489 min average 430.7 = 7 h 11 m, 49 min
+        // under 8 h; the shortest is Friday 16 Oct (5 h 56 m); Sunday and Monday are the two nights over 7 h 45 m.
+        let nights: [(String, Int)] = [("2026-10-13", 452), ("2026-10-14", 418), ("2026-10-15", 431), ("2026-10-16", 356),
+                                       ("2026-10-17", 402), ("2026-10-18", 467), ("2026-10-19", 489)]
         let answer: [String: Any] = [
             "response_type": "insight_with_chart",
-            "title": "Sleep, last three nights",
-            "summary": "You averaged 6 h 36 m over the last three nights, 1 h 24 m under your 8 h goal. Sunday was the shortest at 5 h 56 m.",
-            "bullets": ["Deep sleep peaked on Friday (1 h 11 m).", "Bedtime drifted 40 min later on Sunday."],
+            "title": "Your sleep this week",
+            "summary": "You averaged **7 h 11 m** a night — 49 min under your 8 h goal. Friday was the short one at 5 h 56 m, and you made most of it back over Sunday and Monday.",
+            "bullets": ["Two nights cleared 7 h 45 m: Sunday and Monday.",
+                        "Friday's bedtime was 1 h 10 m later than your usual."],
             "chart": [
-                "chart_type": "line", "title": "Sleep per night", "metric": "sleep",
-                "range": ["start": "2026-10-17", "end": "2026-10-19"],
-                "data": [
-                    ["x": "2026-10-17", "y": 431, "series": NSNull()],
-                    ["x": "2026-10-18", "y": 356, "series": NSNull()],
-                    ["x": "2026-10-19", "y": 402, "series": NSNull()],
-                ],
-                "annotations": [["x": "2026-10-19", "label": "last night"]],
+                "chart_type": "bar", "title": "Hours asleep, last 7 nights", "metric": "sleep",
+                "range": ["start": "2026-10-13", "end": "2026-10-19"],
+                "data": nights.map { ["x": $0.0, "y": $0.1, "series": NSNull()] as [String: Any] },
+                "annotations": [["x": "2026-10-16", "label": "Friday: 5 h 56 m, the shortest night"]],
             ],
             "safety_note": NSNull(), "data_quality_note": "Sample data, not live readings.",
             "sources": [],
-            "follow_up_chips": ["Why was Sunday shorter?", "How does this compare with last week?", "What time should I go to bed?"],
+            "follow_up_chips": ["Why was Friday so short?", "What bedtime gets me to 8 hours?", "Does short sleep lower my HRV?"],
             "actions_taken": [], "confidence": "medium",
         ]
+        // The question that answer replies to. Both are dated just AFTER now: the demo store's daily briefing is
+        // written at launch, and a question dated earlier landed the briefing between the question and its answer.
+        let question = CoachMessage(conversationId: conversationId, role: "user", body: "How did I sleep this week?")
+        question.createdAt = AppClock.now.addingTimeInterval(1)
+        context.insert(question)
         guard let data = try? JSONSerialization.data(withJSONObject: answer),
               let json = String(data: data, encoding: .utf8) else { return }
         let message = CoachMessage(conversationId: conversationId, role: "assistant", body: "You averaged 6 h 36 m…")
         message.cardsJSON = json
+        message.createdAt = AppClock.now.addingTimeInterval(2)
         context.insert(message)
         try? context.save()
     }
@@ -694,10 +600,13 @@ struct CoachBubble: View {
         CoachAttachmentRef.decode(fromJSON: message.attachmentsJSON)
     }
 
+    /// Two shapes, on purpose. The user's message is a bubble at the trailing edge — short, theirs. The coach's answer is
+    /// not a bubble: it is the page, full width, so a summary, bullets, a chart and three questions read as one document.
+    /// Boxing it capped it at ~85% of the width and put a card (the chart) inside a card (the bubble).
     var body: some View {
-        HStack {
-            if message.role == "user" { Spacer(minLength: 40) }
-            VStack(alignment: message.role == "user" ? .trailing : .leading, spacing: 8) {
+        HStack(alignment: .top, spacing: 0) {
+            if message.role == "user" { Spacer(minLength: 56) }
+            VStack(alignment: message.role == "user" ? .trailing : .leading, spacing: 10) {
                 ForEach(attachments, id: \.file) { ref in attachmentImage(ref) }
                 content
                 if let pendingAction {
@@ -717,7 +626,7 @@ struct CoachBubble: View {
                     CoachToolTraceDisclosure(messageId: message.id)
                 }
             }
-            if message.role != "user" { Spacer(minLength: 40) }
+            .frame(maxWidth: message.role == "user" ? nil : .infinity, alignment: .leading)
         }
     }
 
@@ -726,17 +635,23 @@ struct CoachBubble: View {
             CoachErrorBubble(error: turnError)
         } else if let structured {
             CoachResponseView(response: structured, fallbackChips: fallbackChips, onChipTap: onChipTap)
-                .padding(14)
-                .agaraGlass(RoundedRectangle(cornerRadius: 18, style: .continuous))
         } else if message.role == "user" && message.body.isEmpty && !attachments.isEmpty {
             // Image-only message: the image is the bubble, no empty text bubble below.
             EmptyView()
         } else {
-            (message.role == "user" ? Text(message.body) : Text(coachMarkdown: message.body))
-                .font(AgaraFont.subheadline.weight(.regular))
-                .foregroundStyle(message.role == "user" ? AgaraColors.onAccent : AgaraColors.textPrimary)
-                .padding(14)
-                .modifier(CoachBubbleSurface(isUser: message.role == "user"))
+            if message.role == "user" {
+                Text(message.body)
+                    .font(AgaraFont.subheadline.weight(.regular))
+                    .foregroundStyle(AgaraColors.onAccent)
+                    .padding(.horizontal, 14).padding(.vertical, 10)
+                    .background(AgaraColors.accent, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            } else {
+                Text(coachMarkdown: message.body)
+                    .font(AgaraFont.body.weight(.regular))
+                    .lineSpacing(3)
+                    .foregroundStyle(AgaraColors.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
@@ -866,21 +781,6 @@ struct CoachTraceStrip: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .agaraGlass(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .animation(.easeOut(duration: 0.18), value: completedSteps.count)
-    }
-}
-
-/// Message-bubble surface: user bubbles keep the solid accent fill; assistant bubbles
-/// use Liquid Glass. Kept as a modifier so the glass-vs-accent branch stays one place.
-private struct CoachBubbleSurface: ViewModifier {
-    let isUser: Bool
-    func body(content: Content) -> some View {
-        if isUser {
-            content
-                .background(AgaraColors.accent)
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        } else {
-            content.agaraGlass(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        }
     }
 }
 

@@ -176,6 +176,10 @@ enum CoachCopy {
         remaining == 1 ? "1 left today" : "\(remaining) left today"
     }
 
+    /// The header line's quota, after "Agara Cloud ·": the line shares its row with four controls and "24 left today"
+    /// truncated there. The VoiceOver label still says "today" and when it resets. **Android: match**
+    static func quotaShort(remaining: Int) -> String { "\(remaining) left" }
+
     /// The quota pill's VoiceOver label, which also says when the count resets. **Android: match**
     /// Arguments: questions left, and the formatted reset time (or nil when unknown).
     static func quotaPillSpoken(remaining: Int, resets: String?) -> String {
@@ -192,6 +196,22 @@ enum CoachCopy {
 
     /// The header's subtitle under the coach name when the on-device model answers. **Android: match**
     static let headerOnDeviceSubtitle = "Answering on this phone — nothing is sent"
+
+    /// The header's short status line above the title: where answers come from. It shares a row with four controls,
+    /// so it is two words; the full sentences above are its VoiceOver label, and tapping it opens Usage and privacy.
+    /// **Android: match**
+    static let headerStatusCloud = "Agara Cloud"
+    static let headerStatusOnDevice = "On this phone"
+
+    /// The usage sheet's model when the conversation has no recorded turn yet and the cloud answers (it fell back to the
+    /// bring-your-own-key model field and said "gpt-5.4"). Same provider as `consentProviderBody`. **Android: match**
+    static let cloudModelLabel = "DeepSeek, via OpenCode Go"
+
+    /// The sheet the status line opens. **Android: match**
+    static let privacySheetTitle = "Privacy & usage"
+
+    /// What tapping the status line does, for VoiceOver. **Android: match**
+    static let headerStatusHint = "Opens usage and privacy"
 
     /// Settings › AI Coach status line when the cloud coach is ready (signed in, verified, agreed, quota left).
     /// **Android: match**

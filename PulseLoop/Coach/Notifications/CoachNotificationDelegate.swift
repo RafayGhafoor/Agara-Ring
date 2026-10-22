@@ -17,6 +17,17 @@ final class CoachNavigation {
     /// the request only selects the tab, and the tab's state decides what it shows.
     var wantsCoachTab = false
 
+    /// The coach's own actions live in the app header on the Coach tab (one top bar, not two), but their state lives in
+    /// `CoachView`. The header posts a request; the view answers it. Counters rather than flags, so two taps are two
+    /// requests and nothing has to be reset.
+    private(set) var newChatRequests = 0
+    private(set) var historyRequests = 0
+    private(set) var usageRequests = 0
+
+    func requestNewChat() { newChatRequests += 1 }
+    func requestHistory() { historyRequests += 1 }
+    func requestUsage() { usageRequests += 1 }
+
     /// Open the coach on a specific conversation (deep link).
     func open(_ conversationId: UUID) {
         requestedSeed = nil
