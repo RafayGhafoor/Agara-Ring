@@ -1963,7 +1963,7 @@
     },
     {
       "id": "policy-fingerprint-changes-with-the-number",
-      "why": "A materially different number is new information: 1,900 steps is a different fingerprint and may be sent once the gap allows.",
+      "why": "A materially different number is new information: 1,900 steps is a different fingerprint and may be sent once the gap allows (the last activity push was 6 h 10 m ago, past the 6 h category gap).",
       "now": "2026-10-21T20:10:00Z",
       "signals": {
         "rhr_delta_percent": 0,
@@ -1980,7 +1980,7 @@
           "b1:81"
         ],
         "category_last_sent": {
-          "activity": "2026-10-21T15:00:00Z"
+          "activity": "2026-10-21T14:00:00Z"
         }
       },
       "expect": {

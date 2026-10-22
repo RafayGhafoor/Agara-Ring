@@ -16,11 +16,15 @@ final class BlockStoreTests: XCTestCase {
 
     override func setUpWithError() throws {
         context = try TestSupport.makeContext()
+        // The fixtures are dated around `now`, and the code under test reads `AppClock.now`: pin it, or the 30-day and
+        // 12-month windows depend on the real date (the 30-day half passed vacuously) and on earlier tests' clocks.
+        AppClock.pin(now)
         SensorIdentity.shared.reset()
         ReadingDeletion.invalidate()
     }
 
     override func tearDown() {
+        AppClock.reset()
         SensorIdentity.shared.reset()
         ReadingDeletion.invalidate()
     }
@@ -248,6 +252,8 @@ final class BlockStoreTests: XCTestCase {
             MetricsService.metricRange(metric: .heartRate, range: range, context: context)
         }
         let beforeMonth = series(.thirtyDays), beforeYear = series(.twelveMonths)
+        // Both windows must hold data: with the real clock the 30-day one was empty and its half passed vacuously.
+        XCTAssertFalse(beforeMonth.isEmpty, "the 30-day window holds no fixture days — is the clock pinned?")
         XCTAssertFalse(beforeYear.isEmpty)
         _ = compactAll()
         XCTAssertEqual(rowCount(), 0)

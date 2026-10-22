@@ -107,4 +107,12 @@ nonisolated enum AppClock {
 
     /// Test seam: back to the system clock.
     static func reset() { shift.withLock { $0 = 0 } }
+
+    /// Make `now` read `date` (debug builds only; a no-op in Release). For tests whose fixtures are dated: code under
+    /// test reads `AppClock.now`, so a fixture built around a fixed date must pin the clock to it — otherwise the test
+    /// depends on the real date and on whatever an earlier test left pinned.
+    static func pin(_ date: Date, systemNow: Date = Date()) {
+        guard isDebugBuild else { return }
+        shift.withLock { $0 = date.timeIntervalSince(systemNow) }
+    }
 }

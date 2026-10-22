@@ -51,6 +51,27 @@ enum CoachNudgePolicy {
 
         // 2. Related nudges merge, and recovery beats activity for the rest of the day.
         let sentToday = ledger.sentToday(now, calendar: calendar)
+
+        // Two gates are stronger than any merge reason, so they are known BEFORE the merges run (they used to be
+        // evaluated after, and a merge reason that was true but less useful landed first):
+        // * quiet hours — the user's own window (`isQuietReason`);
+        // * a routine budget that was already spent when this run began: nothing routine goes out today, so "stress
+        //   outranks activity" would name a stress nudge that is itself held by the limit.
+        let quiet = settings.isQuiet(minuteOfDay: minutes(now, calendar: calendar), signals: signals ?? .init(now: now))
+        let routineLimit = min(N.policyDailyLimitMax, max(N.policyDailyLimitMin, settings.dailyLimit))
+        let routineSpentAtStart = ledger.routinePushesToday
+            + sentToday.filter { $0.delivery == .push && !isCelebration($0.rule) }.count >= routineLimit
+        let limitReason = settings.dailyLimit < N.policyDailyLimit
+            ? "user limit of \(settings.dailyLimit) reached"
+            : "routine daily limit reached"
+        let quietReason = settings.quietMode == .followSleep ? "quiet hours (follow my sleep)" : "quiet hours"
+        /// The reason a merge records: the stronger gate when one applies to this rule's push, else the merge's own.
+        func mergeReason(_ rule: NudgeRule, _ reason: String) -> String {
+            guard rule.delivery == .push, ledger.notificationsEnabled else { return reason }
+            if quiet { return quietReason }
+            if routineSpentAtStart, !rule.isCelebration { return limitReason }
+            return reason
+        }
         let recoveryFired = sentToday.contains { $0.rule == .a1 || $0.rule == .a2 }
             || eligible.contains { $0.rule == .a1 || $0.rule == .a2 }
         let goalReached = sentToday.contains { $0.rule == .b4 || $0.rule == .f1 }
@@ -67,7 +88,7 @@ enum CoachNudgePolicy {
             let winner = stressWon ? NudgeCategory.stress : NudgeCategory.recovery
             eligible.removeAll { [.b1, .b2, .b3].contains($0.rule) }
             for rule in [NudgeRule.b1, .b2, .b3] where !isQuietReason(plan.silent[rule]) {
-                plan.silent[rule] = winner == .stress ? "stress outranks activity" : "recovery fired today"
+                plan.silent[rule] = mergeReason(rule, winner == .stress ? "stress outranks activity" : "recovery fired today")
             }
         }
         let stressFired = sentToday.contains { $0.category == .stress }
@@ -75,12 +96,14 @@ enum CoachNudgePolicy {
         if stressFired, !recoveryFired {
             eligible.removeAll { [.b1, .b2, .b3].contains($0.rule) }
             for rule in [NudgeRule.b1, .b2, .b3] where !isQuietReason(plan.silent[rule]) {
-                plan.silent[rule] = "stress outranks activity"
+                plan.silent[rule] = mergeReason(rule, "stress outranks activity")
             }
         }
         if goalReached {
             eligible.removeAll { [.b1, .b2, .b3].contains($0.rule) }
-            for rule in [NudgeRule.b1, .b2, .b3] where !isQuietReason(plan.silent[rule]) { plan.silent[rule] = "goal reached" }
+            for rule in [NudgeRule.b1, .b2, .b3] where !isQuietReason(plan.silent[rule]) {
+                plan.silent[rule] = mergeReason(rule, "goal reached")
+            }
         }
 
         // 2b. A rule still inside its own cooldown (E1 weekly, E2 per metric, C1's follow-up) is silent for THAT reason,
@@ -104,7 +127,6 @@ enum CoachNudgePolicy {
         }
 
         // 3. Per-nudge gates: toggles, "Not now", once-a-day, fingerprints, the gap, quiet hours.
-        let quiet = settings.isQuiet(minuteOfDay: minutes(now, calendar: calendar), signals: signals ?? .init(now: now))
         var gated: [CoachNudge] = []
         for nudge in eligible {
             if !settings.topicEnabled(nudge.category) {
@@ -148,7 +170,7 @@ enum CoachNudgePolicy {
                 // A nudge that lands in quiet hours is dropped, not saved for the morning. The one exception is the
                 // morning recovery push: when the ring already shows the user awake at the end of quiet hours, A1 is
                 // the message the quiet window would otherwise make impossible to deliver at all.
-                plan.silent[nudge.rule] = settings.quietMode == .followSleep ? "quiet hours (follow my sleep)" : "quiet hours"
+                plan.silent[nudge.rule] = quietReason
                 continue
             }
             gated.append(nudge)
@@ -165,7 +187,6 @@ enum CoachNudgePolicy {
         var routine = ledger.routinePushesToday
             + sentToday.filter { $0.delivery == .push && !isCelebration($0.rule) }.count
         var celebrations = sentToday.filter { $0.delivery == .push && isCelebration($0.rule) }.count
-        let routineLimit = min(N.policyDailyLimitMax, max(N.policyDailyLimitMin, settings.dailyLimit))
         let celebrationLimit = settings.celebrationExtra ? 1 : 0
 
         for nudge in gated {
@@ -190,9 +211,7 @@ enum CoachNudgePolicy {
                 } else {
                     guard routine < routineLimit else {
                         // Name WHOSE limit stopped it: the user's own choice, or the shipped default.
-                        plan.silent[nudge.rule] = settings.dailyLimit < N.policyDailyLimit
-                            ? "user limit of \(settings.dailyLimit) reached"
-                            : "routine daily limit reached"
+                        plan.silent[nudge.rule] = limitReason
                         continue
                     }
                     routine += 1

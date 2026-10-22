@@ -223,25 +223,34 @@ final class CoachNudgePolicyTests: XCTestCase {
         }
 
         if let improvement = input.improvement_percent {
-            // The window average must land on the stated improvement while `days_above` days sit above the earlier
-            // average: solve for the strong days, the weak ones stay just under it.
-            let earlier = 5_000.0
+            // The named metric's recent window must average exactly the stated improvement over its earlier window,
+            // with `days_above` days above the earlier average: solve for the strong days, the weak ones sit just
+            // under it. Every other metric stays flat, so it cannot qualify. (This used to solve for steps only and
+            // hard-coded sleep at 540/400 min against 480 — about +4%, so a "13% sleep" case silently tested nothing.)
+            let metric = input.improvement_metric ?? "steps"
             let above = input.days_above_previous ?? input.days_above ?? N.e2MinDaysAbove
             let window = N.e2WindowDays
-            let weak = earlier * 0.95
-            let target = earlier * (1 + improvement / 100)
-            let strong = Int((target * Double(window) - Double(window - above) * weak) / Double(max(1, above)))
-            let metric = input.improvement_metric ?? "steps"
+            let baseline: [String: Double] = ["steps": 5_000, "sleep": 480, "active_minutes": 40]
+            func series(_ name: String) -> (strong: Double, weak: Double, earlier: Double) {
+                let earlier = baseline[name] ?? 1
+                guard name == metric else { return (earlier, earlier, earlier) }
+                let weak = earlier * 0.95
+                let target = earlier * (1 + improvement / 100)
+                let strong = (target * Double(window) - Double(window - above) * weak) / Double(max(1, above))
+                return (strong, weak, earlier)
+            }
+            let steps = series("steps"), sleep = series("sleep"), active = series("active_minutes")
             signals.days = (0..<window).map { index in
                 let strongDay = index < above
                 return CoachSignals.DayPoint(
-                    steps: metric == "steps" && strongDay ? strong : (metric == "steps" ? Int(earlier * 0.95) : 5_000),
-                    sleepMinutes: metric == "sleep" ? (strongDay ? 540 : 400) : 480,
-                    activeMinutes: metric == "active_minutes" ? (strongDay ? 60 : 25) : 40,
+                    steps: Int((strongDay ? steps.strong : steps.weak).rounded()),
+                    sleepMinutes: strongDay ? sleep.strong : sleep.weak,
+                    activeMinutes: Int((strongDay ? active.strong : active.weak).rounded()),
                     stepGoalMet: index < above
                 )
             } + (0..<window).map { _ in
-                CoachSignals.DayPoint(steps: Int(earlier), sleepMinutes: 480, activeMinutes: 40, stepGoalMet: false)
+                CoachSignals.DayPoint(steps: Int(steps.earlier), sleepMinutes: sleep.earlier,
+                                      activeMinutes: Int(active.earlier), stepGoalMet: false)
             }
         }
 
@@ -290,10 +299,14 @@ final class CoachNudgePolicyTests: XCTestCase {
         }
         for fingerprint in input.fingerprints_today ?? [] {
             guard let rule = NudgeRule(rawValue: String(fingerprint.split(separator: ":").first ?? "")) else { continue }
+            // A fingerprint is the record of a delivery. When the case says when that category last went out, that IS
+            // the delivery — dating it "an hour ago" invented a second, later push whose gap then silenced the nudge
+            // under test (policy-fingerprint-changes-with-the-number).
+            let deliveredAt = input.category_last_sent?[rule.category.rawValue].map(date) ?? now.addingTimeInterval(-3600)
             ledger.sent.append(NudgeLedger.Sent(
                 rule: rule,
                 category: rule.category,
-                at: now.addingTimeInterval(-3600),
+                at: deliveredAt,
                 fingerprint: fingerprint,
                 delivery: rule.delivery,
                 severity: .greatestFiniteMagnitude,
@@ -383,7 +396,11 @@ final class CoachNudgePolicyTests: XCTestCase {
 
             let emitted = plan.rules.map(\.rawValue)
             if emitted != testCase.expect.emit {
-                failures.append("\(testCase.id): emitted \(emitted), expected \(testCase.expect.emit)")
+                // Say WHY an expected nudge is missing: the silent reason is the diagnosis.
+                let missing = testCase.expect.emit.filter { !emitted.contains($0) }
+                    .map { "\($0)=\(NudgeRule(rawValue: $0).flatMap { plan.silent[$0] } ?? "no reason recorded")" }
+                failures.append("\(testCase.id): emitted \(emitted), expected \(testCase.expect.emit)"
+                    + (missing.isEmpty ? "" : " — silent: \(missing.joined(separator: ", "))"))
             }
             for (rule, reason) in testCase.expect.silent ?? [:] {
                 // The catalog distinguishes WHICH sink was silenced ("a1_push": the push was sunk, the card still
