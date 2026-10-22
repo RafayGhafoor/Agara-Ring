@@ -180,10 +180,10 @@ final class StoreLaunchPhase1Tests: XCTestCase {
         })
     }
 
-    /// The next TestFlight build of the 1.1 train (App Store Connect holds 1.1.0 builds 1–2 as of 2026-10-22).
+    /// The next TestFlight build of the 1.1 train (App Store Connect holds 1.1.0 builds 1–3 as of 2026-10-22).
     func testThisIsTheOneOneBuild() {
         XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String, "1.1.0")
-        XCTAssertGreaterThanOrEqual(Int(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0") ?? 0, 3)
+        XCTAssertGreaterThanOrEqual(Int(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0") ?? 0, 4)
     }
 
     func testBackgroundModesAreBluetoothLocationAndFetchOnly() {
