@@ -231,7 +231,7 @@ enum AgaraFeature: String, CaseIterable {
     case nutrition = "nutrition"
     /// Strava connect + workout upload button. Was Android STRAVA (off).
     case strava = "strava"
-    /// Agara Cloud sign-in/sync. Was Android AGARA_CLOUD (off); needs a domain + pinning + verified server rules first.
+    /// Agara Cloud sign-in/sync. Was Android AGARA_CLOUD (off). iOS on for 1.1 (owner 2026-10-22, option A) - domain api.agaraheart.app live, server rules verified (production e2e 49/49 incl. coach). RELEASE BLOCKER still open - certificate pinning is not implemented. Android stays off until its cloud client and coach are ported.
     case agaraCloud = "agara_cloud"
     /// Heart-rate zones editor (iOS only today; Android uses automatic zones).
     case hrZonesEditor = "hr_zones_editor"
@@ -284,7 +284,7 @@ enum AgaraFeature: String, CaseIterable {
         case .physiology: return false
         case .nutrition: return false
         case .strava: return false
-        case .agaraCloud: return false
+        case .agaraCloud: return true
         case .hrZonesEditor: return false
         case .activityTrackingSettings: return false
         case .chartResolutionSetting: return false

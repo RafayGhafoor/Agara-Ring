@@ -159,7 +159,9 @@ final class ConsistencyPhase456Tests: XCTestCase {
         // coach on 2026-10-20 (decision 5, docs/process/plans/coach-cloud-1.1.md): the 1.1 coach is iOS-only on purpose
         // and the platform difference is recorded in docs/apps/parity-matrix.md, with per-platform flag values in
         // docs/config/features.yaml (value: off, ios: on). Every OTHER parity flag must still ship off.
-        let platformSpecific: Set<AgaraFeature> = [.coach, .coachHistory]
+        // agara_cloud joined on 2026-10-22 (owner, option A: the 1.1 build carries the cloud account and coach; production
+        // backend deployed and verified, e2e 49/49). Still a release blocker: certificate pinning (see features.yaml).
+        let platformSpecific: Set<AgaraFeature> = [.coach, .coachHistory, .agaraCloud]
         XCTAssertTrue(platformSpecific.isSubset(of: Set(AgaraFeatureStore.parityFlags)),
                       "the coach flags are parity switches too")
         // coach_cloud is the new 1.1 switch (iOS on, Android off); it is deliberately not in parityFlags, whose meaning
