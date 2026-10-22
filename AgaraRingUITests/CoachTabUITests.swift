@@ -233,6 +233,32 @@ final class CoachTabUITests: AgaraUITestCase {
 
     // MARK: - 5. Screenshots (light and dark)
 
+    /// Jimmy's 1.1.0 (3) (2026-10-22): with the ring still "Connecting…", the Coach tab's header crushed the title column
+    /// to "● (" over a lone "C". Same state here — the longest status line, a ring that never connects — on the narrowest
+    /// simulator: the title and the status line must keep readable widths.
+    func testHeaderKeepsTheCoachTitleWhileTheRingConnects() {
+        launchCoach(extra: ["-coachOn", "YES", "-coachProvider", "agaraCloud", "-coachGateOpen", "YES",
+                            "-coachQuotaRemaining", "24", "-virtualRing", "9799"])
+        openTab("Coach")
+        let title = waitFor(app.staticTexts["Coach"].firstMatch, timeout: 20, "the Coach title is missing")
+        let status = waitFor(element("coach.quota"), timeout: 20, "the status line is missing")
+        attachScreenshot("coach-header-connecting")
+        XCTAssertGreaterThanOrEqual(title.frame.width, 50, "the title was squeezed to \(title.frame.width) pt")
+        XCTAssertGreaterThanOrEqual(status.frame.width, 90, "the status line was squeezed to \(status.frame.width) pt")
+        XCTAssertLessThanOrEqual(title.frame.maxX, app.buttons["coach.history"].frame.minX + 1, "the title runs under the buttons")
+    }
+
+    /// Owner 2026-10-22: if an update skipped the cloud coach consent, the header line itself must lead to it.
+    func testTheHeaderLineOpensTheSkippedConsent() {
+        launchCoach(extra: ["-coachOn", "YES", "-coachProvider", "agaraCloud", "-coachState", "consent"])
+        openTab("Coach")
+        let line = waitFor(element("coach.consentLine"), timeout: 20, "the 'tap to agree' line is missing")
+        XCTAssertTrue(line.label.contains("tap to agree"), "line reads: \(line.label)")
+        attachScreenshot("coach-header-consent-line")
+        line.tap()
+        waitFor(element("coach.consent.intro"), timeout: 10, "tapping the line did not open the consent sheet")
+    }
+
     func testCoachScreensLight() { walkScreens(theme: "light") }
     func testCoachScreensDark() { walkScreens(theme: "dark") }
 

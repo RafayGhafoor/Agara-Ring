@@ -19,6 +19,7 @@ struct CoachTabView: View {
     @State private var settingsStore = CoachSettingsStore.shared
     @State private var quotaStore = CoachQuotaStore.shared
     @State private var showConsent = false
+    @State private var nav = CoachNavigation.shared
 
     var body: some View {
         VStack(spacing: 0) {
@@ -39,6 +40,8 @@ struct CoachTabView: View {
         }
         // The page colour behind everything the tab draws, the "For you" nudge included (it sat on the system's white).
         .background(AgaraColors.background)
+        // The header's "tap to agree" line (CoachHeaderTitle) asks for the same sheet as the card's button.
+        .onChange(of: nav.consentRequests) { _, _ in showConsent = true }
         .sheet(isPresented: $showConsent) {
             CoachConsentSheet()
                 // The sheet's agree button records the consent and closes the sheet; the body then re-resolves to
@@ -94,6 +97,7 @@ struct CoachTabView: View {
     /// and it is the same switch as Settings › AI Coach › Provider.
     private func useOnDeviceCoach() {
         settingsStore.settings.providerMode = .appleOnDevice
+        settingsStore.settings.providerChosen = true
         if !settingsStore.settings.coachMasterEnabled { settingsStore.settings.coachMasterEnabled = true }
     }
 }
@@ -115,7 +119,23 @@ struct CoachHeaderTitle: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
-            if CoachTabStateInput.currentState() == .ready {
+            if CoachTabStateInput.currentState() == .consentRequired {
+                // The consent was skipped (an update, a dismissed sheet): the line itself is the way to give it.
+                Button { nav.requestConsent() } label: {
+                    HStack(spacing: 5) {
+                        Circle().fill(AgaraColors.accent).frame(width: 6, height: 6)
+                        Text(CoachCopy.headerStatusConsent)
+                            .font(AgaraFont.footnote.weight(.semibold))
+                            .foregroundStyle(AgaraColors.accent)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("coach.consentLine")
+                .accessibilityHint(CoachCopy.headerConsentHint)
+            } else if CoachTabStateInput.currentState() == .ready {
                 Button { nav.requestUsage() } label: {
                     HStack(spacing: 5) {
                         Circle()
@@ -138,8 +158,12 @@ struct CoachHeaderTitle: View {
                 .font(AgaraFont.title2.weight(.semibold))
                 .foregroundStyle(AgaraColors.textPrimary)
                 .lineLimit(1)
+                .fixedSize()
                 .accessibilityAddTraits(.isHeader)
         }
+        // The row is full on this tab (history, new chat, bell, ring, gear): the title column wins the width and the
+        // status line truncates — Jimmy's 1.1.0 (3) showed "● (" over a lone "C" (2026-10-22).
+        .layoutPriority(1)
     }
 
     /// The effective provider, not the stored one: a stored cloud choice that is not ready yet answers on the phone,

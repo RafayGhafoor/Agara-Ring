@@ -32,7 +32,10 @@ enum CoachGate {
         Account(
             signedIn: AgaraCloud.shared.isSignedIn,
             emailVerified: AgaraCloud.shared.phase == .ready,
-            consented: AgaraCloud.shared.hasConsent)
+            // BOTH consents: the Agara Cloud (sync) consent and the coach's own AI disclosure (5.1.2(i): health context
+            // goes to a third-party AI). Until 2026-10-22 only the sync consent was checked, so a synced account could
+            // reach the cloud coach without ever seeing the AI disclosure; the server does not check it either.
+            consented: AgaraCloud.shared.hasConsent && CoachConsentStore.shared.hasConsent)
     }
 
     /// The cloud coach may run.

@@ -97,6 +97,7 @@ struct CoachSettingsSection: View {
     private func withdrawConsent() {
         consent.withdraw()
         store.settings.providerMode = .appleOnDevice
+        store.settings.providerChosen = true
         CoachQuotaStore.shared.reset()
     }
 
@@ -566,6 +567,7 @@ struct CoachSettingsSection: View {
             get: { store.settings.providerMode },
             set: { newProvider in
                 store.settings.providerMode = newProvider
+                store.settings.providerChosen = true
                 // Reset model to the default for the selected provider.
                 switch newProvider {
                 case .userGeminiKey:

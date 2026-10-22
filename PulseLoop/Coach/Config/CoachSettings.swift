@@ -208,6 +208,11 @@ struct CoachSettings: Codable, Equatable {
     /// provider and plug in their own key. (Only applies to fresh installs / unset settings; a user's
     /// saved choice is preserved via the tolerant decode below.)
     var providerMode: CoachProviderMode = CoachProviderMode.defaultForThisBuild
+    /// The user picked `providerMode` themselves (Settings › AI Coach › Provider, withdrawing the cloud consent, or
+    /// "Use the on-device coach"). False for a value that is only a default — including 1.0's stored
+    /// `appleOnDevice`, which `migratedProvider` lifts to this build's default (2026-10-22: every tester updating from
+    /// 1.0, Jimmy included, stayed on the on-device coach and never reached the cloud).
+    var providerChosen: Bool = false
     /// Fallback model string used when the user switches to a keyed provider; user-configurable
     /// (never hard-coded in the client). Unused while on the Apple on-device model.
     var model: String = CoachModel.gpt54.rawValue
@@ -288,6 +293,16 @@ struct CoachSettings: Codable, Equatable {
 
     static let `default` = CoachSettings()
 
+    /// A stored provider that the user never chose follows this build's default. 1.0 saved `appleOnDevice` as a plain
+    /// default; read as-is, it pinned updated users to the on-device coach for good. A chosen value always wins, and the
+    /// cloud coach still falls back to on-device by itself while the account is not ready (`effectiveMode`).
+    static func migratedProvider(stored: CoachProviderMode?, chosen: Bool,
+                                 buildDefault: CoachProviderMode) -> CoachProviderMode {
+        guard let stored else { return buildDefault }
+        if !chosen && stored == .appleOnDevice { return buildDefault }
+        return stored
+    }
+
     init() {}
 
     /// Tolerant decode: missing keys (older stored settings, new fields) fall back
@@ -296,7 +311,10 @@ struct CoachSettings: Codable, Equatable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let d = CoachSettings.default
         coachMasterEnabled = try c.decodeIfPresent(Bool.self, forKey: .coachMasterEnabled) ?? d.coachMasterEnabled
-        providerMode = try c.decodeIfPresent(CoachProviderMode.self, forKey: .providerMode) ?? d.providerMode
+        providerChosen = try c.decodeIfPresent(Bool.self, forKey: .providerChosen) ?? false
+        providerMode = Self.migratedProvider(
+            stored: try c.decodeIfPresent(CoachProviderMode.self, forKey: .providerMode),
+            chosen: providerChosen, buildDefault: d.providerMode)
         model = try c.decodeIfPresent(String.self, forKey: .model) ?? d.model
         reasoningEffort = try c.decodeIfPresent(String.self, forKey: .reasoningEffort)
         enableWebSearch = try c.decodeIfPresent(Bool.self, forKey: .enableWebSearch) ?? d.enableWebSearch
@@ -356,6 +374,7 @@ final class CoachSettingsStore {
         // scripted answer needs no model and no network.
         if let raw = DebugLaunch.string("coachProvider"), let mode = CoachProviderMode(rawValue: raw) {
             settings.providerMode = mode
+            settings.providerChosen = true
         }
         #endif
     }

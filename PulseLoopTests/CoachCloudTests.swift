@@ -1074,3 +1074,75 @@ final class CloudContextIsTheTrimmedPacketTests: XCTestCase {
         XCTAssertEqual(CoachCloudRequest.packet(in: message)?.isEmpty, true)
     }
 }
+
+// MARK: - Testers updating from 1.0 stayed on the on-device coach (found 2026-10-22, Jimmy's 1.1.0 (3))
+
+final class CoachProviderMigrationTests: XCTestCase {
+    func testA1_0DefaultFollowsTheBuildButAChoiceIsKept() {
+        let m = CoachSettings.migratedProvider
+        XCTAssertEqual(m(.appleOnDevice, false, .agaraCloud), .agaraCloud, "1.0 stored on-device as a default, not a choice")
+        XCTAssertEqual(m(.appleOnDevice, true, .agaraCloud), .appleOnDevice, "a 1.1 user who picked 'On this phone' keeps it")
+        XCTAssertEqual(m(.agaraCloud, false, .agaraCloud), .agaraCloud)
+        XCTAssertEqual(m(nil, false, .agaraCloud), .agaraCloud, "no stored value → the build's default")
+        XCTAssertEqual(m(.offlineStub, false, .agaraCloud), .offlineStub, "only the old default is lifted")
+        XCTAssertEqual(m(.appleOnDevice, false, .appleOnDevice), .appleOnDevice, "debug builds default to on-device")
+    }
+
+    func testDecodingA1_0SettingsBlobMarksNothingChosen() throws {
+        // The shape 1.0 wrote: no `providerChosen` key.
+        let old = try JSONDecoder().decode(CoachSettings.self, from: Data(#"{"providerMode":"appleOnDevice","coachMasterEnabled":true}"#.utf8))
+        XCTAssertFalse(old.providerChosen)
+        XCTAssertEqual(old.providerMode, CoachProviderMode.defaultForThisBuild)
+        let chosen = try JSONDecoder().decode(CoachSettings.self, from: Data(#"{"providerMode":"appleOnDevice","providerChosen":true}"#.utf8))
+        XCTAssertEqual(chosen.providerMode, .appleOnDevice)
+        // And the flag survives a save/load round trip.
+        let again = try JSONDecoder().decode(CoachSettings.self, from: try JSONEncoder().encode(chosen))
+        XCTAssertTrue(again.providerChosen)
+        XCTAssertEqual(again.providerMode, .appleOnDevice)
+    }
+}
+
+/// Jimmy's on-device answer called 4,078 steps "imperial miles": the units rule read as "attach the unit to every
+/// number". Both prompts now scope units to measurements and pin steps as a count.
+final class CoachPromptUnitsTests: XCTestCase {
+    func testBothPromptsScopeUnitsAndPinStepsAsACount() {
+        for prompt in [CoachPromptBuilder.systemPromptCompact, CoachPromptBuilder.systemPrompt] {
+            XCTAssertTrue(prompt.contains("steps") && prompt.lowercased().contains("never"), prompt.prefix(80).description)
+            XCTAssertTrue(prompt.contains("ONLY"), "units are scoped to distance/weight/height/temperature")
+            XCTAssertTrue(prompt.contains("city only when"), "the city is not small talk")
+        }
+    }
+}
+
+/// The consent step was unreachable in Release (2026-10-22): the tab only counted the debug `backendProxy` as "cloud in
+/// use", and the cloud gate checked only the sync consent — so a synced account could reach the cloud coach without
+/// the AI disclosure, and the consent card never showed.
+final class CoachConsentGateTests: XCTestCase {
+    func testTheCloudIsInUseWhenSelectedAndAnAccountExists() {
+        let f = CoachTabStateInput.cloudInUse
+        XCTAssertTrue(f(true, .agaraCloud, true), "the Release default with an account — the case that was missed")
+        XCTAssertTrue(f(true, .backendProxy, true))
+        XCTAssertFalse(f(true, .agaraCloud, false), "no account → the on-device coach answers; the coach is not behind sign-in")
+        XCTAssertFalse(f(true, .appleOnDevice, true), "an on-device choice is respected")
+        XCTAssertFalse(f(false, .agaraCloud, true), "coach_cloud off")
+    }
+
+    func testASignedInAccountWithoutTheAIDisclosureGetsTheConsentCard() {
+        let input = CoachTabStateInput(coachFlagOn: true, masterEnabled: true,
+                                       cloudInUse: CoachTabStateInput.cloudInUse(flagOn: true, provider: .agaraCloud, signedIn: true),
+                                       account: .verified, consentGiven: false, busy: false,
+                                       remainingTurnsToday: 24, dayResetsAt: nil)
+        XCTAssertEqual(CoachTabState.resolve(input), .consentRequired)
+        var agreed = input
+        agreed.consentGiven = true
+        XCTAssertEqual(CoachTabState.resolve(agreed), .ready)
+    }
+
+    func testTheCloudGateNeedsAnAccountThatAgreed() {
+        let ready = CoachGate.Account(signedIn: true, emailVerified: true, consented: true)
+        XCTAssertTrue(CoachGate.cloudReady(flagOn: true, userOn: true, account: ready))
+        var notAgreed = ready
+        notAgreed.consented = false     // `CoachGate.account` sets this only when BOTH consents are given
+        XCTAssertFalse(CoachGate.cloudReady(flagOn: true, userOn: true, account: notAgreed))
+    }
+}

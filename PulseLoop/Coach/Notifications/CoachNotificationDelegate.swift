@@ -23,10 +23,13 @@ final class CoachNavigation {
     private(set) var newChatRequests = 0
     private(set) var historyRequests = 0
     private(set) var usageRequests = 0
+    private(set) var consentRequests = 0
 
     func requestNewChat() { newChatRequests += 1 }
     func requestHistory() { historyRequests += 1 }
     func requestUsage() { usageRequests += 1 }
+    /// The header's "tap to agree" line: the tab presents the coach consent sheet.
+    func requestConsent() { consentRequests += 1 }
 
     /// Open the coach on a specific conversation (deep link).
     func open(_ conversationId: UUID) {

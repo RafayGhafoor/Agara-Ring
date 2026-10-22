@@ -114,7 +114,12 @@ extension CoachTabStateInput {
         return CoachTabStateInput(
             coachFlagOn: AgaraFeatureStore.isOn(.coach),
             masterEnabled: settings.coachMasterEnabled,
-            cloudInUse: AgaraFeatureStore.isOn(.coachCloud) && settings.providerMode == .backendProxy,
+            // The cloud is selected (`agaraCloud` — the Release default — or the debug `backendProxy`) AND an account
+            // exists: then the account and the AI disclosure gate the tab, so a missing consent shows the consent card
+            // instead of being skipped. No account → the on-device coach answers (the coach is not behind sign-in).
+            // Until 2026-10-22 this read `== .backendProxy` only, so no Release user ever saw the consent step.
+            cloudInUse: cloudInUse(flagOn: AgaraFeatureStore.isOn(.coachCloud), provider: settings.providerMode,
+                                   signedIn: cloud.isSignedIn),
             account: {
                 switch cloud.phase {
                 case .ready: return .verified
@@ -127,6 +132,11 @@ extension CoachTabStateInput {
             remainingTurnsToday: CoachQuotaStore.shared.remainingTurnsToday,
             dayResetsAt: CoachQuotaStore.shared.dayResetsAt
         )
+    }
+
+    /// Pure, so every combination is tested (`CoachConsentGateTests`).
+    nonisolated static func cloudInUse(flagOn: Bool, provider: CoachProviderMode, signedIn: Bool) -> Bool {
+        flagOn && [.agaraCloud, .backendProxy].contains(provider) && signedIn
     }
 
     /// The state the app should show right now (debug builds honour `-coachState`).

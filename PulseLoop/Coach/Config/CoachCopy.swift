@@ -202,6 +202,10 @@ enum CoachCopy {
     /// **Android: match**
     static let headerStatusCloud = "Agara Cloud"
     static let headerStatusOnDevice = "On this phone"
+    /// Signed in with the cloud selected, but the AI disclosure was never agreed (e.g. skipped by an update): the header
+    /// line asks for it, and tapping it opens the consent sheet.
+    static let headerStatusConsent = "Agara Cloud · tap to agree"
+    static let headerConsentHint = "Opens the Agara Cloud coach consent"
 
     /// The usage sheet's model when the conversation has no recorded turn yet and the cloud answers (it fell back to the
     /// bring-your-own-key model field and said "gpt-5.4"). Same provider as `consentProviderBody`. **Android: match**
