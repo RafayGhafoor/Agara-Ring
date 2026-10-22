@@ -60,7 +60,8 @@ enum CoachSummaryContextBuilder {
         // naps count toward the total.
         guard let day = SleepDay(sessions: SleepInsights.validSessions(range.sessions)) else { return nil }
         let night = day.main
-        let score = SleepScore.calculate(night)
+        // The day's score (night + naps), the number the Today tile and the Sleep tab show — the coach must quote it.
+        let score = day.score
         let activitySteps = MetricsRepository.latestActivity(context: context)?.steps
         let memories = CoachContextBuilder.build(context: context, now: now).memories
 

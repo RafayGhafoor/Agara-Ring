@@ -109,6 +109,9 @@ struct VitalCard<Content: View>: View {
                     .foregroundStyle(AgaraColors.textMuted)
                 }
             }
+            if let range = model.rangeText {
+                Text(range).font(AgaraFont.caption.weight(.regular)).monospacedDigit().foregroundStyle(AgaraColors.textMuted)
+            }
             if let subtitle = model.subtitleText {
                 Text(subtitle).font(AgaraFont.caption.weight(.regular)).foregroundStyle(AgaraColors.textMuted)
             }

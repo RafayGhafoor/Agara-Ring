@@ -287,3 +287,65 @@ final class NudgeLiveDataTests: XCTestCase {
         XCTAssertEqual(b3?.silentReason, "no hourly step data today")
     }
 }
+
+/// The day's sleep score (owner 2026-10-22, option A): the night and the naps scored together.
+final class SleepDayScoreTests: XCTestCase {
+    private func summary(start: Date, deep: Int, light: Int, rem: Int = 0, awake: Int = 0) -> SleepSummary {
+        let total = deep + light + rem + awake
+        let session = SleepSession(date: Calendar.current.startOfDay(for: start), startAt: start,
+                                   endAt: start.addingTimeInterval(TimeInterval(total * 60)), totalMinutes: total, score: nil)
+        return SleepSummary(session: session, lightMinutes: light, deepMinutes: deep, awakeMinutes: awake,
+                            blocks: [], remMinutesWithoutBlocks: rem)
+    }
+
+    private let night = Date(timeIntervalSince1970: 1_792_000_000)
+
+    func testOneSessionScoresExactlyAsBefore() {
+        let main = summary(start: night, deep: 70, light: 230, rem: 60, awake: 25)
+        XCTAssertEqual(SleepScore.calculate(day: SleepDay(main: main)).score, SleepScore.calculate(main).score)
+    }
+
+    func testANapAfterAShortNightRaisesTheDayScore() {
+        let shortNight = summary(start: night, deep: 50, light: 210, rem: 40, awake: 20)   // 5 h asleep
+        let nap = summary(start: night.addingTimeInterval(12 * 3600), deep: 15, light: 75)  // 1 h 30 m nap
+        let alone = SleepScore.calculate(shortNight).score
+        let day = SleepScore.calculate(day: SleepDay(main: shortNight, naps: [nap])).score
+        XCTAssertGreaterThan(day, alone, "a 90-minute nap after a 5-hour night must count toward the day")
+    }
+
+    func testTheDayScoreSumsEveryMinuteNotTheScores() {
+        let main = summary(start: night, deep: 80, light: 240, rem: 70, awake: 20)
+        let nap = summary(start: night.addingTimeInterval(13 * 3600), deep: 10, light: 30)
+        let inputs = SleepScore.inputs(main) + SleepScore.inputs(nap)
+        XCTAssertEqual(inputs.asleep, 430)   // night 80 + 240 + 70 asleep, plus a 40-minute nap
+        XCTAssertEqual(SleepScore.calculate(day: SleepDay(main: main, naps: [nap])).score, SleepScore.score(inputs).score)
+    }
+
+    func testTheBreakdownSaysTheNapsArePartOfTheTotal() {
+        XCTAssertEqual(SleepDayRule.breakdownCaption(mainMinutes: 405, napCount: 2, napMinutes: 97), "Night 6h 45m · 2 naps 1h 37m")
+        XCTAssertEqual(SleepDayRule.breakdownCaption(mainMinutes: 420, napCount: 1, napMinutes: 40), "Night 7h 0m · nap 40m")
+        XCTAssertNil(SleepDayRule.breakdownCaption(mainMinutes: 420, napCount: 0, napMinutes: 0))
+    }
+}
+
+/// Tiles lead with the LATEST reading; the day's range/average and the reading's age are context (owner 2026-10-22).
+final class LatestValueTileTests: XCTestCase {
+    private func samples(_ values: [Double]) -> [MetricSample] {
+        values.enumerated().map { MetricSample(timestamp: Date(timeIntervalSince1970: 1_792_000_000 + Double($0.offset) * 600), value: $0.element) }
+    }
+
+    func testTheRangeIsContextNotTheNumber() {
+        XCTAssertEqual(VitalsCardFactory.dayRange(samples([62, 88, 152, 72])), "62–152 today")
+        XCTAssertNil(VitalsCardFactory.dayRange(samples([72])), "a range of one reading is not context")
+    }
+
+    func testTheAverageIsContextNotTheNumber() {
+        XCTAssertEqual(VitalsCardFactory.dayAverage(samples([96, 98, 97]), unit: "%"), "avg 97% today")
+        XCTAssertNil(VitalsCardFactory.dayAverage(samples([96]), unit: "%"))
+    }
+
+    func testTheAgeDropsTheWordUpdated() {
+        XCTAssertEqual(TodayTileContext.age("Updated 4m ago"), "4m ago")
+        XCTAssertEqual(TodayTileContext.age("Updated just now"), "just now")
+    }
+}

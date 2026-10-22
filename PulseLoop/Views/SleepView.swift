@@ -135,19 +135,58 @@ struct SleepView: View {
         } else {
             // The primary (longest) session drives the day-level coach fallback.
             let primary = sessions.max { $0.session.totalMinutes < $1.session.totalMinutes } ?? sessions[0]
-            let primaryScore = SleepScore.calculate(primary)
+            // The day (night + naps) is what the Today tile scores; the coach fallback speaks about the same number.
+            let wholeDay = SleepDay(sessions: sessions)
+            let primaryScore = wholeDay?.score ?? SleepScore.calculate(primary)
             let dayFallback = SleepInsights.dayCoach(primary, score: primaryScore.score, awakePct: primaryScore.awakePct, deepPct: primaryScore.deepPct, activitySteps: activitySteps)
 
             if sessions.count == 1 {
                 // Single session: render exactly as before, no carousel chrome.
                 sessionPage(sessions[0])
             } else {
+                // Several sessions: the whole day first (the number the Today tile shows), then each session's page.
+                if let wholeDay { dayTotalRow(wholeDay) }
                 sleepCarousel(sessions: sessions)
             }
             // The LLM day summary describes last night only; on a past day fall back to the
             // scripted coach (deterministically computed from that day's own primary session).
             summaryCard(isToday ? daySummary : nil, fallback: dayFallback)
         }
+    }
+
+    /// The whole day in one line: total asleep (night + naps), its breakdown, and the day's score — compact, because
+    /// each session page below carries its own hero.
+    private func dayTotalRow(_ day: SleepDay) -> some View {
+        let score = day.score
+        return HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Whole day")
+                    .font(AgaraFont.caption.weight(.semibold))
+                    .foregroundStyle(AgaraColors.textMuted)
+                Text(SleepFormat.duration(day.totalMinutes))
+                    .font(AgaraFont.title2.weight(.semibold)).monospacedDigit()
+                    .foregroundStyle(AgaraColors.textPrimary)
+                if let breakdown = day.breakdownCaption {
+                    Text(breakdown)
+                        .font(AgaraFont.caption).monospacedDigit()
+                        .foregroundStyle(AgaraColors.textSecondary)
+                }
+            }
+            Spacer(minLength: 8)
+            VStack(alignment: .trailing, spacing: 0) {
+                Text("\(score.score)")
+                    .font(AgaraFont.title2.weight(.semibold)).monospacedDigit()
+                    .foregroundStyle(AgaraColors.textPrimary)
+                Text("SCORE")
+                    .font(AgaraFont.caption2.weight(.semibold))
+                    .foregroundStyle(AgaraColors.textMuted)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(AgaraColors.card))
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("sleep.dayTotal")
     }
 
     /// One session's stack: Hero + hypnogram VisualizationCard + stage cards.

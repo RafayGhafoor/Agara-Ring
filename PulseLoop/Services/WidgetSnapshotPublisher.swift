@@ -240,18 +240,18 @@ final class WidgetSnapshotPublisher {
     }
 
     /// Replicates `SleepTileView`'s derivations (stage distribution, score, duration formatting).
-    /// The day's total (`SleepDayRule`) and nap line; stages and score from the main sleep.
+    /// The day's total (`SleepDayRule`) and its night/nap breakdown, the day's score; stages from the main sleep.
     private func sleepPayload(_ day: SleepDay?) -> WidgetSleepPayload? {
         guard let day else { return nil }
         let sleep = day.main
         let stages = SleepStageDistribution(sleep)
         return WidgetSleepPayload(
             durationText: SleepFormat.duration(day.totalMinutes),
-            score: SleepScore.calculate(sleep).score,
+            score: day.score.score,   // the day's score, as the Today tile shows it
             segments: stages.segments.map {
                 WidgetSleepPayload.Segment(minutes: $0.minutes, colorHex: Self.hexString($0.color), label: $0.label)
             },
-            napText: day.napCaption
+            napText: day.breakdownCaption
         )
     }
 

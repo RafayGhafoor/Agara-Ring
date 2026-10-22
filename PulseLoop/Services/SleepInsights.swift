@@ -70,7 +70,32 @@ enum SleepScore {
     /// stage shares are judged against it. `span` (first block to last, the stored `totalMinutes`) is time
     /// in bed: the awake share and the "does this ring label awake at all" test use it. REM folds into deep
     /// (the model has no REM band; both are restorative). Without blocks the summary's minutes are used.
-    static func calculate(_ sleep: SleepSummary) -> SleepScoreResult {
+    /// What the score is made of, in minutes — summable across sessions, which is how the DAY score works.
+    struct Inputs: Equatable {
+        var deep: Double = 0          // deep + REM
+        var light: Double = 0
+        var awake: Double = 0
+        var asleep: Double = 0        // every stage except awake
+        var span: Double = 0          // time in bed
+        var hasAwakeSignal = false
+
+        static func + (lhs: Inputs, rhs: Inputs) -> Inputs {
+            Inputs(deep: lhs.deep + rhs.deep, light: lhs.light + rhs.light, awake: lhs.awake + rhs.awake,
+                   asleep: lhs.asleep + rhs.asleep, span: lhs.span + rhs.span,
+                   hasAwakeSignal: lhs.hasAwakeSignal || rhs.hasAwakeSignal)
+        }
+    }
+
+    static func calculate(_ sleep: SleepSummary) -> SleepScoreResult { score(inputs(sleep)) }
+
+    /// The day's score (owner 2026-10-22, option A — "a combined score, like Samsung Health"): every session of the
+    /// waking day — the main sleep AND the naps — scored together. Naps add to the duration band and count toward the
+    /// stage and awake shares like any other minute of sleep. One session → exactly `calculate(main)`.
+    static func calculate(day: SleepDay) -> SleepScoreResult {
+        score(([day.main] + day.naps).map(inputs).reduce(Inputs(), +))
+    }
+
+    static func inputs(_ sleep: SleepSummary) -> Inputs {
         let deep: Double
         let light: Double
         let awake: Double
@@ -98,6 +123,14 @@ enum SleepScore {
             sleep.blocks.contains { $0.stage == .awake } ||
             awake > 0 ||
             (span > 0 && coveredStageMin >= span * 0.95)
+        return Inputs(deep: deep, light: light, awake: awake, asleep: total, span: span, hasAwakeSignal: hasAwakeSignal)
+    }
+
+    static func score(_ input: Inputs) -> SleepScoreResult {
+        let deep = input.deep, light = input.light, awake = input.awake
+        let total = max(0, input.asleep)
+        let span = input.span
+        let hasAwakeSignal = input.hasAwakeSignal
 
         let totalHours = total / 60
         let deepPct = total > 0 ? (deep / total) * 100 : 0

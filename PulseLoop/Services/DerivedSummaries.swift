@@ -197,6 +197,19 @@ enum SleepDayRule {
         return (main, naps)
     }
 
+    /// "Night 6h 45m · 2 naps 1h 37m" — the day's total broken down (same strings as Android's
+    /// `SleepDayRule.breakdownCaption`). It replaced "+ 2 naps 1h 37m" under the total, which read as time ON TOP of
+    /// the number above it, when the number already included the naps (owner 2026-10-22).
+    static func breakdownCaption(mainMinutes: Int, napCount: Int, napMinutes: Int) -> String? {
+        guard napCount > 0, napMinutes > 0 else { return nil }
+        let nap = napCount == 1 ? "nap \(duration(napMinutes))" : "\(napCount) naps \(duration(napMinutes))"
+        return "Night \(duration(max(0, mainMinutes))) · \(nap)"
+    }
+
+    private static func duration(_ minutes: Int) -> String {
+        minutes < 60 ? "\(minutes)m" : "\(minutes / 60)h \(minutes % 60)m"
+    }
+
     /// "+ nap 40 m", "+ 2 naps 1h 10m" — the Today tile's nap line (same strings as Android's `SleepDay.napCaption`).
     static func napCaption(count: Int, minutes: Int) -> String? {
         guard count > 0, minutes > 0 else { return nil }
@@ -228,6 +241,12 @@ struct SleepDay {
     /// The day's asleep total: the main sleep plus every nap.
     var totalMinutes: Int { max(0, main.session.totalMinutes) + napMinutes }
     var napCaption: String? { SleepDayRule.napCaption(count: naps.count, minutes: napMinutes) }
+    /// "Night 6h 45m · 2 naps 1h 37m" under the day's total; nil without naps.
+    var breakdownCaption: String? {
+        SleepDayRule.breakdownCaption(mainMinutes: main.session.totalMinutes, napCount: naps.count, napMinutes: napMinutes)
+    }
+    /// The day's sleep score: the night and the naps scored together (`SleepScore.calculate(day:)`).
+    var score: SleepScoreResult { SleepScore.calculate(day: self) }
 }
 
 struct SleepRangeSummary {

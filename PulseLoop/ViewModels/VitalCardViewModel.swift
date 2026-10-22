@@ -97,6 +97,9 @@ struct VitalCardViewModel: Identifiable, Equatable {
     let lastUpdatedText: String?
     /// True when there's nothing to chart yet (drives the empty-state card while preserving height).
     let isEmpty: Bool
+    /// The day's context for a value that shows the LATEST reading: "62–152 today", "avg 97% today". Shown on the
+    /// Today tile beside how long ago the reading was taken (owner 2026-10-22: show the latest value).
+    var rangeText: String? = nil
 
     var accentColor: Color { metric.accentColor }
 }

@@ -114,7 +114,8 @@ enum VitalsCardFactory {
         let quality = SourceQualityResolver.quality(for: .heartRate, latest: samples.last?.timestamp, now: inputs.now, calibration: cal)
         let interp = latest.map { VitalsThresholdEngine.interpret(value: $0, metric: .heartRate, profile: profile) }
 
-        let valueText = TodayInsights.hrRangeLabel(samples, latest)
+        // The LATEST reading is the number (owner 2026-10-22); the day's range moves to the context line.
+        let valueText = latest.map { "\(Int($0.rounded()))" } ?? "—"
         let resting = inputs.summary?.restingHeartRateEstimate.map { "Resting \(Int($0))" } ?? "Resting calibrating"
         let peak = inputs.summary?.peakHeartRateToday.map { "Peak \(Int($0))" } ?? "Peak —"
         let chart = ChartSampleBuilder.from(samples, quality: quality)
@@ -122,7 +123,7 @@ enum VitalsCardFactory {
         let domain = ChartAxes.fixedAxis(.heartRate, data: samples.map(\.value).filter { $0 > 0 })!.domain
         return VitalCardViewModel(
             metric: .heartRate, title: MetricKind.heartRate.title,
-            valueText: valueText, unitText: latest != nil ? "bpm range" : nil,
+            valueText: valueText, unitText: latest != nil ? "bpm" : nil,
             statusText: interp?.displayLabel ?? "No reading", statusColor: interp?.statusColor ?? AgaraColors.textMuted,
             subtitleText: "\(resting) · \(peak)",
             samples: halfHourly(samples, quality: quality), zones: VitalsThresholdEngine.zones(for: .heartRate, profile: profile),
@@ -131,8 +132,23 @@ enum VitalsCardFactory {
             trend: TrendSummary.compute(samples: chart, metric: .heartRate, unitLabel: "bpm"),
             sourceQuality: quality, isEstimated: false, confidenceLabel: nil,
             lastUpdatedText: lastUpdated(samples.last?.timestamp, now: inputs.now),
-            isEmpty: samples.count < 2
+            isEmpty: samples.count < 2,
+            rangeText: dayRange(samples)
         )
+    }
+
+    /// "62–152 today" (nil with fewer than two distinct readings — a range of one is not context).
+    static func dayRange(_ samples: [MetricSample]) -> String? {
+        let values = samples.map(\.value).filter { $0 > 0 }
+        guard let lo = values.min(), let hi = values.max(), Int(lo.rounded()) != Int(hi.rounded()) else { return nil }
+        return "\(Int(lo.rounded()))–\(Int(hi.rounded())) today"
+    }
+
+    /// "avg 97% today" (nil with fewer than two readings — the average of one is the latest).
+    static func dayAverage(_ samples: [MetricSample], unit: String) -> String? {
+        let values = samples.map(\.value).filter { $0 > 0 }
+        guard values.count >= 2 else { return nil }
+        return "avg \(Int((values.reduce(0, +) / Double(values.count)).rounded()))\(unit) today"
     }
 
     // MARK: - SpO₂
@@ -147,7 +163,7 @@ enum VitalsCardFactory {
         let chart = ChartSampleBuilder.from(samples, quality: quality)
         return VitalCardViewModel(
             metric: .spo2, title: MetricKind.spo2.title,
-            valueText: TodayInsights.averageLabel(samples, latest), unitText: latest != nil ? "% avg" : nil,
+            valueText: latest.map { "\(Int($0.rounded()))" } ?? "—", unitText: latest != nil ? "%" : nil,
             statusText: interp?.displayLabel ?? "No reading", statusColor: interp?.statusColor ?? AgaraColors.textMuted,
             subtitleText: subtitle,
             // Spot readings stay individual; logged all day (5-min history) they average per half hour.
@@ -160,7 +176,8 @@ enum VitalsCardFactory {
             trend: TrendSummary.compute(samples: chart, metric: .spo2, unitLabel: "%"),
             sourceQuality: quality, isEstimated: false, confidenceLabel: nil,
             lastUpdatedText: lastUpdated(samples.last?.timestamp, now: inputs.now),
-            isEmpty: samples.count < 2
+            isEmpty: samples.count < 2,
+            rangeText: dayAverage(samples, unit: "%")
         )
     }
 

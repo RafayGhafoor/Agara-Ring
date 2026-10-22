@@ -243,7 +243,8 @@ struct SleepTileView: View {
             if let day {
                 let sleep = day.main
                 let stages = SleepStageDistribution(sleep)
-                let score = SleepScore.calculate(sleep).score
+                // The DAY's score: the night and the naps together (owner 2026-10-22, option A).
+                let score = day.score.score
                 VStack(alignment: .leading, spacing: 10) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(SleepFormat.duration(day.totalMinutes))
@@ -253,7 +254,7 @@ struct SleepTileView: View {
                             .minimumScaleFactor(0.7)
                             .lineLimit(1)
                             .accessibilityIdentifier("today.sleep.total")
-                        if let nap = day.napCaption {
+                        if let nap = day.breakdownCaption {
                             Text(nap)
                                 .font(AgaraFont.caption)
                                 .monospacedDigit()
@@ -331,6 +332,15 @@ struct TodayChartTile: View {
                     Text(unit).font(AgaraFont.caption2).foregroundStyle(AgaraColors.textMuted)
                         .lineLimit(1)
                 }
+            }
+            // The day's context and how old the number is: "62–152 today · 4m ago". The age hides on sample data, whose
+            // timestamps are invented (as the Vitals card's "Updated …" does).
+            if let context = TodayTileContext.line(model, showAge: !SampleDataStore.shared.isActive) {
+                Text(context)
+                    .font(AgaraFont.caption2).monospacedDigit()
+                    .foregroundStyle(AgaraColors.textMuted)
+                    .lineLimit(1).minimumScaleFactor(0.85)
+                    .accessibilityIdentifier("today.tile.context.\(model.metric.rawValue)")
             }
             Spacer(minLength: 0)
             if model.isEmpty {
@@ -443,5 +453,20 @@ struct TodayBloodPressureTile: View {
                 .foregroundStyle(AgaraColors.textMuted)
         }
         .frame(maxWidth: .infinity)
+    }
+}
+
+
+/// The context line under a tile's value (pure, unit-tested).
+enum TodayTileContext {
+    static func line(_ model: VitalCardViewModel, showAge: Bool) -> String? {
+        let age = showAge ? model.lastUpdatedText.map(Self.age) : nil
+        let parts = [model.rangeText, age].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    /// "Updated 4m ago" → "4m ago" (the tile is narrow; the word adds nothing next to a time).
+    static func age(_ updated: String) -> String {
+        updated.hasPrefix("Updated ") ? String(updated.dropFirst("Updated ".count)) : updated
     }
 }
