@@ -7,6 +7,8 @@ import Foundation
 enum AgaraConfig {
     enum Cloud {
         static let v2BaseUrl: String = "https://api.agaraheart.app"
+        static let tlsPinsSha256: String = "C5+lpZ7tcVwmwQIMcRtPbsQtWLABXhQzejna0wHFr8M=,diGVwiVYbubAI3RW4hB9xU8e/CH2GnkuvVFZE8zmgzI=,sCkq5UWXjg+7mKu9lMhhYF5bGLsy7VI/UNW3tccdR7w=,hxqRlPTu1bMS/0DITB1SSu0vd4u/8l8TjPgfaAp63Gc=,mEflZT5enoR1FuXLgYYGqnVEoZvmf9c2bVBpiOjYQ0c="
+        static let tlsPinsExpire: String = "2028-06-30"
         static let firebaseApiKey: String = "AIzaSyAOXtPXDpaDFMSBhY7Ya6Ch3lrhEaYxv1c"
         static let firebaseProjectId: String = "agara-ring-app"
         static let syncIntervalMinutes: Int = 120
