@@ -5,23 +5,23 @@ import Foundation
 /// User-visible product/brand copy shared with the Android app.
 /// Regenerate with `python3 tools/gen_shared.py` (add `--check` in CI).
 enum AgaraCopy {
-    static let appName = "Agara Ring"
-    static let appNameDebug = "Agara Ring Debug"
-    static let ringDisplayName = "Agara Ring"
+    static let appName = "AGARA Heart"
+    static let appNameDebug = "AGARA Heart Debug"
+    static let ringDisplayName = "AGARA Heart"
     static let coachTitle = "Agara Coach"
     static let wordmark = "AGARA"
     static let coachGreeting = "Hi! I'm your Agara Coach. I can answer questions about your sleep, heart rate, activity, and recovery. What would you like to know?"
-    static let aboutDescription = "Agara Ring tracks your sleep, heart, activity and recovery from a ring you barely notice. Your data syncs straight from the ring to your phone and stays yours — cloud backup is optional."
-    static let aboutProductName = "Agara Ring"
+    static let aboutDescription = "AGARA Heart tracks your sleep, heart, activity and recovery from a ring you barely notice. Your data syncs straight from the ring to your phone and stays yours — cloud backup is optional."
+    static let aboutProductName = "AGARA Heart"
     static let onboardingSubtitle = "Your health, on your terms — no subscription."
-    static let onboardingSetupTitle = "Set up Agara Ring"
-    static let welcomeNotificationTitle = "Welcome to Agara Ring"
-    static let removeDataTitle = "Remove Agara Ring data?"
-    static let notificationsDisabled = "Notifications are off for Agara Ring. Turn them on in the Settings app to get check-ins."
-    static let healthPermissionDenied = "Agara Ring wasn't granted access. Turn it on for Agara Ring in the Health app."
-    static let stravaDisconnectCopy = "Agara Ring stops uploading and revokes its access to your Strava account."
+    static let onboardingSetupTitle = "Set up AGARA Heart"
+    static let welcomeNotificationTitle = "Welcome to AGARA Heart"
+    static let removeDataTitle = "Remove AGARA Heart data?"
+    static let notificationsDisabled = "Notifications are off for AGARA Heart. Turn them on in the Settings app to get check-ins."
+    static let healthPermissionDenied = "AGARA Heart wasn't granted access. Turn it on for AGARA Heart in the Health app."
+    static let stravaDisconnectCopy = "AGARA Heart stops uploading and revokes its access to your Strava account."
     static let projectUrl = "https://github.com/RafayGhafoor/Agara-Ring"
-    static let shareCardBrand = "Agara Ring"
+    static let shareCardBrand = "AGARA Heart"
     static let estimateDisclaimer = "Estimated by the ring's optical sensor · not for diagnosis"
     static let aboutTagline = "Wear it. Sleep on it. Know yourself."
     static let socialWebsiteUrl = "https://www.agaralife.com/"
@@ -84,12 +84,12 @@ enum AgaraCopy {
     static let supportUrl = "https://legal.agaraheart.app/support/"
     static let deleteDataUrl = "https://legal.agaraheart.app/delete-data/"
     static let wellnessDisclaimerTitle = "Wellness, not medicine"
-    static let wellnessDisclaimerBody = "Agara Ring is a wellness device, not a medical device. It does not diagnose, treat, cure or prevent any medical condition. Readings are estimates from an optical sensor on your finger and can be affected by fit, movement and skin. Talk to a doctor about your health, and call emergency services if you think you need urgent care."
+    static let wellnessDisclaimerBody = "AGARA Heart is a wellness device, not a medical device. It does not diagnose, treat, cure or prevent any medical condition. Readings are estimates from an optical sensor on your finger and can be affected by fit, movement and skin. Talk to a doctor about your health, and call emergency services if you think you need urgent care."
     static let wellnessDisclaimerAccept = "I understand"
     static let sampleDataBanner = "Sample data — pair your ring to see yours"
     static let sampleDataChip = "Sample"
     static let deleteAllDataTitle = "Delete all my data?"
-    static let deleteAllDataBody = "This removes every reading, workout and setting stored by Agara Ring on this phone, plus any sign-in or API key. It can't be undone. Data already in Apple Health or Health Connect stays there — remove it in that app."
+    static let deleteAllDataBody = "This removes every reading, workout and setting stored by AGARA Heart on this phone, plus any sign-in or API key. It can't be undone. Data already in Apple Health or Health Connect stays there — remove it in that app."
     static let confirmClearRawDataTitle = "Clear raw data?"
     static let confirmClearRawDataBody = "This removes the raw ring packets kept for diagnostics. Your readings, sleep and workouts are not affected, but nights that need repair can no longer be re-derived from the raw trace. This can't be undone."
     static let cloudTitle = "Agara Cloud"
@@ -163,11 +163,14 @@ enum AgaraCopy {
     static let cloudFailureRateLimited = "Too many requests. Please try again in a moment."
     static let cloudFailureServerUnavailable = "Agara Cloud is unavailable right now. Please try again shortly."
     static let cloudFailureAccountDeleted = "This account was deleted, so you've been signed out. Your data on this phone is untouched."
-    static let cloudFailureUpdateRequired = "Update Agara Ring to keep syncing."
+    static let cloudFailureUpdateRequired = "Update AGARA Heart to keep syncing."
     static let cloudFailureSampleData = "Sync is paused while sample data is shown."
     static let cloudNoticeSynced = "Synced."
     static let cloudNoticeSignedOut = "Signed out."
     static let cloudNoticeDeleted = "Your account was deleted."
+    static let sourcesTitle = "Sources & references"
+    static let sourcesIntro = "The ranges and explanations in AGARA Heart come from the public health sources below. They describe adults in general; your own numbers can differ. AGARA Heart is a wellness app, not a medical device — talk to a doctor about your health."
+    static let sourcesMetricFooter = "Where these ranges come from"
     static let nudgeA1V1 = "Rough night: your resting heart rate is {rhr_delta} above your usual and you slept {sleep_short} under goal."
     static let nudgeA1V2 = "Your body is asking for an easier day — resting heart rate up {rhr_delta}, sleep {sleep_short} short."
     static let nudgeA1V3 = "Two signals down this morning: resting heart rate {rhr_delta} high, and {sleep_short} less sleep than usual."
@@ -272,4 +275,35 @@ enum AgaraHelp {
     static let chargingEstimate = "Estimated from how fast the ring has been charging; charging slows as it nears full."
     static let firmware = "The software on your ring. Updates come from the ring's maker and are checked here."
     static let sleepScore = "A 0–100 score from how long you slept and how much of it was deep and REM sleep."
+}
+
+// GENERATED by tools/gen_shared.py from docs/strings/sources.yaml — do not edit by hand.
+
+/// Health-information citations (App Review 1.4.1). Same list and order as Android `AgaraSources`.
+enum AgaraSources {
+    struct Source: Identifiable, Hashable {
+        let id: String
+        /// Metric id: heart_rate, spo2, hrv, stress or sleep.
+        let section: String
+        let title: String
+        let publisher: String
+        let url: String
+        let supports: String
+    }
+
+    static let all: [Source] = [
+        Source(id: "hr_aha_resting", section: "heart_rate", title: "All About Heart Rate (Pulse)", publisher: "American Heart Association, 2024", url: "https://www.heart.org/en/health-topics/high-blood-pressure/the-facts-about-high-blood-pressure/all-about-heart-rate-pulse", supports: "A normal resting heart rate for adults is 60–100 beats per minute; it is often lower in athletes and during sleep."),
+        Source(id: "hr_spodick_range", section: "heart_rate", title: "Normal sinus heart rate: appropriate rate thresholds for sinus tachycardia and bradycardia", publisher: "Spodick DH. South Med J. 1996;89(7):666–667", url: "https://pubmed.ncbi.nlm.nih.gov/8685750/", supports: "A study of 500 healthy adults puts the typical resting range at 50–90 per minute — the band the app starts from before it learns your own resting heart rate."),
+        Source(id: "hr_aha_target", section: "heart_rate", title: "Target Heart Rates Chart", publisher: "American Heart Association, 2024", url: "https://www.heart.org/en/healthy-living/exercise-and-physical-activity/fitness-basics/target-heart-rates", supports: "Maximum heart rate is about 220 minus your age; the app's effort zones are percentages of it."),
+        Source(id: "spo2_medlineplus", section: "spo2", title: "Pulse Oximetry: MedlinePlus Medical Test", publisher: "U.S. National Library of Medicine (MedlinePlus)", url: "https://medlineplus.gov/lab-tests/pulse-oximetry/", supports: "95–100 % is a normal oxygen saturation; contact a provider at 92 % or lower and seek urgent care at 88 % or lower; readings can differ from blood tests by 2–4 %."),
+        Source(id: "hrv_task_force", section: "hrv", title: "Heart rate variability: standards of measurement, physiological interpretation and clinical use", publisher: "Task Force of the European Society of Cardiology and the North American Society of Pacing and Electrophysiology. Circulation. 1996;93(5):1043–1065", url: "https://pubmed.ncbi.nlm.nih.gov/8598068/", supports: "How heart-rate variability is measured and what it reflects."),
+        Source(id: "hrv_shaffer_norms", section: "hrv", title: "An Overview of Heart Rate Variability Metrics and Norms", publisher: "Shaffer F, Ginsberg JP. Front Public Health. 2017;5:258", url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC5624990/", supports: "HRV depends on age, sex and how it is measured, so the app compares your HRV with your own baseline rather than a fixed number."),
+        Source(id: "stress_kim_hrv", section: "stress", title: "Stress and Heart Rate Variability: A Meta-Analysis and Review of the Literature", publisher: "Kim HG, Cheon EJ, Bai DS, Lee YH, Koo BH. Psychiatry Investig. 2018;15(3):235–245", url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC5900369/", supports: "Heart-rate variability changes under stress; the app's stress score is an estimate from these heart-rate patterns, not a clinical measure."),
+        Source(id: "sleep_ninds", section: "sleep", title: "Brain Basics: Understanding Sleep", publisher: "National Institute of Neurological Disorders and Stroke (NIH)", url: "https://www.ninds.nih.gov/health-information/public-education/brain-basics/brain-basics-understanding-sleep", supports: "What light, deep and REM sleep are, and that most adults need 7–9 hours of sleep a night."),
+    ]
+
+    /// Sections in display order (only those with sources).
+    static let sections: [String] = ["heart_rate", "spo2", "hrv", "stress", "sleep"]
+
+    static func forSection(_ section: String) -> [Source] { all.filter { $0.section == section } }
 }
