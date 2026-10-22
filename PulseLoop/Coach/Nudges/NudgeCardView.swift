@@ -7,6 +7,8 @@ import SwiftData
 struct NudgeCardView: View {
     let nudge: CoachNudge
     var compact: Bool = false
+    /// Called after a button's action ran (the inbox closes for "Why?" and "Open ring").
+    var onPerformed: ((NudgeAction) -> Void)? = nil
 
     @State private var delivery = NudgeDeliveryService.shared
 
@@ -71,6 +73,7 @@ struct NudgeCardView: View {
     private func button(for action: NudgeAction, isPrimary: Bool) -> some View {
         Button {
             delivery.perform(action, on: nudge)
+            onPerformed?(action)
         } label: {
             Text(action.title)
                 .font(AgaraFont.caption.weight(.semibold))
@@ -112,104 +115,187 @@ struct NudgeCardView: View {
     }
 }
 
-/// Everything the nudges know right now, read once per pass. One loader for Today and the Coach tab, so the two lists
-/// cannot disagree.
+/// Everything the nudges know right now. ONE instance (`shared`) feeds the bell's badge and the inbox, so the two can
+/// never disagree.
+///
+/// "Shown" means seen: the ledger records `.shown` when the inbox opens (`markSeen`), not when the engine computes a
+/// nudge. The badge counts nudges with no ledger outcome yet — exactly "new since you last looked".
 @MainActor
 @Observable
 final class NudgeFeed {
+    static let shared = NudgeFeed()
+
     var nudges: [CoachNudge] = []
     var status: NudgeStatus = .ready
+    /// The inbox is open: the root action host stands down so the inbox can present the confirmation itself.
+    var inboxOpen = false
 
     func refresh(context: ModelContext, now: Date = Date()) {
         let provider = NudgeEngine.provider()
         nudges = provider.pending(now: now, context: context)
         status = provider.status(now: now, context: context)
+    }
+
+    /// Nudges the user has not seen yet (no ledger outcome). Reads the ledger's revision so the badge updates.
+    var unseenCount: Int {
+        _ = NudgeLedgerStore.shared.revision
+        return nudges.filter { NudgeLedgerStore.shared.outcome(for: $0.id) == nil }.count
+    }
+
+    func markSeen(now: Date = Date()) {
         for nudge in nudges where NudgeLedgerStore.shared.outcome(for: nudge.id) == nil {
             NudgeLedgerStore.shared.record(nudge, outcome: .shown, now: now)
         }
     }
 }
 
-/// The Today cards. Silent when nothing passes the policy, and "Learning your baseline" while the 28-day median has
-/// fewer than seven nights — the honest state rather than an empty-looking section.
-struct NudgeTodaySection: View {
+/// The bell in the app header: nudges live behind it, with a count of the ones not seen yet (owner 2026-10-22: "like
+/// Facebook notifications" — full-width cards on Today and the Coach tab took the whole screen). It also owns the
+/// feed's refresh, because it is on every tab.
+struct NudgeBellButton: View {
     @Environment(\.modelContext) private var modelContext
-    @State private var feed = NudgeFeed()
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var feed = NudgeFeed.shared
     @State private var ledger = NudgeLedgerStore.shared
+    @State private var dataChange = AgaraDataChange.shared
+    /// Push a route from the inbox (its footer opens Settings › Notifications).
+    var onOpenRoute: (AppRoute) -> Void = { _ in }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            if feed.status.learningBaseline {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(AgaraCopy.nudgeLearningBaseline)
-                        .font(AgaraFont.subheadline.weight(.semibold))
-                        .foregroundStyle(AgaraColors.textPrimary)
-                    Text(AgaraCopy.nudgeLearningBaselineBody)
-                        .font(AgaraFont.footnote)
-                        .foregroundStyle(AgaraColors.textSecondary)
+        Button { feed.inboxOpen = true } label: {
+            Image(systemName: feed.unseenCount > 0 ? "bell.badge" : "bell")
+                .symbolRenderingMode(.hierarchical)
+                .font(AgaraFont.body.weight(.regular))
+                .foregroundStyle(AgaraColors.textSecondary)
+                .frame(width: 40, height: 40)
+                .overlay(alignment: .topTrailing) {
+                    if feed.unseenCount > 0 {
+                        Text("\(min(feed.unseenCount, 9))")
+                            .font(AgaraFont.caption2.weight(.bold).monospacedDigit())
+                            .foregroundStyle(AgaraColors.onAccent)
+                            .frame(minWidth: 17, minHeight: 17)
+                            .background(Circle().fill(AgaraColors.accent))
+                            .overlay(Circle().stroke(AgaraColors.background, lineWidth: 2))
+                            .offset(x: -2, y: 3)
+                            .transition(.scale.combined(with: .opacity))
+                            .accessibilityHidden(true)
+                    }
                 }
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(AgaraColors.cardSoft))
-                // One element: a bare VStack carries no identifier (the UI test could not find the card) and VoiceOver
-                // read the title and body as two stops.
-                .accessibilityElement(children: .combine)
-                .accessibilityIdentifier("nudge.learningBaseline")
-            }
-            ForEach(feed.nudges) { nudge in
-                NudgeCardView(nudge: nudge)
-            }
+                .contentShape(Rectangle())
+                .animation(.spring(duration: 0.3), value: feed.unseenCount)
         }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("nudge.bell")
+        .accessibilityLabel("Nudges")
+        .accessibilityValue(feed.unseenCount == 0 ? "No new nudges"
+                            : feed.unseenCount == 1 ? "1 new nudge" : "\(feed.unseenCount) new nudges")
         .task { feed.refresh(context: modelContext) }
-        // Answering a nudge (or snoozing its category) re-reads the engine, so the card goes away at once.
+        // Answering a nudge, new ring data, and coming back to the app all re-read the engine.
         .onChange(of: ledger.revision) { _, _ in feed.refresh(context: modelContext) }
-    }
-}
-
-/// The Coach tab's "For you" list (policy rule 10: with notifications off, every nudge still appears here and on Today).
-struct NudgeForYouList: View {
-    @Environment(\.modelContext) private var modelContext
-    @State private var feed = NudgeFeed()
-
-    var body: some View {
-        // The loader sits OUTSIDE the "there is something to show" branch, on a real zero-height view. When the
-        // empty-list fix moved the scroll view into that branch, `.task` went with it: the list started empty, so the
-        // branch never rendered, so the refresh never ran. (A `Group` around a false `if` is no anchor either — it has
-        // no view for `.task` to attach to.)
-        VStack(spacing: 0) {
-            Color.clear.frame(height: 0)
-                .task { feed.refresh(context: modelContext) }
-                .onChange(of: NudgeLedgerStore.shared.revision) { _, _ in feed.refresh(context: modelContext) }
-            if let top = feed.nudges.first {
-                // The single most important nudge (the policy already ordered them), above the chat. Today lists all of
-                // them; here the chat needs the room. It used to be a 250 pt scroll view — a blank gap under one card —
-                // on the system's white instead of the page colour.
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("For you")
-                        .font(AgaraFont.caption.weight(.semibold))
-                        .foregroundStyle(AgaraColors.textMuted)
-                        .accessibilityAddTraits(.isHeader)
-                    NudgeCardView(nudge: top, compact: true)
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-                .accessibilityIdentifier("nudge.forYou")
-            }
+        .onChange(of: dataChange.token) { _, _ in feed.refresh(context: modelContext) }
+        .onChange(of: scenePhase) { _, phase in if phase == .active { feed.refresh(context: modelContext) } }
+        .sheet(isPresented: $feed.inboxOpen) {
+            NudgeInboxSheet(onOpenRoute: onOpenRoute)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
     }
 }
 
-/// The "Lighter today" host: the shared confirmation (Rule 10) in front of whatever screen the nudge lives on, plus the
-/// breathing sheet. Mounted once — by `MainTabView` — so a push action and a card tap reach the same dialogs.
+/// The nudges, behind the bell: the same cards and buttons, most important first. Opening it marks them seen.
+struct NudgeInboxSheet: View {
+    var onOpenRoute: (AppRoute) -> Void = { _ in }
+    @Environment(\.dismiss) private var dismiss
+    @State private var feed = NudgeFeed.shared
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    if feed.nudges.isEmpty {
+                        emptyState
+                    } else {
+                        ForEach(feed.nudges) { nudge in
+                            // "Why?" and "Open ring" leave for another screen: close the inbox first.
+                            NudgeCardView(nudge: nudge) { action in
+                                if action == .why || action == .openRing { dismiss() }
+                            }
+                        }
+                    }
+                    Button {
+                        dismiss()
+                        onOpenRoute(.settingsNotifications)
+                    } label: {
+                        Label("Notification settings", systemImage: "slider.horizontal.3")
+                            .font(AgaraFont.footnote.weight(.medium))
+                            .foregroundStyle(AgaraColors.textSecondary)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 4)
+                    .accessibilityIdentifier("nudge.inbox.settings")
+                }
+                .padding(16)
+            }
+            .background(AgaraColors.background)
+            .navigationTitle("Nudges")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }.accessibilityIdentifier("nudge.inbox.done")
+                }
+            }
+        }
+        // The inbox presents the lighter-today confirmation and the breathing session itself; the root host stands
+        // down while it is open (an alert from under a sheet never appears).
+        .nudgeActionHost(active: true)
+        .onAppear { feed.markSeen() }
+        .onDisappear { feed.inboxOpen = false }
+        .accessibilityIdentifier("nudge.inbox")
+    }
+
+    @ViewBuilder private var emptyState: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Image(systemName: "bell")
+                .font(AgaraFont.title3)
+                .foregroundStyle(AgaraColors.textMuted)
+            if feed.status.learningBaseline {
+                Text(AgaraCopy.nudgeLearningBaseline)
+                    .font(AgaraFont.subheadline.weight(.semibold))
+                    .foregroundStyle(AgaraColors.textPrimary)
+                Text(AgaraCopy.nudgeLearningBaselineBody)
+                    .font(AgaraFont.footnote)
+                    .foregroundStyle(AgaraColors.textSecondary)
+            } else {
+                Text("Nothing right now")
+                    .font(AgaraFont.subheadline.weight(.semibold))
+                    .foregroundStyle(AgaraColors.textPrimary)
+                Text("Nudges appear here when your ring's data says something worth acting on.")
+                    .font(AgaraFont.footnote)
+                    .foregroundStyle(AgaraColors.textSecondary)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(AgaraColors.cardSoft))
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(feed.status.learningBaseline ? "nudge.learningBaseline" : "nudge.inbox.empty")
+    }
+}
+
 struct NudgeActionHost: ViewModifier {
+    /// The root host is active unless the inbox is open; the inbox's own host is always active.
+    var active: Bool? = nil
     @State private var delivery = NudgeDeliveryService.shared
+    @State private var feed = NudgeFeed.shared
     @State private var pendingConfirm: ConfirmAction?
     @Environment(\.modelContext) private var modelContext
+
+    private var isActive: Bool { active ?? !feed.inboxOpen }
 
     func body(content: Content) -> some View {
         content
             .onChange(of: delivery.confirmingLighter) { _, nudge in
-                guard let nudge else { return }
+                guard isActive, let nudge else { return }
                 pendingConfirm = ConfirmAction.lighterToday(percent: delivery.lighterPercent) { [delivery] in
                     DailyGoalOverrideStore.shared.set(percent: delivery.lighterPercent)
                     NudgeLedgerStore.shared.record(nudge, outcome: .madeLighter)
@@ -217,7 +303,8 @@ struct NudgeActionHost: ViewModifier {
                 }
             }
             .confirmAction($pendingConfirm)
-            .sheet(item: $delivery.breathingFor) { nudge in
+            .sheet(item: Binding(get: { isActive ? delivery.breathingFor : nil },
+                                 set: { delivery.breathingFor = $0 })) { nudge in
                 BreathingSessionView()
                     .onDisappear { NudgeLedgerStore.shared.record(nudge, outcome: .breathed) }
             }
@@ -227,4 +314,6 @@ struct NudgeActionHost: ViewModifier {
 extension View {
     /// Attach once, at the tab root: hosts the lighter-today confirmation and the breathing sheet for every nudge button.
     func nudgeActionHost() -> some View { modifier(NudgeActionHost()) }
+    /// The inbox's own host (always active while the inbox is open).
+    func nudgeActionHost(active: Bool) -> some View { modifier(NudgeActionHost(active: active)) }
 }

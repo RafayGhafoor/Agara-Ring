@@ -191,6 +191,12 @@ final class CoachTabUITests: AgaraUITestCase {
         let promise = waitFor(element("coach.promise"), timeout: 20, "the on-device status line is missing")
         XCTAssertFalse(promise.label.contains("24"), "an on-device status must not carry the cloud count: \(promise.label)")
         XCTAssertFalse(element("coach.quota").exists, "no cloud quota while the phone answers")
+        app.terminate()
+
+        // The conversation runs on the scripted provider: the on-device model is a real model call in the simulator
+        // and failed there ("GenerationError -1"), which made this test flaky rather than wrong.
+        launchCoach(extra: ["-coachOn", "YES", "-coachProvider", "offlineStub"])
+        openTab("Coach")
 
         // The empty thread offers prompts built from the seeded data, not a fixed list.
         let starters = app.buttons.matching(identifier: "coach.starter")

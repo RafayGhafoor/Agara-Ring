@@ -601,6 +601,10 @@ struct AppHeader: View {
             }
             Spacer(minLength: 8)
             if coach { CoachHeaderActions() }
+            // Nudges behind a bell with a count of the unseen ones, on every tab (owner 2026-10-22).
+            if AgaraFeatureStore.shared.isOn(.coachNudges) {
+                NudgeBellButton { path.append($0) }
+            }
             // The live connection status, then Settings behind a gear. Settings has no tab of its own any more:
             // six tabs made iOS collapse the bar into "More", and Settings belongs one tap away from every tab
             // rather than beside them (AGENTS: the gear is on the top bar of all five tabs).

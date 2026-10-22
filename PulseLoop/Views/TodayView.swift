@@ -144,9 +144,8 @@ struct TodayView: View {
                     HeroInsightCardView(title: hero.title, summary: hero.summary, chips: hero.chips)
                 }
 
-                // Proactive nudges (deterministic, on-device): the Today cards, the "Learning your baseline" state and —
-                // while a "Lighter today" override is active — the honest statement of today's lowered goal.
-                NudgeTodaySection()
+                // Nudges live behind the bell in the header (owner 2026-10-22: cards here took the whole screen). What
+                // stays is the one line that changes what the step ring means: today's lowered goal, while it is active.
                 todayGoalOverrideRow(summary: summary)
 
                 LazyVGrid(columns: tileColumns, spacing: 12) {

@@ -26,11 +26,25 @@ final class NudgeFlowUITests: AgaraUITestCase {
         openTab("Today")
     }
 
-    /// Today's card for the fixture rule.
+    /// The fixture rule's card — behind the bell in the header (nudges are not on Today any more).
     private func card(_ rule: String, file: StaticString = #filePath, line: UInt = #line) -> XCUIElement {
-        scrollTo(app.descendants(matching: .any)["nudge.card.\(rule)"], maxSwipes: 6)
+        openInbox(file: file, line: line)
         return waitFor(app.descendants(matching: .any)["nudge.card.\(rule)"], timeout: 20,
-                       "the \(rule) card never appeared on Today", file: file, line: line)
+                       "the \(rule) card never appeared in the nudge inbox", file: file, line: line)
+    }
+
+    /// Tap the bell (its badge counts unseen nudges) and wait for the inbox.
+    private func openInbox(file: StaticString = #filePath, line: UInt = #line) {
+        let inbox = app.descendants(matching: .any)["nudge.inbox"]
+        if inbox.exists { return }
+        waitFor(app.buttons["nudge.bell"], timeout: 20, "the nudge bell is missing", file: file, line: line).tap()
+        waitFor(app.navigationBars["Nudges"], timeout: 10, "the nudge inbox did not open", file: file, line: line)
+    }
+
+    /// Close the inbox if it is still open (Settings is behind the header gear, which the sheet covers).
+    private func closeInbox() {
+        let done = app.buttons["nudge.inbox.done"]
+        if done.exists && done.isHittable { done.tap() }
     }
 
     /// The app's button identifiers are `nudge.<rule>.<button raw value>`: unique when several cards are on screen.
@@ -45,6 +59,7 @@ final class NudgeFlowUITests: AgaraUITestCase {
 
     /// Open Settings › Notifications and read the ledger line for one rule + outcome.
     private func assertLedger(_ rule: String, _ outcome: String, file: StaticString = #filePath, line: UInt = #line) {
+        closeInbox()
         waitFor(app.buttons["settingsGear"], "settings gear missing", file: file, line: line).tap()
         let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Notifications")).firstMatch
         scrollTo(row, maxSwipes: 6)
@@ -100,7 +115,8 @@ final class NudgeFlowUITests: AgaraUITestCase {
         _ = card("b1")
         tap("notNow", on: "b1")
         // "Not now" pauses the category until the next wake time, so the card goes away for the rest of the day.
-        XCTAssertFalse(app.descendants(matching: .any)["nudge.card.b1"].exists, "the card is still there after Not now")
+        XCTAssertFalse(app.descendants(matching: .any)["nudge.card.b1"].waitForExistence(timeout: 2),
+                       "the card is still in the inbox after Not now")
         assertLedger("b1", "notNow")
     }
 
@@ -158,45 +174,44 @@ final class NudgeFlowUITests: AgaraUITestCase {
             openTab("Today")
         }
 
-        // Recovery: the card, then each of its three answers.
-        launch("a1"); _ = card("a1"); snap("today-recovery")
+        // The bell with its count, then the inbox it opens.
+        launch("a1")
+        _ = app.buttons["nudge.bell"].waitForExistence(timeout: 20); snap("bell-badge")
+        _ = card("a1"); snap("inbox-recovery")
         tap("lighterToday", on: "a1")
         waitFor(app.alerts.firstMatch, timeout: 10, "no confirmation"); snap("lighter-today-confirm")
         app.alerts.buttons[AgaraCopyStrings.nudgeConfirmLighter].tap()
-        // The lowered goal shows in place of the card, right under the hero — no scrolling.
+        closeInbox()
         _ = app.descendants(matching: .any)["nudge.goalOverride"].waitForExistence(timeout: 15)
-        snap("lighter-goal-applied")
+        snap("lighter-goal-on-today")
         launch("a1"); _ = card("a1"); tap("why", on: "a1")
         _ = app.descendants(matching: .any)["coach.seed.card"].waitForExistence(timeout: 15); snap("why-seeded-answer")
 
         // Stress, and the two-minute session it offers.
-        launch("c1"); _ = card("c1"); snap("today-stress")
+        launch("c1"); _ = card("c1"); snap("inbox-stress")
         tap("breathe", on: "c1")
         _ = app.descendants(matching: .any)["breathing.session"].waitForExistence(timeout: 10); snap("breathing-session")
 
         // Activity, ring sync, celebration.
-        launch("b1"); _ = card("b1"); snap("today-activity")
-        launch("g1"); _ = card("g1"); snap("today-ring-sync")
-        launch("f1"); _ = card("f1"); snap("today-streak")
+        launch("b1"); _ = card("b1"); snap("inbox-activity")
+        launch("g1"); _ = card("g1"); snap("inbox-ring-sync")
+        launch("f1"); _ = card("f1"); snap("inbox-streak")
 
-        // The same card in the Coach tab's "For you" list.
-        launch("a1"); openTab("Coach")
-        _ = app.descendants(matching: .any)["nudge.card.a1"].waitForExistence(timeout: 15); snap("coach-for-you")
+        // Nothing to say yet: the honest "still learning" state.
+        launch("learning"); openInbox()
+        _ = app.descendants(matching: .any)["nudge.learningBaseline"].waitForExistence(timeout: 10)
+        snap("inbox-learning-baseline")
 
-        // Before 21 nights of baseline: the honest "still learning" state instead of guesses.
-        launch("learning")
-        let learning = app.descendants(matching: .any)["nudge.learningBaseline"]
-        scrollTo(learning, maxSwipes: 6); snap("learning-baseline")
-
-        // Settings › Notifications after a few actions.
+        // Settings › Notifications after a "Not now".
         launch("b1"); _ = card("b1"); tap("notNow", on: "b1")
         openSettingsNotifications(); RunLoop.current.run(until: Date().addingTimeInterval(1)); snap("settings-notifications")
         let ledger = app.descendants(matching: .any)["nudges.ledger.b1.notNow"]
         scrollTo(ledger, maxSwipes: 8); snap("settings-last-7-days")
 
         // Dark.
-        launch("a1", theme: "dark"); _ = card("a1"); snap("today-recovery-dark")
-        launch("c1", theme: "dark"); _ = card("c1"); snap("today-stress-dark")
+        launch("a1", theme: "dark")
+        _ = app.buttons["nudge.bell"].waitForExistence(timeout: 20); snap("bell-badge-dark")
+        _ = card("a1"); snap("inbox-recovery-dark")
     }
 
     // MARK: - Helpers
@@ -211,6 +226,7 @@ final class NudgeFlowUITests: AgaraUITestCase {
     }
 
     private func openSettingsNotifications() {
+        closeInbox()
         waitFor(app.buttons["settingsGear"], "settings gear missing").tap()
         let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Notifications")).firstMatch
         scrollTo(row, maxSwipes: 6)

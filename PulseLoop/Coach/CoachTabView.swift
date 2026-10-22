@@ -22,14 +22,7 @@ struct CoachTabView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Proactive nudges at the top of the Coach tab (policy rule 10: notifications off still means the nudges
-            // appear here). Same card view as Today, compact, and only while the nudge feature is on.
-            // Not while a nudge's seeded answer is open: the same nudge showed twice, as the card and as its answer.
-            if AgaraFeatureStore.isOn(.coachNudges), CoachNavigation.shared.requestedSeed == nil {
-                // No wrapper ScrollView: it reserved up to 250 pt of empty space whenever the list had nothing to show
-                // (which is most of the time — the list is empty until a rule fires).
-                NudgeForYouList()
-            }
+            // Nudges are behind the bell in the header now; the Coach tab is the chat.
             Group {
                 if state == .ready {
                     CoachView(onOpenWorkout: onOpenWorkout, onOpenMeal: onOpenMeal)
