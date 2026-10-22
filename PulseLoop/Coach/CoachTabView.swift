@@ -44,6 +44,7 @@ struct CoachTabView: View {
                 // The sheet's agree button records the consent and closes the sheet; the body then re-resolves to
                 // `.ready` on its own, because it reads the store.
                 .presentationDragIndicator(.visible)
+                .agaraRingEnvironment()   // every presentation root (AgaraRingEnvironment, the 1.0.0 (1) crash)
         }
     }
 

@@ -71,10 +71,6 @@ struct WearableSettingsView: View {
     }
 
     /// Binding into the shared live-streaming preference (default on).
-    private var liveHeartRateBinding: Binding<Bool> {
-        @Bindable var store = VeepooLivePrefsStore.shared
-        return $store.liveHeartRateEnabled
-    }
 
     /// `RelativeDateTimeFormatter` is expensive to allocate; reuse one instance instead of building
     /// a fresh formatter on every access.
@@ -217,7 +213,9 @@ struct WearableSettingsView: View {
                         }
                         FormValueRow(title: "Last synced") { Text(lastSyncedLabel).foregroundStyle(AgaraColors.textMuted) }
                     }
-                    if features.isOn(.autoMeasureSettings), !(devices.first?.autoMeasureSchedule.isEmpty ?? true) {
+                    if AutoMeasure.showsSettingsRow(flagOn: features.isOn(.autoMeasureSettings),
+                                                    schedule: devices.first?.autoMeasureSchedule ?? [],
+                                                    supportsAutoMeasure: devices.first?.ringCapabilities?.autoMeasure == true) {
                         SettingsGroup(footer: "How often the ring measures on its own.") {
                             Button { path.append(AppRoute.settingsAutoMeasure) } label: {
                                 ringActionLabel("Auto-measure", systemImage: "timer", chevron: true)
@@ -227,15 +225,7 @@ struct WearableSettingsView: View {
                     }
                     RingBatteryAlertToggle()
                     BatteryHistorySection()
-                    // Continuous HR streaming is optional (battery); flag `live_hr_toggle` (iOS only today).
-                    if features.isOn(.liveHrToggle), ble.activeDeviceType == .veepoo {
-                        SettingsGroup(
-                            header: "Live data",
-                            footer: "Streams heart rate continuously while connected so the HR card ticks in real time (drains battery). Turn off to revert to periodic updates only."
-                        ) {
-                            FormToggleRow(title: "Live heart rate", isOn: liveHeartRateBinding)
-                        }
-                    }
+                    // The "Live heart rate" toggle lives at the top of Auto-measure (spec item 1, both apps).
                 } else {
                     SettingsGroup(header: "No ring connected") {
                         if ble.hasLastKnownRing && devices.first != nil { nameRow }
@@ -259,14 +249,14 @@ struct WearableSettingsView: View {
         .confirmAction($confirm)
         .fullScreenCover(isPresented: $showsFindRing) {
             FindRingView(canVibrate: canFindRing)
-                .environment(ble)
-                .environment(coordinator)
+                .agaraRingEnvironment()
         }
         .sheet(isPresented: $showsRename) {
             RenameRingSheet(
                 initialText: RingNickname.prefill(identifier: ble.deviceIdentifier, row: devices.first),
                 peripheralIdentifier: ble.deviceIdentifier
             )
+            .agaraRingEnvironment()
         }
     }
 }

@@ -105,9 +105,11 @@ struct NutritionView: View {
         .onChange(of: selectedDay) { _, _ in reload() }
         .sheet(item: $logSheet) { request in
             MealLogSheet(day: selectedDay, presetMealType: request.mealType, editingId: request.editingId)
+                .agaraRingEnvironment()
         }
         .sheet(item: $analysisSheet) { request in
             MealAnalysisSheet(day: selectedDay, startWithCamera: request.startWithCamera)
+                .agaraRingEnvironment()
         }
         .confirmAction($confirm)
     }

@@ -84,6 +84,10 @@ struct MetricDetailView: View {
                 legend
                 explainer
                 if isEstimatedMetric { disclaimer }
+                // Where the ranges above come from (App Review 1.4.1).
+                if let section = HealthSources.section(for: metric) {
+                    HealthSourcesFooter(section: section)
+                }
             }
             .padding(16)
             .padding(.bottom, 40)

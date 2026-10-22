@@ -162,12 +162,15 @@ final class ConsistencyPhase456Tests: XCTestCase {
         // agara_cloud joined on 2026-10-22 (owner, option A: the 1.1 build carries the cloud account and coach; production
         // backend deployed and verified, e2e 49/49). Still a release blocker: certificate pinning (see features.yaml).
         let platformSpecific: Set<AgaraFeature> = [.coach, .coachHistory, .agaraCloud]
+        // `live_hr_toggle` ships on since 2026-10-04 on BOTH apps (rebrand-measure-1.0 spec item 1: the toggle defaults
+        // the stream off) — from agara/1.0-review.
+        XCTAssertTrue(AgaraFeature.liveHrToggle.defaultOn, "the live heart-rate toggle is offered since 1.0.0 (2)")
         XCTAssertTrue(platformSpecific.isSubset(of: Set(AgaraFeatureStore.parityFlags)),
                       "the coach flags are parity switches too")
         // coach_cloud is the new 1.1 switch (iOS on, Android off); it is deliberately not in parityFlags, whose meaning
         // is "one switch per feature both apps already have", so assert its shipped value directly.
         XCTAssertTrue(AgaraFeature.coachCloud.defaultOn, "coach_cloud ships ON for iOS 1.1")
-        for flag in AgaraFeatureStore.parityFlags {
+        for flag in AgaraFeatureStore.parityFlags where flag != .liveHrToggle {
             if platformSpecific.contains(flag) {
                 XCTAssertTrue(flag.defaultOn, "\(flag) ships ON for iOS 1.1 (owner 2026-10-20)")
             } else {

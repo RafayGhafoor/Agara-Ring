@@ -92,7 +92,7 @@ struct WidgetActivityContent: View {
     var body: some View {
         if values.isEmpty {
             WidgetEmptyMessage(systemImage: "figure.walk",
-                               message: rolledOver ? "No data yet today" : "Open Agara Ring to sync",
+                               message: rolledOver ? "No data yet today" : "Open AGARA Heart to sync",
                                color: AgaraColors.steps)
         } else {
             HStack(spacing: 10) {
@@ -180,7 +180,7 @@ struct WidgetNutritionContent: View {
         } else {
             WidgetEmptyMessage(systemImage: "fork.knife",
                                message: rolledOver || (active?.kcal == 0) ? "No meals yet today"
-                                   : (payload == nil ? "Enable nutrition in Agara Ring" : "Open Agara Ring to sync"),
+                                   : (payload == nil ? "Enable nutrition in AGARA Heart" : "Open AGARA Heart to sync"),
                                color: AgaraColors.calories)
         }
     }
@@ -196,7 +196,7 @@ struct WidgetActivityFullContent: View {
 
     var body: some View {
         if payload == nil {
-            WidgetEmptyMessage(systemImage: "figure.walk", message: "Open Agara Ring to sync",
+            WidgetEmptyMessage(systemImage: "figure.walk", message: "Open AGARA Heart to sync",
                                color: AgaraColors.steps)
         } else {
             HStack(alignment: .center, spacing: 12) {
@@ -439,7 +439,7 @@ struct WidgetMetricTileView: View {
                 }
             } else {
                 WidgetEmptyMessage(systemImage: "waveform.path",
-                                   message: entry.snapshot == nil ? "Open Agara Ring to sync" : "No data",
+                                   message: entry.snapshot == nil ? "Open AGARA Heart to sync" : "No data",
                                    color: metric.accentColor)
             }
         }

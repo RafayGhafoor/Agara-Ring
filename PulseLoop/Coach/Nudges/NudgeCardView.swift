@@ -198,6 +198,7 @@ struct NudgeBellButton: View {
             NudgeInboxSheet(onOpenRoute: onOpenRoute)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
+                .agaraRingEnvironment()   // every presentation root (AgaraRingEnvironment, the 1.0.0 (1) crash)
         }
     }
 }
@@ -307,6 +308,7 @@ struct NudgeActionHost: ViewModifier {
                                  set: { delivery.breathingFor = $0 })) { nudge in
                 BreathingSessionView()
                     .onDisappear { NudgeLedgerStore.shared.record(nudge, outcome: .breathed) }
+                    .agaraRingEnvironment()
             }
     }
 }

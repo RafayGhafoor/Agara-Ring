@@ -9,7 +9,7 @@
 		<string>com.agara.ring.cloudsync</string>
 	</array>
 	<key>CFBundleDisplayName</key>
-	<string>Agara Ring</string>
+	<string>AGARA Heart</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>

@@ -65,6 +65,7 @@ struct FirmwareRow: View {
         .onAppear { if let identity, checker.status == .unknown { checker.restore(identity) } }
         .sheet(isPresented: $showsRelease) {
             FirmwareReleaseSheet(installed: installed, identity: identity, checker: checker)
+                .agaraRingEnvironment()
         }
     }
 }

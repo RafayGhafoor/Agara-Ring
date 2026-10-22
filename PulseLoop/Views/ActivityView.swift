@@ -178,12 +178,13 @@ struct ActivityView: View {
         .agaraScrollEdges()
         .task(id: dataChange.token) { reload() }
         .onChange(of: sessions.count) { _, _ in reload() }
-        .sheet(isPresented: $goalsOpen) { GoalEditorSheet() }
+        .sheet(isPresented: $goalsOpen) { GoalEditorSheet().agaraRingEnvironment() }
         .sheet(isPresented: $historyOpen) {
             WorkoutHistorySheet(units: units) { id in
                 historyOpen = false
                 path.append(AppRoute.activityDetail(id))
             }
+            .agaraRingEnvironment()
         }
     }
 

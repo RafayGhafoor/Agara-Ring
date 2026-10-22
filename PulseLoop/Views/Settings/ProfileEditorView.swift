@@ -63,6 +63,7 @@ struct ProfileEditorView: View {
         }
         .sheet(item: $activePicker) { kind in
             pickerSheet(for: kind)
+                .agaraRingEnvironment()
         }
     }
 

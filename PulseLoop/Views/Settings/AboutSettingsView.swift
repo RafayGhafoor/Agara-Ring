@@ -147,6 +147,28 @@ struct AboutSettingsView: View {
                         }
                     }
                 }
+                // Citations for the health ranges and explanations (App Review 1.4.1).
+                SettingsGroup(header: "Health information") {
+                    Button { path.append(AppRoute.healthSources(nil)) } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "book.closed.fill")
+                                .foregroundStyle(AgaraColors.accent)
+                                .frame(width: 24)
+                            Text(AgaraCopy.sourcesTitle)
+                                .font(AgaraFont.body)
+                                .foregroundStyle(AgaraColors.textPrimary)
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.right")
+                                .font(AgaraFont.footnote.weight(.semibold))
+                                .foregroundStyle(AgaraColors.textMuted)
+                        }
+                        .padding(.horizontal, 16)
+                        .frame(minHeight: 50)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("settings.sources")
+                }
                 LegalSettingsGroup(showsDisclaimer: true)
             }
             .padding()

@@ -73,6 +73,9 @@ struct SleepView: View {
                 } else {
                     aggregateView(summary: summary, goalMin: goalMin)
                 }
+
+                // Where the sleep guidance comes from (App Review 1.4.1).
+                HealthSourcesFooter(section: HealthSources.sleepSection, allSourcesIdentifier: "sleep.sources")
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 96)
@@ -88,7 +91,7 @@ struct SleepView: View {
         }
         .sensoryFeedback(.selection, trigger: dayOffset)
         .onChange(of: dayOffset) { _, newOffset in announceDay(newOffset) }
-        .sheet(isPresented: $showDayPicker) { dayPickerSheet }
+        .sheet(isPresented: $showDayPicker) { dayPickerSheet.agaraRingEnvironment() }
         .task(id: "\(range.rawValue)-\(dayOffset)") {
             guard coachEnabled else { return }
             if range == .day {

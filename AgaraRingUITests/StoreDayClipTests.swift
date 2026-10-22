@@ -9,7 +9,7 @@ import XCTest
 /// Today again (the rings and cards animate in), a slow scroll down and back up, then the test ends (the runner terminates the app,
 /// the last big change in the recording, which the script uses to find the clip).
 ///
-/// Environment (`TEST_RUNNER_<NAME>`): `E2E_PORT` (9951), `STORE_NOW` (the emulator's `--now`).
+/// Environment (`TEST_RUNNER_<NAME>`): `E2E_PORT` (9951), `STORE_NOW` (the emulator's `--now`), `STORE_HOLD` (dwell on Today, default 1.6 s).
 /// Debug hooks as in `StoreScreenshotTests`; shipped flag defaults; screen recording only, no value is touched.
 final class StoreDayClipTests: AgaraUITestCase {
     func testDayClip() throws {
@@ -31,7 +31,10 @@ final class StoreDayClipTests: AgaraUITestCase {
         sleep.tap()
         RunLoop.current.run(until: Date().addingTimeInterval(1.2))
         today.tap()
-        RunLoop.current.run(until: Date().addingTimeInterval(1.6))
+        // Dwell on Today before the scroll: 1.6 s normally; `STORE_HOLD` (seconds) lengthens it for the clip that ends the day scene
+        // and is held on screen as the "Your day, at a glance" beat.
+        let hold = ProcessInfo.processInfo.environment["STORE_HOLD"].flatMap(Double.init) ?? 1.6
+        RunLoop.current.run(until: Date().addingTimeInterval(hold))
         app.swipeUp(velocity: .slow)
         RunLoop.current.run(until: Date().addingTimeInterval(0.6))
         app.swipeDown(velocity: .slow)

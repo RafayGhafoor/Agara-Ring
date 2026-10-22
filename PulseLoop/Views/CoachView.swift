@@ -206,6 +206,7 @@ struct CoachView: View {
             CoachHistorySheet(conversations: conversations, activeId: activeConversationId) { id in
                 activeConversationId = id
             }
+            .agaraRingEnvironment()
         }
         .sheet(isPresented: $showUsage) {
             CoachUsageSheet(
@@ -215,6 +216,7 @@ struct CoachView: View {
                 usesCloud: CoachClientResolver.effectiveMode(for: settingsStore.settings.providerMode,
                                                              cloudReady: CoachGate.cloudReady) == .agaraCloud
             )
+            .agaraRingEnvironment()
         }
     }
 
@@ -307,6 +309,7 @@ struct CoachView: View {
         .fullScreenCover(isPresented: $showCamera) {
             CameraPicker { image in stage(image) }
                 .ignoresSafeArea()
+                .agaraRingEnvironment()
         }
     }
 

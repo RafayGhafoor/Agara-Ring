@@ -115,6 +115,7 @@ struct RecordSummaryView: View {
             }
             .sheet(isPresented: $presentingShare) {
                 ShareCardSheet(session: session)
+                    .agaraRingEnvironment()
             }
             .onAppear { effort = session.perceivedEffort; note = session.notes ?? "" }
             .onChange(of: samples.count) { _, _ in

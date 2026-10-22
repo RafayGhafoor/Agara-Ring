@@ -531,10 +531,10 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 3;
-				DEVELOPMENT_TEAM = 545A455972;
+				DEVELOPMENT_TEAM = PD92QL4UZ4;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PulseLoopLiveActivity/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Agara Ring";
+				INFOPLIST_KEY_CFBundleDisplayName = "AGARA Heart";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -543,7 +543,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.agara.ring.LiveActivity;
+				PRODUCT_BUNDLE_IDENTIFIER = com.agara.ring.RingLiveActivity;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SKIP_INSTALL = YES;
@@ -565,10 +565,10 @@
 				CODE_SIGN_ENTITLEMENTS = PulseLoopLiveActivityExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 3;
-				DEVELOPMENT_TEAM = 545A455972;
+				DEVELOPMENT_TEAM = PD92QL4UZ4;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PulseLoopLiveActivity/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Agara Ring";
+				INFOPLIST_KEY_CFBundleDisplayName = "AGARA Heart";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -577,7 +577,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.agara.ring.LiveActivity;
+				PRODUCT_BUNDLE_IDENTIFIER = com.agara.ring.RingLiveActivity;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -625,7 +625,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = 545A455972;
+				DEVELOPMENT_TEAM = PD92QL4UZ4;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -689,7 +689,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = 545A455972;
+				DEVELOPMENT_TEAM = PD92QL4UZ4;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -719,18 +719,18 @@
 				CODE_SIGN_ENTITLEMENTS = PulseLoop/PulseLoop.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 3;
-				DEVELOPMENT_TEAM = 545A455972;
+				DEVELOPMENT_TEAM = PD92QL4UZ4;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PulseLoop/Info.plist;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
-				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Agara Ring connects to your ring over Bluetooth to sync steps, sleep and vitals.";
-				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Save share cards and images from Agara Ring to your photo library.";
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "Agara Ring reads your age, sex, height and weight from Apple Health, only when you tap Import in your profile.";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Agara Ring writes your ring's heart rate, blood oxygen, sleep, activity and workouts to Apple Health, only for the data types you enable.";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Agara Ring connects to the AI model server you run on your own network, so coaching can happen without sending your health data to a cloud provider.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Agara Ring records your route during outdoor workouts.";
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "AGARA Heart connects to your ring over Bluetooth to sync steps, sleep and vitals.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Save share cards and images from AGARA Heart to your photo library.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "AGARA Heart reads your age, sex, height and weight from Apple Health, only when you tap Import in your profile.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "AGARA Heart writes your ring's heart rate, blood oxygen, sleep, activity and workouts to Apple Health, only for the data types you enable.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "AGARA Heart connects to the AI model server you run on your own network, so coaching can happen without sending your health data to a cloud provider.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "AGARA Heart records your route during outdoor workouts.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -763,16 +763,16 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 3;
-				DEVELOPMENT_TEAM = 545A455972;
+				DEVELOPMENT_TEAM = PD92QL4UZ4;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PulseLoop/Info.plist;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
-				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Agara Ring connects to your ring over Bluetooth to sync steps, sleep and vitals.";
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "Agara Ring reads your age, sex, height and weight from Apple Health, only when you tap Import in your profile.";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Agara Ring writes your ring's heart rate, blood oxygen, sleep, activity and workouts to Apple Health, only for the data types you enable.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Agara Ring records your route during outdoor workouts.";
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "AGARA Heart connects to your ring over Bluetooth to sync steps, sleep and vitals.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "AGARA Heart reads your age, sex, height and weight from Apple Health, only when you tap Import in your profile.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "AGARA Heart writes your ring's heart rate, blood oxygen, sleep, activity and workouts to Apple Health, only for the data types you enable.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "AGARA Heart records your route during outdoor workouts.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -803,7 +803,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 3;
-				DEVELOPMENT_TEAM = 545A455972;
+				DEVELOPMENT_TEAM = PD92QL4UZ4;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MARKETING_VERSION = 1.1.0;
@@ -825,7 +825,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 3;
-				DEVELOPMENT_TEAM = 545A455972;
+				DEVELOPMENT_TEAM = PD92QL4UZ4;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MARKETING_VERSION = 1.1.0;
@@ -846,10 +846,10 @@
 				CODE_SIGN_ENTITLEMENTS = PulseLoopWidgetsExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 3;
-				DEVELOPMENT_TEAM = 545A455972;
+				DEVELOPMENT_TEAM = PD92QL4UZ4;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PulseLoopWidgets/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Agara Ring";
+				INFOPLIST_KEY_CFBundleDisplayName = "AGARA Heart";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -858,7 +858,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.agara.ring.Widgets;
+				PRODUCT_BUNDLE_IDENTIFIER = com.agara.ring.RingWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -877,10 +877,10 @@
 				CODE_SIGN_ENTITLEMENTS = PulseLoopWidgetsExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 3;
-				DEVELOPMENT_TEAM = 545A455972;
+				DEVELOPMENT_TEAM = PD92QL4UZ4;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PulseLoopWidgets/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Agara Ring";
+				INFOPLIST_KEY_CFBundleDisplayName = "AGARA Heart";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -889,7 +889,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.agara.ring.Widgets;
+				PRODUCT_BUNDLE_IDENTIFIER = com.agara.ring.RingWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -907,7 +907,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 3;
-				DEVELOPMENT_TEAM = 545A455972;
+				DEVELOPMENT_TEAM = PD92QL4UZ4;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MARKETING_VERSION = 1.1.0;
@@ -925,7 +925,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 3;
-				DEVELOPMENT_TEAM = 545A455972;
+				DEVELOPMENT_TEAM = PD92QL4UZ4;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MARKETING_VERSION = 1.1.0;

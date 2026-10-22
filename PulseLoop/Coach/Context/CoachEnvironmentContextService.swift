@@ -1,7 +1,13 @@
 import Foundation
 import UIKit
 @preconcurrency import CoreLocation
+// WeatherKit is compiled OUT of every shipping build (App Review 5.2.5, 2026-10-20): the coach is off in the store
+// release and the app shows no weather, so the binary must not link WeatherKit. Re-enabling needs all three:
+// `AGARA_WEATHERKIT` in SWIFT_ACTIVE_COMPILATION_CONDITIONS, the WeatherKit capability on the App ID, and the
+// Apple Weather attribution ( Weather trademark + legal link) wherever weather is shown.
+#if AGARA_WEATHERKIT
 import WeatherKit
+#endif
 
 /// Opt-in city-level location + weather for the coach. Produces a
 /// `CoachContextPacket.EnvironmentContext` so coaching can ground practical advice
@@ -22,7 +28,9 @@ final class CoachEnvironmentContextService: NSObject, CLLocationManagerDelegate 
     nonisolated deinit {}   // skip the main-actor isolated-deinit hop (crashes on older sim runtimes)
 
     private let manager = CLLocationManager()
+    #if AGARA_WEATHERKIT
     private let weather = WeatherService.shared
+    #endif
     private let defaults: UserDefaults
     private static let cacheKey = "pulseloop.coach.environment.v1" // install-bound: pre-rename name kept so existing installs keep it
 
@@ -82,6 +90,7 @@ final class CoachEnvironmentContextService: NSObject, CLLocationManagerDelegate 
             return degraded(place: place, now: now)
         }
 
+        #if AGARA_WEATHERKIT
         do {
             let weatherData = try await weather.weather(for: CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude), including: .current, .daily)
             let env = makeContext(place: place, current: weatherData.0, daily: weatherData.1, now: now)
@@ -92,6 +101,9 @@ final class CoachEnvironmentContextService: NSObject, CLLocationManagerDelegate 
             lastWeatherFailureAt = now
             return degraded(place: place, now: now)
         }
+        #else
+        return degraded(place: place, now: now)   // no WeatherKit in this build: city-only context
+        #endif
     }
 
     /// City-only, or a stale cached weather (≤3h) with the current city.
@@ -160,6 +172,7 @@ final class CoachEnvironmentContextService: NSObject, CLLocationManagerDelegate 
 
     // MARK: - Weather → context
 
+    #if AGARA_WEATHERKIT
     private func makeContext(place: Place?, current: CurrentWeather, daily: Forecast<DayWeather>, now: Date) -> CoachContextPacket.EnvironmentContext {
         let today = daily.forecast.first
         let iso = ISO8601DateFormatter()
@@ -176,6 +189,7 @@ final class CoachEnvironmentContextService: NSObject, CLLocationManagerDelegate 
             asOf: CoachDataAccess.isoString(now)
         )
     }
+    #endif
 
     // MARK: - Cache (in-memory + UserDefaults)
 

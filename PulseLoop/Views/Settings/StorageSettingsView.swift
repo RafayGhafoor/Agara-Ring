@@ -151,7 +151,7 @@ struct StorageSettingsView: View {
     }
 
     private var limitFooter: String {
-        var text = "When storage goes over 90% of the limit, Agara Ring first clears diagnostics, old logs and caches, then optimizes. "
+        var text = "When storage goes over 90% of the limit, AGARA Heart first clears diagnostics, old logs and caches, then optimizes. "
             + "Older detail is summarised only after it has been backed up; nothing is removed while your data isn't."
         if let rate = yearlyRateBytes { text += " About \(Self.size(rate)) a year at your usage." }
         return text

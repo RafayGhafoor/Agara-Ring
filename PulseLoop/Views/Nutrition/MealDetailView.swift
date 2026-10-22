@@ -77,6 +77,7 @@ struct MealDetailView: View {
         .sheet(isPresented: $editSheet) {
             if let entry {
                 MealLogSheet(day: entry.date, presetMealType: entry.mealType, editingId: entry.id)
+                    .agaraRingEnvironment()
             }
         }
         .confirmAction($confirm)

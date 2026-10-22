@@ -17,7 +17,7 @@ struct DebugView: View {
             #if DEBUG
             SecondaryButton(title: "Feature flags", systemImage: "flag") { showsFeatureFlags = true }
                 .padding(.horizontal)
-                .sheet(isPresented: $showsFeatureFlags) { FeatureFlagsView() }
+                .sheet(isPresented: $showsFeatureFlags) { FeatureFlagsView().agaraRingEnvironment() }
             #endif
             tipsRow
                 .padding(.horizontal)

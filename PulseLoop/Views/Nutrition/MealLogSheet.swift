@@ -67,6 +67,7 @@ struct MealLogSheet: View {
                     product: picked.product,
                     viaBarcode: picked.viaBarcode
                 ) { dismiss() }
+                .agaraRingEnvironment()
             }
         }
         .presentationDetents([.large])
@@ -154,6 +155,7 @@ struct MealLogSheet: View {
                 showScanner = false
                 Task { await lookupBarcode(code) }
             }
+            .agaraRingEnvironment()
         }
     }
 

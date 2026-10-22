@@ -99,7 +99,7 @@ final class IPadLayoutCaptureTests: XCTestCase {
             }
             // Settings pages.
             openTab("Settings")
-            for row in ["User Profile", "Privacy", "About Agara Ring", "Apple Health", "Data & Export", "Appearance"] {
+            for row in ["User Profile", "Privacy", "About AGARA Heart", "Apple Health", "Data & Export", "Appearance"] {
                 let cell = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", row)).firstMatch
                 guard cell.waitForExistence(timeout: 3) else { continue }
                 cell.tap()

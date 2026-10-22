@@ -89,8 +89,10 @@ struct SettingsView: View {
 
     /// Auto-measure is offered when the flag is on and the ring reported a schedule (or says it has one).
     private var showsAutoMeasure: Bool {
-        guard features.isOn(.autoMeasureSettings), let device = devices.first else { return false }
-        return !device.autoMeasureSchedule.isEmpty || device.ringCapabilities?.autoMeasure == true
+        guard let device = devices.first else { return false }
+        return AutoMeasure.showsSettingsRow(flagOn: features.isOn(.autoMeasureSettings),
+                                            schedule: device.autoMeasureSchedule,
+                                            supportsAutoMeasure: device.ringCapabilities?.autoMeasure == true)
     }
 
     /// User setup: profile (with the glucose unit), physiology (flag), appearance, the ring's auto-measure
@@ -206,6 +208,10 @@ struct SettingsView: View {
         })
         rows.append(SettingsRowItem(icon: "lock.shield", tint: AgaraColors.success, title: "Privacy") {
             path.append(AppRoute.settingsPrivacyData)
+        })
+        // Citations for the health ranges (App Review 1.4.1) — also under About and at the end of Vitals.
+        rows.append(SettingsRowItem(icon: "book.closed", tint: AgaraColors.accent, title: AgaraCopy.sourcesTitle) {
+            path.append(AppRoute.healthSources(nil))
         })
         rows.append(SettingsRowItem(icon: "info.circle", tint: AgaraColors.textMuted, title: "About \(AgaraCopy.aboutProductName)") {
             path.append(AppRoute.settingsAbout)
