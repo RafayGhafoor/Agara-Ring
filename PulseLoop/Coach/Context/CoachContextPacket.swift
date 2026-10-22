@@ -7,7 +7,7 @@ import Foundation
 ///
 /// Encoded camelCase → snake_case by the prompt builder so property names stay
 /// idiomatic Swift while the wire shape matches the web contract.
-struct CoachContextPacket: Encodable {
+nonisolated struct CoachContextPacket: Codable {
     var generatedAt: String
     var timezone: String
     var profile: ProfileContext
@@ -29,7 +29,7 @@ struct CoachContextPacket: Encodable {
     /// doesn't share it with the coach — absent from the JSON entirely.
     var nutrition: NutritionContext?
 
-    struct ProfileContext: Encodable {
+    struct ProfileContext: Codable {
         var name: String?
         var age: Int?
         var sex: String?
@@ -39,9 +39,12 @@ struct CoachContextPacket: Encodable {
         var units: String
         /// "empty" | "partial" | "complete"
         var completeness: String
+        /// Fields imported from Apple Health (`UserProfile.healthImported`): the on-device coach may use them; the cloud
+        /// coach drops them (`CloudContextTrimmer`, `CloudToolOutputFilter`). Nil when none.
+        var healthImported: [String]? = nil
     }
 
-    struct DeviceContext: Encodable {
+    struct DeviceContext: Codable {
         var name: String?
         var batteryPercent: Int?
         var state: String
@@ -49,7 +52,7 @@ struct CoachContextPacket: Encodable {
         var lastSyncAt: String?
     }
 
-    struct GoalContext: Encodable {
+    struct GoalContext: Codable {
         var stepsDaily: Int
         var activeMinutesDaily: Int
         var sleepHours: Double
@@ -61,7 +64,7 @@ struct CoachContextPacket: Encodable {
         var fatGDaily: Int?
     }
 
-    struct DayContext: Encodable {
+    struct DayContext: Codable {
         var localDate: String
         var steps: Int?
         var calories: Double?
@@ -71,7 +74,7 @@ struct CoachContextPacket: Encodable {
         var dataConfidence: String
     }
 
-    struct WeekContext: Encodable {
+    struct WeekContext: Codable {
         var daysAvailable: Int
         var avgSteps: Int?
         var totalSteps: Int?
@@ -80,7 +83,7 @@ struct CoachContextPacket: Encodable {
         var mostActiveDay: String?
     }
 
-    struct VitalsContext: Encodable {
+    struct VitalsContext: Codable {
         var latestHr: Double?
         var latestHrAt: String?
         var latestSpo2: Double?
@@ -89,7 +92,7 @@ struct CoachContextPacket: Encodable {
         var peakHrToday: Double?
     }
 
-    struct SleepContext: Encodable {
+    struct SleepContext: Codable {
         var date: String
         /// The day's asleep total (`SleepDayRule`: main sleep + naps); the stage minutes are the main sleep's.
         var totalMin: Int
@@ -103,7 +106,7 @@ struct CoachContextPacket: Encodable {
         var napMin: Int? = nil
     }
 
-    struct WorkoutContext: Encodable {
+    struct WorkoutContext: Codable {
         var id: String
         var type: String
         var startTime: String
@@ -113,7 +116,7 @@ struct CoachContextPacket: Encodable {
         var status: String
     }
 
-    struct MemoryContext: Encodable {
+    struct MemoryContext: Codable {
         var type: String
         var key: String
         var value: String
@@ -122,7 +125,7 @@ struct CoachContextPacket: Encodable {
 
     /// Today's consumed nutrition + goals + meal list. Only present when the user
     /// enabled nutrition tracking AND sharing it with the coach.
-    struct NutritionContext: Encodable {
+    struct NutritionContext: Codable {
         var caloriesConsumed: Double
         var proteinG: Double
         var carbsG: Double
@@ -131,7 +134,7 @@ struct CoachContextPacket: Encodable {
         var mealsToday: [MealBrief]
         var yesterdayCalories: Double?
 
-        struct MealBrief: Encodable {
+        struct MealBrief: Codable {
             var mealId: String
             var name: String
             var mealType: String
@@ -145,7 +148,7 @@ struct CoachContextPacket: Encodable {
     /// City-level location + current/forecast weather. City-only privacy: never a
     /// street, never coordinates. Any field may be nil when weather degrades to a
     /// city-only or stale result.
-    struct EnvironmentContext: Encodable {
+    struct EnvironmentContext: Codable {
         var city: String?
         var region: String?
         var tempC: Double?

@@ -495,6 +495,10 @@ final class UserProfile {
     var weightKg: Double?
     /// Display/units preference. Defaulted so existing stored profiles migrate without a data change.
     var unitsRaw: String = UnitsPreference.metric.rawValue
+    /// Which of age / sex / height_cm / weight_kg hold a value imported from Apple Health and not edited since
+    /// (comma-separated). The cloud coach never sends those — Health data another app recorded must not leave through
+    /// us (coach consent, contract §5). Defaulted so existing profiles migrate without a data change. 2026-10-22.
+    var healthImportedRaw: String = ""
     var onboardingCompleted: Bool
     var baselineCompleted: Bool
     var createdAt: Date
@@ -1047,5 +1051,14 @@ final class CoachToolCall {
         self.statusRaw = statusRaw
         self.sequence = sequence
         self.createdAt = AppClock.now
+    }
+}
+
+
+extension UserProfile {
+    /// The profile fields whose current value came from Apple Health (see `healthImportedRaw`).
+    var healthImported: Set<String> {
+        get { Set(healthImportedRaw.split(separator: ",").map(String.init).filter { !$0.isEmpty }) }
+        set { healthImportedRaw = newValue.sorted().joined(separator: ",") }
     }
 }

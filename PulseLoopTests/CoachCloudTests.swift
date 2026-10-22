@@ -392,7 +392,9 @@ final class CoachCloudRequestTests: XCTestCase {
         XCTAssertEqual(opening.history.last?["role"] as? String, "assistant")
         XCTAssertEqual(opening.history.last?["text"] as? String, "hello")
         XCTAssertNil(opening.summary)
-        XCTAssertEqual(opening.context["timezone"] as? String, "Europe/Berlin")
+        // The trimmer's projection (§5): today's local date, and no timezone (a coarse location proxy §5 does not list).
+        XCTAssertEqual((opening.context["today"] as? [String: Any])?["local_date"] as? String, "2026-10-20")
+        XCTAssertNil(opening.context["timezone"])
 
         let sent = try json(try CoachCloudRequest.openingBody(
             opening, client: ["app": "ios", "version": "1.1.0", "build": "1010001"]))
@@ -458,7 +460,8 @@ final class CoachCloudRequestTests: XCTestCase {
         let repairInput = try XCTUnwrap((try json(repair))["input"] as? [[String: Any]])
         let repaired = CoachCloudRequest.opening(from: repairInput, fallback: opening)
         XCTAssertEqual(repaired.message, "Return only valid JSON now.")
-        XCTAssertEqual(repaired.context["timezone"] as? String, "Europe/Berlin")
+        XCTAssertEqual((repaired.context["today"] as? [String: Any])?["local_date"] as? String, "2026-10-20",
+                       "the repair send reuses the turn's (trimmed) context")
         XCTAssertTrue(repaired.history.isEmpty)
     }
 
@@ -822,7 +825,10 @@ final class CoachCloudWirePrivacyTests: XCTestCase {
         for canary in ["Zebulon", "Quartz", "CANARY-NOTE", "Hyde Park"] {
             XCTAssertFalse(wire.contains(canary), "'\(canary)' reached the server")
         }
-        XCTAssertFalse(wire.contains("72.3"), "the scale reading itself leaves only at half-kilo resolution")
+        // Structural, not a substring: JSON may spell 72.3 as 72.299999999999997 (the substring check passed while the
+        // raw weight was in fact being sent — found 2026-10-22).
+        let openingProfile = try XCTUnwrap((try json(try XCTUnwrap(sent[0].body))["context"] as? [String: Any])?["profile"] as? [String: Any])
+        XCTAssertEqual(openingProfile["weight_kg"] as? Double, 72.5, "round 1: the scale reading leaves at half-kilo resolution")
 
         // Not vacuous: the three tools really ran and their data went out.
         let round2 = try json(try XCTUnwrap(sent[1].body))
@@ -935,5 +941,136 @@ final class CoachHostileAnswerTests: XCTestCase {
         XCTAssertNotNil(outputs[0]["error"], "an unknown tool is refused, not run")
         let ran = outputs.filter { $0["error"] == nil }.count
         XCTAssertLessThanOrEqual(ran, flags.maxToolCalls, "the budget caps real executions")
+    }
+}
+
+// MARK: - Profile values imported from Apple Health stay off the cloud (owner decision 2026-10-22)
+
+final class HealthImportedProfileTests: XCTestCase {
+    func testImportMarksTheFieldsItFilledAndAnEditMakesAValueTheUsersOwn() {
+        var draft = ProfileDraft(locale: Locale(identifier: "en_GB"))
+        let count = draft.importFromHealth(age: 41, sex: "female", heightCm: nil, weightKg: 81.3)
+        XCTAssertEqual(count, 3)
+        XCTAssertEqual(draft.healthImported, ["age", "sex", "weight_kg"])
+        draft.setWeight(displayValue: 80)          // the user types their own weight
+        XCTAssertEqual(draft.healthImported, ["age", "sex"])
+        draft.heightCm = 170                       // a field Health never filled
+        XCTAssertEqual(draft.healthImported, ["age", "sex"])
+    }
+
+    @MainActor
+    func testTheMarksSurviveSavingAndReopening() throws {
+        let c = try TestSupport.makeContext()
+        let profile = UserProfile()
+        c.insert(profile)
+        var draft = ProfileDraft(profile: profile)
+        _ = draft.importFromHealth(age: 41, sex: nil, heightCm: 172, weightKg: nil)
+        draft.apply(to: profile)
+        try c.save()
+        XCTAssertEqual(ProfileDraft(profile: profile).healthImported, ["age", "height_cm"], "reopening the screen keeps them")
+    }
+
+    func testTheToolFilterDropsMarkedFieldsAndTheListItself() throws {
+        let object = try JSONSerialization.jsonObject(with: Data(#"""
+        {"profile":{"age":41,"sex":"female","height_cm":172,"weight_kg":81.3,"health_imported":["age","weight_kg"]}}
+        """#.utf8))
+        let profile = try XCTUnwrap((CloudToolOutputFilter.sanitize(object) as? [String: Any])?["profile"] as? [String: Any])
+        XCTAssertEqual(Set(profile.keys), ["sex", "height_cm"])
+    }
+}
+
+@MainActor
+final class HealthImportedWireTests: XCTestCase {
+    /// Real chain again: a profile whose age and weight came from Health → neither leaves, in round 1 (context) or in
+    /// round 2 (`get_profile_context`); the user's own height does; the marker list itself never leaves.
+    func testImportedAgeAndWeightNeverReachTheServer() async throws {
+        let c = try TestSupport.makeContext()
+        let profile = UserProfile(age: 41, sex: "female", heightCm: 172, weightKg: 81.3)
+        profile.healthImported = ["age", "weight_kg"]
+        c.insert(profile)
+        try c.save()
+        let transport = CoachProxyTransport([
+            .init(status: 200, body: """
+            {"turn_id":"t8","round":1,"status":"tool_calls","remaining_rounds":3,"answer":null,"tool_calls":[\
+            {"call_id":"c1","name":"get_profile_context","arguments":{}}]}
+            """),
+            .init(status: 200, body: """
+            {"turn_id":"t8","round":2,"status":"answer","remaining_rounds":2,"tool_calls":[],"answer":\(answerJSON())}
+            """),
+        ])
+        let client = AgaraCoachProxyClient(config: coachConfig, auth: signedInAuth(transport),
+                                           transport: transport, appVersion: "1.1.0", appBuild: "3")
+        let flags = CoachFeatureFlags(settings: TestSupport.enabledCoachSettings(), hasAPIKey: true)
+        let orchestrator = CoachOrchestrator(client: client, registry: ToolRegistry(flags: flags), flags: flags,
+                                             toolContext: ToolExecutionContext(modelContext: c, flags: flags))
+        let result = await orchestrator.runTurn(userText: "am I a healthy weight?",
+                                                packet: CoachContextBuilder.build(context: c), recentMessages: [])
+        XCTAssertNil(result.error)
+        let sent = transport.coachRequests
+        XCTAssertEqual(sent.count, 2)
+
+        let opening = try json(try XCTUnwrap(sent[0].body))
+        let contextProfile = try XCTUnwrap((opening["context"] as? [String: Any])?["profile"] as? [String: Any])
+        XCTAssertNil(contextProfile["age"]); XCTAssertNil(contextProfile["weight_kg"])
+        XCTAssertNotNil(contextProfile["height_cm"], "the user's own value still goes")
+
+        let round2 = try json(try XCTUnwrap(sent[1].body))
+        let output = try XCTUnwrap((round2["tool_results"] as? [[String: Any]])?.first?["output"] as? [String: Any])
+        let toolProfile = try XCTUnwrap(output["profile"] as? [String: Any])
+        XCTAssertNil(toolProfile["age"]); XCTAssertNil(toolProfile["weight_kg"])
+        XCTAssertEqual(toolProfile["height_cm"] as? Double, 172)
+
+        let wire = sent.map { String(decoding: $0.body ?? Data(), as: UTF8.self) }.joined()
+        for leak in ["81.3", "81.5", "health_imported", "healthImported"] {
+            XCTAssertFalse(wire.contains(leak), "'\(leak)' reached the server")
+        }
+    }
+}
+
+// MARK: - Round 1 sends the trimmer's projection, never the raw packet (found 2026-10-22)
+
+/// `CloudContextTrimmer` was written and tested but never called: the proxy client sent the developer message's raw
+/// packet minus the name. These pin that the client's context IS the trimmer's output.
+@MainActor
+final class CloudContextIsTheTrimmedPacketTests: XCTestCase {
+    private func fullPacket() -> CoachContextPacket {
+        var packet = samplePacket(summary: "Two good weeks.")
+        packet.profile.weightKg = 78.3
+        packet.profile.healthImported = ["age"]
+        packet.environment = .init(city: "Canaryville", region: "Canary Region", tempC: 14, condition: "rain",
+                                   highC: 16, lowC: 9, precipitationChancePct: 80, sunrise: "07:31", sunset: "17:52",
+                                   asOf: "2026-10-20T07:00:00Z")
+        packet.recentWorkouts = [.init(id: "w-secret-id", type: "run", startTime: "2026-10-19T17:00:00Z",
+                                       durationMin: 31, distanceKm: 5.27, avgHr: 151, status: "finished")]
+        packet.nutrition = .init(caloriesConsumed: 1450, proteinG: 80, carbsG: 160, fatG: 50, mealsLoggedToday: 2,
+                                 mealsToday: [.init(mealId: "m1", name: "Oat porridge", mealType: "breakfast",
+                                                    time: "08:10", kcal: 380, source: "manual")],
+                                 yesterdayCalories: 1900)
+        return packet
+    }
+
+    func testTheContextSentEqualsTheTrimmersProjection() throws {
+        let packet = fullPacket()
+        let sent = try XCTUnwrap(CoachCloudRequest.packet(in: CoachPromptBuilder.developerMessage(packet: packet)))
+        let expected = CloudContextTrimmer.encode(packet)
+        XCTAssertFalse(expected.isEmpty)
+        let canonical = { (o: [String: Any]) in
+            String(decoding: try! JSONSerialization.data(withJSONObject: o, options: [.sortedKeys]), as: UTF8.self)
+        }
+        XCTAssertEqual(canonical(sent), canonical(expected), "the client must send exactly the allowlist projection")
+
+        let text = canonical(sent)
+        for leak in ["Canaryville", "Canary Region", "Rafay", "w-secret-id", "5.27", "\"timezone\"", "health_imported"] {
+            XCTAssertFalse(text.contains(leak), "'\(leak)' reached the server")
+        }
+        let profile = try XCTUnwrap(sent["profile"] as? [String: Any])
+        XCTAssertEqual(profile["weight_kg"] as? Double, 78.5, "0.5 kg resolution")
+        XCTAssertNil(profile["age"], "imported from Apple Health")
+        XCTAssertNil(sent["environment"])
+    }
+
+    func testAPacketThatDoesNotDecodeSendsAnEmptyContextNotTheRawJSON() {
+        let message = "Current context packet:\n{\"profile\":{\"name\":\"Zebulon\"},\"secret\":1}\n\nConversation summary:\n(no prior summary)"
+        XCTAssertEqual(CoachCloudRequest.packet(in: message)?.isEmpty, true)
     }
 }

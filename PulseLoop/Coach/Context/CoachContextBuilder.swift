@@ -28,7 +28,8 @@ enum CoachContextBuilder {
             name: profile?.name, age: profile?.age, sex: profile?.sex,
             heightCm: profile?.heightCm, weightKg: profile?.weightKg,
             units: (profile?.units ?? .metric).rawValue,
-            completeness: completeness
+            completeness: completeness,
+            healthImported: profile.map { $0.healthImported.isEmpty ? nil : $0.healthImported.sorted() } ?? nil
         )
 
         let deviceContext = CoachContextPacket.DeviceContext(

@@ -69,12 +69,31 @@ struct OnboardingProgressStore {
 }
 
 struct ProfileDraft: Equatable {
+    /// Profile field names, as the coach's JSON spells them.
+    enum Field {
+        static let age = "age", sex = "sex", heightCm = "height_cm", weightKg = "weight_kg"
+    }
+
     var name = ""
-    var age: Int?
-    var sex: String?
-    var heightCm: Double?
-    var weightKg: Double?
+    // Any edit of an imported value makes it the user's own (no longer "from Apple Health"). Whole-draft assignment
+    // (loading the screen) does not trigger these observers.
+    var age: Int? { didSet { healthImported.remove(Field.age) } }
+    var sex: String? { didSet { healthImported.remove(Field.sex) } }
+    var heightCm: Double? { didSet { healthImported.remove(Field.heightCm) } }
+    var weightKg: Double? { didSet { healthImported.remove(Field.weightKg) } }
     var units: UnitsPreference
+    /// Fields whose value came from Apple Health and was not edited since (`UserProfile.healthImported`).
+    var healthImported: Set<String> = []
+
+    /// "Import from Apple Health": fills what Health has and marks those fields as imported.
+    mutating func importFromHealth(age: Int?, sex: String?, heightCm: Double?, weightKg: Double?) -> Int {
+        var count = 0
+        if let age { self.age = age; healthImported.insert(Field.age); count += 1 }
+        if let sex, ["female", "male", "other"].contains(sex) { self.sex = sex; healthImported.insert(Field.sex); count += 1 }
+        if let heightCm { self.heightCm = heightCm; healthImported.insert(Field.heightCm); count += 1 }
+        if let weightKg { self.weightKg = weightKg; healthImported.insert(Field.weightKg); count += 1 }
+        return count
+    }
 
     init(profile: UserProfile? = nil, locale: Locale = .current) {
         name = profile?.name ?? ""
@@ -83,6 +102,7 @@ struct ProfileDraft: Equatable {
         heightCm = profile?.heightCm
         weightKg = profile?.weightKg
         units = profile?.units ?? Self.preferredUnits(for: locale)
+        healthImported = profile?.healthImported ?? []
     }
 
     static func preferredUnits(for locale: Locale) -> UnitsPreference {
@@ -116,6 +136,7 @@ struct ProfileDraft: Equatable {
         profile.sex = sex
         profile.heightCm = heightCm
         profile.weightKg = weightKg
+        profile.healthImported = healthImported
         profile.units = units
         profile.updatedAt = AppClock.now
     }

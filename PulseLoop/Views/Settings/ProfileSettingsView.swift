@@ -129,14 +129,8 @@ struct ProfileSettingsView: View {
                 return
             }
             let data = await HealthSyncService.shared.fetchUserProfileData()
-            var imported = 0
-            if let age = data.age { draft.age = age; imported += 1 }
-            if let sex = data.sex, ["female", "male", "other"].contains(sex) {
-                draft.sex = sex
-                imported += 1
-            }
-            if let heightCm = data.heightCm { draft.heightCm = heightCm; imported += 1 }
-            if let weightKg = data.weightKg { draft.weightKg = weightKg; imported += 1 }
+            let imported = draft.importFromHealth(age: data.age, sex: data.sex,
+                                                  heightCm: data.heightCm, weightKg: data.weightKg)
             importing = false
             importStatus = imported > 0
                 ? "Imported \(imported) metric\(imported == 1 ? "" : "s")."

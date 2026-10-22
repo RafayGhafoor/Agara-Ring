@@ -356,14 +356,17 @@ nonisolated enum CoachCloudRequest {
         else { return nil }
         let json = developerMessage[start.upperBound..<end.lowerBound]
             .trimmingCharacters(in: .whitespacesAndNewlines)
+        // Only the trimmer's allowlist projection ever leaves (contract §5). Until 2026-10-22 the raw packet went out
+        // minus the name — the trimmer existed and was tested but nothing called it, so the environment block (city,
+        // weather), raw weight, workout distance/HR and Health-imported profile values reached the server.
+        // Fail CLOSED: a packet that does not decode sends an empty context (the server needs a non-null one), never
+        // the raw JSON.
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
         guard let data = json.data(using: .utf8),
-              var object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
-        else { return nil }
-        if var profile = object["profile"] as? [String: Any] {
-            profile.removeValue(forKey: "name")
-            object["profile"] = profile
-        }
-        return object
+              let packet = try? decoder.decode(CoachContextPacket.self, from: data)
+        else { return [:] }
+        return CloudContextTrimmer.encode(packet)
     }
 
     /// The rolling summary that rides beside the history (§6 `summary`).

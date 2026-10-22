@@ -23,7 +23,7 @@ import Foundation
 /// characteristics the user confirms), so no HealthKit sample exists in the store for the packet to
 /// carry. The projection above is what keeps it that way — `CloudContextTrimmerTests` pins the encoded
 /// key set, so a new field fails the test instead of shipping.
-struct CoachCloudContext: Encodable, Equatable {
+nonisolated struct CoachCloudContext: Encodable, Equatable {
     var generatedAt: String
     var profile: Profile
     var device: Device
@@ -142,7 +142,7 @@ struct CoachCloudContext: Encodable, Equatable {
 
 /// Turns the on-device packet into the trimmed cloud payload (`CoachCloudContext`), and encodes it as
 /// the `context` of a coach turn request.
-enum CloudContextTrimmer {
+nonisolated enum CloudContextTrimmer {
     /// Weights leave at half-kilo resolution: `72.3 kg` → `72.5 kg`, so the scale reading itself never
     /// goes out while advice can still use a real number.
     static func roundWeight(_ weightKg: Double?) -> Double? {
@@ -150,14 +150,20 @@ enum CloudContextTrimmer {
         return (weightKg * 2).rounded() / 2
     }
 
+    /// A profile value imported from Apple Health never goes to the cloud coach (consent: "never … anything from Apple
+    /// Health that another app recorded"; a smart scale's weight would otherwise leave through us).
+    private static func fromHealth(_ packet: CoachContextPacket, _ field: String) -> Bool {
+        packet.profile.healthImported?.contains(field) ?? false
+    }
+
     static func build(_ packet: CoachContextPacket) -> CoachCloudContext {
         CoachCloudContext(
             generatedAt: packet.generatedAt,
             profile: CoachCloudContext.Profile(
-                age: packet.profile.age,
-                sex: packet.profile.sex,
-                heightCm: packet.profile.heightCm,
-                weightKg: roundWeight(packet.profile.weightKg),
+                age: fromHealth(packet, "age") ? nil : packet.profile.age,
+                sex: fromHealth(packet, "sex") ? nil : packet.profile.sex,
+                heightCm: fromHealth(packet, "height_cm") ? nil : packet.profile.heightCm,
+                weightKg: fromHealth(packet, "weight_kg") ? nil : roundWeight(packet.profile.weightKg),
                 units: packet.profile.units
             ),
             device: CoachCloudContext.Device(
@@ -273,10 +279,13 @@ nonisolated enum CloudToolOutputFilter {
     private static func sanitize(_ value: Any, parent: String?) -> Any {
         if let object = value as? [String: Any] {
             var out: [String: Any] = [:]
-            for (key, child) in object where !neverKeys.contains(key) {
+            // A profile names the fields that came from Apple Health; those, and the list itself, stay on the phone.
+            let fromHealth = parent == "profile"
+                ? Set((object["health_imported"] as? [String]) ?? (object["healthImported"] as? [String]) ?? []) : []
+            for (key, child) in object where !neverKeys.contains(key) && !fromHealth.contains(key) {
                 if parent == "profile" {
                     // The person's name never leaves; the weight leaves at half-kilo resolution like the packet's.
-                    if key == "name" { continue }
+                    if key == "name" || key == "health_imported" || key == "healthImported" { continue }
                     if key == "weight_kg", let kg = (child as? NSNumber)?.doubleValue {
                         out[key] = (kg * 2).rounded() / 2
                         continue
