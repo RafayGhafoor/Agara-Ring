@@ -266,12 +266,16 @@ final class NudgeLedgerStore {
             cached[index].outcome = outcome
             cached[index] = NudgeLedgerEntry(id: cached[index].id, nudgeId: nudge.id, rule: nudge.ruleID,
                                              category: nudge.category, title: nudge.title,
-                                             date: cached[index].date, outcome: outcome)
+                                             date: cached[index].date, outcome: outcome,
+                                             templateID: nudge.templateID)
             persist()
             return cached[index]
         }
+        // The template id is what the 7-day wording rotation reads (`NudgeLedger.templateLastUsed`); it was dropped
+        // here, so the rotation never saw a variant as used.
         let entry = NudgeLedgerEntry(id: UUID().uuidString, nudgeId: nudge.id, rule: nudge.ruleID,
-                                     category: nudge.category, title: nudge.title, date: now, outcome: outcome)
+                                     category: nudge.category, title: nudge.title, date: now, outcome: outcome,
+                                     templateID: nudge.templateID)
         cached.append(entry)
         persist()
         return entry

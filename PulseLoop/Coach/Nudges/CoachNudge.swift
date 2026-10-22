@@ -354,8 +354,15 @@ extension NudgeFact {
             return evidence.metric.contains("delta") || evidence.metric.contains("improvement")
                 || evidence.metric.contains("change") ? "+\(value)%" : "\(value)%"
         case "min_of_day":
-            let minutes = Int(evidence.value.rounded()) % (24 * 60)
-            return String(format: "%02d:%02d", minutes / 60, minutes % 60)
+            // Wrap first: a bedtime centred on midnight is negative in the evening (-65 = 22:55). Then the locale's
+            // own clock ("10:55 PM"), matching the card's sentence instead of a 24-hour "%02d:%02d".
+            let minutes = ((Int(evidence.value.rounded()) % 1440) + 1440) % 1440
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = TimeZone(identifier: "UTC")!
+            let date = calendar.date(from: DateComponents(year: 2000, month: 1, day: 1,
+                                                          hour: minutes / 60, minute: minutes % 60)) ?? Date()
+            return date.formatted(Date.FormatStyle(date: .omitted, time: .shortened, locale: locale,
+                                                   calendar: calendar, timeZone: calendar.timeZone))
         case "bpm":
             let value = Int(evidence.value.rounded())
             return evidence.metric.contains("delta") && value > 0 ? "+\(value) bpm" : "\(value) bpm"
@@ -433,15 +440,91 @@ struct NudgeFixtureProvider: NudgeProviding, NudgeStatusProviding {
     }
 }
 
-/// Which provider this build runs. Debug builds can substitute a fixture; everything else is silent until the real
-/// provider (signals + rules + policy) is wired to the store.
+/// The real engine behind the cards: the store's signals → the rules → the user's settings → the policy.
+///
+/// **Cards only (1.1).** The policy is run with notifications treated as off, which its rule 10 already defines: every
+/// nudge that survives is delivered as a card, and no push budget is spent. No push can leave this provider; push
+/// delivery is a separate decision (owner 2026-10-22: no nudge pushes for external testers yet).
+@MainActor
+struct LiveNudgeProvider: NudgeProviding, NudgeStatusProviding {
+    var ledgerStore: NudgeLedgerStore = .shared
+    var preferences: NudgePreferencesStore = .shared
+    var calendar: Calendar = .current
+
+    func pending(now: Date, context: ModelContext) -> [CoachNudge] {
+        let signals = CoachSignalsBuilder.build(context: context, now: now, calendar: calendar)
+        let settings = Self.settings(from: preferences)
+        var ledger = NudgeLedger.build(entries: ledgerStore.entries, snoozes: ledgerStore.snoozes,
+                                       now: now, calendar: calendar)
+        ledger.notificationsEnabled = false   // cards only — see the type's comment
+
+        var outcomes = NudgeRules.evaluate(signals, settings: settings, lastUsed: ledger.templateLastUsed, now: now)
+        // Settings' switches are per TOPIC, the engine's per category, and they do not line up (G1 is an activity-
+        // category rule under "Patterns"; E1 and F2 share a category across two topics). Filter per rule instead.
+        outcomes = outcomes.map { outcome in
+            guard outcome.nudge != nil, !Self.topicOn(outcome.rule, preferences) else { return outcome }
+            return RuleOutcome(rule: outcome.rule, nudge: nil, silentReason: "turned off in settings")
+        }
+        let plan = CoachNudgePolicy.decide(candidates: outcomes, ledger: ledger, now: now, settings: settings,
+                                           signals: signals, calendar: calendar)
+
+        // A card shown today and not yet answered stays while its rule still applies. The feed records each shown
+        // card, and the policy then (rightly) treats it as sent — without this, the next refresh's gap or once-a-day
+        // gate would take the card away seconds after it appeared.
+        let unanswered = Set(ledgerStore.entries
+            .filter { calendar.isDate($0.date, inSameDayAs: now) && $0.outcome == .shown }
+            .map(\.rule))
+        var cards = plan.delivered
+        for outcome in outcomes {
+            guard let nudge = outcome.nudge, unanswered.contains(nudge.ruleID),
+                  !cards.contains(where: { $0.rule == nudge.rule }),
+                  !ledgerStore.isSnoozed(nudge.category, now: now) else { continue }
+            cards.append(nudge)
+        }
+        return cards.sorted { lhs, rhs in
+            let left = CoachNudgePolicy.priority.firstIndex(of: lhs.category) ?? .max
+            let right = CoachNudgePolicy.priority.firstIndex(of: rhs.category) ?? .max
+            return left != right ? left < right : lhs.severity > rhs.severity
+        }
+    }
+
+    func status(now: Date, context: ModelContext) -> NudgeStatus {
+        let signals = CoachSignalsBuilder.build(context: context, now: now, calendar: calendar)
+        let nights = signals.baseline.nightsRecorded
+        return NudgeStatus(learningBaseline: nights < AgaraConfig.Nudges.baselineMinNights, nightsRecorded: nights)
+    }
+
+    /// The user's Notifications settings in the engine's terms. Topic switches are applied per rule in `pending`.
+    static func settings(from prefs: NudgePreferencesStore) -> NudgeSettings {
+        var settings = NudgeSettings()
+        settings.dailyLimit = prefs.dailyLimit
+        settings.celebrationExtra = prefs.celebrationsExtra
+        settings.quietMode = prefs.quietHoursFollowSleep ? .followSleep : .fixed
+        settings.quietStart = prefs.quietStartMinutes
+        settings.quietEnd = prefs.quietEndMinutes
+        settings.weeklyReviewWeekday = prefs.weeklyWeekday
+        settings.weeklyReviewMinute = prefs.weeklyHour * 60
+        settings.stepReminders = prefs.stepReminderHours != nil
+        return settings
+    }
+
+    /// The "Celebrations" switch is the extra celebration slot, not an off switch (`NudgePreferencesStore.isOn`), so
+    /// celebrations are never filtered here.
+    static func topicOn(_ rule: NudgeRule, _ prefs: NudgePreferencesStore) -> Bool {
+        let topic = NudgeTopic.topic(forRule: rule.rawValue, category: rule.category)
+        return topic == .celebrations || prefs.isOn(topic)
+    }
+}
+
+/// Which provider this build runs: the real engine, or — in a debug build, for UI tests and screenshots — a fixture.
 enum NudgeEngine {
+    @MainActor
     static func provider() -> NudgeProviding & NudgeStatusProviding {
         #if DEBUG
-        if let fixture = DebugLaunch.string("nudgeFixture"), !fixture.isEmpty, fixture != "off" {
-            return NudgeFixtureProvider(fixture: fixture)
+        if let fixture = DebugLaunch.string("nudgeFixture"), !fixture.isEmpty {
+            return fixture == "off" ? SilentNudgeProvider() : NudgeFixtureProvider(fixture: fixture)
         }
         #endif
-        return SilentNudgeProvider()
+        return LiveNudgeProvider()
     }
 }

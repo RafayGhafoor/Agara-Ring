@@ -259,3 +259,31 @@ final class NudgeTitleTests: XCTestCase {
         XCTAssertEqual(CoachNudge.title(from: "No data from Agara Ring for 26 hours"), "No data from Agara Ring for 26 hours")
     }
 }
+
+/// Found by wiring the engine to the demo store (2026-10-22): signals and evidence that the rule cases never exercised.
+final class NudgeLiveDataTests: XCTestCase {
+    func testBedtimesAreComparedAcrossMidnight() {
+        XCTAssertEqual(CoachSignalsBuilder.centeredBedMinute(23 * 60), -60)
+        XCTAssertEqual(CoachSignalsBuilder.centeredBedMinute(30), 30)
+        XCTAssertEqual(CoachSignalsBuilder.centeredBedMinute(-65), -65)
+        // 23:00 and 00:30 are 90 minutes apart, not 22.5 hours.
+        XCTAssertEqual(abs(CoachSignalsBuilder.centeredBedMinute(23 * 60) - CoachSignalsBuilder.centeredBedMinute(30)), 90)
+    }
+
+    func testAUsualBedtimeReadsAsAClockTime() {
+        let evening = CoachNudgeEvidence(metric: "median_bedtime_minute", value: -65, unit: "min_of_day")
+        // Apple writes a narrow no-break space before "PM" (U+202F) — correct typography, so normalise it here.
+        let text = NudgeFact.format(evening, locale: Locale(identifier: "en_US_POSIX")).replacingOccurrences(of: "\u{202F}", with: " ")
+        XCTAssertEqual(text, "10:55 PM")
+    }
+
+    func testStepsWithoutHourlyBucketsKeepTheStillnessNudgeSilent() {
+        var signals = CoachSignals(now: Date(timeIntervalSince1970: 1_792_000_000))
+        signals.today.steps = 8_401
+        signals.today.blocks = []
+        signals.today.awake = true
+        let b3 = NudgeRules.evaluate(signals, now: signals.now).first { $0.rule == .b3 }
+        XCTAssertNil(b3?.nudge, "B3 fired with 8,401 steps and no hourly data")
+        XCTAssertEqual(b3?.silentReason, "no hourly step data today")
+    }
+}

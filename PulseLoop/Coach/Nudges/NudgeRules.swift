@@ -199,6 +199,10 @@ enum NudgeRules {
 
         func b3() -> RuleOutcome {
             if let reason = activitySilence { return silent(.b3, reason) }
+            // Unknown is not zero. With steps today but no hourly buckets, the store cannot say when the user last
+            // moved, and "minutes since the last block" fell back to "since midnight": a card claimed "still for
+            // 16 h 50 min" on a day with 8,401 steps. Stay silent until the ring delivers the buckets.
+            if signals.today.blocks.isEmpty, signals.today.steps > 0 { return silent(.b3, "no hourly step data today") }
             guard signals.minutesSinceActiveBlock >= N.b3WindowMinutes else { return silent(.b3, "active within 180 min") }
             return make(.b3, slots: [.walkMin: .number(movementBreakMinutes)], evidence: [
                 CoachNudgeEvidence(metric: "minutes_since_active_block", value: Double(signals.minutesSinceActiveBlock), unit: "min")
@@ -238,10 +242,13 @@ enum NudgeRules {
 
         func e1() -> RuleOutcome {
             guard signals.nights.count >= N.e1WindowNights else { return silent(.e1, "fewer than 5 recorded nights") }
-            let medianBed = CoachSignalsBuilder.median(signals.nights.map { Double($0.bedMinute) })
+            // Bedtimes on a circle centred on midnight (`centeredBedMinute`): a plain difference of minute-of-day values
+            // read 23:00 vs 00:30 as a 22-hour drift, and the card said "Drift 12 h 5 min".
+            let bed = { (minute: Int) in CoachSignalsBuilder.centeredBedMinute(minute) }
+            let medianBed = CoachSignalsBuilder.median(signals.nights.map { bed($0.bedMinute) })
             let medianWake = CoachSignalsBuilder.median(signals.nights.map { Double($0.wakeMinute) })
             let driftMinutes = signals.nights.map { night in
-                max(abs(Double(night.bedMinute) - medianBed), abs(Double(night.wakeMinute) - medianWake))
+                max(abs(bed(night.bedMinute) - medianBed), abs(Double(night.wakeMinute) - medianWake))
             }
             let drifting = driftMinutes.filter { $0 > Double(N.e1DriftHours * 60) }.count
             guard drifting >= N.e1DriftNights else {
@@ -255,7 +262,7 @@ enum NudgeRules {
             ], evidence: [
                 CoachNudgeEvidence(metric: "drift_minutes", value: drift, unit: "min"),
                 CoachNudgeEvidence(metric: "drift_nights", value: Double(drifting), unit: "nights"),
-                CoachNudgeEvidence(metric: "median_bedtime_minute", value: medianBed, unit: "min")
+                CoachNudgeEvidence(metric: "median_bedtime_minute", value: medianBed, unit: "min_of_day")
             ], severity: drift / 60)
         }
 

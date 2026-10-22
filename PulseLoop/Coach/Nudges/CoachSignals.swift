@@ -195,6 +195,14 @@ struct CoachSignals: Equatable, Sendable {
 
 /// Reads the app's stores once and produces the snapshot. The only place in the nudge engine that touches SwiftData.
 enum CoachSignalsBuilder {
+    /// A bedtime as minutes from midnight on a circle centred on it: 23:00 → -60, 00:30 → +30. Bedtimes straddle
+    /// midnight, so a plain median or difference of 0…1439 values mixes 1380 (23:00) with 30 (00:30) — a "drift" of
+    /// 22 h for a 90-minute change, and a median that is no time anyone went to bed.
+    static func centeredBedMinute(_ minute: Int) -> Double {
+        let m = ((minute % 1440) + 1440) % 1440
+        return Double(m >= 720 ? m - 1440 : m)
+    }
+
 
     static func build(context: ModelContext, now: Date = AppClock.now, calendar: Calendar = .current) -> CoachSignals {
         typealias N = AgaraConfig.Nudges
@@ -204,9 +212,17 @@ enum CoachSignalsBuilder {
         let window = N.baselineDays
 
         // Sleep nights, newest first, with the coverage each one actually recorded.
-        let sessions = ((try? context.fetch(FetchDescriptor<SleepSession>(
+        let allSessions = ((try? context.fetch(FetchDescriptor<SleepSession>(
             sortBy: [SortDescriptor(\.startAt, order: .reverse)]
-        ))) ?? []).filter { $0.startAt <= now }.prefix(window * 2).map { $0 }
+        ))) ?? []).filter { $0.startAt <= now }
+        // One night per waking day: its main sleep by the app's one sleep-day rule (`SleepDayRule`, the longest
+        // session; the rest are naps). Every session used to count as a "night", so a 2 pm nap entered the bedtime
+        // median and the baseline — the demo store's naps produced "Drift 12 h 5 min" on the Patterns card.
+        let byWakingDay = Dictionary(grouping: allSessions) { calendar.startOfDay(for: $0.endAt) }
+        let sessions = byWakingDay.values
+            .compactMap { SleepDayRule.split($0, minutes: \.totalMinutes, start: \.startAt)?.main }
+            .sorted { $0.startAt > $1.startAt }
+            .prefix(window * 2).map { $0 }
         let nights: [NightPointSnapshot] = sessions.map { session in
             let sessionID = session.id
             let blocks = ((try? context.fetch(FetchDescriptor<SleepStageBlock>(
@@ -231,7 +247,7 @@ enum CoachSignalsBuilder {
         signals.baseline = CoachSignals.Baseline(
             nightsRecorded: baselineNights.count,
             sleepMinutes: median(baselineNights.map(\.sleepMinutes)),
-            bedMinute: Int(median(baselineNights.map { Double($0.bedMinute) })),
+            bedMinute: Int(median(baselineNights.map { centeredBedMinute($0.bedMinute) }).rounded()),
             wakeMinute: Int(median(baselineNights.map { Double($0.wakeMinute) })),
             restingHeartRate: median(baselineNights.map { restingHeartRate(for: $0, in: heartRates) }.filter { $0 > 0 }),
             eveningStress: median(baselineNights.compactMap { eveningStress(before: $0.startAt, readings: stressReadings) }.filter { $0 > 0 }),
