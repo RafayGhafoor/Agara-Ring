@@ -178,6 +178,12 @@ struct CoachView: View {
             }
             if nav.requestedConversationId != nil { openRequestedConversation() }
             refreshStarterPrompts()
+            #if DEBUG
+            // `-coachDemoChart YES`: seed one real assistant answer carrying a chart, so the chart's rendering (the
+            // shared `AgaraChart` through `CoachChartView`) can be screenshotted without a cloud turn. It writes the same
+            // `coach_response` JSON a real answer carries, so it exercises the production path end to end.
+            if DebugLaunch.bool("coachDemoChart") { seedDemoChartAnswer() }
+            #endif
         }
         // New ring data changes what the empty thread should suggest ("I'm at 4,210 steps…").
         .onChange(of: dataChange.token) { _, _ in refreshStarterPrompts() }
@@ -404,6 +410,49 @@ struct CoachView: View {
         guard !viewModel.isSending else { return false }
         return !draft.trimmingCharacters(in: .whitespaces).isEmpty || stagedAttachment != nil
     }
+
+    #if DEBUG
+    /// Write one assistant message whose `coach_response` carries a chart. DEBUG only; used by screenshot runs
+    /// (`-coachDemoChart YES`), never in a release build.
+    private func seedDemoChartAnswer() {
+        let context = modelContext
+        let conversationId = activeConversationId ?? {
+            let convo = CoachConversation()
+            context.insert(convo)
+            activeConversationId = convo.id
+            return convo.id
+        }()
+        let existing = (try? context.fetch(FetchDescriptor<CoachMessage>(
+            predicate: #Predicate { $0.conversationId == conversationId }))) ?? []
+        guard !existing.contains(where: { $0.cardsJSON?.contains("\"chart\"") == true }) else { return }
+        let answer: [String: Any] = [
+            "response_type": "insight_with_chart",
+            "title": "Sleep, last three nights",
+            "summary": "You averaged 6 h 36 m over the last three nights, 1 h 24 m under your 8 h goal. Sunday was the shortest at 5 h 56 m.",
+            "bullets": ["Deep sleep peaked on Friday (1 h 11 m).", "Bedtime drifted 40 min later on Sunday."],
+            "chart": [
+                "chart_type": "line", "title": "Sleep per night", "metric": "sleep",
+                "range": ["start": "2026-10-17", "end": "2026-10-19"],
+                "data": [
+                    ["x": "2026-10-17", "y": 431, "series": NSNull()],
+                    ["x": "2026-10-18", "y": 356, "series": NSNull()],
+                    ["x": "2026-10-19", "y": 402, "series": NSNull()],
+                ],
+                "annotations": [["x": "2026-10-19", "label": "last night"]],
+            ],
+            "safety_note": NSNull(), "data_quality_note": "Sample data, not live readings.",
+            "sources": [],
+            "follow_up_chips": ["Why was Sunday shorter?", "How does this compare with last week?", "What time should I go to bed?"],
+            "actions_taken": [], "confidence": "medium",
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: answer),
+              let json = String(data: data, encoding: .utf8) else { return }
+        let message = CoachMessage(conversationId: conversationId, role: "assistant", body: "You averaged 6 h 36 m…")
+        message.cardsJSON = json
+        context.insert(message)
+        try? context.save()
+    }
+    #endif
 
     /// Compresses + persists the picked image and stages it for the next send.
     private func stage(_ image: UIImage) {
