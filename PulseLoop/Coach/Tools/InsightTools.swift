@@ -33,9 +33,20 @@ enum InsightTools {
     }
     /// JSON-friendly number: rounded, or null.
     static func num(_ v: Double?, _ places: Int = 1) -> Any { v.map { $0.rounded(toPlaces: places) } as Any? ?? NSNull() }
+    /// Display precision per metric (owner decision C, 2026-10-23): the coach shows whole numbers for heart rate, stress,
+    /// scores, steps, minutes, SpO2 and energy, one decimal for breathing rate and distance. The tools round at source so
+    /// the model never sees "67.7 bpm" to copy; the server prompt rounds as well, for older builds.
+    static func places(_ metric: CoachChartMetric) -> Int {
+        switch metric {
+        case .respRate, .distance: return 1
+        default: return 0
+        }
+    }
+    static func num(_ v: Double?, _ metric: CoachChartMetric) -> Any { num(v, places(metric)) }
+    /// Percent change, whole (the coach shows whole percentages).
     static func pct(_ now: Double?, _ base: Double?) -> Any {
         guard let now, let base, base != 0 else { return NSNull() }
-        return ((now - base) / abs(base) * 100).rounded(toPlaces: 1)
+        return ((now - base) / abs(base) * 100).rounded(toPlaces: 0)
     }
     static func clock(_ minutes: Double?) -> Any { minutes.map { CoachChartView.clock($0) } as Any? ?? NSNull() }
     static func coverage(_ c: CoachDataAccess.Coverage) -> [String: Any] {
@@ -73,7 +84,10 @@ enum InsightTools {
                 CoachDataAccess.coverage(metric: metric, start: day(-28), end: day(-1), context: ctx))]
         }
         let latestDay = cal.startOfDay(for: latest.date)
-        let prior = all.filter { cal.startOfDay(for: $0.date) < latestDay }
+        let allPrior = all.filter { cal.startOfDay(for: $0.date) < latestDay }
+        // Sleep averages skip nap-only days and partial recordings (shared catalog value); they are counted instead.
+        let minSleep = Double(AgaraConfig.Coach.sleepBaselineMinMinutes)
+        let prior = metric == .sleep ? allPrior.filter { $0.value >= minSleep } : allPrior
         let last28 = prior.filter { $0.date >= (cal.date(byAdding: .day, value: -28, to: latestDay) ?? latestDay) }.map(\.value)
         let last7 = prior.filter { $0.date >= (cal.date(byAdding: .day, value: -7, to: latestDay) ?? latestDay) }.map(\.value)
         let low = last28.isEmpty ? nil : CoachSignalsBuilder.percentile(last28, 0.25)
@@ -82,15 +96,16 @@ enum InsightTools {
         let recent7 = all.suffix(7).map(\.value)
         var entry: [String: Any] = [
             "metric": metric.rawValue,
-            "latest": ["date": CoachDataAccess.localDateString(latest.date), "value": num(latest.value),
+            "latest": ["date": CoachDataAccess.localDateString(latest.date), "value": num(latest.value, metric),
                        "is_today": cal.isDate(latest.date, inSameDayAs: AppClock.now)],
-            "avg_7d": num(mean(last7)), "avg_28d": num(avg28),
-            "typical_low": num(low), "typical_high": num(high),
-            "latest_vs_28d": num(avg28.map { latest.value - $0 }), "latest_vs_28d_pct": pct(latest.value, avg28),
+            "avg_7d": num(mean(last7), metric), "avg_28d": num(avg28, metric),
+            "typical_low": num(low, metric), "typical_high": num(high, metric),
+            "latest_vs_28d": num(avg28.map { latest.value - $0 }, metric), "latest_vs_28d_pct": pct(latest.value, avg28),
             "days_above_typical_last_7": high.map { h in recent7.filter { $0 > h }.count } as Any? ?? NSNull(),
             "days_below_typical_last_7": low.map { l in recent7.filter { $0 < l }.count } as Any? ?? NSNull(),
             "coverage": coverage(CoachDataAccess.coverage(metric: metric, start: day(-28), end: day(-1), context: ctx)),
         ]
+        if metric == .sleep { entry["short_days_excluded"] = allPrior.count - prior.count }
         if metric.isClockTime {
             entry["latest_clock"] = clock(latest.value)
             entry["avg_28d_clock"] = clock(avg28)
@@ -122,8 +137,8 @@ enum InsightTools {
         let rows: [[String: Any]] = weekMetrics.map { m in
             let a = values(m, thisStart, thisEnd, ctx), b = values(m, lastStart, lastEnd, ctx)
             let am = mean(a), bm = mean(b)
-            var row: [String: Any] = ["metric": m.rawValue, "this_week": num(am), "last_week": num(bm),
-                                      "change": num(am.flatMap { x in bm.map { x - $0 } }), "change_pct": m.isClockTime ? NSNull() : pct(am, bm),
+            var row: [String: Any] = ["metric": m.rawValue, "this_week": num(am, m), "last_week": num(bm, m),
+                                      "change": num(am.flatMap { x in bm.map { x - $0 } }, m), "change_pct": m.isClockTime ? NSNull() : pct(am, bm),
                                       "days_this_week": a.count, "days_last_week": b.count,
                                       "sparse": CoachDataAccess.isSparse(daysWithData: min(a.count, b.count), daysInRange: 7)]
             if m.isClockTime { row["this_week_clock"] = clock(am); row["last_week_clock"] = clock(bm) }
@@ -154,14 +169,17 @@ enum InsightTools {
         let nights = CoachDataAccess.sleepDays(start: day(-29), end: day(0), context: ctx)
         var sleepPart: [String: Any] = [:]
         if let last = nights.last, last.date >= (cal.date(byAdding: .day, value: -1, to: today) ?? today) {
-            let prior = nights.dropLast().map { CoachDataAccess.sleepDayValue(.sleep, $0, context: ctx) ?? 0 }
+            let allPrior = nights.dropLast().map { CoachDataAccess.sleepDayValue(.sleep, $0, context: ctx) ?? 0 }
+            // Nap-only days and partial recordings are not nights to average against (shared catalog value).
+            let prior = allPrior.filter { $0 >= Double(AgaraConfig.Coach.sleepBaselineMinMinutes) }
             let total = CoachDataAccess.sleepDayValue(.sleep, last, context: ctx)
             let bedtimes = nights.suffix(7).compactMap { CoachDataAccess.sleepDayValue(.bedtime, $0, context: ctx) }
             sleepPart = ["night": last.night, "total_min": num(total, 0),
                          "score": num(CoachDataAccess.sleepDayValue(.sleepScore, last, context: ctx), 0),
                          "bedtime": clock(CoachDataAccess.sleepDayValue(.bedtime, last, context: ctx)),
                          "avg_28d_min": num(mean(prior), 0), "vs_avg_min": num(total.flatMap { t in mean(prior).map { t - $0 } }, 0),
-                         "bedtime_spread_7_nights_min": num(sd(bedtimes), 0), "nights_in_baseline": prior.count]
+                         "bedtime_spread_7_nights_min": num(sd(bedtimes), 0), "nights_in_baseline": prior.count,
+                         "short_days_excluded": allPrior.count - prior.count]
         } else {
             missing.append("last night's sleep (no recent sleep record)")
         }
@@ -313,7 +331,7 @@ enum InsightTools {
         let hours: [[String: Any]] = (0..<24).compactMap { h in
             guard let byDay = cells[h], !byDay.isEmpty else { return nil }
             let perDay = byDay.values.map { summed ? $0.reduce(0, +) : $0.reduce(0, +) / Double($0.count) }
-            return ["hour": h, "value": num(mean(perDay)), "days": byDay.count]
+            return ["hour": h, "value": num(mean(perDay), metric), "days": byDay.count]
         }
         let valued = hours.compactMap { h -> (Int, Double)? in
             guard let v = h["value"] as? Double, let hour = h["hour"] as? Int else { return nil }
@@ -502,8 +520,8 @@ enum InsightTools {
             let during = values(metric, startRaw, duringEnd, ctx), before = values(metric, day(-days, from: start), day(-1, from: start), ctx)
             return ["name": mem.key, "change": v["change"] as? String ?? "", "metric": metricRaw, "start": startRaw, "days": days,
                     "days_elapsed": min(elapsed, days), "status": elapsed >= days ? "finished" : "running",
-                    "during_avg": num(mean(during)), "before_avg": num(mean(before)),
-                    "change_value": num(mean(during).flatMap { d in mean(before).map { d - $0 } }), "change_pct": pct(mean(during), mean(before)),
+                    "during_avg": num(mean(during), metric), "before_avg": num(mean(before), metric),
+                    "change_value": num(mean(during).flatMap { d in mean(before).map { d - $0 } }, metric), "change_pct": pct(mean(during), mean(before)),
                     "days_with_data_during": during.count, "days_with_data_before": before.count,
                     "sparse": CoachDataAccess.isSparse(daysWithData: min(during.count, before.count), daysInRange: max(1, min(days, elapsed)))]
         }

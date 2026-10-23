@@ -639,6 +639,26 @@ final class AgaraCoachProxyClientTests: XCTestCase {
         XCTAssertTrue(transport.coachRequests.isEmpty, "nothing is replayed to the server")
     }
 
+    /// The Today/Sleep card summaries and the coach notifications send system + developer only. The proxy refused each
+    /// with coach_bad_request (two in production, 2026-10-23); the client now fails before the network and the card
+    /// keeps its scripted copy.
+    func testARequestWithoutAUserMessageNeverReachesTheServer() async throws {
+        let transport = CoachProxyTransport([])
+        let client = client(transport)
+        let body = try OpenAIRequestBuilder.data(
+            model: "agara-cloud",
+            input: [OpenAIRequestBuilder.message(role: "system", content: "Write a card."),
+                    OpenAIRequestBuilder.message(role: "developer", content: "{\"steps\":8214}")],
+            tools: [], textFormat: [:], previousResponseId: nil, reasoningEffort: nil)
+        do {
+            _ = try await client.send(requestBody: body)
+            XCTFail("expected a local failure")
+        } catch {
+            XCTAssertEqual(CoachTurnError(error).kind, .badRequest)
+        }
+        XCTAssertTrue(transport.coachRequests.isEmpty, "no request without a user message reaches the proxy")
+    }
+
     func testTheTurnIsClosedWhenTheAnswerArrives() async throws {
         let transport = CoachProxyTransport([
             .init(status: 200, body: """

@@ -127,6 +127,44 @@ final class CoachInsightToolsTests: XCTestCase {
         XCTAssertEqual(rows.first { $0["metric"] as? String == "bedtime" }?["latest_clock"] as? String, "23:00")
     }
 
+    /// Owner decision C (2026-10-23): the tools round at source — whole numbers for heart rate, stress, steps, minutes;
+    /// one decimal for breathing rate — so the model never sees "67.7" to copy.
+    func testBaselinesRoundForDisplay() async throws {
+        let c = try TestSupport.makeContext()
+        for i in 1...6 { _ = night(c, evening: -i - 1, restingHR: i % 2 == 0 ? 56 : 57) }   // average 56.5
+        _ = night(c, evening: -1, restingHR: 60)
+        let d = at(-2, 10)
+        for v in [14.26, 14.31] { TestSupport.insertMeasurement(kind: .respiratoryRate, value: v, timestamp: d, into: c) }
+        TestSupport.insertMeasurement(kind: .respiratoryRate, value: 15.2, timestamp: at(0, 3), into: c)
+        let out = try await run("get_baselines", #"{"metrics":["resting_hr","resp_rate"]}"#, c)
+        let rows = try XCTUnwrap(out["baselines"] as? [[String: Any]])
+        let rhr = try XCTUnwrap(rows.first { $0["metric"] as? String == "resting_hr" })
+        let avg = try XCTUnwrap(rhr["avg_28d"] as? Double)
+        XCTAssertEqual(avg, avg.rounded(), "resting heart rate is whole: \(avg)")
+        let resp = try XCTUnwrap(rows.first { $0["metric"] as? String == "resp_rate" })
+        let r = try XCTUnwrap(resp["avg_28d"] as? Double)
+        XCTAssertEqual(r, (r * 10).rounded() / 10, "breathing rate keeps one decimal: \(r)")
+    }
+
+    /// The owner's 28-day sleep average read 4 h 52 m while he slept 7 h 04 m: nap-only days and partial recordings
+    /// were averaged as nights. Days under `sleepBaselineMinMinutes` (shared catalog) leave the averages and are counted.
+    func testShortSleepDaysLeaveTheSleepAverages() async throws {
+        let c = try TestSupport.makeContext()
+        for i in 2...8 { _ = night(c, evening: -i - 1, minutes: 420) }                         // 7 h nights
+        for i in 9...11 {                                                                       // nap-only days
+            TestSupport.insertSleep(nightStart: at(-i, 14), stages: Array(repeating: .light, count: 40), into: c)
+        }
+        _ = night(c, evening: -1, minutes: 424)                                                  // last night
+        let readiness = try await run("get_readiness", "{}", c)
+        let sleep = try XCTUnwrap(readiness["sleep"] as? [String: Any])
+        XCTAssertEqual(try XCTUnwrap(sleep["avg_28d_min"] as? Double), 420, accuracy: 1, "naps are not nights to average")
+        XCTAssertEqual(sleep["short_days_excluded"] as? Int, 3)
+        let baselines = try await run("get_baselines", #"{"metrics":["sleep"]}"#, c)
+        let row = try XCTUnwrap((baselines["baselines"] as? [[String: Any]])?.first)
+        XCTAssertEqual(try XCTUnwrap(row["avg_28d"] as? Double), 420, accuracy: 1)
+        XCTAssertEqual(row["short_days_excluded"] as? Int, 3)
+    }
+
     func testWeekReviewIsOneCallForEveryMetric() async throws {
         let c = try TestSupport.makeContext()
         for i in 1...7 { TestSupport.insertActivity(date: TestSupport.day(-i), steps: 9000, into: c) }
@@ -135,7 +173,7 @@ final class CoachInsightToolsTests: XCTestCase {
         let steps = try XCTUnwrap((out["metrics"] as? [[String: Any]])?.first { $0["metric"] as? String == "steps" })
         XCTAssertEqual(steps["this_week"] as? Double, 9000)
         XCTAssertEqual(steps["last_week"] as? Double, 8000)
-        XCTAssertEqual(steps["change_pct"] as? Double, 12.5)
+        XCTAssertEqual(steps["change_pct"] as? Double, 13, "percent changes are whole (owner decision C, 2026-10-23)")
         XCTAssertEqual((out["metrics"] as? [[String: Any]])?.count, InsightTools.weekMetrics.count)
     }
 

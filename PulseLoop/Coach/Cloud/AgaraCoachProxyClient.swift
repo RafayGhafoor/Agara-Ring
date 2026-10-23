@@ -72,6 +72,13 @@ final class AgaraCoachProxyClient: ResponsesClient {
 
     private func openTurn(input: [[String: Any]]) async throws -> OpenAIResponse {
         let opening = CoachCloudRequest.opening(from: input, fallback: opening)
+        // A request with no user message (the Today/Sleep card summaries and coach notifications are system + developer
+        // only) is not a coach turn: the proxy answers coach_bad_request (two in production on 2026-10-23) and could
+        // only ever answer in the coach_response shape, not the card's. Fail here, without a network call — the
+        // callers fall back to their scripted copy, exactly as they did after the 400.
+        guard !opening.message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw CoachCloudFailure(kind: .badRequest, status: 0, code: "no_user_message")
+        }
         let body = try CoachCloudRequest.openingBody(opening, client: client)
         self.opening = opening
         return accept(try CoachCloudRequest.reply(try await post(body)))
