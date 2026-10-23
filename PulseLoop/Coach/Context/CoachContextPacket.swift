@@ -100,14 +100,14 @@ nonisolated struct CoachContextPacket: Codable {
         /// REM minutes of the main sleep (already inside `nightMin`). The ring reports REM; the coach may name it.
         var remMin: Int = 0
         /// The waking day's asleep total (`SleepDayRule`: main sleep + naps). NOT last night — only "today's sleep".
-        var totalMin: Int
+        var dayTotalMin: Int
         var deepMin: Int
         var lightMin: Int
         var awakeMin: Int
         var score: Int?
         var confidence: String
         var decoderNote: String
-        /// Minutes of the day's naps (included in `totalMin`); nil when there were none.
+        /// Minutes of the day's naps (included in `dayTotalMin`); nil when there were none.
         var napMin: Int? = nil
     }
 

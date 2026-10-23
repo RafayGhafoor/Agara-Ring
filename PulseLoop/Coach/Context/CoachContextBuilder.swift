@@ -91,10 +91,10 @@ enum CoachContextBuilder {
             let s = day.main
             return CoachContextPacket.SleepContext(
                 date: localDate(s.session.date),
-                // Last night = the main sleep, REM included; `totalMin` stays the waking day's total incl. naps.
+                // Last night = the main sleep, REM included; `dayTotalMin` stays the waking day's total incl. naps.
                 nightMin: s.deepMinutes + s.lightMinutes + s.remMinutes,
                 remMin: s.remMinutes,
-                totalMin: day.totalMinutes,
+                dayTotalMin: day.totalMinutes,
                 deepMin: s.deepMinutes,
                 lightMin: s.lightMinutes,
                 awakeMin: s.awakeMinutes,

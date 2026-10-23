@@ -97,7 +97,7 @@ nonisolated struct CoachCloudContext: Encodable, Equatable {
         var nightMin: Int = 0
         var remMin: Int = 0
         /// The waking day's total incl. naps; not last night.
-        var totalMin: Int
+        var dayTotalMin: Int
         var deepMin: Int
         var lightMin: Int
         var awakeMin: Int
@@ -214,7 +214,7 @@ nonisolated enum CloudContextTrimmer {
                     date: sleep.date,
                     nightMin: sleep.nightMin,
                     remMin: sleep.remMin,
-                    totalMin: sleep.totalMin,
+                    dayTotalMin: sleep.dayTotalMin,
                     deepMin: sleep.deepMin,
                     lightMin: sleep.lightMin,
                     awakeMin: sleep.awakeMin,

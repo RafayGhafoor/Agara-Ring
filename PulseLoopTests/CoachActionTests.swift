@@ -421,7 +421,7 @@ final class CoachSleepContextTests: XCTestCase {
         let sleep = try XCTUnwrap(packet.latestSleep)
         XCTAssertEqual(sleep.nightMin, 324, "last night is the main sleep: deep + light + REM")
         XCTAssertEqual(sleep.remMin, 64, "REM is decoded and reported")
-        XCTAssertEqual(sleep.totalMin, 605, "the day total adds the 280-minute nap")
+        XCTAssertEqual(sleep.dayTotalMin, 605, "the day total adds the 280-minute nap")
         XCTAssertEqual(sleep.napMin, 280)
 
         // The readiness tool carries the same distinction, because the answer quotes it.

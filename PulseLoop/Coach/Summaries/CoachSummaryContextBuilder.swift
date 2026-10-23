@@ -42,7 +42,7 @@ enum CoachSummaryContextBuilder {
             packet.today.activeMinutes.map(String.init), packet.today.distanceKm.map { String($0) },
             packet.latestVitals.latestHr.map { String(Int($0)) },
             packet.latestVitals.latestSpo2.map { String(Int($0)) },
-            packet.latestSleep.map { "\($0.nightMin):\($0.totalMin):\($0.remMin)" }, packet.today.dataConfidence,
+            packet.latestSleep.map { "\($0.nightMin):\($0.dayTotalMin):\($0.remMin)" }, packet.today.dataConfidence,
         ])
         return Built(
             scopeKey: CoachDataAccess.localDateString(now),
@@ -66,14 +66,14 @@ enum CoachSummaryContextBuilder {
         let memories = CoachContextBuilder.build(context: context, now: now).memories
 
         struct Packet: Encodable {
-            let date: String, totalMin: Int, nightMin: Int, remMin: Int, napMin: Int?, deepMin: Int, lightMin: Int, awakeMin: Int
+            let date: String, dayTotalMin: Int, nightMin: Int, remMin: Int, napMin: Int?, deepMin: Int, lightMin: Int, awakeMin: Int
             let score: Int, scoreLabel: String, awakePct: Int?, deepPct: Int, activitySteps: Int?
             let memories: [CoachContextPacket.MemoryContext]
             let environment: CoachContextPacket.EnvironmentContext?
         }
         let p = Packet(
             date: CoachDataAccess.localDateString(night.session.date),
-            totalMin: day.totalMinutes, nightMin: night.deepMinutes + night.lightMinutes + night.remMinutes,
+            dayTotalMin: day.totalMinutes, nightMin: night.deepMinutes + night.lightMinutes + night.remMinutes,
             remMin: night.remMinutes, napMin: day.naps.isEmpty ? nil : day.napMinutes, deepMin: night.deepMinutes,
             lightMin: night.lightMinutes, awakeMin: night.awakeMinutes,
             score: score.score, scoreLabel: score.label.rawValue, awakePct: score.awakePct,

@@ -40,7 +40,7 @@ final class CloudContextTrimmerTests: XCTestCase {
                 latestHr: 71, latestHrAt: "2026-10-20T07:10:00Z", latestSpo2: 97,
                 latestSpo2At: "2026-10-20T07:10:00Z", restingHrEstimate: 58, peakHrToday: 128),
             latestSleep: .init(
-                date: "2026-10-20", totalMin: 402, deepMin: 78, lightMin: 300, awakeMin: 24,
+                date: "2026-10-20", dayTotalMin: 402, deepMin: 78, lightMin: 300, awakeMin: 24,
                 score: 76, confidence: "medium", decoderNote: "No REM stage decoded.", napMin: nil),
             recentWorkouts: [
                 .init(

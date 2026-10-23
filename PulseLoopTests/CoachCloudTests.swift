@@ -36,7 +36,7 @@ private func samplePacket(summary: String? = nil) -> CoachContextPacket {
                              exerciseDays: 4, mostActiveDay: "2026-10-18"),
         latestVitals: .init(latestHr: 58, latestHrAt: "2026-10-20T06:57:00Z", latestSpo2: 97,
                             latestSpo2At: "2026-10-20T06:57:00Z", restingHrEstimate: 54, peakHrToday: 96),
-        latestSleep: .init(date: "2026-10-19", totalMin: 431, deepMin: 78, lightMin: 320, awakeMin: 33,
+        latestSleep: .init(date: "2026-10-19", dayTotalMin: 431, deepMin: 78, lightMin: 320, awakeMin: 33,
                            score: 82, confidence: "high", decoderNote: "REM not decoded", napMin: nil),
         recentWorkouts: [],
         memories: [.init(type: "preference", key: "training", value: "prefers morning runs", importance: 2)],

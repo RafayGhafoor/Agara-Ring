@@ -74,12 +74,12 @@ final class SleepDayAndSyncPlanTests: XCTestCase {
         insertNightAndNap(context)
         let noon = at(12)
         let packet = CoachContextBuilder.build(context: context, now: noon)
-        XCTAssertEqual(packet.latestSleep?.totalMin, 460)
+        XCTAssertEqual(packet.latestSleep?.dayTotalMin, 460)
         XCTAssertEqual(packet.latestSleep?.napMin, 40)
         XCTAssertEqual(packet.latestSleep?.deepMin, 120, "stage minutes are the night's")
 
         let built = try XCTUnwrap(CoachSummaryContextBuilder.sleepDay(context: context, now: at(15)))
-        XCTAssertTrue(built.json.contains("\"total_min\":460"), built.json)
+        XCTAssertTrue(built.json.contains("\"day_total_min\":460"), built.json)
         XCTAssertTrue(built.json.contains("\"nap_min\":40"), built.json)
         XCTAssertTrue(built.json.contains("\"deep_min\":120"), "the nap used to be taken as the night (\(built.json))")
     }
