@@ -94,7 +94,12 @@ nonisolated struct CoachContextPacket: Codable {
 
     struct SleepContext: Codable {
         var date: String
-        /// The day's asleep total (`SleepDayRule`: main sleep + naps); the stage minutes are the main sleep's.
+        /// **Last night's** asleep minutes: the main sleep's deep + light + REM. This is the number behind "how long did I
+        /// sleep", and it is what the coach must quote for "last night".
+        var nightMin: Int = 0
+        /// REM minutes of the main sleep (already inside `nightMin`). The ring reports REM; the coach may name it.
+        var remMin: Int = 0
+        /// The waking day's asleep total (`SleepDayRule`: main sleep + naps). NOT last night — only "today's sleep".
         var totalMin: Int
         var deepMin: Int
         var lightMin: Int

@@ -177,6 +177,11 @@ struct SleepSummary {
         if blocks.isEmpty, let remMinutesWithoutBlocks { return remMinutesWithoutBlocks }
         return blocks.filter { $0.stage == .rem }.reduce(0) { $0 + $1.durationMinutes }
     }
+
+    /// Time **asleep**: every staged minute except awake — deep + light + REM. `session.totalMinutes` is time in bed
+    /// (first block to last), so it can exceed this when the ring staged an awake stretch; the coach and the tools use
+    /// this number for "how long did I sleep".
+    var asleepMinutes: Int { max(0, deepMinutes) + max(0, lightMinutes) + max(0, remMinutes) }
 }
 
 /// The one sleep-day rule (owner feedback 2026-09-26; AGENTS.md Rule 10), identical on Android: of a waking

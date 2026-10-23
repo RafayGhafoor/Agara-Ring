@@ -169,15 +169,21 @@ enum InsightTools {
         let nights = CoachDataAccess.sleepDays(start: day(-29), end: day(0), context: ctx)
         var sleepPart: [String: Any] = [:]
         if let last = nights.last, last.date >= (cal.date(byAdding: .day, value: -1, to: today) ?? today) {
-            let allPrior = nights.dropLast().map { CoachDataAccess.sleepDayValue(.sleep, $0, context: ctx) ?? 0 }
+            // Readiness is about the NIGHT (main sleep, REM included), never the day total: a long nap must not make a
+            // short night look recovered, and it must not inflate the 28-day baseline it is compared against.
+            let nightSummary = SleepService.summary(for: last.main, context: ctx)
+            let night = Double(nightSummary.asleepMinutes)
+            let allPrior = nights.dropLast().map { Double(SleepService.summary(for: $0.main, context: ctx).asleepMinutes) }
             // Nap-only days and partial recordings are not nights to average against (shared catalog value).
             let prior = allPrior.filter { $0 >= Double(AgaraConfig.Coach.sleepBaselineMinMinutes) }
-            let total = CoachDataAccess.sleepDayValue(.sleep, last, context: ctx)
+            let dayTotal = CoachDataAccess.sleepDayValue(.sleep, last, context: ctx)
+            let napMin = Double(last.naps.reduce(0) { $0 + max(0, $1.totalMinutes) })
             let bedtimes = nights.suffix(7).compactMap { CoachDataAccess.sleepDayValue(.bedtime, $0, context: ctx) }
-            sleepPart = ["night": last.night, "total_min": num(total, 0),
+            sleepPart = ["night": last.night, "night_min": num(night, 0), "rem_min": num(Double(nightSummary.remMinutes), 0),
+                         "day_total_min": num(dayTotal, 0), "nap_min": num(napMin, 0),
                          "score": num(CoachDataAccess.sleepDayValue(.sleepScore, last, context: ctx), 0),
                          "bedtime": clock(CoachDataAccess.sleepDayValue(.bedtime, last, context: ctx)),
-                         "avg_28d_min": num(mean(prior), 0), "vs_avg_min": num(total.flatMap { t in mean(prior).map { t - $0 } }, 0),
+                         "avg_28d_min": num(mean(prior), 0), "vs_avg_min": num(mean(prior).map { night - $0 }, 0),
                          "bedtime_spread_7_nights_min": num(sd(bedtimes), 0), "nights_in_baseline": prior.count,
                          "short_days_excluded": allPrior.count - prior.count]
         } else {
@@ -222,7 +228,7 @@ enum InsightTools {
                 "load": loadPart, "recent_workouts": workouts, "stress": stressPart.isEmpty ? NSNull() : stressPart,
                 "missing": missing,
                 "not_used": ["hrv (the ring's HRV decoding is not validated yet)"],
-                "note": "No readiness score: weigh these against each other and the user's goals. Resting HR is the lowest reading during the main sleep."]
+                "note": "No readiness score: weigh these against each other and the user's goals. Resting HR is the lowest reading during the main sleep. Sleep: night_min is the main sleep (deep + light + REM, awake excluded) and avg_28d_min/vs_avg_min are the same measure over prior nights; day_total_min adds the waking day's naps and is not \"last night\"."]
     }
 
     // MARK: - get_sleep_patterns (use cases 2, 10)
@@ -243,44 +249,50 @@ enum InsightTools {
 
     static func sleepPatternsObject(start: String, end: String, _ ctx: ModelContext) -> [String: Any] {
         let days = CoachDataAccess.sleepDays(start: start, end: end, context: ctx).suffix(31)
-        struct Night { let label: String; let total, bed, wake, awake: Double; let score: Double?; let naps: Double
+        struct Night { let label: String; let night, dayTotal, bed, wake, awake: Double; let score: Double?; let naps: Double
             let deep, light, rem: Int }
         let nights: [Night] = days.map { d in
             let summary = SleepService.summary(for: d.main, context: ctx)
+            let naps = Double(d.naps.reduce(0) { $0 + max(0, $1.totalMinutes) })
+            let dayTotal = CoachDataAccess.sleepDayValue(.sleep, d, context: ctx) ?? 0
             return Night(label: d.night,
-                         total: CoachDataAccess.sleepDayValue(.sleep, d, context: ctx) ?? 0,
+                         night: Double(summary.asleepMinutes),
+                         dayTotal: dayTotal,
                          bed: CoachDataAccess.sleepDayValue(.bedtime, d, context: ctx) ?? 0,
                          wake: CoachDataAccess.sleepDayValue(.wakeTime, d, context: ctx) ?? 0,
                          awake: CoachDataAccess.sleepDayValue(.sleepAwake, d, context: ctx) ?? 0,
                          score: CoachDataAccess.sleepDayValue(.sleepScore, d, context: ctx),
-                         naps: Double(d.naps.reduce(0) { $0 + max(0, $1.totalMinutes) }),
+                         naps: naps,
                          deep: summary.deepMinutes, light: summary.lightMinutes, rem: summary.remMinutes)
         }
         guard !nights.isEmpty else {
             return ["nights": [], "summary": NSNull(), "note": "No sleep recorded in this range."]
         }
-        let medianTotal = CoachSignalsBuilder.median(nights.map(\.total))
+        // "Short"/"late" are judged on the NIGHT (deep + light + REM), not on a day total inflated by naps.
+        let medianTotal = CoachSignalsBuilder.median(nights.map(\.night))
         let medianBed = CoachSignalsBuilder.median(nights.map(\.bed))
         let awakeHigh = max(30, CoachSignalsBuilder.percentile(nights.map(\.awake), 0.75))
-        let pairs = nights.map { ($0.bed, $0.total) }
+        let pairs = nights.map { ($0.bed, $0.night) }
         return [
             "nights": nights.map { n in
-                ["night": n.label, "bedtime": clock(n.bed), "wake": clock(n.wake), "total_min": num(n.total, 0),
+                ["night": n.label, "bedtime": clock(n.bed), "wake": clock(n.wake),
+                 "night_min": num(n.night, 0), "day_total_min": num(n.dayTotal, 0),
                  "awake_min": num(n.awake, 0), "deep_min": n.deep, "light_min": n.light, "rem_min": n.rem,
                  "naps_min": num(n.naps, 0), "score": num(n.score, 0),
-                 "short": n.total < medianTotal - 45, "late": n.bed > medianBed + 45, "fragmented": n.awake > awakeHigh] as [String: Any]
+                 "short": n.night < medianTotal - 45, "late": n.bed > medianBed + 45, "fragmented": n.awake > awakeHigh] as [String: Any]
             },
             "summary": [
-                "nights": nights.count, "avg_total_min": num(mean(nights.map(\.total)), 0),
+                "nights": nights.count, "avg_night_min": num(mean(nights.map(\.night)), 0),
+                "avg_day_total_min": num(mean(nights.map(\.dayTotal)), 0),
                 "median_bedtime": clock(medianBed), "median_wake": clock(CoachSignalsBuilder.median(nights.map(\.wake))),
                 "bedtime_spread_min": num(sd(nights.map(\.bed)), 0), "wake_spread_min": num(sd(nights.map(\.wake)), 0),
-                "short_nights": nights.filter { $0.total < medianTotal - 45 }.count,
+                "short_nights": nights.filter { $0.night < medianTotal - 45 }.count,
                 "late_nights": nights.filter { $0.bed > medianBed + 45 }.count,
                 "fragmented_nights": nights.filter { $0.awake > awakeHigh }.count,
                 "bedtime_vs_duration": nights.count >= 5 ? AnalysisEngine.correlation(pairs).asDictionary : NSNull(),
             ] as [String: Any],
             "coverage": coverage(CoachDataAccess.coverage(metric: .sleep, start: start, end: end, context: ctx)),
-            "note": "Stages are the ring's estimates. 'short' = 45+ min under this user's median, 'late' = bedtime 45+ min after the median, 'fragmented' = awake above max(30 min, this user's 75th percentile). A negative bedtime_vs_duration r means later bedtimes went with shorter nights.",
+            "note": "night_min is the main sleep (deep + light + REM, awake excluded) — the number behind \"last night\". day_total_min adds any naps the ring recorded that waking day; naps_min is that addition. Stages are the ring's estimates. 'short' = 45+ min under this user's median night, 'late' = bedtime 45+ min after the median, 'fragmented' = awake above max(30 min, this user's 75th percentile). A negative bedtime_vs_duration r means later bedtimes went with shorter nights.",
         ]
     }
 

@@ -243,7 +243,9 @@ enum CoachSignalsBuilder {
         let stressReadings = stressReadings(context: context, days: window, now: now)
         let heartRates = heartRateReadings(context: context, now: now)
 
-        let baselineNights = Array(nights.prefix(window))
+        // The night being judged is excluded (`nights.first`): a baseline that contains it damps every deviation it is
+        // then used to measure — the spec says "28-day median excluding the night being judged".
+        let baselineNights = Array(nights.dropFirst().prefix(window))
         signals.baseline = CoachSignals.Baseline(
             nightsRecorded: baselineNights.count,
             sleepMinutes: median(baselineNights.map(\.sleepMinutes)),

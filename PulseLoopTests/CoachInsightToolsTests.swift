@@ -157,10 +157,12 @@ final class CoachInsightToolsTests: XCTestCase {
         _ = night(c, evening: -1, minutes: 424)                                                  // last night
         let readiness = try await run("get_readiness", "{}", c)
         let sleep = try XCTUnwrap(readiness["sleep"] as? [String: Any])
-        XCTAssertEqual(try XCTUnwrap(sleep["avg_28d_min"] as? Double), 420, accuracy: 1, "naps are not nights to average")
+        // Readiness compares NIGHTS (main sleep, awake excluded): a 7 h night with 15 awake minutes is 405 asleep.
+        XCTAssertEqual(try XCTUnwrap(sleep["avg_28d_min"] as? Double), 405, accuracy: 1, "naps are not nights to average")
         XCTAssertEqual(sleep["short_days_excluded"] as? Int, 3)
         let baselines = try await run("get_baselines", #"{"metrics":["sleep"]}"#, c)
         let row = try XCTUnwrap((baselines["baselines"] as? [[String: Any]])?.first)
+        // `get_baselines` reports the `sleep` metric the Sleep tab shows: the waking-day total (night + naps).
         XCTAssertEqual(try XCTUnwrap(row["avg_28d"] as? Double), 420, accuracy: 1)
         XCTAssertEqual(row["short_days_excluded"] as? Int, 3)
     }
@@ -183,7 +185,8 @@ final class CoachInsightToolsTests: XCTestCase {
         _ = night(c, evening: -1, minutes: 330, restingHR: 64)        // short night, resting HR up
         let out = try await run("get_readiness", "{}", c)
         let sleep = try XCTUnwrap(out["sleep"] as? [String: Any])
-        XCTAssertEqual(sleep["total_min"] as? Double, 330)
+        // 330 minutes in bed with 15 awake → 315 asleep, REM included (0 here: the fixture seeds light + deep).
+        XCTAssertEqual(sleep["night_min"] as? Double, 315)
         XCTAssertLessThan(try XCTUnwrap(sleep["vs_avg_min"] as? Double), -100)
         let rhr = try XCTUnwrap(out["resting_hr"] as? [String: Any])
         XCTAssertEqual(rhr["vs_baseline"] as? Double, 8)

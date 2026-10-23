@@ -277,6 +277,37 @@ final class NudgeLiveDataTests: XCTestCase {
         XCTAssertEqual(text, "10:55 PM")
     }
 
+    /// The judged night must not sit inside the median it is judged against (spec: "excluding the night being
+    /// judged"). Eight nights with the newest deliberately extreme: the baseline is the seven earlier ones.
+    @MainActor
+    func testTheBaselineExcludesTheNightBeingJudged() throws {
+        let context = try TestSupport.makeContext()
+        let calendar = Calendar.current
+        let now = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 10, day: 23, hour: 20)))
+
+        // Oldest first; each ends on a different waking day, so `SleepDayRule` keeps them apart.
+        let durations = [400, 410, 420, 430, 440, 450, 460, 900]
+        for (index, minutes) in durations.enumerated() {
+            let wake = try XCTUnwrap(calendar.date(byAdding: .day,
+                                                   value: -(durations.count - 1 - index), to: now))
+            let start = wake.addingTimeInterval(-Double(minutes) * 60)
+            let session = SleepSession(date: start, startAt: start, endAt: wake, totalMinutes: minutes)
+            context.insert(session)
+            // Full coverage: the 80 % data gate must not be what silences this test.
+            context.insert(SleepStageBlock(sessionId: session.id, startAt: start, startMinute: 0,
+                                           durationMinutes: minutes, stage: .light))
+        }
+        try context.save()
+
+        let signals = CoachSignalsBuilder.build(context: context, now: now)
+
+        XCTAssertEqual(signals.lastNight?.totalMinutes, 900, "the newest night is the one being judged")
+        XCTAssertEqual(signals.baseline.nightsRecorded, 7,
+                       "the judged night must not count toward the baseline")
+        XCTAssertEqual(signals.baseline.sleepMinutes, 430, accuracy: 0.001,
+                       "median of the seven earlier nights; including the 900-minute night would give 435")
+    }
+
     func testStepsWithoutHourlyBucketsKeepTheStillnessNudgeSilent() {
         var signals = CoachSignals(now: Date(timeIntervalSince1970: 1_792_000_000))
         signals.today.steps = 8_401
@@ -347,5 +378,58 @@ final class LatestValueTileTests: XCTestCase {
     func testTheAgeDropsTheWordUpdated() {
         XCTAssertEqual(TodayTileContext.age("Updated 4m ago"), "4m ago")
         XCTAssertEqual(TodayTileContext.age("Updated just now"), "just now")
+    }
+}
+
+/// The coach's sleep packet: "last night" is the main sleep (deep + light + REM), never the waking-day total that adds
+/// naps. Jimmy's 2026-10-23 case: a 5 h 25 m night plus a 4 h 40 m nap read as "10 h 5 m last night", and the answer
+/// called it short of a 7-hour goal (owner report).
+final class CoachSleepContextTests: XCTestCase {
+    @MainActor
+    func testLastNightIsTheMainSleepNotTheDayTotalIncludingNaps() throws {
+        let calendar = Calendar.current
+        let now = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 10, day: 24, hour: 20)))
+        AppClock.configure("2026-10-24T20:00:00", debugBuild: true, systemNow: Date(), timeZone: .current)
+        defer { AppClock.reset() }
+
+        let context = try TestSupport.makeContext()
+
+        // Night: 23:12 → 04:37 = 5 h 25 m in bed; deep 100 + light 160 + REM 64 + awake 1.
+        let nightStart = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 10, day: 23, hour: 23, minute: 12)))
+        let night = SleepSession(date: now, startAt: nightStart,
+                                 endAt: nightStart.addingTimeInterval(325 * 60), totalMinutes: 325)
+        context.insert(night)
+        var minute = 0
+        for (stage, minutes) in [(SleepStage.deep, 100), (.light, 160), (.rem, 64), (.awake, 1)] {
+            context.insert(SleepStageBlock(sessionId: night.id,
+                                           startAt: nightStart.addingTimeInterval(Double(minute) * 60),
+                                           startMinute: minute, durationMinutes: minutes, stage: stage))
+            minute += minutes
+        }
+
+        // The same waking day: an afternoon nap, 13:00 → 17:40 = 4 h 40 m. `SleepDayRule` makes the longer sleep the
+        // night and this the nap, so the day total is 10 h 5 m.
+        let napStart = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 10, day: 24, hour: 13)))
+        let nap = SleepSession(date: now, startAt: napStart,
+                               endAt: napStart.addingTimeInterval(280 * 60), totalMinutes: 280)
+        context.insert(nap)
+        context.insert(SleepStageBlock(sessionId: nap.id, startAt: napStart, startMinute: 0,
+                                       durationMinutes: 280, stage: .light))
+        try context.save()
+
+        let packet = CoachContextBuilder.build(context: context, now: now)
+        let sleep = try XCTUnwrap(packet.latestSleep)
+        XCTAssertEqual(sleep.nightMin, 324, "last night is the main sleep: deep + light + REM")
+        XCTAssertEqual(sleep.remMin, 64, "REM is decoded and reported")
+        XCTAssertEqual(sleep.totalMin, 605, "the day total adds the 280-minute nap")
+        XCTAssertEqual(sleep.napMin, 280)
+
+        // The readiness tool carries the same distinction, because the answer quotes it.
+        let readiness = InsightTools.readinessObject(context)
+        let part = try XCTUnwrap(readiness["sleep"] as? [String: Any])
+        XCTAssertEqual(part["night_min"] as? Double, 324)
+        XCTAssertEqual(part["day_total_min"] as? Double, 605)
+        XCTAssertEqual(part["rem_min"] as? Double, 64)
+        XCTAssertEqual(part["nap_min"] as? Double, 280)
     }
 }

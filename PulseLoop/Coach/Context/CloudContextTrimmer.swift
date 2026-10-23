@@ -93,6 +93,10 @@ nonisolated struct CoachCloudContext: Encodable, Equatable {
 
     struct Sleep: Encodable, Equatable {
         var date: String
+        /// Last night (the main sleep): deep + light + REM.
+        var nightMin: Int = 0
+        var remMin: Int = 0
+        /// The waking day's total incl. naps; not last night.
         var totalMin: Int
         var deepMin: Int
         var lightMin: Int
@@ -208,6 +212,8 @@ nonisolated enum CloudContextTrimmer {
             latestSleep: packet.latestSleep.map { sleep in
                 CoachCloudContext.Sleep(
                     date: sleep.date,
+                    nightMin: sleep.nightMin,
+                    remMin: sleep.remMin,
                     totalMin: sleep.totalMin,
                     deepMin: sleep.deepMin,
                     lightMin: sleep.lightMin,

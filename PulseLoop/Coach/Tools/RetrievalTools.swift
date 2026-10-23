@@ -68,10 +68,17 @@ enum RetrievalTools {
             result["hr"] = encodeStats(CoachDataAccess.stats(hr))
             result["spo2"] = encodeStats(CoachDataAccess.stats(spo2))
             if let sleep, let naps = sleepSplit?.naps {
+                let summary = SleepService.summary(for: sleep, context: ctx.modelContext)
                 let napMin = naps.reduce(0) { $0 + max(0, $1.totalMinutes) }
                 result["sleep"] = [
+                    // `night_min` is last night's main sleep (deep + light + REM); `total_min` is the waking day incl. naps.
+                    "night_min": summary.asleepMinutes,
+                    "rem_min": summary.remMinutes,
+                    "deep_min": summary.deepMinutes, "light_min": summary.lightMinutes,
+                    "awake_min": summary.awakeMinutes,
                     "total_min": max(0, sleep.totalMinutes) + napMin, "nap_min": napMin, "score": sleep.score as Any,
-                    "confidence": "medium", "note": "experimental decoder (no REM)",
+                    "confidence": "medium",
+                    "note": "Stages are experimental estimates; REM is decoded and included in night_min.",
                 ]
             }
             return .object(result)
@@ -132,10 +139,16 @@ enum RetrievalTools {
                 result["spo2"] = encodeStats(CoachDataAccess.stats(spo2))
             }
             if include.contains("sleep") {
-                let sleeps = CoachDataAccess.sleepSessions(start: args.startDate, end: args.endDate, context: ctx.modelContext)
-                let avg = sleeps.isEmpty ? nil : sleeps.reduce(0) { $0 + $1.totalMinutes } / sleeps.count
-                result["sleep"] = ["sessions": sleeps.count, "avg_total_min": avg as Any,
-                                   "confidence": "medium", "note": "experimental decoder (light/deep/awake only)"]
+                let days = CoachDataAccess.sleepDays(start: args.startDate, end: args.endDate, context: ctx.modelContext)
+                let nights = days.map { Double(SleepService.summary(for: $0.main, context: ctx.modelContext).asleepMinutes) }
+                let naps = days.map { Double($0.naps.reduce(0) { $0 + max(0, $1.totalMinutes) }) }
+                result["sleep"] = [
+                    "nights": nights.count,
+                    "avg_night_min": nights.isEmpty ? NSNull() : InsightTools.num(InsightTools.mean(nights), 0),
+                    "avg_nap_min": naps.isEmpty ? NSNull() : InsightTools.num(InsightTools.mean(naps), 0),
+                    "confidence": "medium",
+                    "note": "avg_night_min is the main sleep (deep + light + REM); naps are reported separately, not mixed into the night average.",
+                ]
             }
             return .object(result)
         }

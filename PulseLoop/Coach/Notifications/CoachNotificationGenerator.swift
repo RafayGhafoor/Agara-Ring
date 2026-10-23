@@ -85,7 +85,7 @@ enum CoachNotificationGenerator {
         switch slot {
         case .morning:
             if let sleep = packet.latestSleep {
-                let h = sleep.totalMin / 60, m = sleep.totalMin % 60
+                let h = sleep.nightMin / 60, m = sleep.nightMin % 60
                 return CoachNotification(title: "Good morning\(name)",
                                          body: "You logged \(h)h \(m)m of sleep. Here's to a strong day — get moving when you can.")
             }

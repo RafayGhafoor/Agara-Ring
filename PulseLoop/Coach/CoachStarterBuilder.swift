@@ -42,9 +42,10 @@ enum CoachStarterBuilder {
     /// Last night against the sleep goal — the example the plan calls out.
     private static func sleepStarter(_ summary: TodaySummary) -> CoachStarter? {
         guard let sleep = summary.sleepDay else { return nil }
-        let slept = hoursMinutes(sleep.totalMinutes)
+        // "I slept X" is last night's main sleep (deep + light + REM); the day total would add any nap.
+        let slept = hoursMinutes(sleep.main.asleepMinutes)
         let goal = hoursMinutes(Int((summary.goals.sleepHours * 60).rounded()))
-        if sleep.totalMinutes < Int((summary.goals.sleepHours * 60).rounded()) {
+        if sleep.main.asleepMinutes < Int((summary.goals.sleepHours * 60).rounded()) {
             return CoachStarter(
                 id: "sleep-vs-goal",
                 text: "I slept \(slept) against a \(goal) goal — what would have helped?"

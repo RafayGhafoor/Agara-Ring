@@ -36,8 +36,8 @@ enum CoachAnomalyDetector {
         }
 
         // 2. Short sleep — fires after a sleep download, when it's most relevant.
-        if let sleep = packet.latestSleep, (1..<300).contains(sleep.totalMin) {
-            let h = sleep.totalMin / 60, m = sleep.totalMin % 60
+        if let sleep = packet.latestSleep, (1..<300).contains(sleep.nightMin) {
+            let h = sleep.nightMin / 60, m = sleep.nightMin % 60
             let target = packet.goals.sleepHours
             return CoachAnomaly(
                 kind: .poorSleep,

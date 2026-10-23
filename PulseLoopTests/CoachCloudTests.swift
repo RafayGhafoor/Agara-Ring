@@ -803,12 +803,13 @@ final class CloudToolOutputFilterTests: XCTestCase {
     func testUserNotesAreDroppedAtAnyDepthButSystemNotesStay() throws {
         let out = try filtered(#"""
         {"sessions":[{"id":"s1","type":"run","notes":"met Zebulon at Hyde Park","duration_min":31}],
-         "sleep":{"confidence":"medium","note":"experimental decoder (no REM)"}}
+         "sleep":{"confidence":"medium","note":"Stages are experimental estimates; REM is decoded and included in night_min."}}
         """#)
         let session = try XCTUnwrap((out["sessions"] as? [[String: Any]])?.first)
         XCTAssertNil(session["notes"], "free text the user typed (§5)")
         XCTAssertEqual(session["duration_min"] as? Int, 31)
-        XCTAssertEqual((out["sleep"] as? [String: Any])?["note"] as? String, "experimental decoder (no REM)",
+        XCTAssertEqual((out["sleep"] as? [String: Any])?["note"] as? String,
+                       "Stages are experimental estimates; REM is decoded and included in night_min.",
                        "a system remark the coach needs is not user text")
     }
 
