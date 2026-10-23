@@ -23,6 +23,8 @@ struct CoachView: View {
     @State private var keyboardHeight: CGFloat = 0
     @State private var nav = CoachNavigation.shared
     @State private var settingsStore = CoachSettingsStore.shared
+    /// The answer as the cloud coach writes it (server-sent events, 2026-10-23).
+    @State private var stream = CoachStreamStore.shared
     /// Coalesced "rows changed" signal, so the empty thread's prompts follow the last sync.
     @State private var dataChange = AgaraDataChange.shared
     @FocusState private var composerFocused: Bool
@@ -123,7 +125,13 @@ struct CoachView: View {
                             CoachSuggestionList(questions: starterPrompts, identifier: "coach.starter") { send($0) }
                         }
                         if viewModel.isSending {
-                            CoachTraceStrip(events: viewModel.traceEvents).id("trace")
+                            if stream.hasPreview {
+                                // The cloud coach is writing: its title and summary as they arrive. The finished,
+                                // validated answer replaces this when the turn ends.
+                                CoachStreamingPreview(title: stream.title, summary: stream.summary).id("trace")
+                            } else {
+                                CoachTraceStrip(events: viewModel.traceEvents).id("trace")
+                            }
                         }
                     }
                     .padding(.horizontal, 16)
@@ -718,6 +726,38 @@ struct CoachErrorBubble: View {
 /// Live progress strip shown while a turn runs (in-process trace). Folds the
 /// event stream into completed tool steps (shown with a status icon) above the
 /// current phase's spinner row, so the user sees the turn's work accumulate.
+/// The answer while it is still being written: the same heading and body type as `CoachResponseView`, plain text (the
+/// final answer brings the markdown, bullets, chart and chips), and a quiet "Writing…" line under it.
+struct CoachStreamingPreview: View {
+    let title: String
+    let summary: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if !title.isEmpty {
+                Text(title)
+                    .font(AgaraFont.headline)
+                    .foregroundStyle(AgaraColors.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if !summary.isEmpty {
+                Text(CoachText.keepUnitsTogether(summary))
+                    .font(AgaraFont.body.weight(.regular))
+                    .lineSpacing(3)
+                    .foregroundStyle(AgaraColors.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, -4)
+            }
+            Text("Writing…")
+                .font(AgaraFont.caption)
+                .foregroundStyle(AgaraColors.textSecondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("coach.streaming")
+    }
+}
+
 struct CoachTraceStrip: View {
     let events: [CoachTraceEvent]
 

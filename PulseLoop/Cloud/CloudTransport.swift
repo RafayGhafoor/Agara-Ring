@@ -37,6 +37,62 @@ nonisolated enum CloudTransportError: Error, Equatable, Sendable {
 
 nonisolated protocol CloudTransport: Sendable {
     func send(_ request: CloudRequest) async throws -> CloudResponse
+    /// `send` for a request the server may answer with server-sent events (`text/event-stream`; the coach since
+    /// 2026-10-23, contract §7). Every non-terminal event goes to `onEvent` as it arrives; the terminal `final` or `error`
+    /// event becomes the returned response — status 200, or the error event's `status` — with the event's data as the
+    /// body, so a caller handles a streamed reply exactly like a plain one. A plain reply is returned unchanged.
+    func stream(_ request: CloudRequest, onEvent: @escaping @Sendable (String, Data) -> Void) async throws -> CloudResponse
+}
+
+extension CloudTransport {
+    /// Transports that cannot stream (the debug fake backend, test doubles) answer the plain way.
+    func stream(_ request: CloudRequest, onEvent: @escaping @Sendable (String, Data) -> Void) async throws -> CloudResponse {
+        try await send(request)
+    }
+}
+
+/// Server-sent events, one line at a time (the WHATWG format, as much of it as the coach server writes): `event:` names
+/// the event, `data:` lines carry it, a blank line — or the next `event:` line, or the end of the stream — ends it.
+nonisolated struct ServerSentEventParser {
+    private var name = ""
+    private var data: [String] = []
+
+    /// Feeds one line without its line break; returns the event the line completed, if any.
+    mutating func feed(line: String) -> (name: String, data: Data)? {
+        if line.isEmpty { return flush() }
+        if line.hasPrefix(":") { return nil }                       // a comment / keep-alive
+        if line.hasPrefix("event:") {
+            let done = flush()
+            name = String(line.dropFirst(6)).trimmingCharacters(in: .whitespaces)
+            return done
+        }
+        if line.hasPrefix("data:") {
+            var value = Substring(line.dropFirst(5))
+            if value.hasPrefix(" ") { value = value.dropFirst() }
+            data.append(String(value))
+        }
+        return nil
+    }
+
+    /// Ends the pending event (a blank line, or the end of the stream).
+    mutating func flush() -> (name: String, data: Data)? {
+        defer { name = ""; data = [] }
+        guard !data.isEmpty else { return nil }
+        return (name.isEmpty ? "message" : name, Data(data.joined(separator: "\n").utf8))
+    }
+
+    /// The response a terminal event stands for, or nil when the event is not terminal.
+    static func terminalResponse(name: String, data: Data, headers: [String: String]) -> CloudResponse? {
+        switch name {
+        case "final":
+            return CloudResponse(status: 200, headers: headers, body: data)
+        case "error":
+            let status = ((try? JSONSerialization.jsonObject(with: data)) as? [String: Any])?["status"] as? Int ?? 502
+            return CloudResponse(status: status, headers: headers, body: data)
+        default:
+            return nil
+        }
+    }
 }
 
 /// The real transport: an ephemeral `URLSession` (no cookies, no disk cache — the bodies are health data and tokens),
@@ -61,6 +117,63 @@ nonisolated struct URLSessionCloudTransport: CloudTransport {
             var headers: [String: String] = [:]
             for (key, value) in http.allHeaderFields { headers[String(describing: key)] = String(describing: value) }
             return CloudResponse(status: http.statusCode, headers: headers, body: data)
+        } catch let error as CloudTransportError {
+            throw error
+        } catch let error as URLError {
+            switch error.code {
+            case .notConnectedToInternet, .networkConnectionLost, .cannotConnectToHost, .cannotFindHost,
+                 .dnsLookupFailed, .dataNotAllowed, .internationalRoamingOff, .secureConnectionFailed:
+                throw CloudTransportError.offline
+            case .timedOut: throw CloudTransportError.timedOut
+            default: throw CloudTransportError.other
+            }
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            throw CloudTransportError.other
+        }
+    }
+
+    func stream(_ request: CloudRequest, onEvent: @escaping @Sendable (String, Data) -> Void) async throws -> CloudResponse {
+        var urlRequest = URLRequest(url: request.url)
+        urlRequest.httpMethod = request.method
+        urlRequest.timeoutInterval = request.timeout
+        urlRequest.httpBody = request.body
+        for (name, value) in request.headers { urlRequest.setValue(value, forHTTPHeaderField: name) }
+        do {
+            let (bytes, response) = try await session.bytes(for: urlRequest)
+            guard let http = response as? HTTPURLResponse else { throw CloudTransportError.other }
+            var headers: [String: String] = [:]
+            for (key, value) in http.allHeaderFields { headers[String(describing: key)] = String(describing: value) }
+            let contentType = http.value(forHTTPHeaderField: "Content-Type") ?? ""
+            guard contentType.contains("text/event-stream") else {
+                var body = Data()
+                for try await byte in bytes { body.append(byte) }
+                return CloudResponse(status: http.statusCode, headers: headers, body: body)
+            }
+            // Byte by byte, not `bytes.lines`: that sequence drops blank lines, which end events.
+            var parser = ServerSentEventParser()
+            var line = Data()
+            func handle(_ event: (name: String, data: Data)?) -> CloudResponse? {
+                guard let event else { return nil }
+                if let done = ServerSentEventParser.terminalResponse(name: event.name, data: event.data, headers: headers) {
+                    return done
+                }
+                onEvent(event.name, event.data)
+                return nil
+            }
+            for try await byte in bytes {
+                if byte == UInt8(ascii: "\n") {
+                    if line.last == UInt8(ascii: "\r") { line.removeLast() }
+                    if let done = handle(parser.feed(line: String(decoding: line, as: UTF8.self))) { return done }
+                    line.removeAll(keepingCapacity: true)
+                } else {
+                    line.append(byte)
+                }
+            }
+            if !line.isEmpty, let done = handle(parser.feed(line: String(decoding: line, as: UTF8.self))) { return done }
+            if let done = handle(parser.flush()) { return done }
+            throw CloudTransportError.other                      // the stream ended without its final event
         } catch let error as CloudTransportError {
             throw error
         } catch let error as URLError {

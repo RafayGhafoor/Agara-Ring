@@ -176,9 +176,10 @@ struct CoachHeaderTitle: View {
 
     /// The cloud's quota, shown only while the cloud is what answers: "On this phone · 24 left" mixed the on-device
     /// coach with a count that does not apply to it (seen when the cloud choice was stored but not ready).
-    private var quotaText: String? {
-        usesCloud ? quota.remainingTurnsToday.map(CoachCopy.quotaShort(remaining:)) : nil
-    }
+    /// Owner 2026-10-23: the header no longer shows how many questions are left ("Agara Cloud · 13 left" while the cost cap
+    /// had already stopped the next one read as a bug, and the number invites rationing). The count still drives the
+    /// out-of-questions card (`CoachTabState`); only the header text is gone.
+    private var quotaText: String? { nil }
 
     private var statusLine: String {
         let base = usesCloud ? CoachCopy.headerStatusCloud : CoachCopy.headerStatusOnDevice

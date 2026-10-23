@@ -50,7 +50,11 @@ final class CoachViewModel {
         isSending = true
         traceEvents = []
         errorBanner = nil
-        defer { isSending = false }
+        CoachStreamStore.shared.reset()
+        defer {
+            isSending = false
+            CoachStreamStore.shared.reset()
+        }
 
         // Optimistically persist the user message so the UI shows it immediately.
         let userMessage = CoachMessage(

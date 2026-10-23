@@ -116,14 +116,21 @@ final class AgaraCoachProxyClient: ResponsesClient {
             var request = CloudRequest(method: "POST", url: url)
             request.headers["Authorization"] = "Bearer " + token
             request.headers["Content-Type"] = "application/json"
-            request.headers["Accept"] = "application/json"
+            // Server-sent events first (2026-10-23): the answer's title and summary arrive as the model writes them and
+            // feed the Coach tab's preview; tool rounds and refusals still come back as plain JSON.
+            request.headers["Accept"] = "text/event-stream, application/json"
             request.headers[CoachCloudRequest.versionHeader] = String(CoachCloudRequest.contract)
             request.body = body
             request.timeout = Self.requestTimeout
 
-            let response = try await transport.send(request)
+            let response = try await transport.stream(request) { name, data in
+                guard name == "delta" else { return }
+                Task { @MainActor in CoachStreamStore.shared.apply(delta: data) }
+            }
+            // Every reply carries the quota headers, refusals included: the out-of-questions card must not wait for
+            // the next success (a refused turn left the last count standing, 2026-10-23).
+            if let quota = CoachQuota(response: response) { CoachQuotaStore.shared.update(quota) }
             if (200...299).contains(response.status) {
-                if let quota = CoachQuota(response: response) { CoachQuotaStore.shared.update(quota) }
                 guard let json = (try? JSONSerialization.jsonObject(with: response.body)) as? [String: Any] else {
                     throw ResponsesError.decoding("the coach reply was not a JSON object")
                 }

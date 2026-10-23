@@ -96,6 +96,17 @@ private final class CoachProxyTransport: CloudTransport, @unchecked Sendable {
         var status: Int
         var body: String
         var headers: [String: String] = [:]
+        /// Server-sent `delta` payloads delivered before the reply (a streamed answer, 2026-10-23).
+        var deltas: [String] = []
+    }
+
+    /// Streams a reply's deltas through `onEvent`, then answers like `send` (the terminal event's response).
+    func stream(_ request: CloudRequest, onEvent: @escaping @Sendable (String, Data) -> Void) async throws -> CloudResponse {
+        let deltas: [String] = lock.withLock {
+            (request.url.host ?? "").contains("securetoken") ? [] : (replies.first?.deltas ?? [])
+        }
+        for d in deltas { onEvent("delta", Data(d.utf8)) }
+        return try await send(request)
     }
 
     private let lock = NSLock()
@@ -659,6 +670,29 @@ final class AgaraCoachProxyClientTests: XCTestCase {
         XCTAssertTrue(transport.coachRequests.isEmpty, "no request without a user message reaches the proxy")
     }
 
+    /// Streaming (2026-10-23): the request asks for server-sent events, each `delta` grows the Coach tab's preview, and
+    /// the final event's answer is what the orchestrator gets.
+    @MainActor
+    func testAStreamedAnswerFeedsThePreviewAndStillAnswers() async throws {
+        CoachStreamStore.shared.reset()
+        let transport = CoachProxyTransport([
+            .init(status: 200, body: """
+            {"turn_id":"t1","round":1,"status":"answer","remaining_rounds":3,"tool_calls":[],"answer":\(answerJSON())}
+            """, deltas: [#"{"field":"title","text":"Your "}"#, #"{"field":"title","text":"sleep"}"#,
+                          #"{"field":"summary","text":"6 h 42 m, "}"#, #"{"field":"summary","text":"steady."}"#]),
+        ])
+        let client = client(transport)
+        let reply = try await client.send(requestBody: try orchestratorBody(
+            packet: samplePacket(), userText: "how did I sleep last night?"))
+        XCTAssertNotNil(CoachResponseParser.parse(reply.outputText), "the final event is the answer")
+        XCTAssertEqual(transport.coachRequests.first?.headers["Accept"], "text/event-stream, application/json")
+        for _ in 0..<20 where CoachStreamStore.shared.summary != "6 h 42 m, steady." { await Task.yield() }
+        XCTAssertEqual(CoachStreamStore.shared.title, "Your sleep")
+        XCTAssertEqual(CoachStreamStore.shared.summary, "6 h 42 m, steady.")
+        CoachStreamStore.shared.reset()
+        XCTAssertFalse(CoachStreamStore.shared.hasPreview)
+    }
+
     func testTheTurnIsClosedWhenTheAnswerArrives() async throws {
         let transport = CoachProxyTransport([
             .init(status: 200, body: """
@@ -1164,5 +1198,33 @@ final class CoachConsentGateTests: XCTestCase {
         var notAgreed = ready
         notAgreed.consented = false     // `CoachGate.account` sets this only when BOTH consents are given
         XCTAssertFalse(CoachGate.cloudReady(flagOn: true, userOn: true, account: notAgreed))
+    }
+}
+
+// MARK: - Server-sent events (2026-10-23)
+
+final class ServerSentEventParserTests: XCTestCase {
+    func testEventsEndOnABlankLineOrTheNextEventLine() {
+        var parser = ServerSentEventParser()
+        var events: [(String, String)] = []
+        let lines = ["event: delta", #"data: {"field":"title","text":"Hi"}"#, "",
+                     ": keep-alive", "event: delta", #"data: {"field":"summary","text":"A"}"#,
+                     "event: final", #"data: {"status":"answer"}"#]
+        for line in lines {
+            if let e = parser.feed(line: line) { events.append((e.name, String(decoding: e.data, as: UTF8.self))) }
+        }
+        if let e = parser.flush() { events.append((e.name, String(decoding: e.data, as: UTF8.self))) }
+        XCTAssertEqual(events.map(\.0), ["delta", "delta", "final"])
+        XCTAssertEqual(events.last?.1, #"{"status":"answer"}"#)
+    }
+
+    func testTerminalEventsBecomeResponses() {
+        let final = ServerSentEventParser.terminalResponse(name: "final", data: Data(#"{"status":"answer"}"#.utf8), headers: [:])
+        XCTAssertEqual(final?.status, 200)
+        let error = ServerSentEventParser.terminalResponse(
+            name: "error", data: Data(#"{"status":502,"code":"coach_bad_answer"}"#.utf8), headers: [:])
+        XCTAssertEqual(error?.status, 502)
+        XCTAssertEqual(CoachCloudFailure.from(status: 502, body: error!.body).kind, .badAnswer)
+        XCTAssertNil(ServerSentEventParser.terminalResponse(name: "delta", data: Data(), headers: [:]))
     }
 }
