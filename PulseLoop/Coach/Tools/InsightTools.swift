@@ -178,9 +178,15 @@ enum InsightTools {
             let prior = allPrior.filter { $0 >= Double(AgaraConfig.Coach.sleepBaselineMinMinutes) }
             let dayTotal = CoachDataAccess.sleepDayValue(.sleep, last, context: ctx)
             let napMin = Double(last.naps.reduce(0) { $0 + max(0, $1.totalMinutes) })
+            // Compare both totals with the user's own goal, so advice can weigh the short night against a nap-filled day
+            // instead of recommending more sleep on the day total alone (or ignoring the nap on the night alone).
+            let goalMin = Double(MetricsRepository.goals(context: ctx)?.sleepMinutes ?? 8 * 60)
             let bedtimes = nights.suffix(7).compactMap { CoachDataAccess.sleepDayValue(.bedtime, $0, context: ctx) }
             sleepPart = ["night": last.night, "night_min": num(night, 0), "rem_min": num(Double(nightSummary.remMinutes), 0),
                          "day_total_min": num(dayTotal, 0), "nap_min": num(napMin, 0),
+                         "goal_min": num(goalMin, 0),
+                         "night_vs_goal_min": num(night - goalMin, 0),
+                         "day_total_vs_goal_min": num((dayTotal ?? 0) - goalMin, 0),
                          "score": num(CoachDataAccess.sleepDayValue(.sleepScore, last, context: ctx), 0),
                          "bedtime": clock(CoachDataAccess.sleepDayValue(.bedtime, last, context: ctx)),
                          "avg_28d_min": num(mean(prior), 0), "vs_avg_min": num(mean(prior).map { night - $0 }, 0),
@@ -228,7 +234,7 @@ enum InsightTools {
                 "load": loadPart, "recent_workouts": workouts, "stress": stressPart.isEmpty ? NSNull() : stressPart,
                 "missing": missing,
                 "not_used": ["hrv (the ring's HRV decoding is not validated yet)"],
-                "note": "No readiness score: weigh these against each other and the user's goals. Resting HR is the lowest reading during the main sleep. Sleep: night_min is the main sleep (deep + light + REM, awake excluded) and avg_28d_min/vs_avg_min are the same measure over prior nights; day_total_min adds the waking day's naps and is not \"last night\"."]
+                "note": "No readiness score: weigh these against each other and the user's goals. Resting HR is the lowest reading during the main sleep. Sleep: night_min is the main sleep (deep + light + REM, awake excluded) and avg_28d_min/vs_avg_min are the same measure over prior nights; day_total_min adds the waking day's naps and is not \"last night\". goal_min is the user's sleep goal; night_vs_goal_min and day_total_vs_goal_min compare last night and the day to it. A short night with a nap that brings day_total to or above the goal is not a reason to recommend more total sleep today; the night's length and timing are."]
     }
 
     // MARK: - get_sleep_patterns (use cases 2, 10)

@@ -393,6 +393,7 @@ final class CoachSleepContextTests: XCTestCase {
         defer { AppClock.reset() }
 
         let context = try TestSupport.makeContext()
+        context.insert(UserGoal(sleepMinutes: 420))   // 7 h goal, so the nap/day comparison has a reference
 
         // Night: 23:12 → 04:37 = 5 h 25 m in bed; deep 100 + light 160 + REM 64 + awake 1.
         let nightStart = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 10, day: 23, hour: 23, minute: 12)))
@@ -431,5 +432,8 @@ final class CoachSleepContextTests: XCTestCase {
         XCTAssertEqual(part["day_total_min"] as? Double, 605)
         XCTAssertEqual(part["rem_min"] as? Double, 64)
         XCTAssertEqual(part["nap_min"] as? Double, 280)
+        XCTAssertEqual(part["goal_min"] as? Double, 420)
+        XCTAssertEqual(part["night_vs_goal_min"] as? Double, -96, "the night is short of the 7-hour goal")
+        XCTAssertEqual(part["day_total_vs_goal_min"] as? Double, 185, "the nap puts the day above the goal")
     }
 }
