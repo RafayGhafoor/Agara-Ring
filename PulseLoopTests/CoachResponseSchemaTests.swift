@@ -42,3 +42,16 @@ final class CoachResponseSchemaTests: XCTestCase {
         XCTAssertEqual(response.followUpChips.count, AgaraConfig.Coach.followups)
     }
 }
+
+    /// A small local model wrote the STRING "null" into safety_note; the note row then showed a warning reading "null"
+    /// (Hayden's 2026-10-24 screenshot). It must decode as absent.
+    func testLiteralNullNotesDecodeAsAbsent() throws {
+        let json = """
+        {"response_type":"insight","title":"Steps","summary":"18,441 a day.","bullets":[],\
+        "chart":null,"safety_note":"null","data_quality_note":" NULL ",\
+        "sources":[],"follow_up_chips":["a","b","c"],"actions_taken":[],"confidence":"medium"}
+        """
+        let response = try XCTUnwrap(CoachResponse.decode(fromJSON: json))
+        XCTAssertNil(response.safetyNote)
+        XCTAssertNil(response.dataQualityNote)
+    }

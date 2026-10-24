@@ -73,13 +73,25 @@ struct CoachResponse: Codable, Equatable {
         summary = try c.decode(String.self, forKey: .summary)
         bullets = try c.decodeIfPresent([String].self, forKey: .bullets) ?? []
         chart = try c.decodeIfPresent(CoachChart.self, forKey: .chart)
-        safetyNote = try c.decodeIfPresent(String.self, forKey: .safetyNote)
-        dataQualityNote = try c.decodeIfPresent(String.self, forKey: .dataQualityNote)
+        safetyNote = Self.note(try c.decodeIfPresent(String.self, forKey: .safetyNote))
+        dataQualityNote = Self.note(try c.decodeIfPresent(String.self, forKey: .dataQualityNote))
         sources = try c.decodeIfPresent([CoachSource].self, forKey: .sources) ?? []
         followUpChips = try c.decodeIfPresent([String].self, forKey: .followUpChips) ?? []
         actionsTaken = try c.decodeIfPresent([String].self, forKey: .actionsTaken) ?? []
         confidence = try c.decodeIfPresent(CoachConfidence.self, forKey: .confidence) ?? .medium
         cards = try c.decodeIfPresent([CoachCard].self, forKey: .cards) ?? []
+    }
+
+    /// A small local model sometimes serialises a missing optional as the STRING "null" (or "nil"), which the note row
+    /// then showed as a warning reading "null" (Hayden's 2026-10-24 screenshot). Treat those as absent, like a real null.
+    private static func note(_ raw: String?) -> String? {
+        guard let text = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return nil }
+        switch text.lowercased() {
+        case "null", "nil", "none", "n/a", "undefined":
+            return nil
+        default:
+            return text
+        }
     }
 
     // MARK: - Persistence helpers (CoachMessage.cardsJSON)
