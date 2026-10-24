@@ -125,4 +125,22 @@ final class OnboardingAndTabsTests: AgaraUITestCase {
         openTab("Sleep")
         assertSleepDayShowsNight()
     }
+
+    /// Owner 2026-10-24 (Jimmy): the rotating greeting truncated to "How's the day trea…" at the default font size
+    /// because the bell, the ring chip and the gear take the trailing width. 2026-10-25 14:00 selects the long
+    /// afternoon variant under the current rotation (block index 3); it must wrap, not ellipsize.
+    func testLongHeaderGreetingWrapsInsteadOfTruncating() throws {
+        launchWithoutRing(extra: [
+            "-fixedNow", "2026-10-25T14:00:00",
+            "-sampleData", "YES",
+            "-storeCapture", "YES",
+            "-forceOnboarding", "NO",
+        ])
+        let greeting = element("header.greeting")
+        waitFor(greeting, "header greeting missing")
+        eventually(timeout: 30, "the long greeting did not wrap (frame \(greeting.frame)): \(greeting.label)") {
+            greeting.label.contains("How's the day treating you") && greeting.frame.height > 32
+        }
+        attachScreenshot("header-long-greeting")
+    }
 }

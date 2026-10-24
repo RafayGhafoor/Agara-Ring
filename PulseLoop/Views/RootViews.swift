@@ -614,17 +614,30 @@ struct AppHeader: View {
                     Text("\(greeting.lead),")
                         .font(AgaraFont.footnote)
                         .foregroundStyle(AgaraColors.textMuted)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.85)
+                        .fixedSize(horizontal: false, vertical: true)
                     Text("\(firstName)\(greeting.suffix)")
                         .font(AgaraFont.title2.weight(.semibold))
                         .foregroundStyle(AgaraColors.textPrimary)
                         .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                 } else {
+                    // The rotating greeting can be long ("How's the day treating you?"). Wrapping to a second line beats
+                    // the one-line ellipsis ("How's the day trea…") the testers saw on a 6.3" phone with the bell, ring
+                    // chip and gear taking the trailing width (Jimmy, 2026-10-24).
                     Text("\(greeting.lead)\(greeting.suffix)")
                         .font(AgaraFont.title3)
                         .foregroundStyle(AgaraColors.textPrimary)
-                        .lineLimit(1)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.85)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
+            // One VoiceOver element and one stable frame for the header's greeting (the wrap test reads this).
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("header.greeting")
+            .layoutPriority(1)
             }
             Spacer(minLength: 8)
             if coach { CoachHeaderActions() }
