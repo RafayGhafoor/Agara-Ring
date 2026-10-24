@@ -28,7 +28,7 @@ enum AgaraConfig {
         static let measureTypicalSecondsStress: Int = 30
         static let measureTypicalSecondsGlucose: Int = 30
         static let measureTypicalSecondsBloodComponents: Int = 30
-        static let autoMeasureDefaultIntervalMinutes: Int = 30
+        static let autoMeasureDefaultIntervalMinutes: Int = 120
         static let autoMeasureShortIntervalsMinutes: String = ""
         static let liveHrDefaultOn: Int = 0
         static let firmwareCheckUrl: String = "https://www.vphband.com:9001/api/Version/GetVersionForSport"
