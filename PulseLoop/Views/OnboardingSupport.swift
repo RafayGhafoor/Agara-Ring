@@ -36,6 +36,8 @@ enum OnboardingStep: String, CaseIterable, Codable, Identifiable {
     case syncing
     case profile
     case goals
+    /// Choose where the coach thinks: Agara Cloud (sign in / create account) or the on-device model.
+    case coach
     case baseline
 
     var id: String { rawValue }

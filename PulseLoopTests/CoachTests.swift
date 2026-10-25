@@ -906,3 +906,14 @@ final class CoachTurnErrorTests: XCTestCase {
         XCTAssertEqual(CoachTurnError.decode(fromJSON: json), original)
     }
 }
+
+/// The on-device → cloud in-app notice: only while the coach answers, the provider is on-device, and it is not dismissed.
+final class CoachCloudUpsellTests: XCTestCase {
+    func testOnlyShowsForAReadyOnDeviceCoachThatWasNotDismissed() {
+        XCTAssertTrue(CoachCloudUpsell.shouldShow(state: .ready, usesCloud: false, dismissed: false))
+        XCTAssertFalse(CoachCloudUpsell.shouldShow(state: .ready, usesCloud: true, dismissed: false))
+        XCTAssertFalse(CoachCloudUpsell.shouldShow(state: .ready, usesCloud: false, dismissed: true))
+        XCTAssertFalse(CoachCloudUpsell.shouldShow(state: .signedOut, usesCloud: false, dismissed: false))
+        XCTAssertFalse(CoachCloudUpsell.shouldShow(state: .outOfQuota(resetsAt: nil), usesCloud: true, dismissed: false))
+    }
+}

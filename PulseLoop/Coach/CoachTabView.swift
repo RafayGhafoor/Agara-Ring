@@ -20,9 +20,15 @@ struct CoachTabView: View {
     @State private var quotaStore = CoachQuotaStore.shared
     @State private var showConsent = false
     @State private var nav = CoachNavigation.shared
+    @State private var cloud = AgaraCloud.shared
+    /// One-time (per install) in-app notice for users whose coach runs on this phone: the cloud is the advanced coach.
+    @AppStorage("coach.cloudUpsell.dismissed") private var cloudUpsellDismissed = false
 
     var body: some View {
         VStack(spacing: 0) {
+            if CoachCloudUpsell.shouldShow(state: state, usesCloud: usesCloud, dismissed: cloudUpsellDismissed) {
+                cloudUpsell
+            }
             // Nudges are behind the bell in the header now; the Coach tab is the chat.
             Group {
                 if state == .ready {
@@ -51,11 +57,62 @@ struct CoachTabView: View {
         }
     }
 
+    /// The in-app notice for an on-device user: the cloud coach has the baselines, trends and readiness the on-device
+    /// model cannot see. Sign in (or switch the provider, if already signed in) from the one button; dismiss is permanent
+    /// for this install so it never nags.
+    private var cloudUpsell: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "sparkles")
+                .font(AgaraFont.subheadline.weight(.semibold))
+                .foregroundStyle(AgaraColors.accent)
+                .padding(.top, 2)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Get deeper answers with Agara Cloud")
+                    .font(AgaraFont.subheadline.weight(.semibold))
+                    .foregroundStyle(AgaraColors.textPrimary)
+                Text("28-day baselines, trends and readiness. Sign in to use the advanced coach.")
+                    .font(AgaraFont.caption)
+                    .foregroundStyle(AgaraColors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 8)
+            Button(cloud.isSignedIn ? "Switch" : "Sign in") {
+                onOpenRoute(cloud.isSignedIn ? .settingsCoach : .settingsCloud)
+            }
+            .font(AgaraFont.caption.weight(.semibold))
+            .foregroundStyle(AgaraColors.onAccent)
+            .padding(.horizontal, 10).padding(.vertical, 6)
+            .background(Capsule().fill(AgaraColors.accent))
+            .accessibilityIdentifier("coach.cloudUpsell.signIn")
+            Button {
+                cloudUpsellDismissed = true
+            } label: {
+                Image(systemName: "xmark")
+                    .font(AgaraFont.caption2.weight(.bold))
+                    .foregroundStyle(AgaraColors.textMuted)
+                    .padding(6)
+            }
+            .accessibilityLabel("Dismiss")
+            .accessibilityIdentifier("coach.cloudUpsell.dismiss")
+        }
+        .padding(.horizontal, 16).padding(.vertical, 10)
+        .background(AgaraColors.card)
+        .overlay(alignment: .bottom) { Rectangle().fill(AgaraColors.borderSubtle).frame(height: 1) }
+        .accessibilityIdentifier("coach.cloudUpsell")
+    }
+
     // MARK: - State
 
     /// The tab's state: forced in a debug build when the UI test asks for one (`-coachState`), otherwise resolved from
     /// the switches, the account, the consent record and the quota the cloud client last reported.
     private var state: CoachTabState { CoachTabStateInput.currentState() }
+
+    /// The provider that actually answers (a stored cloud choice that is not ready answers on the phone).
+    private var usesCloud: Bool {
+        _ = cloud.phase
+        return CoachClientResolver.effectiveMode(for: settingsStore.settings.providerMode,
+                                                cloudReady: CoachGate.cloudReady) == .agaraCloud
+    }
 
     // MARK: - The card's two actions
 
@@ -222,5 +279,13 @@ struct CoachHeaderActions: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+}
+
+/// The on-device → cloud notice shows only when the coach is answering, the provider is on-device, and the user has not
+/// dismissed it. Pure so a unit test pins the rule.
+enum CoachCloudUpsell {
+    static func shouldShow(state: CoachTabState, usesCloud: Bool, dismissed: Bool) -> Bool {
+        state == .ready && !usesCloud && !dismissed
     }
 }

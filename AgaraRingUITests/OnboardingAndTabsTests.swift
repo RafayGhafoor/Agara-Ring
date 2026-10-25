@@ -48,6 +48,8 @@ final class OnboardingAndTabsTests: AgaraUITestCase {
         waitFor(saveGoals, "goals step missing")
         scrollTo(saveGoals)
         saveGoals.tap()
+        // Coach choice (1.1.0 (13)): keep it on this phone so the test needs no account.
+        waitFor(app.buttons["onboarding.coach.onDevice"], "coach step missing").tap()
         // Baseline explainer → into the app.
         let start = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Start using'")).firstMatch
         waitFor(start, "baseline step missing")

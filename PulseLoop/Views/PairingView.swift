@@ -473,21 +473,15 @@ struct PairingView: View {
         let signalLevel: String = ring.rssi >= -65 ? "Strong signal"
             : ring.rssi >= -80 ? "Medium signal"
             : "Weak signal"
-        // Maturity is a property of the family we would actually drive, so the matched family wins over
-        // the model card: a the ring tagged `.the ringSmartHealth` is an unproven driver even though the same
-        // card, on QRing, is a fully-supported one. Falls back to the model when the scan matched nothing.
+        // A matched ring is shown by the app's product name, never the Bluetooth hardware name the ring advertises
+        // ("TK20"): pairing is the first place a person meets the ring, and the hardware model is not our name for it
+        // (AGENTS Rule 3). Unmatched peripherals keep their advertised name so the user can still find them.
+        let shownName = ring.deviceType.map { _ in AgaraCopy.ringDisplayName } ?? ring.name
         return HStack {
             Image(systemName: ring.isLikelyRing ? "circle.hexagongrid.circle.fill" : "dot.radiowaves.left.and.right")
                 .foregroundStyle(ring.isLikelyRing ? AgaraColors.accent : AgaraColors.textMuted)
             VStack(alignment: .leading, spacing: 2) {
-                Text(ring.name).font(AgaraFont.subheadline.weight(.medium)).foregroundStyle(AgaraColors.textPrimary)
-                if let type = ring.deviceType {
-                    HStack(spacing: 6) {
-                        Text(WearableModel.model(id: ring.wearableModelID)?.displayName ?? type.displayName)
-                            .font(AgaraFont.caption2)
-                            .foregroundStyle(AgaraColors.accent)
-                    }
-                }
+                Text(shownName).font(AgaraFont.subheadline.weight(.medium)).foregroundStyle(AgaraColors.textPrimary)
             }
             Spacer()
             SignalStrengthDots(rssi: ring.rssi) // §5
@@ -509,8 +503,7 @@ struct PairingView: View {
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine) // §5
         .accessibilityLabel(Text( // §5 spoken label with signal level
-            "\(ring.name)\(ring.deviceType.map { ", \($0.displayName)" } ?? "")"
-                + ", \(signalLevel)"
+            "\(shownName), \(signalLevel)"
         ))
     }
 

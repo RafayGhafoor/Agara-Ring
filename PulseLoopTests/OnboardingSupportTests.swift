@@ -120,4 +120,14 @@ final class OnboardingSupportTests: XCTestCase {
         XCTAssertEqual(goal.distanceMeters, 10_000, accuracy: 0.01)
         XCTAssertEqual(goal.workoutsPerWeek, 3)
     }
+
+    func testCoachStepSitsBetweenGoalsAndBaseline() {
+        let steps = OnboardingStep.allCases
+        XCTAssertEqual(steps.firstIndex(of: .coach), steps.firstIndex(of: .goals).map { $0 + 1 })
+        XCTAssertEqual(steps.firstIndex(of: .baseline), steps.firstIndex(of: .coach).map { $0 + 1 })
+        // A route saved before the step existed still loads (raw values, no positional decoding).
+        let store = OnboardingProgressStore(defaults: defaults)
+        store.savePath([.welcome, .ring, .profile, .goals, .baseline])
+        XCTAssertEqual(store.loadPath(), [.welcome, .ring, .profile, .goals, .baseline])
+    }
 }

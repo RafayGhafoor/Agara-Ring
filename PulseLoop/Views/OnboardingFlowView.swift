@@ -40,7 +40,9 @@ struct OnboardingFlowView: View {
                 case .profile:
                     OnboardingProfileView(next: { push(.goals) })
                 case .goals:
-                    OnboardingGoalsView(next: { push(.baseline) })
+                    OnboardingGoalsView(next: { push(.coach) })
+                case .coach:
+                    OnboardingCoachView(next: { push(.baseline) })
                 case .baseline:
                     OnboardingBaselineView(finish: finish)
                 }
@@ -414,6 +416,110 @@ struct OnboardingGoalsView: View {
         try? modelContext.save()
         coordinator.setGoal(steps: Int(draft.steps))
         next()
+    }
+}
+
+/// The coach choice, before the user lands in the app: Agara Cloud (the advanced coach; needs an account and the AI
+/// disclosure) or the on-device model (private, offline, simpler answers). "Decide later" keeps the release default
+/// (Agara Cloud) without marking a choice, so the Coach tab's own state card can ask when the user opens it.
+struct OnboardingCoachView: View {
+    @State private var cloud = AgaraCloud.shared
+    @State private var showCloud = false
+    let next: () -> Void
+
+    private var signedIn: Bool { cloud.isSignedIn }
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 16) {
+                CompactOnboardingHeader(
+                    title: "Choose your coach",
+                    subtitle: "Agara Cloud analyses your trends; the on-device coach keeps everything on this phone. You can change this later."
+                )
+
+                choice(
+                    icon: "cloud.fill", tint: AgaraColors.accent, title: "Agara Cloud", badge: "Recommended",
+                    detail: "28-day baselines, trends, readiness and sleep patterns. Needs a free account; your numbers go to our coach server.",
+                    primary: signedIn ? "Use Agara Cloud" : "Sign in or create account",
+                    identifier: "onboarding.coach.cloud"
+                ) {
+                    if signedIn { choose(.agaraCloud) } else { showCloud = true }
+                }
+
+                choice(
+                    icon: "iphone", tint: AgaraColors.info, title: "On this phone", badge: nil,
+                    detail: "Private and offline. Simpler answers: no long-term trends or readiness analysis.",
+                    primary: "Use on this phone",
+                    identifier: "onboarding.coach.onDevice"
+                ) {
+                    choose(.appleOnDevice)
+                }
+
+                Button("Decide later") { next() }
+                    .font(AgaraFont.footnote.weight(.medium))
+                    .foregroundStyle(AgaraColors.textMuted)
+                    .accessibilityIdentifier("onboarding.coach.later")
+            }
+            .frame(maxWidth: 560)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+            .frame(maxWidth: .infinity)
+        }
+        .sheet(isPresented: $showCloud) {
+            NavigationStack {
+                AgaraCloudSettingsView()
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("Done") { showCloud = false }
+                        }
+                    }
+            }
+            .agaraRingEnvironment()
+        }
+        .onChange(of: showCloud) { _, open in
+            // The sheet walks consent → sign up/in → verify. If it closed with an account, take the cloud choice now.
+            if !open, signedIn { choose(.agaraCloud) }
+        }
+    }
+
+    private func choose(_ mode: CoachProviderMode) {
+        var settings = CoachSettingsStore.shared.settings
+        settings.providerMode = mode
+        settings.providerChosen = true
+        CoachSettingsStore.shared.settings = settings
+        // Someone who has just been shown the cloud option and chose the phone does not need the Coach tab's cloud
+        // notice on top; users who were already on-device before this step existed still see it.
+        if mode == .appleOnDevice {
+            UserDefaults.standard.set(true, forKey: "coach.cloudUpsell.dismissed")
+        }
+        next()
+    }
+
+    @ViewBuilder
+    private func choice(icon: String, tint: Color, title: String, badge: String?, detail: String,
+                        primary: String, identifier: String, action: @escaping () -> Void) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: icon).font(AgaraFont.subheadline.weight(.semibold)).foregroundStyle(tint)
+                Text(title).font(AgaraFont.headline.weight(.semibold)).foregroundStyle(AgaraColors.textPrimary)
+                if let badge {
+                    Text(badge.uppercased())
+                        .font(AgaraFont.caption2.weight(.bold))
+                        .foregroundStyle(AgaraColors.onAccent)
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                        .background(Capsule().fill(tint))
+                }
+                Spacer()
+            }
+            Text(detail)
+                .font(AgaraFont.footnote)
+                .foregroundStyle(AgaraColors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            PrimaryButton(title: primary, systemImage: title == "Agara Cloud" ? "person.fill" : "iphone", action: action)
+                .accessibilityIdentifier(identifier)
+        }
+        .padding(16)
+        .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(AgaraColors.card))
     }
 }
 
