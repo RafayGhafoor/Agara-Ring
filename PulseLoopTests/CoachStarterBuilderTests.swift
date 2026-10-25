@@ -8,18 +8,24 @@ import XCTest
 @MainActor
 final class CoachStarterBuilderTests: XCTestCase {
     /// 23:00 on the given day — a night that wakes on that day + 1, i.e. "last night" for day 0.
-    private func night(_ dayOffset: Int) -> Date {
-        let base = TestSupport.day(dayOffset)
-        return Calendar.current.date(bySettingHour: 23, minute: 0, second: 0, of: base) ?? base
+    private func night(_ dayOffset: Int, from base: Date = Date()) -> Date {
+        let day = TestSupport.day(dayOffset, from: base)
+        return Calendar.current.date(bySettingHour: 23, minute: 0, second: 0, of: day) ?? day
     }
 
     func testFullDataProducesThreeGroundedStarters() throws {
+        // Pin a Sunday: the 7-day scaffold is the CURRENT Monday–Sunday week, so a run on a Monday would only see
+        // today's row and the week-steps starter would legitimately be absent. The test needs a full week in view.
+        let sunday = try XCTUnwrap(Calendar.current.date(from: DateComponents(year: 2026, month: 10, day: 25, hour: 12)))
+        AppClock.configure("2026-10-25T12:00:00", debugBuild: true, systemNow: Date(), timeZone: .current)
+        defer { AppClock.reset() }
+
         let context = try TestSupport.makeContext()
         // A week of steps, last night's sleep and a resting heart-rate estimate.
         for offset in -6...0 {
-            TestSupport.insertActivity(date: TestSupport.day(offset), steps: 9000 + offset * 100, into: context)
+            TestSupport.insertActivity(date: TestSupport.day(offset, from: sunday), steps: 9000 + offset * 100, into: context)
         }
-        TestSupport.insertSleep(nightStart: night(-1), stages: Array(repeating: .light, count: 402), into: context)
+        TestSupport.insertSleep(nightStart: night(-1, from: sunday), stages: Array(repeating: .light, count: 402), into: context)
         TestSupport.insertMeasurement(
             kind: .heartRate, value: 71, timestamp: TestSupport.day(0).addingTimeInterval(3600), into: context)
 

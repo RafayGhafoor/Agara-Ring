@@ -373,7 +373,10 @@ enum CoachSignalsBuilder {
         let steps = stepBlocks(context: context, on: now, calendar: .current)
             .filter { $0.startMinute >= CoachSignals.minuteOfDay(first.timestamp) }
             .reduce(0) { $0 + $1.steps }
-        return CoachSignals.StressRun(minutes: minutes, steps: steps)
+        // C1's floor is a reading (`score >= nudge_c1_min_score`), not the percentile. Leaving it at 0 (the struct
+        // default) silenced every stress nudge in production; the run's peak is the reading the rule asks about.
+        let peak = run.map(\.value).max() ?? 0
+        return CoachSignals.StressRun(minutes: minutes, steps: steps, score: Int(peak.rounded()))
     }
 
     private static func stepBlocks(context: ModelContext, on date: Date, calendar: Calendar) -> [CoachSignals.StepBlock] {

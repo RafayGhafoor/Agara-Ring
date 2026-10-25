@@ -277,6 +277,23 @@ final class NudgeLiveDataTests: XCTestCase {
         XCTAssertEqual(text, "10:55 PM")
     }
 
+    /// C1's floor is a reading, not the percentile: the builder must carry the run's peak (iOS left `score` at 0, so
+    /// the stress nudge never fired in production; the Android port exposed it).
+    @MainActor
+    func testStressRunCarriesThePeakReading() throws {
+        let context = try TestSupport.makeContext()
+        let now = Date()
+        for i in 0..<8 {
+            TestSupport.insertMeasurement(kind: .stress, value: 75,
+                                          timestamp: now.addingTimeInterval(-Double(i) * 600), into: context)
+        }
+        try context.save()
+
+        let signals = CoachSignalsBuilder.build(context: context, now: now)
+        XCTAssertEqual(signals.stressRun?.score, 75, "the run's peak is what C1's floor checks")
+        XCTAssertGreaterThanOrEqual(signals.stressRun?.minutes ?? 0, 60, "eight 10-minute-apart readings span an hour")
+    }
+
     /// The judged night must not sit inside the median it is judged against (spec: "excluding the night being
     /// judged"). Eight nights with the newest deliberately extreme: the baseline is the seven earlier ones.
     @MainActor
