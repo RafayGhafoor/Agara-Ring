@@ -229,7 +229,7 @@ enum AgaraFeature: String, CaseIterable {
     case coachCloud = "coach_cloud"
     /// Coach conversation history (iOS only today; port to Android).
     case coachHistory = "coach_history"
-    /// Deterministic on-device nudges (13 rules, template wordings, anti-nagging policy) plus the "For you" list. Costs 0 tokens - the model is only called if the user then asks a question. iOS-only for 1.1 (Android pending, parity matrix); thresholds docs/config/coach_nudges.yaml, wordings docs/strings/coach_nudges.yaml, policy cases docs/config/coach_nudges_cases.json.
+    /// Deterministic on-device nudges (13 rules, template wordings, anti-nagging policy) plus the bell/inbox cards. Costs 0 tokens - the model is only called if the user then asks a question. Android on 2026-10-25 (13 rules/policy/cards ported; cards only, no pushes); iOS on since 1.1. Thresholds docs/config/coach_nudges.yaml, wordings docs/strings/coach_nudges.yaml, policy cases docs/config/coach_nudges_cases.json.
     case coachNudges = "coach_nudges"
     /// Coach check-ins midday slot + anomaly heads-ups (iOS only today).
     case coachCheckinExtras = "coach_checkin_extras"
