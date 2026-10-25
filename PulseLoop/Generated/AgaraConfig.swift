@@ -223,9 +223,9 @@ enum AgaraFeature: String, CaseIterable {
     case firmwareInstall = "firmware_install"
     /// Demo-data rows in Settings (seed/clear demo data). Off in release; debug builds can turn it on via the override (2026-09-26).
     case demoData = "demo_data"
-    /// AI Coach (tab/floating button, cards, check-ins). Was Android AgaraFeatureFlags.COACH (off); iOS showed it. iOS-only for 1.1 (owner 2026-10-20) - an intentional platform difference recorded in docs/apps/parity-matrix.md; Android turns on when the cloud coach is ported.
+    /// AI Coach (tab/floating button, cards, check-ins). Was Android AgaraFeatureFlags.COACH (off); iOS showed it. Android on 2026-10-25 after the Agara Cloud coach parity port (transport/gate/context/tools) and certificate pinning; iOS on since 1.1 (owner 2026-10-20).
     case coach = "coach"
-    /// Route coach turns through the Agara Cloud coach proxy (docs/ring/coach-proxy.md) instead of a bring-your-own key. Needs a signed-in, email-verified account; bring-your-own-key providers are debug builds only. Off on Android until the proxy client ships there.
+    /// Route coach turns through the Agara Cloud coach proxy (docs/ring/coach-proxy.md) instead of a bring-your-own key. Needs a signed-in, email-verified account; bring-your-own-key providers are debug builds only. Android on 2026-10-25 (proxy client + gate/consent ported, certificate pinning added).
     case coachCloud = "coach_cloud"
     /// Coach conversation history (iOS only today; port to Android).
     case coachHistory = "coach_history"
@@ -239,7 +239,7 @@ enum AgaraFeature: String, CaseIterable {
     case nutrition = "nutrition"
     /// Strava connect + workout upload button. Was Android STRAVA (off).
     case strava = "strava"
-    /// Agara Cloud sign-in/sync. Was Android AGARA_CLOUD (off). iOS on for 1.1 (owner 2026-10-22, option A) - domain api.agaraheart.app live, server rules verified (production e2e 49/49 incl. coach). RELEASE BLOCKER still open - certificate pinning is not implemented. Android stays off until its cloud client and coach are ported.
+    /// Agara Cloud sign-in/sync. Was Android AGARA_CLOUD (off). iOS on for 1.1 (owner 2026-10-22, option A). Android on 2026-10-25: cloud client + coach ported and certificate pinning for api.agaraheart.app added (root SPKI pins + expiry from the catalog). Owner: do not upload to Play without a release review.
     case agaraCloud = "agara_cloud"
     /// Heart-rate zones editor (iOS only today; Android uses automatic zones).
     case hrZonesEditor = "hr_zones_editor"
