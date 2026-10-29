@@ -135,7 +135,7 @@ final class SyncPlanFirmwareTests: XCTestCase {
         )
         engine.handle(.firmware(version: "00.12.09", deviceNumber: nil, testVersion: nil))
         engine.handle(.commandAck(commandId: 0xA1))
-        engine.handle(.unknown(commandId: 0xE0, raw: sleepNoData))
+        engine.handle(.unknown(commandId: 0xE0, raw: sleepNoData(day: 0)))
         // The pass planned from that ledger resumes at 94 — the state BUG-211 describes. The ring answers the
         // end marker alone, so the watermark cannot move: this is why the empty answer cannot fix itself.
         XCTAssertTrue(writer.asked(VeepooEncoder.dailyHistory(dayOffset: 0, position: 94)),
@@ -148,7 +148,7 @@ final class SyncPlanFirmwareTests: XCTestCase {
         // Flashed ring, then the next pass.
         engine.handle(.firmware(version: "00.13.01", deviceNumber: nil, testVersion: nil))
         engine.syncHistory()
-        engine.handle(.unknown(commandId: 0xE0, raw: sleepNoData))
+        engine.handle(.unknown(commandId: 0xE0, raw: sleepNoData(day: 0)))
 
         XCTAssertTrue(writer.asked(VeepooEncoder.dailyHistory(dayOffset: 0, position: 1)),
                       "the new firmware's history is read from record 1; asked "
@@ -159,8 +159,39 @@ final class SyncPlanFirmwareTests: XCTestCase {
 
     /// `df ff ff` — what the ring answers when a day has nothing left to serve (`frames.daily_end`).
     private let dailyEnd = Data([0xDF, 0xFF, 0xFF, 0x58])
-    /// `e0 00 00 <day>` — the ring kept no sleep for the day, which completes the sleep phase.
-    private let sleepNoData = Data([0xE0, 0x00, 0x00, 0x00] + [UInt8](repeating: 0, count: 16))
+    /// `e0 00 00 <day>` — the ring kept no sleep for the day, which completes the sleep phase. The day byte
+    /// matters: the engine ignores a marker for a day it is not transferring.
+    private func sleepNoData(day: Int) -> Data {
+        Data([0xE0, 0x00, 0x00, UInt8(day)] + [UInt8](repeating: 0, count: 16))
+    }
+
+    /// The real ordering, measured in the E2E (2026-10-30 02:12): `a1` is answered *after* the pass has been
+    /// planned from the ledger, so the stale plan is already in flight when the new firmware is seen. Its days
+    /// were chosen from the old ledger and would skip the past days the change exists to re-read — hence one
+    /// fresh pass follows it.
+    func testAFirmwareChangeDuringAPassIsFollowedByOneFreshPass() {
+        let writer = RecordingWriter()
+        writer.source = "ring-A"
+        let engine = isolatedEngine(writer, historyDays: 2)
+        engine.connectionDidStart()
+        engine.handle(.firmware(version: "00.12.09", deviceNumber: nil, testVersion: nil))
+        engine.handle(.commandAck(commandId: 0xA1))
+        engine.handle(.unknown(commandId: 0xE0, raw: sleepNoData(day: 0)))
+        engine.handle(.unknown(commandId: 0xDF, raw: dailyEnd))      // day 0 done
+        engine.handle(.unknown(commandId: 0xE0, raw: sleepNoData(day: 1)))   // day 1 sleep
+        XCTAssertTrue(writer.asked(VeepooEncoder.dailyHistory(dayOffset: 1, position: 1)))
+
+        writer.commands.removeAll()
+        engine.handle(.firmware(version: "00.13.01", deviceNumber: nil, testVersion: nil))  // mid-pass
+        XCTAssertEqual(engine.syncPlanStore.ledger(ring: "ring-A").count, 0, "cleared at once")
+        engine.handle(.unknown(commandId: 0xDF, raw: dailyEnd))      // pass ends
+
+        XCTAssertTrue(writer.asked(VeepooEncoder.sleepHistory(dayOffset: 0)),
+                      "a fresh pass starts on its own; asked \(writer.commands.map { $0.hexString.prefix(8) })")
+        engine.handle(.unknown(commandId: 0xE0, raw: sleepNoData(day: 0)))
+        XCTAssertTrue(writer.asked(VeepooEncoder.dailyHistory(dayOffset: 0, position: 1)),
+                      "and reads day 0 from record 1")
+    }
 
     private static var todayKey: String {
         SyncPlan.dateKey(offset: 0, today: fixtureDay, calendar: .current)

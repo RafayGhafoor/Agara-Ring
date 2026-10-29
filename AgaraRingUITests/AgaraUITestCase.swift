@@ -16,6 +16,9 @@ import XCTest
 /// | `E2E_NAP_LOG`     | that emulator's log file (the DF requests it served)           |
 /// | `E2E_FIND_PORT`   | ring whose signal walks far → near (`--rssi-walk far-to-near:20`) |
 /// | `E2E_FIND_LOG`    | that emulator's log file (the find-device frames it received)  |
+/// | `E2E_FW_PORT`     | ring that can be "re-flashed" mid-test (same identity, new `a1`) |
+/// | `E2E_FW_LOG`      | that emulator's log file (the DF requests it served)            |
+/// | `E2E_FW_HTTP`     | its control route: `POST /control/firmware?version=`            |
 ///
 /// A variable that isn't set skips the tests that need that emulator, rather than failing them.
 class AgaraUITestCase: XCTestCase {
