@@ -875,16 +875,28 @@ final class VeepooSyncEngine: RingSyncEngine {
     private func recordDayInLedger(endMarker: Bool) {
         guard let ring = passRing else { return }
         let date = SyncPlan.dateKey(offset: currentDay, today: passToday, calendar: decoder.calendar)
-        let state = SyncPlan.record(syncPlanStore.state(ring: ring, date: date), offset: currentDay,
+        let prior = syncPlanStore.state(ring: ring, date: date)
+        let state = SyncPlan.record(prior, offset: currentDay,
                                     position: currentPosition, records: dayRecords,
                                     totalBlocks: dayTotalBlocks, endMarker: endMarker,
                                     sleepStored: daySleepStored)
         syncPlanStore.set(state, ring: ring, date: date, today: passToday, calendar: decoder.calendar)
+        // BUG-211: the ring's own count came back below the watermark the app kept — its storage reset (a
+        // firmware flash, a replacement ring, a cleared store). The day starts over; say why, so a stale
+        // "stored through 93" over a ring that now holds 5 is not diagnosed as a sync that did nothing.
+        let shrank = SyncPlan.shrank(prior, totalBlocks: dayTotalBlocks)
+        if shrank {
+            writer?.emit(.historySyncProgress(
+                stage: "history: the ring's stored count for \(date) shrank (stored \(prior?.storedThrough ?? 0), "
+                    + "ring now \(dayTotalBlocks ?? 0) records) — re-reading the day"
+            ))
+        }
         #if DEBUG
         E2ETrace.log("history day \(currentDay) (\(date)) from \(currentPosition): \(dayRecords.count) records, "
                      + "total \(dayTotalBlocks.map(String.init) ?? "-"), stored through \(state.storedThrough), "
                      + "sleep \(state.sleepStored ? "stored" : "missing"), "
-                     + (state.complete ? "complete" : "open"))
+                     + (state.complete ? "complete" : "open")
+                     + (shrank ? " (ring storage shrank — re-reading the day)" : ""))
         #endif
     }
 }

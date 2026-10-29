@@ -11,8 +11,10 @@ import Foundation
 ///   unbroken run of stored records from record 1 reached the DF header's `total_blocks`; a complete day is
 ///   skipped from then on;
 /// * **day 0** is always requested — from `storedThrough + 1`, the record after the unbroken run from record 1
-///   (position 1 when nothing of today is stored). A record missing mid-day is therefore asked for again rather
-///   than left as a gap — Android's rule, identical here (Rule 2);
+///   (position 1 when nothing of today is stored), never past the count the ring last reported. A record missing
+///   mid-day is therefore asked for again rather than left as a gap — Android's rule, identical here (Rule 2);
+/// * a day whose count **shrank** (the ring's own storage reset) starts over from record 1 instead of keeping a
+///   watermark behind records the ring no longer has (BUG-211);
 /// * a ring with no ledger (new pairing, another ring) or a date not yet complete is fetched in full.
 ///
 /// Sleep (`E0 <day>`) keeps its rule: a day in the plan is asked for its sleep as before; a skipped day is
@@ -42,6 +44,12 @@ struct SyncPlan: Equatable {
         var sleepStored: Bool = false
         /// The day is closed and fully received: skip it from now on.
         var complete: Bool = false
+
+        /// The position to ask for next: the record after the watermark, but never past the count the ring last
+        /// reported (BUG-211). A watermark that ran past that count (two sources disagreeing, or a clamp that
+        /// followed a shrink) is asked for its last known record rather than a phantom one, so the ring can
+        /// answer with a header at all.
+        var nextPosition: Int { (totalBlocks > 0 ? min(storedThrough, totalBlocks) : storedThrough) + 1 }
     }
 
     /// How many days back a *complete* day whose sleep never reached storage is still asked for its sleep —
@@ -73,17 +81,25 @@ struct SyncPlan: Equatable {
         for offset in 0..<count {
             let state = ledger[dateKey(offset: offset, today: today, calendar: calendar)]
             if offset == 0 {
-                days.append(Day(offset: 0, position: (state?.storedThrough ?? 0) + 1))
+                days.append(Day(offset: 0, position: state?.nextPosition ?? 1))
             } else if state?.complete != true {
                 days.append(Day(offset: offset, position: 1))
             } else if state?.sleepStored == false, offset <= healWindowDays {
                 // BUG-203 heal: the day's records are stored but its night never arrived, and days already
                 // marked complete in the field have the same hole. Ask for it once more while the ring still
                 // holds it, resuming after the watermark so the DF half answers the end marker at once.
-                days.append(Day(offset: offset, position: (state?.storedThrough ?? 0) + 1))
+                days.append(Day(offset: offset, position: state?.nextPosition ?? 1))
             }
         }
         return SyncPlan(days: days)
+    }
+
+    /// BUG-211: the total the ring reports for the date is below the watermark the app kept, so the ring's own
+    /// storage reset under us (a firmware flash, a replacement ring, a cleared store) and the records behind
+    /// the watermark are gone. Saying "stored through N" then means the day is never asked for again.
+    static func shrank(_ prior: DayState?, totalBlocks: Int?) -> Bool {
+        guard let prior, let totalBlocks else { return false }
+        return totalBlocks > 0 && totalBlocks < prior.storedThrough
     }
 
     /// The date's state after one transfer of day `offset` from `position`.
@@ -97,10 +113,12 @@ struct SyncPlan: Equatable {
     /// before `position`. The watermark then extends over every consecutive record received. Only a past day
     /// fetched whole can become complete (today keeps growing); without a header nothing says how many records
     /// the day holds — unless nothing came at all: a day the ring kept nothing for answers the end marker alone.
+    /// A total below the watermark is a reset and starts the day over (BUG-211).
     /// Same as Android's `SyncPlan.afterDay`.
     static func record(_ prior: DayState?, offset: Int, position: Int, records: Set<Int>,
                        totalBlocks: Int?, endMarker: Bool, sleepStored: Bool = false) -> DayState {
-        var through = position <= 1 ? 0 : min(prior?.storedThrough ?? 0, position - 1)
+        let reset = shrank(prior, totalBlocks: totalBlocks)
+        var through = reset || position <= 1 ? 0 : min(prior?.storedThrough ?? 0, position - 1)
         while records.contains(through + 1) { through += 1 }
         let total = totalBlocks ?? (position <= 1 ? 0 : prior?.totalBlocks ?? 0)
         // BUG-203: the day is complete only when its **sleep** is in storage too (or the ring said it kept

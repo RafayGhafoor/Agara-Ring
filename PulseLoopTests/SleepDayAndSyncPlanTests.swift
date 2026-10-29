@@ -169,6 +169,47 @@ final class SleepDayAndSyncPlanTests: XCTestCase {
         XCTAssertEqual(third, second)
     }
 
+    /// BUG-211 — the ring's own count for a day can **shrink** (a firmware flash, a replacement ring, a
+    /// cleared store). Asking for `storedThrough + 1` then asks past the end, the ring answers the end marker
+    /// and no records, and the watermark never moves — so the day is never re-read and the pre-reset numbers
+    /// stay until midnight. The smaller total re-bases the day so the next plan asks from 1.
+    func testADayWhoseRecordCountShrankIsReadAgainFromTheBeginning() {
+        let previous = SyncPlan.DayState(storedThrough: 93, totalBlocks: 93)
+        // The resume from 94 after the reset: the ring's header says 5 records and nothing came.
+        let after = SyncPlan.record(previous, offset: 0, position: 94, records: [], totalBlocks: 5, endMarker: true)
+        XCTAssertNotEqual(after.storedThrough, 93, "the watermark behind a reset ring is stale")
+        XCTAssertEqual(after.storedThrough, 0)
+        XCTAssertEqual(after.totalBlocks, 5, "the ring's new count replaces the old one")
+        XCTAssertFalse(after.complete)
+        let plan = SyncPlan.make(historyDays: 7, today: today, calendar: calendar, ledger: [key(0): after])
+        XCTAssertEqual(plan.days.first, SyncPlan.Day(offset: 0, position: 1), "the day is read again from record 1")
+    }
+
+    /// The plan never asks for a position past the count the ring last reported: a watermark that ran past it
+    /// (two sources disagreeing) is asked for its last known record, not a phantom one.
+    func testThePlanNeverAsksForAPositionPastTheRingsLastCount() {
+        let ledger = [key(0): SyncPlan.DayState(storedThrough: 93, totalBlocks: 40)]
+        let plan = SyncPlan.make(historyDays: 7, today: today, calendar: calendar, ledger: ledger)
+        XCTAssertEqual(plan.days.first, SyncPlan.Day(offset: 0, position: 41), "clamped to the ring's own total")
+        // No total known (no header arrived yet) — nothing to clamp against, the watermark stands.
+        let noTotal = [key(0): SyncPlan.DayState(storedThrough: 56, totalBlocks: 0)]
+        XCTAssertEqual(SyncPlan.make(historyDays: 7, today: today, calendar: calendar, ledger: noTotal).days.first,
+                       SyncPlan.Day(offset: 0, position: 57))
+    }
+
+    /// The same total with nothing new is not a reset: a refresh that brings no records leaves the day where
+    /// it was (this is what a clamping or re-reading rule must not break). This also codifies the shape that
+    /// **hides** a shrink: a resume past the end is answered with the end marker and no header at all, which is
+    /// byte-identical to a benign "nothing new" refresh — so BUG-211's deadlock is not detectable from this
+    /// answer (see `BUG-211.md`; detecting it needs a record-1 probe or a firmware-change invalidation).
+    func testADayWithTheSameTotalAndNothingNewStaysWhereItIs() {
+        let previous = SyncPlan.DayState(storedThrough: 56, totalBlocks: 56)
+        let after = SyncPlan.record(previous, offset: 0, position: 57, records: [], totalBlocks: nil, endMarker: true)
+        XCTAssertEqual(after, previous, "no header, no records, same day: the watermark stays")
+        XCTAssertEqual(SyncPlan.make(historyDays: 7, today: today, calendar: calendar, ledger: [key(0): after]).days.first,
+                       SyncPlan.Day(offset: 0, position: 57))
+    }
+
     /// Records 1–10 and 12–20 stored (11 lost to a checksum failure): today resumes at 11, so the gap is asked
     /// for again instead of being skipped over (Android's rule).
     func testAMissingRecordMidDayIsAskedForAgain() {
@@ -384,6 +425,31 @@ final class SleepDayAndSyncPlanTests: XCTestCase {
         for p in writer.progress.prefix(1) { progress.apply(p) }
         XCTAssertEqual(progress.totalDays, 1)
         XCTAssertEqual(progress.progressSummary, "Day 1 of 1")
+    }
+
+    /// BUG-211 at the loop: when the ring's own count comes back below the watermark the app kept (its storage
+    /// reset), the engine says so and the day starts over instead of asking forever for a record that is gone.
+    func testARingWhoseCountShrankIsAnnouncedAndTheDayStartsOver() {
+        let store = SyncPlanStore(defaults: freshDefaults())
+        // The shape a reset leaves behind: the watermark says 93 records, the count the plan can clamp to is 10.
+        store.set(SyncPlan.DayState(storedThrough: 93, totalBlocks: 10), ring: "ring-A", date: key(0),
+                  today: today, calendar: calendar)
+        let engine = makeEngine(ring: "ring-A", store: store, days: 1)
+        engine.handle(.commandAck(commandId: 0xA1))
+        // The ring now holds 12 records, so the clamped request (11) is answered with a header saying 12 —
+        // fewer than the 93 the app kept.
+        XCTAssertEqual(servePass(engine, recordsPerDay: [0: 12]), [[0, 11]], "asked from the clamped position")
+        XCTAssertTrue(writer.emitted.contains {
+            if case let .historySyncProgress(stage) = $0 { return stage.contains("shrank") }
+            return false
+        }, "the ring's storage changed under us — say so")
+        XCTAssertEqual(store.state(ring: "ring-A", date: key(0))?.storedThrough, 0)
+
+        // The next pass re-reads the day from the beginning and rebuilds the watermark from the new records.
+        let next = makeEngine(ring: "ring-A", store: store, days: 1)
+        next.handle(.commandAck(commandId: 0xA1))
+        XCTAssertEqual(servePass(next, recordsPerDay: [0: 12]), [[0, 1]], "the day is read again from record 1")
+        XCTAssertEqual(store.state(ring: "ring-A", date: key(0))?.storedThrough, 12)
     }
 
     func testAnotherRingOrAnInterruptedDayIsFetchedInFull() {
