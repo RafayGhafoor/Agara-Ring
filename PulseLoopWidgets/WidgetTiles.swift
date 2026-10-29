@@ -265,6 +265,13 @@ struct WidgetSleepContent: View {
                             .foregroundStyle(AgaraColors.textMuted)
                             .lineLimit(1)
                     }
+                    // BUG-210: the same caption the Today tile shows when this is not last night's sleep.
+                    if let caption = payload.captionText {
+                        Text(caption)
+                            .font(AgaraFont.face(12, .medium))
+                            .foregroundStyle(AgaraColors.textMuted)
+                            .lineLimit(1)
+                    }
                 }
                 SleepStageBar(segments: payload.segments.map {
                     SleepStageSegment(minutes: $0.minutes, color: Color(hex: $0.colorHex), label: $0.label)

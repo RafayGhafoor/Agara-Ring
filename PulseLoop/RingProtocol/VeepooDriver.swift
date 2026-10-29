@@ -111,6 +111,12 @@ final class VeepooDriver: WearableDriver {
 
         switch data[0] {
         case VeepooOpcode.open.rawValue:
+            // BUG-109: byte 3 is the status — 0 is "wrong password", a **refusal**, not an ack. Emitting
+            // `commandAck` for it made the engine authenticate against a ring that never accepted us and
+            // run the whole post-auth sequence into silence ("connected", permanently empty history).
+            if data.count >= 4, data[data.startIndex + 3] == 0x00 {
+                return [.historySyncProgress(stage: "auth: the ring refused the session frame (wrong password)")]
+            }
             // The auth ack — the engine's gate for the whole post-auth sequence — plus the firmware it
             // carries (bytes 6–8).
             var events: [RingDecodedEvent] = [.commandAck(commandId: data[0])]

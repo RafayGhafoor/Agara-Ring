@@ -316,6 +316,26 @@ struct LatestReading: Equatable {
     }
 }
 
+/// Which night the Today sleep tile is about — the three states both platforms must agree on (BUG-210).
+/// Not `Equatable`: `SleepDay` holds live SwiftData rows; compare `kind` and `caption`.
+struct SleepTileState {
+    enum Kind: Equatable {
+        /// The reference night (last night, or the night in progress before 04:00).
+        case referenceNight
+        /// Nothing last night; the newest stored night, which the tile labels with `caption`.
+        case lastRecorded
+        /// Nothing stored at all — the tile reads "No sleep recorded".
+        case none
+    }
+
+    let kind: Kind
+    let day: SleepDay?
+    /// "Last recorded: Tue 30 Sep" in `.lastRecorded`, nil in the other two states.
+    let caption: String?
+
+    static let none = SleepTileState(kind: .none, day: nil, caption: nil)
+}
+
 struct TodaySummary {
     var date: Date
     var steps: Int?
@@ -330,8 +350,11 @@ struct TodaySummary {
     var latestSpO2: LatestReading?
     var restingHeartRateEstimate: Double?
     var peakHeartRateToday: Double?
-    /// Last night's sleep day (`SleepDayRule`): the main sleep plus the day's naps.
+    /// Last night's sleep day (`SleepDayRule`): the main sleep plus the day's naps — the `.referenceNight`
+    /// and `.lastRecorded` states' day, nil in `.none`. The tile reads `sleepTile` for which state it is.
     var sleepDay: SleepDay?
+    /// The Sleep tile's state (BUG-210): last night / an older night labelled / nothing.
+    var sleepTile: SleepTileState = .none
     var batteryPercent: Int?
     var deviceState: RingConnectionState
     var trends: TrendsSummary
@@ -345,4 +368,7 @@ struct TodaySummary {
     var sevenDaySteps: [DailyMetricPoint] { trends.steps7d }
     /// The main sleep of `sleepDay` — stages, score and bounds come from it.
     var sleep: SleepSummary? { sleepDay?.main }
+    /// **Last night's** sleep only — nil when the tile is showing a captioned older night (BUG-210). The
+    /// hero sentence reads this, so "…of sleep…" is never said about the night before last.
+    var lastNight: SleepSummary? { sleepTile.kind == .referenceNight ? sleepTile.day?.main : nil }
 }

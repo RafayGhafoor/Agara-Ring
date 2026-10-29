@@ -35,8 +35,23 @@ struct SyncPlan: Equatable {
         var storedThrough: Int = 0
         /// The DF header's `total_blocks` (bytes 4–5, LE) — the ring's own record count for the day.
         var totalBlocks: Int = 0
+        /// The day's sleep (`E0` transfer) reached storage — or the ring genuinely answered no-data for it.
+        /// BUG-203: "complete" used to be a statement about the DF records alone, so a day whose sleep
+        /// transfer produced nothing was closed for good and its night could never be recovered. Decoded
+        /// with a default, so a ledger written before this field reads as "no sleep stored".
+        var sleepStored: Bool = false
         /// The day is closed and fully received: skip it from now on.
         var complete: Bool = false
+    }
+
+    /// How many days back a *complete* day whose sleep never reached storage is still asked for its sleep —
+    /// the ring keeps about three, so this is the window in which the heal can succeed (BUG-203).
+    static let healWindowDays = 3
+
+    /// Day `offset`'s date, counted back from `today` (midnight). A DF record is dated by it (BUG-102).
+    static func date(offset: Int, today: Date, calendar: Calendar) -> Date {
+        let start = calendar.startOfDay(for: today)
+        return calendar.date(byAdding: .day, value: -offset, to: start) ?? start
     }
 
     /// The `yyyy-MM-dd` key of day `offset` counted back from `today`.
@@ -61,6 +76,11 @@ struct SyncPlan: Equatable {
                 days.append(Day(offset: 0, position: (state?.storedThrough ?? 0) + 1))
             } else if state?.complete != true {
                 days.append(Day(offset: offset, position: 1))
+            } else if state?.sleepStored == false, offset <= healWindowDays {
+                // BUG-203 heal: the day's records are stored but its night never arrived, and days already
+                // marked complete in the field have the same hole. Ask for it once more while the ring still
+                // holds it, resuming after the watermark so the DF half answers the end marker at once.
+                days.append(Day(offset: offset, position: (state?.storedThrough ?? 0) + 1))
             }
         }
         return SyncPlan(days: days)
@@ -79,13 +99,16 @@ struct SyncPlan: Equatable {
     /// the day holds — unless nothing came at all: a day the ring kept nothing for answers the end marker alone.
     /// Same as Android's `SyncPlan.afterDay`.
     static func record(_ prior: DayState?, offset: Int, position: Int, records: Set<Int>,
-                       totalBlocks: Int?, endMarker: Bool) -> DayState {
+                       totalBlocks: Int?, endMarker: Bool, sleepStored: Bool = false) -> DayState {
         var through = position <= 1 ? 0 : min(prior?.storedThrough ?? 0, position - 1)
         while records.contains(through + 1) { through += 1 }
         let total = totalBlocks ?? (position <= 1 ? 0 : prior?.totalBlocks ?? 0)
-        let complete = offset >= 1 && position <= 1 && endMarker && (totalBlocks != nil || records.isEmpty)
-            && through >= total
-        return DayState(storedThrough: through, totalBlocks: total, complete: complete)
+        // BUG-203: the day is complete only when its **sleep** is in storage too (or the ring said it kept
+        // none). A heal request (`position > 1`) never re-completes a day by itself: it only refreshes the
+        // sleep flag, so the day leaves the walk once a night (or a no-data answer) arrives.
+        let receivedAll = position <= 1 && endMarker && (totalBlocks != nil || records.isEmpty) && through >= total
+        let complete = offset >= 1 && receivedAll && sleepStored
+        return DayState(storedThrough: through, totalBlocks: total, sleepStored: sleepStored, complete: complete)
     }
 }
 

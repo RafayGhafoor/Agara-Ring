@@ -370,6 +370,38 @@ final class SleepSourceMergeTests: XCTestCase {
         XCTAssertEqual(blocks(of: nil, in: context).map(\.id), ids)
     }
 
+    /// BUG-204 — Android drops an incoming record when a stored same-source record overlaps it and is
+    /// *longer* (a ring record only grows while it is staged, so the short copy is the stale one). iOS had
+    /// no such comparison: one page's worth of loss (BUG-201's 620-minute decode) shrank a 650-minute night.
+    func testAShorterReSendDoesNotShrinkTheStoredNight() throws {
+        let context = try TestSupport.makeContext()
+        let subscriber = EventPersistenceSubscriber(context: context)
+        let grown = record(SleepTransferFixtures.ringB1111)          // 00:21 → 11:11, 650 minutes
+        let earlier = record(SleepTransferFixtures.ringB1105)        // 00:21 → 11:05, 644 minutes (a re-read)
+        XCTAssertEqual([earlier.stages.count, grown.stages.count], [644, 650])
+
+        // The grown record first, then the *shorter* one the ring served earlier in the same evening.
+        subscriber.persist(.sleepTimeline(timestamp: grown.start, stages: grown.stages, source: ringB))
+        subscriber.persist(.sleepTimeline(timestamp: earlier.start, stages: earlier.stages, source: ringB))
+        subscriber.stop()
+
+        var rows = sessions(of: ringB, in: context)
+        XCTAssertEqual(rows.count, 1)
+        XCTAssertEqual(rows.first?.startAt, Self.date(9, 25, 0, 21))
+        XCTAssertEqual(rows.first?.endAt, Self.date(9, 25, 11, 11), "the stored 650-minute night wins")
+        XCTAssertEqual(blocks(of: ringB, in: context).reduce(0) { $0 + $1.durationMinutes }, 650)
+
+        // In the other order the night still lands on 650: a longer re-send replaces the shorter copy.
+        let fresh = try TestSupport.makeContext()
+        let subscriber2 = EventPersistenceSubscriber(context: fresh)
+        subscriber2.persist(.sleepTimeline(timestamp: earlier.start, stages: earlier.stages, source: ringB))
+        subscriber2.persist(.sleepTimeline(timestamp: grown.start, stages: grown.stages, source: ringB))
+        subscriber2.stop()
+        rows = sessions(of: ringB, in: fresh)
+        XCTAssertEqual(rows.count, 1)
+        XCTAssertEqual(rows.first?.endAt, Self.date(9, 25, 11, 11))
+    }
+
     func testRepairLeavesHealthyNightsAlone() throws {
         let context = try TestSupport.makeContext()
         legacyAddOnly(SleepTransferFixtures.ringB1111, into: context)

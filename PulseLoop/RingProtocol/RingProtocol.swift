@@ -31,6 +31,24 @@ struct SyncDayProgress: Equatable, Sendable {
     var days: [Int]? = nil
 }
 
+/// How the sleep records this link delivered could be attributed to the ring's own `a1` identity
+/// (SEC-301). **Report-only** in this release (decision D4): a record is always stored; these counts reach
+/// diagnostics so one release of field data can say whether rejecting is safe.
+///
+/// iOS has no BLE address to compare against (CoreBluetooth hides it), so the check Android makes — the
+/// `a1` MAC against the peer's address — becomes "the `a1` MAC must not contradict the one this peripheral
+/// first reported", which is what catches the replayed identity SEC-301 describes.
+struct SleepProvenance: Equatable, Sendable {
+    /// Sessions whose provenance was checked (one per decoded `E0` session).
+    var checked = 0
+    /// Sessions whose link never reported an `a1` MAC — the null case Android's `ringMac != null` guard skips.
+    var nullIdentity = 0
+    /// Sessions whose `a1` MAC contradicts the identity this peripheral first reported.
+    var mismatched = 0
+
+    var hasFindings: Bool { nullIdentity > 0 || mismatched > 0 }
+}
+
 enum RingDecodedEvent: Sendable {
     case activityUpdate(timestamp: Date, steps: Int, distanceMeters: Double, calories: Double)
     /// One intraday activity bucket (e.g. a the ring quarter-hour history sample). Unlike the cumulative

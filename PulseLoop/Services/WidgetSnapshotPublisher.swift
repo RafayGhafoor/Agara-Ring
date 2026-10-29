@@ -171,7 +171,7 @@ final class WidgetSnapshotPublisher {
             generatedAt: AppClock.now,
             dayStart: Calendar.current.startOfDay(for: AppClock.now),
             activity: activityPayload(summary, units: units),
-            sleep: sleepPayload(summary.sleepDay),
+            sleep: sleepPayload(summary.sleepTile),
             metrics: metrics,
             nutrition: nutritionPayload(summary)
         )
@@ -239,19 +239,22 @@ final class WidgetSnapshotPublisher {
         )
     }
 
-    /// Replicates `SleepTileView`'s derivations (stage distribution, score, duration formatting).
-    /// The day's total (`SleepDayRule`) and nap line; stages and score from the main sleep.
-    private func sleepPayload(_ day: SleepDay?) -> WidgetSleepPayload? {
-        guard let day else { return nil }
+    /// Replicates `SleepTileView`'s derivations (stage distribution, score, duration formatting) from the
+    /// same `SleepTileState`: the main sleep's duration (BUG-205), the nap line, and — when the night on
+    /// screen is not last night's — the "Last recorded: …" caption (BUG-210), so the widget and the tile
+    /// say the same thing.
+    private func sleepPayload(_ tile: SleepTileState) -> WidgetSleepPayload? {
+        guard let day = tile.day else { return nil }
         let sleep = day.main
         let stages = SleepStageDistribution(sleep)
         return WidgetSleepPayload(
-            durationText: SleepFormat.duration(day.totalMinutes),
+            durationText: SleepFormat.duration(sleep.session.totalMinutes),
             score: SleepScore.calculate(sleep).score,
             segments: stages.segments.map {
                 WidgetSleepPayload.Segment(minutes: $0.minutes, colorHex: Self.hexString($0.color), label: $0.label)
             },
-            napText: day.napCaption
+            napText: day.napCaption,
+            captionText: tile.caption
         )
     }
 

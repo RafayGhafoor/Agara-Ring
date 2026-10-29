@@ -365,9 +365,10 @@ final class MeasureHubProtocolTests: XCTestCase {
             return [tag, UInt8(bytes.count)] + bytes
         }
         let record = decoder.dailyRecord(payload: payload)
-        XCTAssertEqual(record?.respiration, [11, 11], "0xFF = none")
+        XCTAssertEqual(record?.respiration, [SlotSample(offset: 0, value: 11), SlotSample(offset: 4, value: 11)],
+                       "0xFF = none, and the minute survives the filter (BUG-104)")
         XCTAssertEqual(record?.met ?? 0, 1.0, accuracy: 0.001)
-        XCTAssertEqual(record?.cardiacLoad, [30])
+        XCTAssertEqual(record?.cardiacLoad, [SlotSample(offset: 0, value: 30)])
         XCTAssertEqual(record?.oxygen, [], "SpO₂ group empty")
         let bc = record?.bloodComponents
         XCTAssertEqual(bc?.totalCholesterol ?? 0, 4.22, accuracy: 0.001)

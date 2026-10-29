@@ -10,6 +10,8 @@ final class VeepooSyncEngineTests: XCTestCase {
 
     private final class RecordingWriter: RingCommandWriter {
         var deviceIdentifier: String? { nil }
+        /// The link's identity (a peripheral UUID on BLE) — sleep records are stamped with it.
+        var source: String?
         var commands: [Data] = []
         var emitted: [RingDecodedEvent] = []
         func enqueue(_ command: Data) { commands.append(command) }
@@ -18,6 +20,7 @@ final class VeepooSyncEngineTests: XCTestCase {
             completion(.success(()))
         }
         func emit(_ event: RingDecodedEvent) { emitted.append(event) }
+        var connectionSource: String? { source }
         func asked(_ frame: Data) -> Bool { commands.contains(frame) }
 
         var heartRates: [Double] {
@@ -36,10 +39,15 @@ final class VeepooSyncEngineTests: XCTestCase {
     /// Keeps the engine alive for the test — the writer is held weakly by the engine.
     private var writer = RecordingWriter()
 
+    /// The evening the fixtures' records were captured; the pass's "today" is pinned to it so a record's
+    /// date is the day the loop asked for (BUG-102) rather than the day the suite happens to run.
+    static let fixtureDay = Calendar.current.date(from: DateComponents(year: 2026, month: 9, day: 25, hour: 23, minute: 30))!
+
     /// An authenticated engine whose day-0 sleep phase is done, so the DF read for day 0 is in flight.
     private func engineInDailyPhase() -> VeepooSyncEngine {
         writer = RecordingWriter()
         let engine = VeepooSyncEngine(writer: writer, decoder: VeepooDecoder(), historyDays: 2)
+        engine.now = { Self.fixtureDay }
         engine.connectionDidStart()
         engine.handle(.commandAck(commandId: 0xA1))
         engine.handle(.unknown(commandId: 0xE0, raw: sleepNoData))
@@ -357,7 +365,7 @@ final class VeepooSyncEngineTests: XCTestCase {
     func testFifteenPartRecordAtDefaultMTUYieldsAllVitals() {
         completeDay(smallMtuRecord)
         XCTAssertEqual(values(.heartRate), [64])
-        XCTAssertEqual(values(.hrv), [93, 97])
+        XCTAssertEqual(values(.hrv), [40], "BUG-103: the vendor reduction, one value for minute 0")
         XCTAssertEqual(values(.bloodPressureSystolic), [115])
         XCTAssertEqual(values(.bloodPressureDiastolic), [83])
         XCTAssertEqual(values(.spo2), [97])
@@ -369,9 +377,200 @@ final class VeepooSyncEngineTests: XCTestCase {
 
     func testTwoPartRecordAtLargeMTUStillAssembles() {
         completeDay(largeMtuRecord)
+        // BUG-102: the slot is dated by the day the loop asked for (day 0 = 09-25 here), taking only the
+        // time of day from `B1` (`09 18 10 19` = 16:25).
         let c = Calendar.current.dateComponents([.month, .day, .hour, .minute], from: buckets.first ?? .distantPast)
-        XCTAssertEqual([c.month, c.day, c.hour, c.minute], [9, 24, 16, 25])
+        XCTAssertEqual([c.month, c.day, c.hour, c.minute], [9, 25, 16, 25])
         XCTAssertFalse(skippedRecords)
+    }
+
+    // MARK: Sleep transfer completeness (BUG-201 / BUG-108 / BUG-202 / SEC-301)
+
+    private var sleepTimelines: [(start: Date, stages: Int)] {
+        writer.emitted.compactMap {
+            if case let .sleepTimeline(start, stages, _) = $0 { return (start, stages.count) }
+            return nil
+        }
+    }
+
+    /// An authenticated engine with day 0's `E0` transfer outstanding.
+    private func engineAwaitingSleep(days: Int = 2) -> VeepooSyncEngine {
+        writer = RecordingWriter()
+        let engine = VeepooSyncEngine(writer: writer, decoder: VeepooDecoder(), historyDays: days)
+        engine.connectionDidStart()
+        engine.handle(.commandAck(commandId: 0xA1))
+        XCTAssertTrue(writer.asked(VeepooEncoder.sleepHistory(dayOffset: 0)))
+        return engine
+    }
+
+    private func feedSleepPages(_ engine: VeepooSyncEngine, _ pages: [String]) {
+        for page in pages { frame(engine, hex(page)) }
+    }
+
+    /// BUG-201 — the real 17-page night with page 9 lost on the way up decoded to a 620-minute curve that
+    /// was stored as if the ring had said so. It must be refused instead: nothing stored, the day not
+    /// advanced (so it is asked for again), and the failure counted for diagnostics.
+    func testSleepTransferMissingAPageStoresNothingAndKeepsTheDayOpen() {
+        let engine = engineAwaitingSleep()
+        feedSleepPages(engine, SleepTransferFixtures.ringB1111.filter { !$0.hasPrefix("e009") })
+        XCTAssertTrue(sleepTimelines.isEmpty, "an incomplete transfer is not a night")
+        XCTAssertEqual(engine.sleepIncompleteTransfers, 1)
+        XCTAssertFalse(writer.asked(VeepooEncoder.dailyHistory(dayOffset: 0)), "the day must not be advanced")
+        XCTAssertFalse(writer.asked(VeepooEncoder.sleepHistory(dayOffset: 1)))
+        engine.connectionDidEnd()
+    }
+
+    /// The complete transfer is stored exactly once, and completes the sleep phase itself.
+    func testCompleteSleepTransferStoresOneSession() {
+        let engine = engineAwaitingSleep()
+        feedSleepPages(engine, SleepTransferFixtures.ringB1111)
+        XCTAssertEqual(sleepTimelines.map(\.stages), [650])
+        XCTAssertEqual(engine.sleepIncompleteTransfers, 0)
+        XCTAssertTrue(writer.asked(VeepooEncoder.dailyHistory(dayOffset: 0)), "the DF half follows")
+        engine.connectionDidEnd()
+    }
+
+    /// BUG-201 — a page-0-only answer (`e0 00 01 <day>` with an `A6` trailer and no `A1`) announces one
+    /// session and carries none: the old code stored nothing *and* closed the day, so the night was lost.
+    func testPageZeroOnlyTransferAnnouncesASessionAndDecodesNone() {
+        let engine = engineAwaitingSleep()
+        frame(engine, hex("e0000100a60200ff000000000000000000"))
+        XCTAssertTrue(sleepTimelines.isEmpty)
+        XCTAssertEqual(engine.sleepIncompleteTransfers, 1)
+        XCTAssertFalse(writer.asked(VeepooEncoder.dailyHistory(dayOffset: 0)))
+        engine.connectionDidEnd()
+    }
+
+    /// BUG-201 — `e0 00 00 <day>` (page 0, **no** sessions) is the only no-data answer. A real page whose
+    /// byte 2 happens to be 0 (`e0 10 00 04 …`, page 0x10 of day 4) used to be swallowed as one.
+    func testARealPageWithAZeroSessionByteIsNotANoDataMarker() {
+        let engine = engineAwaitingSleep()
+        // Page 0x10 out of order: it must be buffered, not treated as "the ring kept no sleep".
+        frame(engine, hex("e0100004a10c01a208515230cf28f13897a32409"))
+        XCTAssertFalse(writer.asked(VeepooEncoder.dailyHistory(dayOffset: 0)), "the sleep phase is still open")
+        engine.connectionDidEnd()
+    }
+
+    /// BUG-108 — a session with no `A5` curve used to be stored as deep → light → REM → awake runs. The
+    /// counts are real, the order is not: the record is skipped (and counted) instead of invented.
+    func testSleepSessionWithoutACurveIsNotStoredAsAFabricatedNight() {
+        let engine = engineAwaitingSleep()
+        frame(engine, Self.curveLessPage)
+        XCTAssertTrue(sleepTimelines.isEmpty, "no curve, no hypnogram")
+        XCTAssertEqual(engine.sleepRejectedSessions, 1)
+        engine.connectionDidEnd()
+    }
+
+    /// BUG-202 / A2 (migration-free) — the ring's own `A3` numbers are compared with the decoded curve at
+    /// emit time. On the real 17-page night they agree exactly, so nothing is reported…
+    func testTheRingsOwnCountsAgreeWithTheRealCurve() {
+        let engine = engineAwaitingSleep()
+        feedSleepPages(engine, SleepTransferFixtures.ringB1111)
+        XCTAssertEqual(sleepTimelines.map(\.stages), [650])
+        XCTAssertEqual(engine.sleepCountMismatches, 0)
+        engine.connectionDidEnd()
+    }
+
+    /// …and a curve that lost minutes against the ring's own window is *reported*, never silently accepted.
+    /// Diagnostic only: the night is still stored, and the retry signals stay A1/A4.
+    func testACurveShorterThanTheRingsOwnWindowIsReported() {
+        let engine = engineAwaitingSleep()
+        // A complete transfer (no overrun) whose A3 says 650 minutes while its A5 curve covers 90.
+        frame(engine, Self.page(total: 650, awake: 38, curveMinutes: 90))
+        XCTAssertEqual(engine.sleepIncompleteTransfers, 0, "the synthetic transfer must pass the completeness checks")
+        XCTAssertEqual(sleepTimelines.map(\.stages), [90])
+        XCTAssertEqual(engine.sleepCountMismatches, 1)
+        XCTAssertTrue(writer.emitted.contains {
+            if case let .historySyncProgress(stage) = $0 { return stage.contains("the ring's own count differs") }
+            return false
+        })
+        engine.connectionDidEnd()
+    }
+
+    /// One `E0` page: a single `A1` block with an `A3` summary and an `A5` curve of `curveMinutes`.
+    private static func page(total: Int, awake: Int, curveMinutes: Int) -> Data {
+        var summary = [UInt8](repeating: 0, count: 31)
+        summary[0...3] = [0x09, 0x19, 0x00, 0x21]
+        summary[4...7] = [0x09, 0x19, 0x0B, 0x0B]
+        summary[25] = UInt8(total & 0xFF)
+        summary[26] = UInt8(total >> 8)
+        summary[29] = UInt8(awake & 0xFF)
+        summary[30] = UInt8(awake >> 8)
+        // `A5` is the one tag with a 2-byte LE minute count instead of a 1-byte length.
+        let bitmap = [UInt8](repeating: 0x00, count: (curveMinutes + 3) / 4)   // all deep
+        let curve: [UInt8] = [0xA5, UInt8(curveMinutes & 0xFF), UInt8(curveMinutes >> 8)] + bitmap
+        let body: [UInt8] = [0xA3, 0x1F] + summary + curve
+        let declared = UInt16(3 + body.count)
+        let block: [UInt8] = [0xA1, UInt8(declared & 0xFF), UInt8(declared >> 8)] + body
+        return Data([0xE0, 0x00, 0x01, 0x00] + block)
+    }
+
+    /// SEC-301 (report-only, decision D4) — three cases: a matching `a1` identity, none at all, and one that
+    /// contradicts what this peripheral first reported. All three still store the night; the counts are the
+    /// diagnostic.
+    func testSleepProvenanceIsCountedButTheRecordIsStillStored() {
+        // A link with no `a1` identity at all (the null-MAC case Android's guard skips).
+        let silent = engineAwaitingSleep()
+        feedSleepPages(silent, SleepTransferFixtures.ringB1111)
+        XCTAssertEqual(sleepTimelines.count, 1, "report-only: the night is still stored")
+        XCTAssertEqual(silent.sleepProvenance.checked, 1)
+        XCTAssertEqual(silent.sleepProvenance.nullIdentity, 1)
+        XCTAssertEqual(silent.sleepProvenance.mismatched, 0)
+        silent.connectionDidEnd()
+
+        // The same peripheral reports one identity, then a different one: a replayed `a1` (SEC-301).
+        writer = RecordingWriter()
+        writer.source = "peripheral-A"
+        let ring = VeepooSyncEngine(writer: writer, decoder: VeepooDecoder(), historyDays: 1)
+        ring.connectionDidStart()
+        ring.handle(.ringIdentity(sensorId: "aaaa000000000001"))
+        ring.handle(.commandAck(commandId: 0xA1))
+        feedSleepPages(ring, SleepTransferFixtures.ringB1111)
+        XCTAssertEqual(ring.sleepProvenance.mismatched, 0, "the first identity pins the link")
+        ring.connectionDidEnd()
+
+        writer.commands.removeAll()
+        writer.emitted.removeAll()
+        ring.connectionDidStart()
+        ring.handle(.ringIdentity(sensorId: "bbbb000000000002"))
+        ring.handle(.commandAck(commandId: 0xA1))
+        feedSleepPages(ring, SleepTransferFixtures.ringB1111)
+        XCTAssertEqual(ring.sleepProvenance.checked, 2)
+        XCTAssertEqual(ring.sleepProvenance.mismatched, 1, "a contradictory a1 MAC on the same peripheral")
+        XCTAssertEqual(writer.emitted.filter { if case .sleepTimeline = $0 { return true }; return false }.count, 1,
+                       "report-only: still stored")
+        ring.connectionDidEnd()
+    }
+
+    /// One `E0` page carrying a single `A3`-only `A1` block (no `A5`): a real summary, no curve.
+    private static var curveLessPage: Data {
+        var summary = [UInt8](repeating: 0, count: 31)
+        summary[0...3] = [0x09, 0x19, 0x00, 0x21]      // start
+        summary[4...7] = [0x09, 0x19, 0x0B, 0x0B]      // end
+        summary[19] = 0x87                              // deep 135
+        summary[21] = 0x7B                              // light 379
+        summary[22] = 0x01
+        summary[23] = 0x62                              // REM 98
+        summary[25] = 0x8A                              // total 650
+        summary[26] = 0x02
+        summary[29] = 0x26                              // awake 38
+        let body: [UInt8] = [0xA3, 0x1F] + summary
+        let declared = UInt16(3 + body.count)
+        let block: [UInt8] = [0xA1, UInt8(declared & 0xFF), UInt8(declared >> 8)] + body
+        return Data([0xE0, 0x00, 0x01, 0x00] + block + [UInt8](repeating: 0, count: max(0, 16 - block.count)))
+    }
+
+    /// The diagnostics report says **why** a night is missing: the sleep counters reach the export
+    /// (BUG-201/108/202, SEC-301), which is what makes one release of report-only provenance usable.
+    func testSleepSyncCountersReachTheDiagnosticsExport() {
+        SleepSyncDiagnostics.shared.reset()
+        let engine = engineAwaitingSleep()
+        feedSleepPages(engine, SleepTransferFixtures.ringB1111.filter { !$0.hasPrefix("e009") })
+        let snapshot = SleepSyncDiagnostics.shared.snapshot()
+        XCTAssertEqual(snapshot["incomplete_transfers"], 1)
+        XCTAssertEqual(snapshot["rejected_sessions"], 0)
+        XCTAssertNotNil(snapshot["provenance_null_identity"], "every field is present, zeros included")
+        engine.connectionDidEnd()
     }
 
     func testRecordMissingADeclaredPartIsSkipped() {

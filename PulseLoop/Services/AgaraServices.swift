@@ -37,7 +37,8 @@ enum MetricsService {
         let calibration = calibrationState(device: device, activityRows: activityRows, isDemo: isDemo, context: context)
         let hrFreshness = freshness(lastUpdatedAt: latestHR?.timestamp, isDemo: isDemo)
         let spo2Freshness = freshness(lastUpdatedAt: latestSpO2?.timestamp, isDemo: isDemo)
-        let sleepDay = SleepService.latestSleepDay(context: context)
+        let sleepTile = SleepService.sleepTile(context: context)
+        let sleepDay = sleepTile.day
         let sleep = sleepDay?.main
         let goals = goalsSummary(context: context)
         let profileValues = MetricsProfileValues(profile: ProfileRepository.profile(context: context))
@@ -76,6 +77,7 @@ enum MetricsService {
             restingHeartRateEstimate: restingHeartRate(samples: hrSamples),
             peakHeartRateToday: hrSamples.map(\.value).max(),
             sleepDay: sleepDay,
+            sleepTile: sleepTile,
             batteryPercent: device?.batteryPercent ?? 0,
             deviceState: device?.state ?? .idle,
             trends: trends,
@@ -684,36 +686,74 @@ extension Calendar {
     /// Hour-of-day boundary between "belongs to last night" and "belongs to the coming night."
     /// Sleep starting at or after this hour rolls onto the *next* morning's waking day; anything
     /// earlier (including small-hours and daytime naps) stays on the current day.
-    static let sleepEveningBoundaryHour = 19  // 7 PM
+    ///
+    /// **20 — the vendor app's boundary** (`SleepPrecisionData.setPresicionDate`, BUG-207). At 19 an
+    /// evening doze from 19:30 to 19:55 was filed under tomorrow and surfaced as "+ nap 25 m" on the next
+    /// morning's tile instead of on the day it happened.
+    static let sleepEveningBoundaryHour = 20  // 8 PM
 
-    /// The waking-morning day key for a sleep session starting at `date`. Sleep that begins at or
-    /// after 7 PM belongs to the *next* day's waking morning (you fall asleep tonight, wake tomorrow),
-    /// so a night that crosses midnight groups onto the single morning it ends on. Sleep before 7 PM
-    /// — early-morning hours or a daytime nap — stays on the current day / last night's session.
+    /// The waking-morning day key for a sleep session starting at `date` (no end known).
     func wakingDay(forSleepStart date: Date) -> Date {
         let base = startOfDay(for: date)
         guard component(.hour, from: date) >= Self.sleepEveningBoundaryHour else { return base }
         return self.date(byAdding: .day, value: 1, to: base) ?? base
+    }
+
+    /// The waking-morning day key with the session's **end** known — the vendor's full rule (BUG-207):
+    /// a session whose end falls on a later date belongs to the morning it ended on whatever its start
+    /// hour (a night that crosses midnight), and only a session that starts and ends on the same date
+    /// uses the evening boundary.
+    func wakingDay(forSleepStart start: Date, end: Date) -> Date {
+        if !isDate(start, inSameDayAs: end) {
+            return startOfDay(for: end)
+        }
+        return wakingDay(forSleepStart: start)
     }
 }
 
 @MainActor
 enum SleepService {
     /// The main sleep of the latest sleep day (`latestSleepDay`).
-    static func latestSleep(context: ModelContext) -> SleepSummary? {
-        latestSleepDay(context: context)?.main
+    static func latestSleep(context: ModelContext, now: Date = AppClock.now) -> SleepSummary? {
+        latestSleepDay(context: context, now: now)?.main
     }
 
-    /// "Last night": the waking day of the newest session, by `SleepDayRule` (main sleep = the longest, naps
-    /// add to the total). Gated on *today* so Today only shows a recent night; a day more than a day old (with
-    /// nothing newer) is hidden rather than shown as if it were last night.
-    static func latestSleepDay(context: ModelContext, now: Date = AppClock.now) -> SleepDay? {
-        let calendar = Calendar.current
-        let sessions = SleepRepository.sessions(context: context)
-        guard let latest = sessions.max(by: { $0.startAt < $1.startAt }) else { return nil }
-        let staleCutoff = calendar.date(byAdding: .day, value: -1, to: calendar.startOfDay(for: now)) ?? now
-        guard calendar.startOfDay(for: latest.date) >= staleCutoff else { return nil }
-        return sleepDay(sessions.filter { calendar.isDate($0.date, inSameDayAs: latest.date) }, context: context)
+    /// "Last night": the reference night's sleep day, by `SleepDayRule` (main sleep = the longest, naps add
+    /// to the total), or nil when the ring was not worn.
+    ///
+    /// BUG-210: keyed strictly on the **reference night** (today's waking day, or yesterday's before 04:00),
+    /// the same rule Android's `referenceNightLocal` applies. It used to take the newest session and only
+    /// reject it a day later, so one unworn night made iOS show the night *before last* where Android showed
+    /// "No sleep recorded" — a one-day-wide divergence that read as the data having disappeared. An older
+    /// night is still reachable through `sleepTile`, which labels it.
+    static func latestSleepDay(context: ModelContext, now: Date = AppClock.now,
+                               calendar: Calendar = .current) -> SleepDay? {
+        sleepDay(for: dayReferenceNight(now: now, calendar: calendar), context: context)
+    }
+
+    /// Which night the Today sleep tile is about — three states, identical on both platforms (BUG-210):
+    /// last night's sleep; nothing last night but an older night on record, shown with an explicit
+    /// "Last recorded: …" line rather than presented as last night; or nothing at all.
+    static func sleepTile(context: ModelContext, now: Date = AppClock.now,
+                          calendar: Calendar = .current) -> SleepTileState {
+        if let day = latestSleepDay(context: context, now: now, calendar: calendar) {
+            return SleepTileState(kind: .referenceNight, day: day, caption: nil)
+        }
+        guard let latest = SleepRepository.sessions(context: context).max(by: { $0.startAt < $1.startAt }),
+              let day = sleepDay(for: latest.date, context: context)
+        else { return .none }
+        let caption = "Last recorded: " + Self.recordedDayText(latest.date, calendar: calendar)
+        return SleepTileState(kind: .lastRecorded, day: day, caption: caption)
+    }
+
+    /// "Tue 30 Sep" — the day an older night belongs to, for the `.lastRecorded` caption.
+    private static func recordedDayText(_ date: Date, calendar: Calendar) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.locale = .current
+        formatter.timeZone = calendar.timeZone
+        formatter.setLocalizedDateFormatFromTemplate("EEE d MMM")
+        return formatter.string(from: date)
     }
 
     /// The sleep day stored under `date` (its waking day), by `SleepDayRule`.

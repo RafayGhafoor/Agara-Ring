@@ -103,8 +103,10 @@ final class SleepDayAndSyncPlanTests: XCTestCase {
 
     private func key(_ offset: Int) -> String { SyncPlan.dateKey(offset: offset, today: today, calendar: calendar) }
 
+    /// A day received whole — its records *and* its sleep (BUG-203). A complete day without stored sleep
+    /// is the field's mis-marked case, which `make` heals.
     private func done(_ total: Int) -> SyncPlan.DayState {
-        SyncPlan.DayState(storedThrough: total, totalBlocks: total, complete: true)
+        SyncPlan.DayState(storedThrough: total, totalBlocks: total, sleepStored: true, complete: true)
     }
 
     func testDateKeysCountBackFromToday() {
@@ -143,15 +145,17 @@ final class SleepDayAndSyncPlanTests: XCTestCase {
 
     func testRecordCompletesAPastDayOnlyWithTheEndMarkerAndEveryBlock() {
         let all = Set(1...28)
-        XCTAssertTrue(SyncPlan.record(nil, offset: 1, position: 1, records: all, totalBlocks: 28, endMarker: true).complete)
+        XCTAssertTrue(SyncPlan.record(nil, offset: 1, position: 1, records: all, totalBlocks: 28, endMarker: true,
+                                      sleepStored: true).complete)
         XCTAssertFalse(SyncPlan.record(nil, offset: 1, position: 1, records: Set(1...27), totalBlocks: 28, endMarker: true).complete,
                        "a record lost to a CRC failure keeps the day open")
         XCTAssertFalse(SyncPlan.record(nil, offset: 1, position: 1, records: all, totalBlocks: 28, endMarker: false).complete,
                        "the stall watchdog closing the day is not a complete transfer")
         XCTAssertFalse(SyncPlan.record(nil, offset: 0, position: 1, records: all, totalBlocks: 28, endMarker: true).complete,
                        "today is never complete — it keeps growing")
-        XCTAssertTrue(SyncPlan.record(nil, offset: 4, position: 1, records: [], totalBlocks: nil, endMarker: true).complete,
-                      "a day the ring holds nothing for (end marker at once) is done")
+        XCTAssertTrue(SyncPlan.record(nil, offset: 4, position: 1, records: [], totalBlocks: nil, endMarker: true,
+                                      sleepStored: true).complete,
+                      "a day the ring holds nothing for (end marker at once, no-data sleep) is done")
     }
 
     func testRecordResumeContinuesTheUnbrokenRun() {
@@ -178,7 +182,53 @@ final class SleepDayAndSyncPlanTests: XCTestCase {
         XCTAssertEqual(after.storedThrough, 20)
         // The same gap on a past day keeps it open (the run is 10 < total 20).
         XCTAssertFalse(SyncPlan.record(nil, offset: 1, position: 1, records: records, totalBlocks: 20, endMarker: true).complete)
-        XCTAssertTrue(SyncPlan.record(nil, offset: 1, position: 1, records: Set(1...20), totalBlocks: 20, endMarker: true).complete)
+        XCTAssertTrue(SyncPlan.record(nil, offset: 1, position: 1, records: Set(1...20), totalBlocks: 20, endMarker: true,
+                                      sleepStored: true).complete)
+    }
+
+    /// BUG-203 — "complete" was a statement about the DF records alone, so a day whose sleep transfer
+    /// produced nothing was closed for good and the ring's night became unrecoverable.
+    func testADayWithItsActivityButNoSleepIsNotComplete() {
+        let all = Set(1...28)
+        XCTAssertFalse(SyncPlan.record(nil, offset: 1, position: 1, records: all, totalBlocks: 28,
+                                       endMarker: true, sleepStored: false).complete,
+                       "DF complete, sleep missing → the day stays in the walk")
+        XCTAssertTrue(SyncPlan.record(nil, offset: 1, position: 1, records: all, totalBlocks: 28,
+                                      endMarker: true, sleepStored: true).complete)
+        // A day the ring kept nothing for answers the no-data marker, which counts as stored sleep.
+        XCTAssertTrue(SyncPlan.record(nil, offset: 1, position: 1, records: [], totalBlocks: nil,
+                                      endMarker: true, sleepStored: true).complete)
+    }
+
+    /// The bounded heal: a day already marked complete in the field (before `sleepStored` existed) whose
+    /// sleep never reached storage is asked for once more — while the ring still holds it — and only for
+    /// its sleep (its records resume after the watermark, so the DF half is an end marker).
+    func testACompleteDayWithoutSleepIsHealedOnceWhileTheRingStillHoldsIt() {
+        // Day 1: complete with 20 records, but its night never reached storage (the field's old shape).
+        var noSleep = done(20)
+        noSleep.sleepStored = false
+        let ledger = [key(1): noSleep, key(5): done(0)]
+        let plan = SyncPlan.make(historyDays: 7, today: today, calendar: calendar, ledger: ledger)
+        XCTAssertEqual(plan.days.first { $0.offset == 1 }, SyncPlan.Day(offset: 1, position: 21),
+                       "day 1 is healed from its resume position, so its DF half is just the end marker")
+        XCTAssertNil(plan.days.first { $0.offset == 5 }, "day 5 is done and its sleep is stored — stays skipped")
+        // The heal is bounded: a day outside the ring's retention is not asked for its sleep again.
+        var far = done(9)
+        far.sleepStored = false
+        let bounded = SyncPlan.make(historyDays: 7, today: today, calendar: calendar, ledger: [key(4): far])
+        XCTAssertNil(bounded.days.first { $0.offset == 4 })
+    }
+
+    /// BUG-105 — a record the plausibility gate throws away must not count as stored, or the watermark
+    /// passes it and the day is never asked for again. Day 9 of a 10-day walk is outside the 8-day history
+    /// window `RingEventBridge` enforces, so nothing from it survives.
+    func testARecordOutsideTheHistoryWindowDoesNotAdvanceTheWatermark() {
+        let store = SyncPlanStore(defaults: freshDefaults())
+        let engine = makeEngine(ring: "ring-A", store: store, days: 10)
+        engine.handle(.commandAck(commandId: 0xA1))
+        servePass(engine, recordsPerDay: [9: 3])
+        XCTAssertEqual(store.state(ring: "ring-A", date: key(9))?.storedThrough, 0,
+                       "the three records decoded to today-9 and were dropped, so the day is still open")
     }
 
     func testStoreKeepsLedgersPerRingAndResets() {

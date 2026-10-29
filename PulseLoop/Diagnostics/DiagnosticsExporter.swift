@@ -17,6 +17,8 @@ enum DiagnosticsExporter {
         root["app"] = appInfo()
         root["device"] = deviceInfo(context: context)
         root["logs"] = recentLogs(context: context, limit: maxLogs)
+        // Why a night may be missing (BUG-201/108/202, SEC-301) — counters, never record contents.
+        root["sleepSync"] = SleepSyncDiagnostics.shared.snapshot()
         if RawPacketCapture.isEnabled {
             root["rawPackets"] = recentPackets(context: context, limit: 200)
         }

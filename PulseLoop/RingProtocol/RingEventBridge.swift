@@ -275,7 +275,7 @@ enum RingEventBridge {
     /// month/day/hour/minute), so anything far outside its own retention cannot be trusted. `-historyWindowDays
     /// N` widens it for tooling — e.g. rendering months of history against the ring emulator — while the
     /// default stays at the ring's real horizon.
-    private static func isWithinHistoryWindow(_ date: Date, now: Date) -> Bool {
+    static func isWithinHistoryWindow(_ date: Date, now: Date) -> Bool {
         let lower = now.addingTimeInterval(-historyWindowDays * 24 * 3600)
         let upper = now.addingTimeInterval(3600)
         return date >= lower && date <= upper
