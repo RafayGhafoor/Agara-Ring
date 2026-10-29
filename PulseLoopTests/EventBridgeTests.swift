@@ -285,4 +285,34 @@ final class EventBridgeTests: XCTestCase {
     func testWearStateIsNotFamilyGatedInTheBridge() {
         XCTAssertEqual(RingEventBridge.events(for: .wearingStatus(worn: false, timestamp: Date())).count, 1)
     }
+
+    // MARK: - The history window (BUG-102's rule, tested on purpose)
+
+    /// A record is kept when it is inside the ring's retention window and not meaningfully in the future.
+    /// `isWithinHistoryWindow` had no test of its own until BUG-213: the rule was only ever exercised through
+    /// fixtures that happened to be dated the right way, which is how six tests came to depend on the hour the
+    /// suite ran. These pin the boundary itself.
+    func testAHistoryRecordIsKeptInsideTheWindowAndJustAheadOfNow() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        // An hour ahead is still "just now" — the ring's clock runs a little fast, and the vendor accepts it.
+        XCTAssertTrue(RingEventBridge.isWithinHistoryWindow(now.addingTimeInterval(1_800), now: now),
+                      "30 minutes ahead is kept (the ring's clock drifts)")
+        XCTAssertTrue(RingEventBridge.isWithinHistoryWindow(now.addingTimeInterval(3_600), now: now),
+                      "exactly the 1 h upper bound is kept — the boundary is inclusive")
+        // Past it, the record is a ring-clock artefact that would file a day in the wrong place (BUG-102).
+        XCTAssertFalse(RingEventBridge.isWithinHistoryWindow(now.addingTimeInterval(3_601), now: now),
+                       "one second past the upper bound is dropped")
+        XCTAssertFalse(RingEventBridge.isWithinHistoryWindow(now.addingTimeInterval(7_200), now: now),
+                       "two hours ahead is dropped")
+    }
+
+    func testAHistoryRecordIsKeptUpToTheRetentionWindowAndNotBefore() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let window = Double(RingEventBridge.historyWindowDays) * 24 * 3600
+        XCTAssertTrue(RingEventBridge.isWithinHistoryWindow(now.addingTimeInterval(-window), now: now),
+                      "exactly the retention horizon is kept — the boundary is inclusive")
+        XCTAssertFalse(RingEventBridge.isWithinHistoryWindow(now.addingTimeInterval(-window - 1), now: now),
+                       "one second older is dropped")
+        XCTAssertTrue(RingEventBridge.isWithinHistoryWindow(now, now: now), "the boundary value 'now' is kept")
+    }
 }

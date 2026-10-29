@@ -40,6 +40,7 @@ final class SleepServiceTests: XCTestCase {
     }
 
     func testRecentSleepShown() throws {
+        try TestSupport.withClock("2026-10-30T09:00:00") {
         let context = try TestSupport.makeContext()
         // A night that began at 02:00 today is keyed to today's waking day — last night.
         let earlyToday = Calendar.current.date(bySettingHour: 2, minute: 0, second: 0, of: TestSupport.day(0))!
@@ -47,6 +48,7 @@ final class SleepServiceTests: XCTestCase {
         let latest = SleepService.latestSleep(context: context)
         XCTAssertNotNil(latest)
         XCTAssertEqual(latest?.deepMinutes, 90)
+        }
     }
 
     func testStaleSleepHiddenFromToday() throws {
@@ -228,44 +230,48 @@ final class SleepServiceTests: XCTestCase {
     }
 
     func testMigrateSplitSleepSessions() throws {
-        let context = try TestSupport.makeContext()
-        // The migration is UserDefaults-gated; clear the flag so it runs in this test.
-        UserDefaults.standard.removeObject(forKey: "sleepMidnightMerge.v1")
-        let cal = Calendar.current
-        let today = cal.startOfDay(for: Date())
-        let yesterday = cal.date(byAdding: .day, value: -1, to: today)!
+        // BUG-213: the sessions are dated "today", and `latestSleep` filters against the clock — before 07:00
+        // local, a night that ends at 07:00 is still in the future and this read came back empty.
+        try TestSupport.withClock("2026-10-30T09:00:00") {
+            let context = try TestSupport.makeContext()
+            // The migration is UserDefaults-gated; clear the flag so it runs in this test.
+            UserDefaults.standard.removeObject(forKey: "sleepMidnightMerge.v1")
+            let cal = Calendar.current
+            let today = cal.startOfDay(for: Date())
+            let yesterday = cal.date(byAdding: .day, value: -1, to: today)!
 
-        // Create duplicate sessions like the ones in the bug:
-        // Session 1: pre-midnight chunk dated yesterday (duration 45m, start 23:15, end 00:00)
-        let start = cal.date(bySettingHour: 23, minute: 15, second: 0, of: yesterday)!
-        let end1 = cal.date(bySettingHour: 0, minute: 0, second: 0, of: today)!
-        let session1 = SleepSession(date: yesterday, startAt: start, endAt: end1, totalMinutes: 45)
-        context.insert(session1)
-        context.insert(SleepStageBlock(sessionId: session1.id, startAt: start, startMinute: 0, durationMinutes: 45, stage: .light))
+            // Create duplicate sessions like the ones in the bug:
+            // Session 1: pre-midnight chunk dated yesterday (duration 45m, start 23:15, end 00:00)
+            let start = cal.date(bySettingHour: 23, minute: 15, second: 0, of: yesterday)!
+            let end1 = cal.date(bySettingHour: 0, minute: 0, second: 0, of: today)!
+            let session1 = SleepSession(date: yesterday, startAt: start, endAt: end1, totalMinutes: 45)
+            context.insert(session1)
+            context.insert(SleepStageBlock(sessionId: session1.id, startAt: start, startMinute: 0, durationMinutes: 45, stage: .light))
 
-        // Session 2: full night dated today (duration 7h 45m, start 23:15, end 07:00)
-        let end2 = cal.date(bySettingHour: 7, minute: 0, second: 0, of: today)!
-        let session2 = SleepSession(date: today, startAt: start, endAt: end2, totalMinutes: 465)
-        context.insert(session2)
-        context.insert(SleepStageBlock(sessionId: session2.id, startAt: start, startMinute: 0, durationMinutes: 465, stage: .deep))
+            // Session 2: full night dated today (duration 7h 45m, start 23:15, end 07:00)
+            let end2 = cal.date(bySettingHour: 7, minute: 0, second: 0, of: today)!
+            let session2 = SleepSession(date: today, startAt: start, endAt: end2, totalMinutes: 465)
+            context.insert(session2)
+            context.insert(SleepStageBlock(sessionId: session2.id, startAt: start, startMinute: 0, durationMinutes: 465, stage: .deep))
 
-        try context.save()
+            try context.save()
 
-        // Assert they both exist initially
-        XCTAssertEqual(try context.fetch(FetchDescriptor<SleepSession>()).count, 2)
+            // Assert they both exist initially
+            XCTAssertEqual(try context.fetch(FetchDescriptor<SleepSession>()).count, 2)
 
-        SleepService.migrateSplitSleepSessionsIfNeeded(context: context)
+            SleepService.migrateSplitSleepSessionsIfNeeded(context: context)
 
-        // Only one session should remain, and it should be the 465-minute one (7h 45m)
-        let sessions = try context.fetch(FetchDescriptor<SleepSession>())
-        XCTAssertEqual(sessions.count, 1)
-        XCTAssertEqual(sessions.first?.totalMinutes, 465)
-        XCTAssertEqual(SleepService.latestSleep(context: context)?.session.totalMinutes, 465)
+            // Only one session should remain, and it should be the 465-minute one (7h 45m)
+            let sessions = try context.fetch(FetchDescriptor<SleepSession>())
+            XCTAssertEqual(sessions.count, 1)
+            XCTAssertEqual(sessions.first?.totalMinutes, 465)
+            XCTAssertEqual(SleepService.latestSleep(context: context)?.session.totalMinutes, 465)
 
-        // The orphaned block for the deleted session should be cleaned up
-        let blocks = try context.fetch(FetchDescriptor<SleepStageBlock>())
-        XCTAssertEqual(blocks.count, 1)
-        XCTAssertEqual(blocks.first?.sessionId, session2.id)
+            // The orphaned block for the deleted session should be cleaned up
+            let blocks = try context.fetch(FetchDescriptor<SleepStageBlock>())
+            XCTAssertEqual(blocks.count, 1)
+            XCTAssertEqual(blocks.first?.sessionId, session2.id)
+        }
     }
 
     func testMigrateTieBreakKeepsRicherSession() throws {

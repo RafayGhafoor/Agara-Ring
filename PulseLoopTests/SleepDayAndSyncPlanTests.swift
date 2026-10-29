@@ -55,6 +55,9 @@ final class SleepDayAndSyncPlanTests: XCTestCase {
     }
 
     func testTodayShowsTheNightWithTheNapAddedToTheTotal() throws {
+        // BUG-213: "today" here means a full day, and the nap is at 13:00 — run before 13:00 it was still in the
+        // future and `latestSleepDay` came back nil. Pin the evening rather than depend on the hour of the run.
+        try TestSupport.withClock("2026-10-30T22:00:00") {
         let context = try TestSupport.makeContext()
         insertNightAndNap(context)
         let day = try XCTUnwrap(SleepService.latestSleepDay(context: context))
@@ -67,6 +70,7 @@ final class SleepDayAndSyncPlanTests: XCTestCase {
         let today = MetricsService.buildTodaySummary(context: context)
         XCTAssertEqual(today.sleepDay?.totalMinutes, 460)
         XCTAssertEqual(today.sleep?.session.totalMinutes, 420, "stages and score come from the main sleep")
+        }
     }
 
     func testCoachSleepContextsUseTheSameRule() throws {
