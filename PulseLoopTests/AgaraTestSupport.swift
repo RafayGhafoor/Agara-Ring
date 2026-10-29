@@ -7,6 +7,19 @@ import XCTest
 @MainActor
 enum TestSupport {
     /// A fresh, isolated in-memory store per call.
+    /// Pin the app clock to `iso` (device zone, exactly like the `-fixedNow` launch argument) for the duration of
+    /// `body`, and restore the real clock after — even if `body` throws.
+    ///
+    /// BUG-213: a test whose result depends on what time of day the suite runs is not evidence. Six tests failed
+    /// every night after local midnight and passed all evening on the same commit, because fixtures dated "today at
+    /// 10:05" are in the future before 10:05 and day keys flip at midnight. Anything that reads a date relative to
+    /// "now" should pin it here rather than hope.
+    static func withClock<T>(_ iso: String, _ body: () throws -> T) rethrows -> T {
+        AppClock.configure(iso)
+        defer { AppClock.reset() }
+        return try body()
+    }
+
     static func makeContext() throws -> ModelContext {
         let container = try ModelContainerFactory.make(inMemory: true)
         return ModelContext(container)
@@ -25,7 +38,7 @@ enum TestSupport {
         return settings
     }
 
-    static func day(_ offset: Int, from base: Date = Date()) -> Date {
+    static func day(_ offset: Int, from base: Date = AppClock.now) -> Date {
         Calendar.current.date(byAdding: .day, value: offset, to: Calendar.current.startOfDay(for: base)) ?? base
     }
 

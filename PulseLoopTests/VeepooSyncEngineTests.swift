@@ -204,6 +204,9 @@ final class VeepooSyncEngineTests: XCTestCase {
         writer = RecordingWriter()
         let days = 7
         let engine = VeepooSyncEngine(writer: writer, decoder: VeepooDecoder(), historyDays: days)
+        // BUG-213: without this the pass's "today" is the real date and the fixture record (10:05) is in the
+        // future when the suite runs before 10:05 — the record is dropped as implausible and this reads 0.
+        engine.now = { Self.fixtureDay }
         engine.connectionDidStart()
         engine.handle(.commandAck(commandId: 0xA1))
         let end = hex("dfffff58" + String(repeating: "00", count: 16))
@@ -231,6 +234,7 @@ final class VeepooSyncEngineTests: XCTestCase {
     func testDayLoopReportsPerDayProgressWithCounts() {
         writer = RecordingWriter()
         let engine = VeepooSyncEngine(writer: writer, decoder: VeepooDecoder(), historyDays: 2)
+        engine.now = { Self.fixtureDay }   // BUG-213: a fixture dated "today 10:05" is future-dated before 10:05
         engine.connectionDidStart()
         engine.handle(.commandAck(commandId: 0xA1))
         let end = hex("dfffff58" + String(repeating: "00", count: 16))
@@ -256,6 +260,7 @@ final class VeepooSyncEngineTests: XCTestCase {
     func testStrayEndMarkerDuringSleepPhaseDoesNotAdvance() {
         writer = RecordingWriter()
         let engine = VeepooSyncEngine(writer: writer, decoder: VeepooDecoder(), historyDays: 2)
+        engine.now = { Self.fixtureDay }   // BUG-213: a fixture dated "today 10:05" is future-dated before 10:05
         engine.connectionDidStart()
         engine.handle(.commandAck(commandId: 0xA1))                   // E0 00 is now outstanding
         frame(engine, hex("dfffff58" + String(repeating: "00", count: 16)))
@@ -397,6 +402,9 @@ final class VeepooSyncEngineTests: XCTestCase {
     private func engineAwaitingSleep(days: Int = 2) -> VeepooSyncEngine {
         writer = RecordingWriter()
         let engine = VeepooSyncEngine(writer: writer, decoder: VeepooDecoder(), historyDays: days)
+        // BUG-213: without this the pass's "today" is the real date and the fixture record (10:05) is in the
+        // future when the suite runs before 10:05 — the record is dropped as implausible and this reads 0.
+        engine.now = { Self.fixtureDay }
         engine.connectionDidStart()
         engine.handle(.commandAck(commandId: 0xA1))
         XCTAssertTrue(writer.asked(VeepooEncoder.sleepHistory(dayOffset: 0)))

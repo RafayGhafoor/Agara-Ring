@@ -32,7 +32,9 @@ final class StorageCenterTests: XCTestCase {
 
     /// Readings every `stepSeconds` for `days` days ending `daysAgo` days before now.
     private func seed(daysAgo: Int, days: Int = 1, perDay: Int = 400, kind: MeasurementKind = .heartRate) {
-        let start = Date().addingTimeInterval(-Double(daysAgo + days) * 86_400)
+        // BUG-213: seed off the app clock so a pinned test is reproducible; `Date()` here made the block
+        // count depend on the hour the suite ran (5 all evening, 6 after midnight).
+        let start = AppClock.now.addingTimeInterval(-Double(daysAgo + days) * 86_400)
         for d in 0..<days {
             for i in 0..<perDay {
                 context.insert(Measurement(kind: kind, value: Double(55 + (i + d) % 60), unit: kind.unit,
@@ -104,6 +106,8 @@ final class StorageCenterTests: XCTestCase {
     // MARK: Optimize now, end to end on a file store
 
     func testOptimizeNowCompactsInTheBackgroundAndReportsProgressOnTheSyncProgressModel() async throws {
+        AppClock.configure("2026-10-30T12:00:00")   // BUG-213: midday, so no seeding window straddles midnight
+        defer { AppClock.reset() }
         seed(daysAgo: 20, days: 5, perDay: 400)
         seed(daysAgo: 1, days: 1, perDay: 100)
         let center = StorageCenter()
@@ -136,12 +140,14 @@ final class StorageCenterTests: XCTestCase {
     // MARK: Backup and restore over compacted readings
 
     func testAnExportStillCarriesCompactedReadingsAndImportsThemBack() async throws {
+        AppClock.configure("2026-10-30T12:00:00")   // BUG-213: same pinned midday as the compaction test
+        defer { AppClock.reset() }
         seed(daysAgo: 25, days: 3, perDay: 200)
         seed(daysAgo: 2, days: 1, perDay: 50)
         let originals = try context.fetch(FetchDescriptor<Measurement>()).map { BlockStore.ms($0.timestamp) }.sorted()
         XCTAssertEqual(originals.count, 650)
         var options = StorageMaintenance.Options(); options.runLadder = false
-        let report = StorageMaintenance.run(now: Date(), context: context, options: options)
+        let report = StorageMaintenance.run(now: AppClock.now, context: context, options: options)
         XCTAssertEqual(report.blocksCompacted, 3)
         try context.save()
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<Measurement>()), 50)
