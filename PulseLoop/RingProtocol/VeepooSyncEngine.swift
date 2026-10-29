@@ -201,6 +201,11 @@ final class VeepooSyncEngine: RingSyncEngine {
         case let .commandAck(commandId) where commandId == 0xA1 && !authenticated:
             authenticated = true
             runPostAuthentication()
+        case let .firmware(version, _, _) where !version.isEmpty:
+            // BUG-211, deterministic trigger: a different firmware on the same ring means the history the
+            // old one wrote cannot be trusted — a flash clears it, and the lab flashes constantly. Cheap
+            // and unambiguous, unlike guessing from a count the ring never re-reports.
+            noteFirmwareVersion(version)
         case let .ringIdentity(sensorId):
             // SEC-301: the only identity iOS can compare — the ring's own `a1` MAC, hashed. CoreBluetooth
             // never reveals the BLE address, so the check is "does not contradict what this peripheral
@@ -862,6 +867,35 @@ final class VeepooSyncEngine: RingSyncEngine {
             writer?.enqueue(VeepooEncoder.heartRateStop())
         }
         beginPass()
+    }
+
+    /// Compare the firmware now on the ring with the one that wrote the ledger.
+    ///
+    /// The version is remembered either way. A change clears the ring's ledger, so its next pass re-reads
+    /// every day from record 1 instead of resuming behind a watermark the new firmware never wrote — the
+    /// state `BUG-211` describes, where day 0 was asked past its last record and the ring answered only the
+    /// end marker, leaving the day stale until midnight. Mid-pass the clear waits (the pass in flight was
+    /// planned against the old ledger) but records with a cleared prior, so it self-corrects next pass.
+    private func noteFirmwareVersion(_ version: String) {
+        guard let ring = writer?.historyRingID else { return }
+        let previous = syncPlanStore.firmware(ring: ring)
+        syncPlanStore.setFirmware(version, ring: ring)
+        guard let previous, previous != version else { return }
+        // Cleared immediately, even mid-pass: the pass in flight was planned against the old ledger, but any
+        // day it records now starts from a cleared prior, so it lands at `storedThrough 0` and the next pass
+        // asks from record 1. Deferring the clear would lose it on a disconnect mid-pass -- the very state
+        // this fixes.
+        clearLedgerForFirmware(ring: ring, from: previous, to: version)
+    }
+
+    private func clearLedgerForFirmware(ring: String, from previous: String, to version: String) {
+        syncPlanStore.reset(ring: ring)
+        writer?.emit(.historySyncProgress(
+            stage: "firmware \(previous) → \(version): re-reading the ring's history"
+        ))
+        #if DEBUG
+        E2ETrace.log("firmware \(previous) → \(version) on \(ring): ledger cleared, next pass reads every day in full")
+        #endif
     }
 
     /// Reset the day's counts and say the day started (`SyncProgress` shows it as "syncing").

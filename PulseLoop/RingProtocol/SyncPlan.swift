@@ -140,11 +140,15 @@ final class SyncPlanStore {
 
     /// New key, not install-bound upstream state — so it takes the `agara.` prefix.
     static let key = "agara.syncPlan.v1"
+    /// The firmware version last seen on each ring (BUG-211's deterministic trigger: a flash clears the ring's
+    /// history, so a watermark the old firmware wrote must not outlive it).
+    static let firmwareKey = "agara.syncPlanFirmware.v1"
     /// Dates older than this are dropped on write (the ring holds ~3 days; the loop walks 7 by default).
     static let keepDays = 60
 
     private let defaults: UserDefaults
     private var cache: [String: [String: SyncPlan.DayState]]?
+    private var firmwareCache: [String: String]?
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -156,6 +160,26 @@ final class SyncPlanStore {
             .flatMap { try? JSONDecoder().decode([String: [String: SyncPlan.DayState]].self, from: $0) } ?? [:]
         cache = decoded
         return decoded
+    }
+
+    private var firmwareAll: [String: String] {
+        if let firmwareCache { return firmwareCache }
+        let decoded = defaults.data(forKey: Self.firmwareKey)
+            .flatMap { try? JSONDecoder().decode([String: String].self, from: $0) } ?? [:]
+        firmwareCache = decoded
+        return decoded
+    }
+
+    /// The firmware version last seen on `ring`, nil the first time this ring is synced.
+    func firmware(ring: String) -> String? { firmwareAll[ring] }
+
+    /// Remember the firmware now on `ring`. Written before the ledger decision, so a crash between the two
+    /// re-reads the history instead of trusting a watermark.
+    func setFirmware(_ version: String, ring: String) {
+        var value = firmwareAll
+        value[ring] = version
+        firmwareCache = value
+        if let data = try? JSONEncoder().encode(value) { defaults.set(data, forKey: Self.firmwareKey) }
     }
 
     private func save(_ value: [String: [String: SyncPlan.DayState]]) {
@@ -187,6 +211,8 @@ final class SyncPlanStore {
     /// The ring was forgotten or the data wiped.
     func resetAll() {
         cache = [:]
+        firmwareCache = [:]
         defaults.removeObject(forKey: Self.key)
+        defaults.removeObject(forKey: Self.firmwareKey)
     }
 }
