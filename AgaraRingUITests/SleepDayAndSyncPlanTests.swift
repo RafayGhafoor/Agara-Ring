@@ -97,3 +97,65 @@ final class SleepDayAndSyncPlanTests: AgaraUITestCase {
         attachScreenshot("today-sleep-after-reconnect")
     }
 }
+
+/// BUG-211's deterministic trigger, proved on real frames: **the same ring, re-flashed, is read again from the
+/// beginning** — including a past day the app had already stored and would normally skip.
+///
+/// The protocol offers no cheaper signal: `df` has no count selector (a transfer runs from the requested record to
+/// the end of the day, and the count header rides only on records sent), so a resume past the ring's last record is
+/// byte-identical to a benign "nothing new" refresh. A changed `a1` firmware is the signal that a flash rewrote the
+/// ring's history — and it is what the lab actually does.
+///
+/// A second emulator cannot stand in for the re-flash: the app keys its history ledger per port (`virtual:<port>`),
+/// so another port is another ring. Hence the `fw` rig's control route (`POST /control/firmware`) changes what the
+/// *same* ring reports, and the app is relaunched against it.
+final class ReFlashedRingSyncTests: AgaraUITestCase {
+
+    /// A past day is read in full on the first connection, then read **again** after the firmware changes.
+    /// Without the invalidation the second pass skips it (it is `complete`), so this assertion is exactly the fix.
+    func testAReFlashedRingIsReadAgainFromTheBeginning() throws {
+        guard let logPath = ProcessInfo.processInfo.environment["E2E_FW_LOG"],
+              let controlPort = ProcessInfo.processInfo.environment["E2E_FW_HTTP"] else {
+            throw XCTSkip("needs the fw rig (tools/e2e_ios.sh starts it)")
+        }
+
+        try launch(portKey: "E2E_FW_PORT", extra: ["-startTab", "today"])
+        waitForConnected()
+
+        // The first connection reads the past days in full.
+        eventually(timeout: 120, "day 1 was never read from record 1 on the first connection") {
+            self.occurrences(of: "day 1 from position 1", in: logPath) >= 1
+        }
+        let before = occurrences(of: "day 1 from position 1", in: logPath)
+
+        // Re-flash the same ring, then come back to it exactly as a user would: the app is closed and reopened.
+        app.terminate()
+        XCTAssertEqual(try setFirmware("00.13.01", port: controlPort), 200, "the control route refused the change")
+        _ = try launch(portKey: "E2E_FW_PORT", extra: ["-startTab", "today"])
+        waitForConnected()
+
+        eventually(timeout: 120, "the re-flashed ring's day 1 was skipped — the ledger survived the flash") {
+            self.occurrences(of: "day 1 from position 1", in: logPath) > before
+        }
+    }
+
+    private func occurrences(of needle: String, in path: String) -> Int {
+        (try? String(contentsOfFile: path, encoding: .utf8))?
+            .split(separator: "\n").filter { $0.contains(needle) }.count ?? 0
+    }
+
+    /// `POST /control/firmware?version=…` on the rig's test-only control route; returns the HTTP status.
+    private func setFirmware(_ version: String, port: String) throws -> Int {
+        var status = -1
+        let done = expectation(description: "control route")
+        var request = URLRequest(url: URL(string: "http://127.0.0.1:\(port)/control/firmware?version=\(version)")!)
+        request.httpMethod = "POST"
+        request.httpBody = Data()
+        URLSession.shared.dataTask(with: request) { _, response, _ in
+            status = (response as? HTTPURLResponse)?.statusCode ?? -1
+            done.fulfill()
+        }.resume()
+        wait(for: [done], timeout: 15)
+        return status
+    }
+}

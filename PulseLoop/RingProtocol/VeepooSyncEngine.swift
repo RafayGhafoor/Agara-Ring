@@ -91,6 +91,9 @@ final class VeepooSyncEngine: RingSyncEngine {
     /// A per-day history pass is in flight (startup or `syncHistory`). While set, the live stream
     /// must stay off — the ring refuses measurements mid-daily-read; `reconcileLiveStream` gates on it.
     private var historyInFlight = false
+    /// A firmware change landed while a pass was in flight, so that pass was planned from the ledger the change
+    /// invalidated. One fresh pass runs as soon as it ends — bounded by this flag, never a loop.
+    private var repassAfterCurrent = false
     /// Poll-tick number at which the history pass last made progress — a completion *or any E0/DF
     /// frame*. A day silent for a whole tick is treated as done by `watchdogAdvance` — the ring normally
     /// sends an explicit completion (or no-data) marker per day, but a dropped one (observed across a
@@ -577,6 +580,10 @@ final class VeepooSyncEngine: RingSyncEngine {
             historyFinished = true
             historyInFlight = false
             reconcileLiveStream()
+            if repassAfterCurrent {
+                repassAfterCurrent = false
+                syncHistory()
+            }
         }
     }
 
@@ -886,6 +893,11 @@ final class VeepooSyncEngine: RingSyncEngine {
         // asks from record 1. Deferring the clear would lose it on a disconnect mid-pass -- the very state
         // this fixes.
         clearLedgerForFirmware(ring: ring, from: previous, to: version)
+        // `a1` is answered *after* the pass has been planned from the ledger, so on a real reconnect the stale
+        // plan is already in flight (measured: the trace shows `history plan: day 0 from 10` immediately before
+        // `firmware 00.12.09 → 00.13.01`). Its days were chosen from the old ledger and would skip the past days
+        // this change exists to re-read, so one fresh pass follows it. Bounded: the flag is cleared when used.
+        if historyInFlight { repassAfterCurrent = true }
     }
 
     private func clearLedgerForFirmware(ring: String, from previous: String, to version: String) {
