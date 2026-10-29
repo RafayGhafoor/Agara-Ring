@@ -18,6 +18,20 @@ final class VitalsThresholdEngineTests: XCTestCase {
                               usesBetaBlockers: true, hasKnownLungCondition: false, preferredGlucoseUnit: .mgdl)
     }
 
+    /// BUG-103 (decision D1) — the HRV card's number is the ring's own derivation from raw beat-to-beat
+    /// samples, not a clinical HRV, and it dropped by roughly half when the reduction was fixed. The card
+    /// therefore says it is estimated and relative, as the glucose and blood-component cards already do.
+    func testTheHRVCardIsLabelledEstimatedAndRelative() {
+        let now = Date()
+        let samples = (0..<12).map { index in
+            MetricSample(timestamp: now.addingTimeInterval(Double(index - 12) * 300), value: 40 + Double(index % 3))
+        }
+        let card = VitalsCardFactory.card(.hrv, inputs: .init(hrv: samples, now: now),
+                                          profile: base, calibration: Calibration())
+        XCTAssertTrue(card.isEstimated)
+        XCTAssertTrue(card.subtitleText?.contains("relative") == true)
+    }
+
     private func severity(_ value: Double, _ metric: MetricKind, _ profile: UserPhysiologyProfile,
                           context: MetricContext = MetricContext(), baseline: BaselineStats? = nil) -> ZoneSeverity {
         VitalsThresholdEngine.interpret(value: value, metric: metric, profile: profile,

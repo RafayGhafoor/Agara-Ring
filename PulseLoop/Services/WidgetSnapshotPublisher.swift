@@ -171,7 +171,7 @@ final class WidgetSnapshotPublisher {
             generatedAt: AppClock.now,
             dayStart: Calendar.current.startOfDay(for: AppClock.now),
             activity: activityPayload(summary, units: units),
-            sleep: sleepPayload(summary.sleepDay),
+            sleep: sleepPayload(summary.sleepTile),
             metrics: metrics,
             nutrition: nutritionPayload(summary)
         )
@@ -239,19 +239,23 @@ final class WidgetSnapshotPublisher {
         )
     }
 
-    /// Replicates `SleepTileView`'s derivations (stage distribution, score, duration formatting).
-    /// The day's total (`SleepDayRule`) and its night/nap breakdown, the day's score; stages from the main sleep.
-    private func sleepPayload(_ day: SleepDay?) -> WidgetSleepPayload? {
-        guard let day else { return nil }
+    /// Replicates `SleepTileView`'s derivations from the same `SleepTileState`, so the widget and the tile
+    /// cannot drift: the day's total (`SleepDayRule`) with its night/nap breakdown, the day's score, stages
+    /// from the main sleep, and — when the night on screen is not last night's — the "Last recorded: …"
+    /// caption (BUG-210). The whole-day values are the 2026-10-22 policy; the bar staying main-session-only
+    /// is that decision's uncovered part (see the tile's comment).
+    private func sleepPayload(_ tile: SleepTileState) -> WidgetSleepPayload? {
+        guard let day = tile.day else { return nil }
         let sleep = day.main
         let stages = SleepStageDistribution(sleep)
         return WidgetSleepPayload(
             durationText: SleepFormat.duration(day.totalMinutes),
-            score: day.score.score,   // the day's score, as the Today tile shows it
+            score: day.score.score,
             segments: stages.segments.map {
                 WidgetSleepPayload.Segment(minutes: $0.minutes, colorHex: Self.hexString($0.color), label: $0.label)
             },
-            napText: day.breakdownCaption
+            napText: day.breakdownCaption,
+            captionText: tile.caption
         )
     }
 

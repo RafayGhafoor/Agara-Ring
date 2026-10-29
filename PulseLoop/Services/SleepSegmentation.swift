@@ -102,8 +102,18 @@ extension SleepService {
         let allBlocks = (try? context.fetch(FetchDescriptor<SleepStageBlock>())) ?? []
         let sessionsById = Dictionary(allSessions.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
 
-        let dateKey = calendar.wakingDay(forSleepStart: start)
+        let dateKey = calendar.wakingDay(forSleepStart: start, end: end)
         let superseded = allBlocks.filter { $0.sourceAddress == source && $0.startAt < end && $0.endAt > start }
+        // BUG-204: a ring record only grows while the ring keeps staging it, so an incoming record that is
+        // *shorter* than a stored same-source record it overlaps is the stale copy — Android's rule
+        // (`SleepSourceMerge.mergeSleepRecord`). Without it a 620-minute decode of the same night replaced
+        // the stored 650-minute one, and the two platforms disagreed about the same night by 30 minutes.
+        let overlapping = Dictionary(grouping: superseded, by: \.recordStartAt)
+            .filter { $0.key != nil }
+        for blocks in overlapping.values {
+            guard let first = blocks.map(\.startAt).min(), let last = blocks.map(\.endAt).max() else { continue }
+            if last.timeIntervalSince(first) > end.timeIntervalSince(start) { return }
+        }
         var affectedDays: Set<Date> = [dateKey]
         for block in superseded {
             if let row = sessionsById[block.sessionId] { affectedDays.insert(calendar.startOfDay(for: row.date)) }

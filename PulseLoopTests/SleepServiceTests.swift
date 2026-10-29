@@ -21,9 +21,29 @@ final class SleepServiceTests: XCTestCase {
         XCTAssertNil(SleepService.latestSleep(context: context), "a 3-day-old session is stale")
     }
 
+    /// BUG-210 — Android keys the Today tile strictly on the *reference night*, so a night the ring was not
+    /// worn reads "No sleep recorded". iOS showed the night before last instead, which is a different answer
+    /// to the same stored data (and one day-wide, so it looks like a bug rather than a policy).
+    func testAnUnwornNightReadsAsNoSleepRatherThanTheNightBeforeLast() throws {
+        let context = try TestSupport.makeContext()
+        let calendar = Calendar.current
+        // One night stored under the 1st; it is now 09:00 on the 2nd and the ring was not worn overnight.
+        TestSupport.insertSleep(nightStart: calendar.date(from: DateComponents(year: 2026, month: 10, day: 1,
+                                                                            hour: 0, minute: 20))!,
+                                stages: Array(repeating: .light, count: 60), into: context)
+        let now = calendar.date(from: DateComponents(year: 2026, month: 10, day: 2, hour: 9))!
+        XCTAssertNil(SleepService.latestSleepDay(context: context, now: now))
+        XCTAssertNil(SleepService.latestSleep(context: context, now: now))
+        // The same night is still what the 1st's own day view holds.
+        XCTAssertNotNil(SleepService.sleepDay(for: calendar.date(from: DateComponents(year: 2026, month: 10, day: 1))!,
+                                              context: context))
+    }
+
     func testRecentSleepShown() throws {
         let context = try TestSupport.makeContext()
-        TestSupport.insertSleep(nightStart: night(0), stages: Array(repeating: .deep, count: 90), into: context)
+        // A night that began at 02:00 today is keyed to today's waking day — last night.
+        let earlyToday = Calendar.current.date(bySettingHour: 2, minute: 0, second: 0, of: TestSupport.day(0))!
+        TestSupport.insertSleep(nightStart: earlyToday, stages: Array(repeating: .deep, count: 90), into: context)
         let latest = SleepService.latestSleep(context: context)
         XCTAssertNotNil(latest)
         XCTAssertEqual(latest?.deepMinutes, 90)
@@ -32,7 +52,14 @@ final class SleepServiceTests: XCTestCase {
     func testStaleSleepHiddenFromToday() throws {
         let context = try TestSupport.makeContext()
         TestSupport.insertSleep(nightStart: night(-4), stages: Array(repeating: .light, count: 30), into: context)
-        XCTAssertNil(MetricsService.buildTodaySummary(context: context).sleep)
+        let summary = MetricsService.buildTodaySummary(context: context)
+        // BUG-210: a 4-day-old night is not last night — it is only reachable as the captioned
+        // "last recorded" state, and the Today hero sentence never quotes it.
+        XCTAssertNil(summary.lastNight)
+        guard case .lastRecorded = summary.sleepTile.kind else {
+            return XCTFail("expected the captioned last-recorded state, got \(summary.sleepTile.kind)")
+        }
+        XCTAssertTrue(summary.sleepTile.caption?.hasPrefix("Last recorded: ") == true)
     }
 
     func testSummaryStageMinutes() throws {
@@ -43,6 +70,44 @@ final class SleepServiceTests: XCTestCase {
         XCTAssertEqual(summary.lightMinutes, 40)
         XCTAssertEqual(summary.deepMinutes, 20)
         XCTAssertEqual(summary.awakeMinutes, 5)
+    }
+
+    /// BUG-206 — the coach's sleep trends answer with the same numbers the card shows: one point per
+    /// **day** (a night and its nap are one day, not two nights) and only the visible source (the paired
+    /// ring's nights — never the emulator's or another ring's). Android's tool answered `3 / 233` for this
+    /// fixture; iOS's `sleepRange` + `SleepInsights` answer `2 / 350`, which is the card's answer.
+    func testTheCoachSleepTrendsCountDaysNotSessionsAndIgnoreOtherSources() throws {
+        let context = try TestSupport.makeContext()
+        let calendar = Calendar.current
+        let day1 = calendar.startOfDay(for: TestSupport.day(-1))
+        let day2 = calendar.startOfDay(for: TestSupport.day(0))
+        func night(_ start: Date, minutes: Int, source: String) {
+            let session = SleepSession(date: calendar.wakingDay(forSleepStart: start, end: start.addingTimeInterval(Double(minutes) * 60)),
+                                       startAt: start, endAt: start.addingTimeInterval(Double(minutes) * 60),
+                                       totalMinutes: minutes, sourceAddress: source)
+            context.insert(session)
+            for index in 0..<minutes {
+                context.insert(SleepStageBlock(sessionId: session.id,
+                                               startAt: start.addingTimeInterval(Double(index) * 60),
+                                               startMinute: index, durationMinutes: 1, stage: .light,
+                                               sourceAddress: source))
+            }
+        }
+        let ring = "00000000-0000-4000-8000-00000000000B"
+        // Day 1: one 300-minute night.
+        night(calendar.date(bySettingHour: 2, minute: 0, second: 0, of: day1)!, minutes: 300, source: ring)
+        // …and a second source's shorter night on the same day, which the policy must not mix in.
+        night(calendar.date(bySettingHour: 3, minute: 0, second: 0, of: day1)!, minutes: 100, source: "another-source")
+        // Day 2: a 360-minute night and a 40-minute afternoon nap — one day, not two nights.
+        night(calendar.date(bySettingHour: 23, minute: 50, second: 0, of: day1)!, minutes: 360, source: ring)
+        night(calendar.date(bySettingHour: 14, minute: 0, second: 0, of: day2)!, minutes: 40, source: ring)
+        try context.save()
+
+        let summary = SleepService.sleepRange(.week, context: context)
+        let valid = SleepInsights.validSessions(summary.sessions)
+        XCTAssertEqual(valid.count, 3, "the second source is not visible at all")
+        XCTAssertEqual(SleepInsights.collapseByDay(valid).count, 2, "two days, not three nights")
+        XCTAssertEqual(SleepInsights.averageDuration(valid), 350)
     }
 
     func testExpectedNightsPerRange() throws {
@@ -93,7 +158,9 @@ final class SleepServiceTests: XCTestCase {
         XCTAssertEqual(SleepService.dayReferenceNight(now: at4am), today, "from 4 AM, flip to today")
     }
 
-    func testWakingDayUsesSevenPMBoundary() {
+    /// BUG-207 — the boundary is the vendor app's **20:00**, not 19:00 (`SleepPrecisionData.setPresicionDate`),
+    /// and a session that ends on a later date belongs to the morning it ended on whatever its start hour.
+    func testWakingDayFollowsTheVendorBoundaryAndTheEndDate() {
         let cal = Calendar.current
         let today = cal.startOfDay(for: Date())
         let tomorrow = cal.date(byAdding: .day, value: 1, to: today)!
@@ -106,11 +173,22 @@ final class SleepServiceTests: XCTestCase {
         let at1pm = cal.date(bySettingHour: 13, minute: 0, second: 0, of: today)!
         XCTAssertEqual(cal.wakingDay(forSleepStart: at1pm), today, "afternoon nap stays on today")
 
-        // 6:59 PM is still today; 7 PM rolls to tomorrow's waking morning.
-        let at659pm = cal.date(bySettingHour: 18, minute: 59, second: 0, of: today)!
-        let at7pm = cal.date(bySettingHour: 19, minute: 0, second: 0, of: today)!
-        XCTAssertEqual(cal.wakingDay(forSleepStart: at659pm), today, "just before 7 PM stays on today")
-        XCTAssertEqual(cal.wakingDay(forSleepStart: at7pm), tomorrow, "from 7 PM, sleep rolls to next morning")
+        // 7:30 PM → 7:55 PM is an evening doze, not the next morning: the boundary is 20:00, as in the vendor
+        // app. At 19 it was filed under tomorrow and surfaced as "+ nap 25 m" on the wrong day.
+        let at730pm = cal.date(bySettingHour: 19, minute: 30, second: 0, of: today)!
+        let at755pm = cal.date(bySettingHour: 19, minute: 55, second: 0, of: today)!
+        XCTAssertEqual(cal.wakingDay(forSleepStart: at730pm), today, "before 8 PM stays on today")
+        XCTAssertEqual(cal.wakingDay(forSleepStart: at730pm, end: at755pm), today, "and its end is the same date")
+        // 8:10 PM on the same date rolls to tomorrow's waking morning.
+        let at810pm = cal.date(bySettingHour: 20, minute: 10, second: 0, of: today)!
+        XCTAssertEqual(cal.wakingDay(forSleepStart: at810pm), tomorrow, "from 8 PM, sleep rolls to next morning")
+        // A night that crosses midnight belongs to the morning it ended on, at any start hour.
+        let at1030pm = cal.date(bySettingHour: 22, minute: 30, second: 0, of: today)!
+        let at605am = cal.date(bySettingHour: 6, minute: 5, second: 0, of: tomorrow)!
+        XCTAssertEqual(cal.wakingDay(forSleepStart: at1030pm, end: at605am), tomorrow)
+        let at730pmNextDay = cal.date(bySettingHour: 7, minute: 30, second: 0, of: tomorrow)!
+        XCTAssertEqual(cal.wakingDay(forSleepStart: at730pm, end: at730pmNextDay), tomorrow,
+                       "the end date wins even for a 19:00-hour start that crosses midnight")
     }
 
     func testCrossMidnightSleepMerging() throws {

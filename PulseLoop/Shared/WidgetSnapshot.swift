@@ -132,6 +132,9 @@ struct WidgetSleepPayload: Codable {
     var segments: [Segment]
     /// "Night 6h 45m · nap 40m" when the day had naps (`SleepDay.breakdownCaption`). Optional so snapshots written before it still decode.
     var napText: String? = nil
+    /// "Last recorded: Tue 30 Sep" when this is not last night's sleep (BUG-210). Optional so older
+    /// snapshots still decode; nil means the payload is the reference night.
+    var captionText: String? = nil
 }
 
 // MARK: - Vitals metric (chart / gauge / BP tiles)

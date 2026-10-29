@@ -1,5 +1,17 @@
 import Foundation
 
+/// One value of a per-minute series and the minute **of its 5-minute slot** it was measured in (0…4).
+///
+/// The offset is carried through the "no sample" filter (BUG-104): a slot whose first minute is empty
+/// (`B4 = 00 62 51 53 00`) measured 98, 81 and 83 at minutes 1, 2 and 3 — numbering the *survivors* from
+/// zero stamped them a minute early, so the app claimed a heart rate for a minute the ring never read.
+/// Android carries the same pair (`VeepooDecoder.perMinute`).
+struct SlotSample: Equatable, Sendable {
+    /// Minute of the slot, 0…4.
+    let offset: Int
+    let value: Int
+}
+
 /// One decoded DF daily-history record (the B1…C2 TLV payload). This is a single 5-minute slot: the
 /// ring stores 288 of them per day, and the verified capture decoded 107 such records for one day.
 ///
@@ -12,22 +24,22 @@ struct VeepooDailyRecord {
     var distanceMeters = 0
     var calories = 0.0
     /// Five one-minute HR values per slot (B4).
-    var heartRates: [Int] = []
-    /// HRV milliseconds (B7); 255 = absent sample.
-    var hrv: [Int] = []
+    var heartRates: [SlotSample] = []
+    /// HRV milliseconds per minute (B7, the vendor's reduction); absent minutes are dropped.
+    var hrv: [SlotSample] = []
     var systolic = 0
     var diastolic = 0
     /// Five one-minute SpO₂ values per slot (B9, first five bytes only).
-    var oxygen: [Int] = []
+    var oxygen: [SlotSample] = []
     /// Glucose in mg/dL (BE is mmol/L ×100; converted on decode).
     var glucoseMgdl = 0.0
     var stress = 0
     /// Five one-minute respiration rates (B6), breaths/min; 0 and 0xFF = no value, dropped.
-    var respiration: [Int] = []
+    var respiration: [SlotSample] = []
     /// MET for the slot (BF ÷ 10); 0 = none.
     var met = 0.0
     /// Five one-minute cardiac-load values (B9 bytes 20–24); 0 = none, dropped.
-    var cardiacLoad: [Int] = []
+    var cardiacLoad: [SlotSample] = []
     /// Blood-component estimates (C2); nil when the tag is absent or all zero ("no measurement").
     var bloodComponents: BloodComponentsReading?
 }
@@ -46,18 +58,22 @@ struct VeepooSleepSummary {
     let quality: Int
     let efficiencyScore: Int
     let deepScore: Int
+    /// `A3` bytes 29–30 — the ring's **own** awake-minute count. On real firmware it equals the `A5`
+    /// timeline's awake minutes exactly; nil on a short `A3` (BUG-202).
+    var statedAwakeMinutes: Int? = nil
+    /// The `A1` block's declared length ran past the transfer, so the block is clamped and its curve
+    /// (if any) is partial — the sync engine must re-ask the day instead of storing it (BUG-108/201).
+    var blockOverrun = false
     /// Per-minute stages from `A5`, starting at `start`; nil when the block had no bitmap.
     var timeline: [SleepStage]? = nil
 
-    /// One stage per minute from `start`: the ring's own timeline when present, otherwise the counts
-    /// laid out in a fixed deep → light → REM → awake order (an assumption; only used without a bitmap).
-    var stages: [SleepStage] {
-        if let timeline, !timeline.isEmpty { return timeline }
-        return [SleepStage](repeating: .deep, count: deepMinutes)
-            + [SleepStage](repeating: .light, count: lightMinutes)
-            + [SleepStage](repeating: .rem, count: remMinutes)
-            + [SleepStage](repeating: .awake, count: awakeMinutes)
-    }
+    /// One stage per minute from `start` — **only** the ring's own `A5` timeline.
+    ///
+    /// BUG-108: the counts used to be laid out as deep → light → REM → awake when the curve was absent or
+    /// truncated, which is an invented hypnogram with the right totals (so nothing downstream noticed) and
+    /// a wrong stage order (so the score, the chart and the coach were wrong). A session with no usable
+    /// curve now yields no stages; the caller emits its counts instead of a made-up night.
+    var stages: [SleepStage] { timeline ?? [] }
 }
 
 /// Pure decode of the Veepoo frames this app ingests. No BLE, no state — mirrors the confirmed wire
@@ -73,10 +89,24 @@ struct VeepooDecoder {
         self.now = now
     }
 
-    /// A0 reply: battery percent at payload byte 4.
+    /// A0 reply → battery percentage, by the vendor's byte rule (BUG-101): byte 4 is the **level** (0–4),
+    /// byte 5 == 1 says byte 6 is the percentage, byte 7 == 2 is the ring's own low flag. This firmware
+    /// (`a0 00 00 00 25 01 25 01`) copies the percentage into the level byte as well, which is why reading
+    /// byte 4 alone looked right — on a unit that fills the level honestly it reads `3 %`, firing the
+    /// critical-battery alert and blocking a firmware install.
     func battery(frame: Data) -> Int? {
         guard frame.count >= 5, frame[0] == VeepooOpcode.deviceInfo.rawValue else { return nil }
-        return Int(frame[4])
+        let bytes = [UInt8](frame)
+        if bytes.count >= 7, bytes[5] == 0x01 { return Int(bytes[6]) }
+        let level = Int(bytes[4])
+        return (0...4).contains(level) ? level * 25 : level
+    }
+
+    /// A0 byte 7 == 2: the ring's own "low battery" flag (BUG-101). Nil for a frame too short to carry it.
+    func batteryLow(frame: Data) -> Bool? {
+        let bytes = [UInt8](frame)
+        guard bytes.count >= 8, bytes[0] == VeepooOpcode.deviceInfo.rawValue else { return nil }
+        return bytes[7] == 0x02
     }
 
     /// A0 byte 1: the ring's power mode — 1 = on the charger.
@@ -325,10 +355,12 @@ struct VeepooDecoder {
 
     /// Decode one DF record from its reassembled (part 1 + part 2) payload — the B1…C2 TLV stream
     /// after the 4-byte frame header. `nil` when the record has no B1 timestamp (incomplete frame).
-    func dailyRecord(payload: [UInt8]) -> VeepooDailyRecord? {
+    ///
+    /// `day` is the date the loop **asked the ring for** (see BUG-102); it is what dates the record.
+    func dailyRecord(payload: [UInt8], day: Date? = nil) -> VeepooDailyRecord? {
         let fields = veepooTLVFields(payload)
         guard let time = fields[0xB1], time.count >= 4,
-              let timestamp = dateFromMonthDayHourMinute(Array(time[0..<4]))
+              let timestamp = dateFromMonthDayHourMinute(Array(time[0..<4]), on: day)
         else { return nil }
 
         var record = VeepooDailyRecord(timestamp: timestamp)
@@ -341,11 +373,14 @@ struct VeepooDecoder {
             record.calories = Double(veepooUInt16BE(activity, 6)) / 10
         }
 
+        // BUG-104: the minute is the sample's own index in the slot, carried through the "no sample"
+        // filter. Numbering the survivors from zero moved every later value to the wrong minute as soon
+        // as a slot's first minute was empty (record 167: `00 62 51 53 00` → minutes 1, 2, 3).
         if let heart = fields[0xB4] {
-            record.heartRates = heart.map(Int.init).filter { $0 > 25 && $0 < 250 }
+            record.heartRates = Self.perMinute(heart, in: 26...249)
         }
         if let hrv = fields[0xB7] {
-            record.hrv = hrv.map(Int.init).filter { $0 > 0 && $0 < 255 }
+            record.hrv = Self.hrvPerMinute(hrv)
         }
         if let pressure = fields[0xB8], pressure.count >= 2, pressure[0] > 0, pressure[1] > 0 {
             record.systolic = Int(pressure[0])
@@ -353,7 +388,7 @@ struct VeepooDecoder {
         }
         if let oxygen = fields[0xB9] {
             // Only the first five bytes are SpO₂ — the rest are other per-minute series, never oxygen.
-            record.oxygen = oxygen.prefix(5).map(Int.init).filter { $0 >= 50 && $0 <= 100 }
+            record.oxygen = Self.perMinute(Array(oxygen.prefix(5)), in: 50...100)
         }
         if let glucose = fields[0xBE], glucose.count >= 2 {
             let hundredths = veepooUInt16LE(glucose, 0)
@@ -367,7 +402,7 @@ struct VeepooDecoder {
         }
         // B6: five one-minute respiration rates; 0 and 0xFF are "no value".
         if let breath = fields[0xB6] {
-            record.respiration = breath.map(Int.init).filter { $0 > 0 && $0 < 255 }
+            record.respiration = Self.perMinute(breath, in: 1...254)
         }
         // BF: MET ×10.
         if let met = fields[0xBF]?.first, met > 0, met < 255 {
@@ -375,7 +410,7 @@ struct VeepooDecoder {
         }
         // B9 is six groups of five per-minute values; group 5 (bytes 20–24) is cardiac load.
         if let group = fields[0xB9], group.count >= 25 {
-            record.cardiacLoad = group[20..<25].map(Int.init).filter { $0 > 0 && $0 < 255 }
+            record.cardiacLoad = Self.perMinute(Array(group[20..<25]), in: 1...254)
         }
         // C2: five LE16 — cholesterol, triglycerides, HDL, LDL (÷100 mmol/L), uric acid (÷10 µmol/L).
         if let panel = fields[0xC2], panel.count >= 10 {
@@ -406,8 +441,13 @@ struct VeepooDecoder {
         var offset = 0
         while offset + 3 <= payload.count, payload[offset] == 0xA1 {
             let declared = veepooUInt16LE(payload, offset + 1)
+            // X1 — an `A1` whose declared length runs past the payload means the transfer lost a page:
+            // the block is clamped (as Android does) and **flagged**, so the engine can re-ask the day
+            // instead of storing a night that is missing minutes (BUG-201, BUG-108).
+            let overrun = offset + declared > payload.count
             let end = declared >= 3 ? min(payload.count, offset + declared) : payload.count
-            if let summary = sessionSummary(block: Array(payload[(offset + 3)..<end])) {
+            if var summary = sessionSummary(block: Array(payload[(offset + 3)..<end])) {
+                summary.blockOverrun = overrun
                 summaries.append(summary)
             }
             guard declared >= 3 else { break }
@@ -428,6 +468,9 @@ struct VeepooDecoder {
         let light = veepooUInt16LE(summary, 21)
         let rem = veepooUInt16LE(summary, 23)
         let total = veepooUInt16LE(summary, 25)
+        // A2 (BUG-202): bytes 29–30 are the ring's **own** awake count — the number the app could only
+        // derive from the curve before, so a short curve was invisible. Nil on a short (29-byte) `A3`.
+        let statedAwake = summary.count >= 31 ? veepooUInt16LE(summary, 29) : nil
         return VeepooSleepSummary(
             start: start,
             end: end,
@@ -440,6 +483,7 @@ struct VeepooDecoder {
             quality: Int(summary[15]),
             efficiencyScore: Int(summary[11]),
             deepScore: Int(summary[10]),
+            statedAwakeMinutes: statedAwake,
             timeline: Self.sleepTimeline(block)
         )
     }
@@ -473,23 +517,68 @@ struct VeepooDecoder {
         return nil
     }
 
-    /// B1 payloads carry month/day/hour/minute with **no year**. Build the date in the current year;
-    /// if that lands in the future, roll back a year (the ring's day-0 record covers today).
-    private func dateFromMonthDayHourMinute(_ bytes: [UInt8]) -> Date? {
+    /// The per-minute series filter: every sample's **own** minute (0…4 in its slot) survives, so a slot
+    /// whose first minute is empty keeps its later values on the minutes the ring measured them (BUG-104).
+    private static func perMinute<S: Sequence>(_ values: S, in allowed: ClosedRange<Int>) -> [SlotSample]
+    where S.Element == UInt8 {
+        values.enumerated().compactMap { index, byte in
+            let value = Int(byte)
+            return allowed.contains(value) ? SlotSample(offset: index, value: value) : nil
+        }
+    }
+
+    /// `B7` → the vendor's per-minute HRV (BUG-103). Byte 0 is the per-minute flags, bytes 1–50 are **ten
+    /// raw samples per minute**; the vendor (`vp_ao.java:641-658`) reduces a minute to
+    /// `round(10 × mean|successive Δ|)` over its samples in 30…210, `% 211`, and calls 0 "not computed".
+    /// Reading each sample byte as "HRV ms" made every card value a raw amplitude, about twice the
+    /// vendor's number (93/97 where the ring says 40) and 1–4 values per slot instead of one.
+    private static func hrvPerMinute(_ hrv: [UInt8]) -> [SlotSample] {
+        guard hrv.count >= 51 else { return [] }
+        let samples = hrv[1..<51].map(Int.init)
+        return (0..<5).compactMap { minute in
+            var total = 0, pairs = 0, previous: Int?
+            for value in samples[(minute * 10)..<(minute * 10 + 10)] where (30...210).contains(value) {
+                if let previous { total += abs(previous - value); pairs += 1 }
+                previous = value
+            }
+            let value = pairs == 0 ? 0 : Int((Double(total) * 10 / Double(pairs)).rounded()) % 211
+            return value > 0 ? SlotSample(offset: minute, value: value) : nil
+        }
+    }
+
+    /// The B1/A3 date carries month/day/hour/minute with **no year**; the ring never says which.
+    ///
+    /// * `on day` — a DF record is always answered inside the day the loop asked for, and the vendor SDK
+    ///   dates it exactly that way (`vp_ao.java:563-577`: the requested day's date, B1's time of day). The
+    ///   old rule built the date in the current year and rolled it back a **year** whenever it landed in
+    ///   the future, so a ring clock a minute fast filed the newest records 365 days back and the
+    ///   history-window gate then threw them away (BUG-102: 115 of 192 records in the real capture).
+    /// * no day — a sleep `A3` arrives with no day request. A start a little ahead of the phone is the
+    ///   ring's clock; take `now`. Anything further in the future cannot be dated, and a missing night is
+    ///   recoverable where a year-old one is poison — so it is **dropped**.
+    private func dateFromMonthDayHourMinute(_ bytes: [UInt8], on day: Date? = nil) -> Date? {
         guard bytes.count >= 4 else { return nil }
-        let month = Int(bytes[0]), day = Int(bytes[1]), hour = Int(bytes[2]), minute = Int(bytes[3])
-        guard (1...12).contains(month), (1...31).contains(day), (0..<24).contains(hour), (0..<60).contains(minute)
+        let month = Int(bytes[0]), dayOfMonth = Int(bytes[1]), hour = Int(bytes[2]), minute = Int(bytes[3])
+        guard (1...12).contains(month), (1...31).contains(dayOfMonth), (0..<24).contains(hour), (0..<60).contains(minute)
         else { return nil }
 
-        let reference = now()
-        let year = calendar.component(.year, from: reference)
-        var components = DateComponents(
-            calendar: calendar, year: year, month: month, day: day, hour: hour, minute: minute
+        let reference = day ?? now()
+        let components = DateComponents(
+            calendar: calendar,
+            year: calendar.component(.year, from: reference),
+            // The requested day's month and day win: we asked for that day, so that is the day of the slot.
+            month: day.map { _ in calendar.component(.month, from: reference) } ?? month,
+            day: day.map { _ in calendar.component(.day, from: reference) } ?? dayOfMonth,
+            hour: hour, minute: minute
         )
-        guard let date = calendar.date(from: components), date <= reference else {
-            components.year = year - 1
-            return calendar.date(from: components)
-        }
-        return date
+        guard let date = calendar.date(from: components) else { return nil }
+        if day != nil { return date }
+        let current = now()
+        if date <= current { return date }
+        // `< 10 min` ahead is the ring's RTC having drifted, not a different night.
+        return date.timeIntervalSince(current) <= Self.futureTolerance ? current : nil
     }
+
+    /// How far ahead of the phone a date-only field (`A3`) may be before it is treated as undateable.
+    static let futureTolerance: TimeInterval = 10 * 60
 }

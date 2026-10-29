@@ -197,11 +197,14 @@ enum VitalsCardFactory {
             bands = [ReferenceBand(lower: baseline.mean - half, upper: baseline.mean + half,
                                    colorToken: .metricAccent(.hrv), opacity: 0.12)]
         }
+        // BUG-103 (decision D1): the value is the ring's own per-minute reduction, derived from raw
+        // beat-to-beat samples the radio never labels with its units — so the card says what it is. The
+        // reduction also roughly halves the number this card used to show; that is the fix, not a regression.
         let subtitle: String?
         if let baseline, baseline.isEstablished {
-            subtitle = "Baseline \(Int(baseline.mean)) ms"
+            subtitle = "Baseline \(Int(baseline.mean)) ms · relative"
         } else {
-            subtitle = "Building baseline"
+            subtitle = "Building baseline · relative"
         }
         return VitalCardViewModel(
             metric: .hrv, title: MetricKind.hrv.title,
@@ -211,7 +214,7 @@ enum VitalsCardFactory {
             samples: halfHourly(samples, quality: quality), zones: VitalsThresholdEngine.zones(for: .hrv, profile: profile, baseline: baseline),
             yDomain: domain, referenceBands: bands, dashedRules: baseline.map { [$0.mean] } ?? [],
             trend: TrendSummary.compute(samples: chart, metric: .hrv, baseline: baseline, unitLabel: "ms"),
-            sourceQuality: quality, isEstimated: false, confidenceLabel: interp?.confidenceLabel,
+            sourceQuality: quality, isEstimated: true, confidenceLabel: interp?.confidenceLabel ?? "Estimated",
             lastUpdatedText: lastUpdated(samples.last?.timestamp, now: inputs.now),
             isEmpty: samples.count < 2
         )

@@ -231,23 +231,43 @@ struct NutritionTileView: View {
 // MARK: - Sleep tile (duration + stage distribution bar + score)
 
 /// A single stacked bar of proportional deep/light/REM/awake segments (sleep-page colors), the day's
-/// asleep total above it (main sleep + naps, `SleepDayRule`, with a "Night 6h 45m · nap 40m" line when there was one),
-/// and the main sleep's score below. No percentages or per-segment labels — the bar reads distribution at
-/// a glance.
+/// asleep total above it (main sleep + naps, `SleepDayRule`, with a "Night 6h 45m · 2 naps 1h 37m"
+/// breakdown line when there was one), and the **day's** score below. No percentages or per-segment
+/// labels — the bar reads distribution at a glance.
+///
+/// The whole-day number is the owner-approved policy of 2026-10-22 (`SleepScore.calculate(day:)`), not the
+/// 1.0 rule that printed only the main sleep (BUG-205 in the 1.0 direction — do not revert to it here).
+/// Known and deliberate: the bar and `stages` below still describe the **main** sleep, which the 22 October
+/// decision did not cover; making the bar whole-day too is a separate change, and until it lands a day with
+/// a nap shows a day total above a night's bar.
+///
+/// Three states, not two (BUG-210, from the 1.0 pass): last night's sleep; nothing last night but an older
+/// night on record — shown with an explicit `caption` so it is never mistaken for last night; or nothing.
 struct SleepTileView: View {
-    let day: SleepDay?
+    let tile: SleepTileState
     var onTap: () -> Void
+
+    init(tile: SleepTileState, onTap: @escaping () -> Void) {
+        self.tile = tile
+        self.onTap = onTap
+    }
+
+    /// Convenience for previews and tests: a reference-night tile from a day (nil = the empty state).
+    init(day: SleepDay?, onTap: @escaping () -> Void) {
+        self.init(tile: day.map { SleepTileState(kind: .referenceNight, day: $0, caption: nil) } ?? .none,
+                  onTap: onTap)
+    }
 
     var body: some View {
         TodayTile(label: "Sleep", color: AgaraColors.sleep, onTap: onTap) {
-            if let day {
+            if let day = tile.day {
                 let sleep = day.main
                 let stages = SleepStageDistribution(sleep)
                 // The DAY's score: the night and the naps together (owner 2026-10-22, option A).
                 let score = day.score.score
                 VStack(alignment: .leading, spacing: 10) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(SleepFormat.duration(day.totalMinutes))
+                        Text(SleepFormat.duration(sleep.session.totalMinutes))
                             .font(AgaraFont.greeting)
                             .monospacedDigit()
                             .foregroundStyle(AgaraColors.textPrimary)
@@ -262,6 +282,14 @@ struct SleepTileView: View {
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.8)
                                 .accessibilityIdentifier("today.sleep.nap")
+                        }
+                        if let caption = tile.caption {
+                            Text(caption)
+                                .font(AgaraFont.caption)
+                                .foregroundStyle(AgaraColors.textMuted)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                                .accessibilityIdentifier("today.sleep.caption")
                         }
                     }
                     SleepStageBar(segments: stages.segments)

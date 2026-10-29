@@ -38,8 +38,21 @@ final class VeepooSyncEngine: RingSyncEngine {
     private var currentDay = 0
     private var sleepComplete = false
     private var dailyComplete = false
-    /// day → page index → raw frame, for the E0 sleep pages.
-    private var sleepFrames: [Int: [Int: Data]] = [:]
+    /// The E0 sleep pages of the transfer in flight: page index → raw frame. Scoped to **one transfer**
+    /// (BUG-201): the buffer used to be keyed by day and page and survived across transfers, so a second
+    /// transfer's page 0 replaced the first one's and the assembled payload mixed two nights.
+    private var sleepFrames: [Int: Data] = [:]
+    /// The highest page index this transfer announced (its first page carries it); page 0 is the last.
+    private var sleepPageCount = 0
+    /// The last page index buffered — a page index above it means the ring started a new transfer.
+    private var lastSleepPageIndex = -1
+    /// The day's sleep outcome for the ledger: true once a transfer's sleep reached storage, or the ring
+    /// genuinely answered no-data. BUG-203: a day is not complete without it.
+    private var daySleepStored = false
+    /// The first `a1` identity this install saw per link (SEC-301); a later contradiction is counted.
+    private var pinnedSensorId: [String: String] = [:]
+    /// The `a1` identity of the current link, nil until its handshake reply arrives.
+    private var linkSensorId: String?
     /// day → record index (BE16) → part → raw frame, for the DF daily records.
     private var dailyFrames: [Int: [Int: [Int: Data]]] = [:]
     /// The pass's plan (`SyncPlan`): which days, from which record. `planIndex` is the day in flight.
@@ -103,6 +116,17 @@ final class VeepooSyncEngine: RingSyncEngine {
 
     /// DF records dropped this connection because their CRC-16 didn't match the header (debug count).
     private(set) var crcFailures = 0
+    /// Sleep transfers whose completeness checks failed (BUG-201): a page missing, or fewer sessions decoded
+    /// than the header announced. The day is left un-advanced so the next pass asks for it again.
+    private(set) var sleepIncompleteTransfers = 0
+    /// Sleep sessions dropped because the `A1` block overran the payload, or carried no `A5` curve at all —
+    /// storing either would be a fabricated hypnogram (BUG-108).
+    private(set) var sleepRejectedSessions = 0
+    /// Provenance of the sleep records this link delivered (SEC-301, report-only per decision D4).
+    private(set) var sleepProvenance = SleepProvenance()
+    /// Sessions whose decoded curve disagreed with the ring's own `A3` total or awake count (A2/BUG-202).
+    /// Diagnostics only: the record is stored as decoded and the retries stay A1's and A4's.
+    private(set) var sleepCountMismatches = 0
     /// The user's profile + goals for the `a3` frame, pushed after auth and on change (flag `profile_sync`).
     private var profile: UserProfileValues?
     /// Feature-flag lookup, injectable so tests can pin a flag without touching UserDefaults.
@@ -143,8 +167,10 @@ final class VeepooSyncEngine: RingSyncEngine {
         currentDay = 0
         sleepComplete = false
         dailyComplete = false
-        sleepFrames.removeAll()
+        resetSleepTransfer()
         dailyFrames.removeAll()
+        daySleepStored = false
+        linkSensorId = nil
         plan = []
         planIndex = 0
         dayTotalBlocks = nil
@@ -175,6 +201,11 @@ final class VeepooSyncEngine: RingSyncEngine {
         case let .commandAck(commandId) where commandId == 0xA1 && !authenticated:
             authenticated = true
             runPostAuthentication()
+        case let .ringIdentity(sensorId):
+            // SEC-301: the only identity iOS can compare — the ring's own `a1` MAC, hashed. CoreBluetooth
+            // never reveals the BLE address, so the check is "does not contradict what this peripheral
+            // reported before" rather than Android's MAC-vs-address equality.
+            linkSensorId = sensorId
         case let .settingAck(commandId, _) where commandId == 0xB3:
             // Read the table back after every set, ok or not, so the app shows what the ring now holds.
             writer?.enqueue(VeepooEncoder.autoMeasureRead())
@@ -224,7 +255,7 @@ final class VeepooSyncEngine: RingSyncEngine {
         currentDay = plan.first?.offset ?? 0
         sleepComplete = false
         dailyComplete = false
-        sleepFrames.removeAll()
+        resetSleepTransfer()
         dailyFrames.removeAll()
         dayTotalBlocks = nil
         dayRecords = []
@@ -320,26 +351,51 @@ final class VeepooSyncEngine: RingSyncEngine {
         guard data.count >= 4 else { return }
         lastProgressTick = pollTick
         let dayOffset = Int(data[3])
-        // No-data marker (`E0 ?? 00 <day>`): the ring kept no sleep for this day. Complete the
-        // phase so the loop moves on to the daily transfer — same as the harness.
-        if data[2] == 0x00 {
-            if dayOffset == currentDay, !sleepComplete { completeSleepTransfer() }
+        let pageIndex = Int(data[1])
+        let sessions = Int(data[2])
+        // No-data marker is exactly `E0 00 00 <day>`: page 0, no sessions. Reading byte 2 alone also
+        // swallowed a real page — `e0 10 00 04 …` (page 0x10 of day 4) was discarded as "no data" (BUG-201).
+        if pageIndex == 0x00, sessions == 0x00 {
+            if dayOffset == currentDay, !sleepComplete {
+                daySleepStored = true    // the ring kept no sleep for this day: that is an answer, not a loss
+                completeSleepTransfer()
+            }
             return
         }
-        sleepFrames[dayOffset, default: [:]][Int(data[1])] = data
-        // Last page (`E0 00 <sessions> <day>`): the payload pages are all in. Byte 2 is the number of
-        // sessions in the transfer — 1 on every page seen so far, but a day with a nap is `E0 00 02`,
-        // which the old `== 0x01` test never completed (only the stall watchdog moved it on).
-        if data[1] == 0x00, dayOffset == currentDay, !sleepComplete {
-            completeSleepTransfer()
+        guard dayOffset == currentDay, !sleepComplete else { return }
+        // BUG-201: pages count down to 0, so a page index above the last one held means the ring has
+        // started a **new** transfer — drop the old pages rather than splicing two transfers together.
+        if pageIndex > lastSleepPageIndex {
+            sleepFrames.removeAll()
+            sleepPageCount = pageIndex
         }
+        lastSleepPageIndex = pageIndex
+        // Never overwrite a page already held for this transfer: the same index from a second transfer can
+        // carry a different body (16 payload bytes in a complete transfer, 4 in a page-0-only answer).
+        if sleepFrames[pageIndex] == nil { sleepFrames[pageIndex] = data }
+        if pageIndex == 0x00 { completeSleepTransfer(announcedSessions: sessions) }
     }
 
-    private func completeSleepTransfer() {
+    /// Close the day's sleep phase.
+    ///
+    /// `announcedSessions` is the count page 0 declared (0 for the no-data marker, nil when the stall
+    /// watchdog closed a transfer that never finished). An incomplete transfer is **not** stored and the
+    /// day is not advanced: the watchdog closes the phase a tick later, and `SyncPlan` keeps the day in the
+    /// walk because it has no sleep, so the next pass asks again (BUG-201 + BUG-203).
+    private func completeSleepTransfer(announcedSessions: Int? = nil) {
+        if let announcedSessions, announcedSessions > 0, !emitSleepSummary(announcedSessions: announcedSessions) {
+            return
+        }
         sleepComplete = true
         lastProgressTick = pollTick
-        emitSleepSummary()
+        resetSleepTransfer()
         requestHistory(VeepooEncoder.dailyHistory(dayOffset: currentDay, position: currentPosition))
+    }
+
+    private func resetSleepTransfer() {
+        sleepFrames.removeAll()
+        sleepPageCount = 0
+        lastSleepPageIndex = -1
     }
 
     /// Send the day loop's next request — or hold it while a spot HR test runs (`spotHeartRateActive`).
@@ -372,13 +428,92 @@ final class VeepooSyncEngine: RingSyncEngine {
     /// (`docs/process/plans/sleep-session-merge.md` §5). On iOS the identity is the CoreBluetooth peripheral
     /// UUID — CoreBluetooth hides the MAC, so the `a1` MAC check Android applies (D3) has nothing to compare
     /// against here (a recorded platform difference).
-    private func emitSleepSummary() {
-        guard let frames = sleepFrames[currentDay], !frames.isEmpty else { return }
-        let payload = frames.keys.sorted(by: >).flatMap { Array((frames[$0] ?? Data()).dropFirst(4)) }
+    /// - Returns: whether the transfer was stored (false = incomplete, nothing stored, retry the day).
+    @discardableResult
+    private func emitSleepSummary(announcedSessions: Int) -> Bool {
+        // BUG-201 checks, the same two `SleepRawRepair` applies to stored bytes: every page index
+        // 0…highest is here, and the sessions decoded equal the count the header announced.
+        let runComplete = (0...sleepPageCount).allSatisfy { sleepFrames[$0] != nil }
+        let payload = sleepFrames.keys.sorted(by: >).flatMap { Array((sleepFrames[$0] ?? Data()).dropFirst(4)) }
+        let summaries = decoder.sleepSummaries(payload: payload)
+        guard runComplete, summaries.count == announcedSessions else {
+            sleepIncompleteTransfers += 1
+            SleepSyncDiagnostics.shared.record(.incompleteTransfers)
+            writer?.emit(.historySyncProgress(
+                stage: "sleep: transfer incomplete (\(summaries.count) of \(announcedSessions) sessions), will retry"
+            ))
+            return false
+        }
         let source = writer?.connectionSource
-        for summary in decoder.sleepSummaries(payload: payload) {
+        for summary in summaries {
+            noteProvenance()
+            // BUG-108: a block whose declared length overran the payload is only partly decoded, and a
+            // block with no `A5` curve has no stage order at all. Skip it (and keep the day in the walk)
+            // rather than store a night the ring never gave.
+            guard !summary.blockOverrun, !summary.stages.isEmpty else {
+                sleepRejectedSessions += 1
+                SleepSyncDiagnostics.shared.record(.rejectedSessions)
+                writer?.emit(.historySyncProgress(
+                    stage: summary.blockOverrun ? "sleep: a record overran its transfer, will retry"
+                                                : "sleep: a record carried no stage curve, skipped"
+                ))
+                continue
+            }
             writer?.emit(.sleepTimeline(timestamp: summary.start, stages: summary.stages, source: source))
             dayCounts.sleepNights += 1
+            daySleepStored = true
+            noteSleepCountMismatch(summary)
+        }
+        return daySleepStored
+    }
+
+    /// A2 (BUG-202) — compare the ring's own `A3` numbers with what was decoded, and say so.
+    ///
+    /// `A3` bytes 25–26 are the ring's total window (awake included) and bytes 29–30 its own awake count;
+    /// the curve is what the app stores. On real firmware the two agree exactly (650 = 650, awake 38 = 38),
+    /// so a difference means the transfer or the curve lost minutes — which nothing could see before, because
+    /// the ring's numbers were dropped one frame after they were decoded.
+    ///
+    /// **Diagnostic only** (decision A2): no rewrite of what the user sees, and no second retry mechanism —
+    /// the retries are A1's incomplete-transfer counter and A4's `blockOverrun`.
+    private func noteSleepCountMismatch(_ summary: VeepooSleepSummary) {
+        let curveMinutes = summary.stages.count
+        let curveAwake = summary.stages.filter { $0 == .awake }.count
+        var differences: [String] = []
+        if abs(summary.totalMinutes - curveMinutes) > Self.sleepCountTolerance {
+            differences.append("total \(summary.totalMinutes) vs curve \(curveMinutes)")
+        }
+        if let statedAwake = summary.statedAwakeMinutes, abs(statedAwake - curveAwake) > Self.sleepCountTolerance {
+            differences.append("awake \(statedAwake) vs curve \(curveAwake)")
+        }
+        guard !differences.isEmpty else { return }
+        sleepCountMismatches += 1
+        SleepSyncDiagnostics.shared.record(.countMismatches)
+        writer?.emit(.historySyncProgress(stage: "sleep: the ring's own count differs (" + differences.joined(separator: ", ") + ")"))
+    }
+
+    /// How far the ring's own `A3` count and the decoded curve may differ before it is reported as a
+    /// diagnostic. Zero on real firmware; one minute absorbs a rounding difference in a re-staged night.
+    static let sleepCountTolerance = 1
+
+    /// SEC-301, **report-only** this release (decision D4): count what we would reject, keep storing.
+    private func noteProvenance() {
+        sleepProvenance.checked += 1
+        guard let sensorId = linkSensorId else {
+            sleepProvenance.nullIdentity += 1
+            SleepSyncDiagnostics.shared.record(.provenanceNullIdentity)
+            return
+        }
+        let source = writer?.connectionSource ?? ""
+        if let pinned = pinnedSensorId[source] {
+            guard pinned != sensorId else { return }
+            sleepProvenance.mismatched += 1
+            SleepSyncDiagnostics.shared.record(.provenanceMismatches)
+            writer?.emit(.historySyncProgress(
+                stage: "sleep: this link reports a different ring identity than it did before (SEC-301)"
+            ))
+        } else {
+            pinnedSensorId[source] = sensorId
         }
     }
 
@@ -425,10 +560,11 @@ final class VeepooSyncEngine: RingSyncEngine {
             // engine against the ring emulator; on hardware it hid behind the watchdog.
             sleepComplete = false
             dailyComplete = false
-            sleepFrames.removeAll()
+            resetSleepTransfer()
             dailyFrames.removeAll()
             dayTotalBlocks = nil
             dayRecords = []
+            daySleepStored = false
             beginHistoryDay(currentDay)
             requestHistory(VeepooEncoder.sleepHistory(dayOffset: currentDay))
         } else {
@@ -443,6 +579,7 @@ final class VeepooSyncEngine: RingSyncEngine {
         guard let records = dailyFrames[currentDay] else { return }
         var incomplete = 0
         var corrupt = 0
+        var implausible = 0
         for index in records.keys.sorted() {
             guard let parts = records[index] else { continue }
             let payload: [UInt8]
@@ -451,13 +588,25 @@ final class VeepooSyncEngine: RingSyncEngine {
             case .incomplete: incomplete += 1; continue
             case .checksumMismatch: corrupt += 1; continue
             }
-            guard let record = decoder.dailyRecord(payload: payload) else { continue }
+            // BUG-102: the record's date is the day we asked for — B1 carries no year, and building one
+            // from the phone's clock filed a ring a minute ahead a *year* back.
+            guard let record = decoder.dailyRecord(payload: payload,
+                                                   day: SyncPlan.date(offset: currentDay, today: passToday,
+                                                                      calendar: decoder.calendar))
+            else { continue }
+            // BUG-105: a record whose slot the plausibility gate throws away must not count as stored —
+            // the ring still holds those bytes and would serve them correctly, but a watermark that covers
+            // a dropped record means the day is never asked for again.
+            guard RingEventBridge.isWithinHistoryWindow(record.timestamp, now: now()) else {
+                implausible += 1
+                continue
+            }
             // The SDK's record number (LE of bytes 1–2) — what a resume position counts in.
             dayRecords.insert((index >> 8) | ((index & 0xFF) << 8))
             dayCounts.steps += record.steps
-            dayCounts.heartRate += record.heartRates.filter { $0 > 0 }.count
-            dayCounts.spo2 += record.oxygen.filter { $0 > 0 }.count
-            dayCounts.hrv += record.hrv.filter { $0 > 0 }.count
+            dayCounts.heartRate += record.heartRates.filter { $0.value > 0 }.count
+            dayCounts.spo2 += record.oxygen.filter { $0.value > 0 }.count
+            dayCounts.hrv += record.hrv.filter { $0.value > 0 }.count
             if record.stress > 0 { dayCounts.stress += 1 }
 
             // Activity slot (B2): the day total is recomputed as the sum of distinct-timestamp
@@ -471,17 +620,17 @@ final class VeepooSyncEngine: RingSyncEngine {
             // Per-minute vitals. B4 (HR) and B9 (SpO₂) carry five one-minute samples per 5-minute
             // slot, stamped at slot + i minutes; the rest are single values at the slot start.
             let calendar = decoder.calendar
-            for (offset, value) in record.heartRates.enumerated() {
+            for (offset, sample) in record.heartRates.enumerated() {
                 let date = calendar.date(byAdding: .minute, value: offset, to: record.timestamp) ?? record.timestamp
-                writer?.emit(.historyMeasurement(kind: .heartRate, value: Double(value), timestamp: date))
+                writer?.emit(.historyMeasurement(kind: .heartRate, value: Double(sample.value), timestamp: date))
             }
-            for (offset, value) in record.oxygen.enumerated() {
+            for (offset, sample) in record.oxygen.enumerated() {
                 let date = calendar.date(byAdding: .minute, value: offset, to: record.timestamp) ?? record.timestamp
-                writer?.emit(.historyMeasurement(kind: .spo2, value: Double(value), timestamp: date))
+                writer?.emit(.historyMeasurement(kind: .spo2, value: Double(sample.value), timestamp: date))
             }
-            for (offset, value) in record.hrv.enumerated() {
+            for (offset, sample) in record.hrv.enumerated() {
                 let date = calendar.date(byAdding: .minute, value: offset, to: record.timestamp) ?? record.timestamp
-                writer?.emit(.historyMeasurement(kind: .hrv, value: Double(value), timestamp: date))
+                writer?.emit(.historyMeasurement(kind: .hrv, value: Double(sample.value), timestamp: date))
             }
             if record.systolic > 0, record.diastolic > 0 {
                 writer?.emit(.historyMeasurement(
@@ -506,19 +655,24 @@ final class VeepooSyncEngine: RingSyncEngine {
         if corrupt > 0, let writer {
             writer.emit(.historySyncProgress(stage: "daily: \(corrupt) records failed their checksum"))
         }
+        if implausible > 0, let writer {
+            writer.emit(.historySyncProgress(
+                stage: "daily: \(implausible) records outside the history window, will retry"
+            ))
+        }
     }
 
     /// Respiration (B6) and cardiac load (B9 20–24) per minute; MET (BF) and the five blood components
     /// (C2) at the slot start. Always decoded and stored — only their UI is behind flags.
     private func emitExtendedMetrics(_ record: VeepooDailyRecord) {
         let calendar = decoder.calendar
-        for (offset, value) in record.respiration.enumerated() {
+        for (offset, sample) in record.respiration.enumerated() {
             let date = calendar.date(byAdding: .minute, value: offset, to: record.timestamp) ?? record.timestamp
-            writer?.emit(.historyMeasurement(kind: .respiratoryRate, value: Double(value), timestamp: date))
+            writer?.emit(.historyMeasurement(kind: .respiratoryRate, value: Double(sample.value), timestamp: date))
         }
-        for (offset, value) in record.cardiacLoad.enumerated() {
+        for (offset, sample) in record.cardiacLoad.enumerated() {
             let date = calendar.date(byAdding: .minute, value: offset, to: record.timestamp) ?? record.timestamp
-            writer?.emit(.historyMeasurement(kind: .cardiacLoad, value: Double(value), timestamp: date))
+            writer?.emit(.historyMeasurement(kind: .cardiacLoad, value: Double(sample.value), timestamp: date))
         }
         if record.met > 0 {
             writer?.emit(.historyMeasurement(kind: .met, value: record.met, timestamp: record.timestamp))
@@ -723,11 +877,13 @@ final class VeepooSyncEngine: RingSyncEngine {
         let date = SyncPlan.dateKey(offset: currentDay, today: passToday, calendar: decoder.calendar)
         let state = SyncPlan.record(syncPlanStore.state(ring: ring, date: date), offset: currentDay,
                                     position: currentPosition, records: dayRecords,
-                                    totalBlocks: dayTotalBlocks, endMarker: endMarker)
+                                    totalBlocks: dayTotalBlocks, endMarker: endMarker,
+                                    sleepStored: daySleepStored)
         syncPlanStore.set(state, ring: ring, date: date, today: passToday, calendar: decoder.calendar)
         #if DEBUG
         E2ETrace.log("history day \(currentDay) (\(date)) from \(currentPosition): \(dayRecords.count) records, "
                      + "total \(dayTotalBlocks.map(String.init) ?? "-"), stored through \(state.storedThrough), "
+                     + "sleep \(state.sleepStored ? "stored" : "missing"), "
                      + (state.complete ? "complete" : "open"))
         #endif
     }
