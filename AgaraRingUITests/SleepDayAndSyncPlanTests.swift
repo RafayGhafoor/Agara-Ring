@@ -2,7 +2,8 @@ import XCTest
 
 /// Owner feedback before release (2026-09-26, `docs/process/plans/consistency-framework.md`), on the real app
 /// against the naps emulator (`--sleep-sessions 2`: a night plus a 40-minute nap at 13:00 each day):
-/// 1. Today's sleep tile shows the day's main sleep with the nap added to the total and a "+ nap 40 m" line.
+/// 1. Today's sleep tile shows the day's **main sleep** (this branch's BUG-205 rule) with the nap on its own
+///    "+ nap 40 m" line beside it.
 /// 2. A reconnect asks the ring only for day 0, from the record after the last one stored (`SyncPlan`) — read
 ///    from the emulator's own log of the DF requests it served.
 final class SleepDayAndSyncPlanTests: AgaraUITestCase {
@@ -42,7 +43,10 @@ final class SleepDayAndSyncPlanTests: AgaraUITestCase {
 
     func testTodayShowsNightPlusNapAndReconnectAsksOnlyForToday() throws {
         let log = try napLog()
-        try launch(portKey: "E2E_NAP_PORT")
+        // Determinism, not a fix for anything: pin the tab this test asserts on instead of inheriting the tab an
+        // earlier test left in use — a test must not depend on remembered UI state. (The ring chip lives in
+        // `AppHeader`, mounted above the `TabView` for every tab, so it is not tab-dependent.)
+        try launch(portKey: "E2E_NAP_PORT", extra: ["-startTab", "today"])
         waitForConnected()
         waitForSyncIdle()
         openTab("Today")
@@ -50,18 +54,21 @@ final class SleepDayAndSyncPlanTests: AgaraUITestCase {
         let nap = element("today.sleep.nap")
         scrollTo(nap)
         eventually(timeout: 60, "no nap line on the Today sleep tile") { nap.exists && nap.label == "+ nap 40 m" }
-        // The headline is the night (as the emulator logged it) plus the nap.
+        // This branch shows the **main sleep** in the tile's headline (BUG-205): the bar and the score below it
+        // describe that one session, so the nap is not added to it. 1.1 (`agara/1.1-cloud`) shows the whole day
+        // — night + naps — on purpose; see `docs/apps/parity-matrix.md` › "1.0 vs 1.1 — the sleep number
+        // differs on purpose". Change this assertion only with a decision to adopt that rule here.
         let night = linesOfLastConnection(log).first { $0.contains("day 0: sleep") }.flatMap(Self.minutes(ofLogDuration:))
         let total = element("today.sleep.total")
         XCTAssertTrue(total.exists, "no sleep total on the Today tile")
         if let night {
-            XCTAssertEqual(total.label, Self.format(night + 40), "Today's total = night \(night) min + nap 40 min")
+            XCTAssertEqual(total.label, Self.format(night), "Today's headline is the main night (\(night) min)")
         }
         attachScreenshot("today-sleep-night-plus-nap")
 
         // Reconnect (relaunch = a new connection to the same ring): only day 0, from the resume position.
         app.terminate()
-        try launch(portKey: "E2E_NAP_PORT")
+        try launch(portKey: "E2E_NAP_PORT", extra: ["-startTab", "today"])
         waitForConnected()
         waitForSyncIdle()
         var requests: [String] = []
