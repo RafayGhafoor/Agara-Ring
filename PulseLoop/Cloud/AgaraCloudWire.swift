@@ -61,17 +61,22 @@ nonisolated struct WireDay: Codable, Equatable, Sendable {
     var other: Int
     var sleepMinutes: Int
     var sleepScore: Int
+    /// When this day was last **confirmed from the ring** (cloud-v2 §2.1). Absent means unknown — never zero: without
+    /// it a missed sync day and a genuinely quiet day look identical, and a consistency metric counts the first as a
+    /// real zero. `ActivityDaily.syncedAt` already carries this locally; it just never left the device.
+    var syncedAt: Int64?
     enum CodingKeys: String, CodingKey {
         case date, steps, distanceKm = "distance_km", calories, sleepStart = "sleep_start", sleepEnd = "sleep_end"
-        case deep, light, awake, other, sleepMinutes = "sleep_minutes", sleepScore = "sleep_score"
+        case deep, light, awake, other, sleepMinutes = "sleep_minutes", sleepScore = "sleep_score", syncedAt = "synced_at"
     }
 
     init(date: String, steps: Int, distanceKm: Double, calories: Double, sleepStart: String? = nil, sleepEnd: String? = nil,
-         deep: Int = 0, light: Int = 0, awake: Int = 0, other: Int = 0, sleepMinutes: Int = 0, sleepScore: Int = 0) {
+         deep: Int = 0, light: Int = 0, awake: Int = 0, other: Int = 0, sleepMinutes: Int = 0, sleepScore: Int = 0,
+         syncedAt: Int64? = nil) {
         self.date = date; self.steps = steps; self.distanceKm = distanceKm; self.calories = calories
         self.sleepStart = sleepStart; self.sleepEnd = sleepEnd
         self.deep = deep; self.light = light; self.awake = awake; self.other = other
-        self.sleepMinutes = sleepMinutes; self.sleepScore = sleepScore
+        self.sleepMinutes = sleepMinutes; self.sleepScore = sleepScore; self.syncedAt = syncedAt
     }
 
     /// Tolerant: the server may omit zero fields or send numbers as doubles; missing fields read as 0.
@@ -84,6 +89,8 @@ nonisolated struct WireDay: Codable, Equatable, Sendable {
         sleepEnd = try? c.decodeIfPresent(String.self, forKey: .sleepEnd)
         deep = Int(number(.deep)); light = Int(number(.light)); awake = Int(number(.awake)); other = Int(number(.other))
         sleepMinutes = Int(number(.sleepMinutes)); sleepScore = Int(number(.sleepScore))
+        let stamp = (try? c.decodeIfPresent(Int64.self, forKey: .syncedAt)) ?? nil
+        syncedAt = (stamp ?? 0) > 0 ? stamp : nil
     }
 }
 
@@ -117,11 +124,23 @@ nonisolated struct DayResult: Codable, Equatable, Sendable {
     var reason: String?
 }
 
+/// The server's answer for one session: `accepted` (stored, changed), `duplicate` (already held — both are
+/// acknowledgements), or `rejected` with a reason.
+nonisolated struct SessionResult: Codable, Equatable, Sendable {
+    var sessionKey: String
+    var status: String
+    var reason: String?
+    enum CodingKeys: String, CodingKey { case sessionKey = "session_key", status, reason }
+}
+
 nonisolated struct SyncResponse: Codable, Equatable, Sendable {
     var envelope: Int?
     var cursor: String?
     var blocks: [BlockResult]
     var days: [DayResult]
+    /// Absent on a server that predates sessions (and on every request that carries none), so it decodes as empty
+    /// rather than failing the whole response.
+    var sessions: [SessionResult] = []
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -129,9 +148,10 @@ nonisolated struct SyncResponse: Codable, Equatable, Sendable {
         cursor = try c.decodeIfPresent(String.self, forKey: .cursor)
         blocks = try c.decodeIfPresent([BlockResult].self, forKey: .blocks) ?? []
         days = try c.decodeIfPresent([DayResult].self, forKey: .days) ?? []
+        sessions = try c.decodeIfPresent([SessionResult].self, forKey: .sessions) ?? []
     }
-    init(envelope: Int? = 1, cursor: String?, blocks: [BlockResult], days: [DayResult]) {
-        self.envelope = envelope; self.cursor = cursor; self.blocks = blocks; self.days = days
+    init(envelope: Int? = 1, cursor: String?, blocks: [BlockResult], days: [DayResult], sessions: [SessionResult] = []) {
+        self.envelope = envelope; self.cursor = cursor; self.blocks = blocks; self.days = days; self.sessions = sessions
     }
 }
 
@@ -140,17 +160,20 @@ nonisolated struct ChangesResponse: Codable, Equatable, Sendable {
     var more: Bool
     var blocks: [WireBlock]
     var days: [WireDay]
+    /// Sessions pulled from another device (empty until the server stores them).
+    var sessions: [WireSession] = []
 
-    enum CodingKeys: String, CodingKey { case cursor, more, blocks, days }
+    enum CodingKeys: String, CodingKey { case cursor, more, blocks, days, sessions }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         cursor = try c.decodeIfPresent(String.self, forKey: .cursor) ?? ""
         more = try c.decodeIfPresent(Bool.self, forKey: .more) ?? false
         blocks = try c.decodeIfPresent([WireBlock].self, forKey: .blocks) ?? []
         days = try c.decodeIfPresent([WireDay].self, forKey: .days) ?? []
+        sessions = try c.decodeIfPresent([WireSession].self, forKey: .sessions) ?? []
     }
-    init(cursor: String, more: Bool, blocks: [WireBlock], days: [WireDay]) {
-        self.cursor = cursor; self.more = more; self.blocks = blocks; self.days = days
+    init(cursor: String, more: Bool, blocks: [WireBlock], days: [WireDay], sessions: [WireSession] = []) {
+        self.cursor = cursor; self.more = more; self.blocks = blocks; self.days = days; self.sessions = sessions
     }
 }
 
@@ -185,6 +208,30 @@ nonisolated struct DeleteMeResult: Equatable, Sendable {
 /// The upload JSON, written by hand in a **fixed key order** with the summary printed as exact decimals, so the text is a
 /// pure function of (key, revision, sealed, container, tombstones) and both apps reach the same digest for the same
 /// input (`wire_golden.txt` in the Android tree pins 19 of them; `AgaraCloudGoldenTests` reads it in place).
+/// One recorded workout session (cloud-v2 §2.1, "Workout sessions"). Both apps recorded these locally and uploaded
+/// **none** of it, which is why a `source=workout` filter over block metrics could never match; the cloud had no
+/// session shape at all.
+nonisolated struct WireSession: Codable, Equatable, Sendable {
+    var sessionKey: String
+    var date: String
+    var type: String
+    var startedAt: Int64
+    var endedAt: Int64?
+    var durationMin: Double
+    var calories: Double?
+    var distanceM: Double?
+    var avgHr: Double?
+    var minHr: Double?
+    var maxHr: Double?
+    var avgSpo2: Double?
+    var deleted: Bool
+    enum CodingKeys: String, CodingKey {
+        case sessionKey = "session_key", date, type, startedAt = "started_at", endedAt = "ended_at"
+        case durationMin = "duration_min", calories, distanceM = "distance_m"
+        case avgHr = "avg_hr", minHr = "min_hr", maxHr = "max_hr", avgSpo2 = "avg_spo2", deleted
+    }
+}
+
 nonisolated enum WireBlockBuilder {
     /// One block object of the envelope (storage-format §12) from the stored container.
     static func json(blockKey: String, revision: Int, sealed: Bool, decoded: AGBDecoded, tombstones: [Int64], container: Data) -> String? {
@@ -279,12 +326,34 @@ nonisolated enum WireBlockBuilder {
     }
 
     /// One day row, fixed order (sleep fields only when the night exists).
+    /// A session object of the envelope. Absent optional values are **omitted**, not encoded as null, so the server
+    /// keeps whatever it already holds for them (a later partial write cannot blank a heart rate).
+    static func json(_ w: WireSession) -> String {
+        var parts = [
+            "\"session_key\":\(quote(w.sessionKey))",
+            "\"date\":\(quote(w.date))",
+            "\"type\":\(quote(w.type))",
+            "\"started_at\":\(w.startedAt)",
+            "\"duration_min\":\(num(w.durationMin))",
+        ]
+        if let ended = w.endedAt { parts.append("\"ended_at\":\(ended)") }
+        if let v = w.calories { parts.append("\"calories\":\(num(v))") }
+        if let v = w.distanceM { parts.append("\"distance_m\":\(num(v))") }
+        if let v = w.avgHr { parts.append("\"avg_hr\":\(num(v))") }
+        if let v = w.minHr { parts.append("\"min_hr\":\(num(v))") }
+        if let v = w.maxHr { parts.append("\"max_hr\":\(num(v))") }
+        if let v = w.avgSpo2 { parts.append("\"avg_spo2\":\(num(v))") }
+        if w.deleted { parts.append("\"deleted\":true") }
+        return "{" + parts.joined(separator: ",") + "}"
+    }
+
     static func json(_ d: WireDay) -> String {
         var s = "{\"date\":\"\(d.date)\",\"steps\":\(d.steps),\"distance_km\":\(num(d.distanceKm)),\"calories\":\(num(d.calories))"
         if let start = d.sleepStart, let end = d.sleepEnd {
             s += ",\"sleep_start\":\"\(start)\",\"sleep_end\":\"\(end)\",\"deep\":\(d.deep),\"light\":\(d.light),\"awake\":\(d.awake),\"other\":\(d.other),\"sleep_minutes\":\(d.sleepMinutes)"
             if d.sleepScore > 0 { s += ",\"sleep_score\":\(d.sleepScore)" }
         }
+        if let stamp = d.syncedAt, stamp > 0 { s += ",\"synced_at\":\(stamp)" }
         return s + "}"
     }
 
@@ -292,20 +361,25 @@ nonisolated enum WireBlockBuilder {
     static let envelopeVersion = 1
 
     /// The request body: `envelope, client_id, app{platform,version}, sent_at, blocks, days` in that order.
-    static func envelope(clientId: String, platform: String, version: String, sentAt: Int64, blocks: [String], days: [String]) -> Data {
-        func quote(_ v: String) -> String {
-            var out = "\""
-            for ch in v.unicodeScalars {
-                switch ch {
-                case "\"": out += "\\\""
-                case "\\": out += "\\\\"
-                default: out += ch.value < 0x20 ? String(format: "\\u%04x", ch.value) : String(ch)
-                }
+    /// A JSON string literal, escaped. One implementation, because the envelope and the session objects both quote
+    /// user-provided text (`type`, `client_id`) and a second copy would drift.
+    static func quote(_ v: String) -> String {
+        var out = "\""
+        for ch in v.unicodeScalars {
+            switch ch {
+            case "\"": out += "\\\""
+            case "\\": out += "\\\\"
+            default: out += ch.value < 0x20 ? String(format: "\\u%04x", ch.value) : String(ch)
             }
-            return out + "\""
         }
+        return out + "\""
+    }
+
+    static func envelope(clientId: String, platform: String, version: String, sentAt: Int64, blocks: [String], days: [String],
+                         sessions: [String] = []) -> Data {
         var s = "{\"envelope\":\(envelopeVersion),\"client_id\":\(quote(clientId)),\"app\":{\"platform\":\(quote(platform)),\"version\":\(quote(version))},\"sent_at\":\(sentAt),\"blocks\":["
-        s += blocks.joined(separator: ",") + "],\"days\":[" + days.joined(separator: ",") + "]}"
+        s += blocks.joined(separator: ",") + "],\"days\":[" + days.joined(separator: ",")
+        s += "],\"sessions\":[" + sessions.joined(separator: ",") + "]}"
         return Data(s.utf8)
     }
 }

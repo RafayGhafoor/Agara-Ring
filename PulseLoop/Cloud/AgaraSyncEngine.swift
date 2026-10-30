@@ -10,6 +10,7 @@ nonisolated struct CloudSyncProgress: Equatable, Sendable {
     var done: [String: Int] = [:]
     var total: [String: Int] = [:]
     var daysSent = 0
+    var sessionsSent = 0
 
     var totalBlocks: Int { total.values.reduce(0, +) }
     var doneBlocks: Int { done.values.reduce(0, +) }
@@ -21,6 +22,7 @@ nonisolated struct CloudSyncSummary: Equatable, Sendable {
     var blocksAccepted = 0
     var blocksRejected = 0
     var daysSent = 0
+    var sessionsSent = 0
     var requests = 0
     var pull = PullReport()
     var pullPages = 0
@@ -139,6 +141,7 @@ final class AgaraSyncEngine {
             summary.rounds = round
             snapshot.stage = .uploading
             progress(snapshot)
+            try await pushSessions(&summary)
             try await pushDays(&summary)
             try await pushBlocks(&summary, &snapshot, progress: progress)
             snapshot.stage = .downloading
@@ -155,9 +158,35 @@ final class AgaraSyncEngine {
 
     // MARK: Push
 
-    private func envelope(blocks: [String], days: [WireDay]) -> Data {
+    private func envelope(blocks: [String], days: [WireDay], sessions: [String] = []) -> Data {
         WireBlockBuilder.envelope(clientId: clientId(), platform: "ios", version: appVersion, sentAt: BlockStore.ms(now()),
-                                  blocks: blocks, days: days.map(WireBlockBuilder.json))
+                                  blocks: blocks, days: days.map(WireBlockBuilder.json), sessions: sessions)
+    }
+
+    /// Upload recorded workout sessions (cloud-v2 §2.1). They go **before** the days: the server computes each day's
+    /// workout rollup from the sessions it holds, so a day sent first would be rolled up a pass late.
+    ///
+    /// A session is acknowledged, not merely attempted: both `accepted` and `duplicate` mark it sent, while a
+    /// `rejected` one stays pending (its data may be right after the next local edit) and a request that throws marks
+    /// nothing, so nothing is lost.
+    private func pushSessions(_ summary: inout CloudSyncSummary) async throws {
+        let context = container.mainContext
+        while true {
+            let pending = AgaraCloudSessions.pending(context: context, limit: 200)
+            guard !pending.isEmpty else { return }
+            let response = try await api.sync(
+                body: envelope(blocks: [], days: [], sessions: AgaraCloudSessions.payload(pending))
+            )
+            summary.requests += 1
+            let rejected = Set(response.sessions.filter { $0.status == "rejected" }.map { $0.sessionKey })
+            let acknowledged = pending.filter { !rejected.contains($0.id.uuidString) }
+            for reason in response.sessions where reason.status == "rejected" {
+                Self.log.error("server refused session: \(reason.reason ?? "unknown")")
+            }
+            AgaraCloudSessions.mark(synced: acknowledged, at: now(), context: context)
+            summary.sessionsSent += acknowledged.count
+            if acknowledged.isEmpty { return }   // nothing moved: do not spin on the same rejected rows
+        }
     }
 
     private func pushDays(_ summary: inout CloudSyncSummary) async throws {

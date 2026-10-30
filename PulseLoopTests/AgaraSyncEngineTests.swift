@@ -555,3 +555,198 @@ final class AgaraCloudDemoDataTests: XCTestCase {
         XCTAssertFalse(AgaraCloudDays.isMockSource("ring_history"))
     }
 }
+
+// MARK: - Workout sessions on the wire (cloud-v2 §2.1)
+
+/// Both apps recorded sessions locally and uploaded none of it, so a `source=workout` filter over block metrics could
+/// never match. These pin the upload half: what counts as uploadable, how a session becomes wire JSON, and that an
+/// acknowledged session is not sent again (the second-occurrence rule).
+@MainActor
+final class CloudSessionUploadTests: XCTestCase {
+
+    private func session(started: Date, ended: Date?, pause: Double = 0, type: String = "run",
+                         calories: Double? = 160, distance: Double? = 2_400) -> ActivitySession {
+        ActivitySession(id: UUID(), type: type, status: ended == nil ? .recording : .finished,
+                        startedAt: started, endedAt: ended, totalPauseSeconds: pause,
+                        calories: calories, distanceMeters: distance, notes: nil, useGps: true)
+    }
+
+    private var start: Date {
+        Calendar.current.date(from: DateComponents(year: 2026, month: 10, day: 30, hour: 7, minute: 30))!
+    }
+
+    // MARK: duration
+
+    func testTheNetDurationSubtractsPauses() {
+        let s = session(started: start, ended: start.addingTimeInterval(3600), pause: 600)
+        XCTAssertEqual(AgaraCloudSessions.durationMinutes(s), 50, accuracy: 0.001,
+                       "60 minutes of wall time minus 10 paused")
+    }
+
+    func testAClockThatWentBackwardsYieldsNoDurationRatherThanANegativeOne() {
+        let s = session(started: start, ended: start.addingTimeInterval(-60))
+        XCTAssertEqual(AgaraCloudSessions.durationMinutes(s), 0, "never negative")
+        XCTAssertFalse(AgaraCloudSessions.uploadable(s), "and never uploaded")
+    }
+
+    func testASessionStillRecordingIsNotUploadable() {
+        let s = session(started: start, ended: nil)
+        XCTAssertFalse(AgaraCloudSessions.uploadable(s), "its duration is still growing; uploading would freeze it")
+        XCTAssertNil(AgaraCloudSessions.wire(s), "and it maps to nothing")
+    }
+
+    func testASessionShorterThanTheFloorIsNotUploaded() {
+        let s = session(started: start, ended: start.addingTimeInterval(20))   // 20 s
+        XCTAssertFalse(AgaraCloudSessions.uploadable(s), "a started-then-abandoned recording is not a workout")
+    }
+
+    func testTheFloorItselfIsUploaded() {
+        let s = session(started: start, ended: start.addingTimeInterval(30))   // exactly 0.5 min
+        XCTAssertTrue(AgaraCloudSessions.uploadable(s), "the boundary is inclusive")
+    }
+
+    // MARK: mapping
+
+    func testASessionMapsToTheWireShapeWithNetMinutesAndLocalDate() throws {
+        let s = session(started: start, ended: start.addingTimeInterval(3_600), pause: 300)
+        let wire = try XCTUnwrap(AgaraCloudSessions.wire(s))
+        XCTAssertEqual(wire.sessionKey, s.id.uuidString, "the model id is the idempotency key")
+        XCTAssertEqual(wire.date, AgaraCloudDays.dayString(start), "dated by the local day it started")
+        XCTAssertEqual(wire.type, "run")
+        XCTAssertEqual(wire.durationMin, 55, accuracy: 0.001)
+        XCTAssertEqual(wire.startedAt, Int64(start.timeIntervalSince1970 * 1000))
+        XCTAssertEqual(wire.calories, 160)
+        XCTAssertEqual(wire.distanceM, 2_400)
+        XCTAssertFalse(wire.deleted)
+        XCTAssertNil(wire.avgHr, "no heart-rate summary recorded means no value, not zero")
+    }
+
+    func testTheWireJsonOmitsAbsentOptionalsInsteadOfSendingNulls() {
+        let s = session(started: start, ended: start.addingTimeInterval(600), calories: nil, distance: nil)
+        let json = WireBlockBuilder.json(AgaraCloudSessions.wire(s)!)
+        XCTAssertTrue(json.contains("\"session_key\":"), json)
+        XCTAssertTrue(json.contains("\"duration_min\":10"), json)
+        XCTAssertFalse(json.contains("calories"), "absent stays absent so a later write cannot blank it: \(json)")
+        XCTAssertFalse(json.contains("null"), "no nulls: \(json)")
+        XCTAssertFalse(json.contains("\"deleted\""), "false is omitted, the server defaults it: \(json)")
+    }
+
+    func testATypeWithQuotesCannotBreakTheEnvelope() {
+        let s = session(started: start, ended: start.addingTimeInterval(600), type: "run \"fast\"\\x")
+        let json = WireBlockBuilder.json(AgaraCloudSessions.wire(s)!)
+        XCTAssertTrue(json.contains(#""type":"run \"fast\"\\x""#), "escaped, not injected: \(json)")
+    }
+
+    // MARK: envelope
+
+    func testTheEnvelopeCarriesSessionsAlongsideBlocksAndDays() {
+        let s = session(started: start, ended: start.addingTimeInterval(600))
+        let body = WireBlockBuilder.envelope(clientId: "c1", platform: "ios", version: "1.1", sentAt: 1,
+                                             blocks: [], days: [], sessions: AgaraCloudSessions.payload([s]))
+        let text = String(decoding: body, as: UTF8.self)
+        XCTAssertTrue(text.contains("\"sessions\":[{"), text)
+        XCTAssertTrue(text.contains("\"days\":[]"), text)
+        XCTAssertTrue(text.contains("\"blocks\":[]"), text)
+    }
+
+    func testAnEnvelopeWithoutSessionsStillCarriesTheEmptyArray() {
+        let body = WireBlockBuilder.envelope(clientId: "c1", platform: "ios", version: "1.1", sentAt: 1,
+                                             blocks: [], days: [])
+        XCTAssertTrue(String(decoding: body, as: UTF8.self).contains("\"sessions\":[]"),
+                      "the shape does not depend on the caller")
+    }
+
+    // MARK: pending + acknowledgement
+
+    func testPendingSelectsOnlyFinishedUnsentSessionsOldestFirstUpToTheLimit() throws {
+        let context = try TestSupport.makeContext()
+        let sent = session(started: start, ended: start.addingTimeInterval(600))
+        sent.syncedAt = start
+        let late = session(started: start.addingTimeInterval(7_200), ended: start.addingTimeInterval(7_800))
+        let early = session(started: start, ended: start.addingTimeInterval(600))
+        let recording = session(started: start.addingTimeInterval(9_000), ended: nil)
+        for s in [sent, late, early, recording] { context.insert(s) }
+        try context.save()
+
+        let pending = AgaraCloudSessions.pending(context: context, limit: 200)
+        XCTAssertEqual(pending.map(\.id), [early.id, late.id], "oldest first, no acknowledged and no recording session")
+
+        XCTAssertEqual(AgaraCloudSessions.pending(context: context, limit: 1).map(\.id), [early.id],
+                       "the limit is respected")
+    }
+
+    func testAnAcknowledgedSessionIsNotSentAgain() throws {
+        let context = try TestSupport.makeContext()
+        let s = session(started: start, ended: start.addingTimeInterval(600))
+        context.insert(s)
+        try context.save()
+        XCTAssertEqual(AgaraCloudSessions.pending(context: context).count, 1, "precondition: it is pending")
+
+        AgaraCloudSessions.mark(synced: [s], at: start.addingTimeInterval(3_600), context: context)
+
+        XCTAssertNotNil(s.syncedAt)
+        XCTAssertTrue(AgaraCloudSessions.pending(context: context).isEmpty, "the second pass sends nothing")
+    }
+}
+
+// MARK: - A confirmed quiet day vs a day that never synced (G3)
+
+/// `dayRows` used to drop any day whose activity was all zeros *and* whose night was empty — which made two different
+/// facts look identical downstream: "the ring confirmed this day and nothing happened" and "this day was never synced".
+/// Any consistency metric reading the second as a zero is wrong, so the confirmation stamp now travels with the row
+/// (`ActivityDaily.syncedAt` has always been on the device; it just never left it).
+@MainActor
+final class CloudDayConfirmationTests: XCTestCase {
+
+    private var day: Date {
+        Calendar.current.date(from: DateComponents(year: 2026, month: 10, day: 28, hour: 12))!
+    }
+
+    func testAConfirmedQuietDayIsUploadedWithItsConfirmationStamp() throws {
+        let context = try TestSupport.makeContext()
+        context.insert(ActivityDaily(date: day, steps: 0, calories: 0, distanceMeters: 0, activeMinutes: 0, source: "ring"))
+        let row = (try context.fetch(FetchDescriptor<ActivityDaily>())).first
+        row?.syncedAt = day.addingTimeInterval(600)
+        try context.save()
+
+        let rows = AgaraCloudDays.dayRows(context: context)
+        let mine = try XCTUnwrap(rows.first { $0.date == AgaraCloudDays.dayString(day) },
+                                 "a confirmed day must be sent even with nothing in it")
+        XCTAssertEqual(mine.steps, 0)
+        XCTAssertEqual(mine.syncedAt, Int64(day.addingTimeInterval(600).timeIntervalSince1970 * 1000),
+                       "the confirmation time is what distinguishes it from a missing day")
+    }
+
+    func testAZeroDayWithNoConfirmationIsNotUploaded() throws {
+        let context = try TestSupport.makeContext()
+        context.insert(ActivityDaily(date: day, steps: 0, calories: 0, distanceMeters: 0, activeMinutes: 0, source: "ring"))
+        try context.save()
+
+        XCTAssertTrue(AgaraCloudDays.dayRows(context: context).isEmpty,
+                      "unconfirmed and empty is unknown, not zero — sending it would invent a quiet day")
+    }
+
+    func testADayWithNoRowAtAllIsNotUploaded() throws {
+        let context = try TestSupport.makeContext()
+        XCTAssertTrue(AgaraCloudDays.dayRows(context: context).isEmpty)
+    }
+
+    func testTheConfirmationStampReachesTheWireJson() {
+        let wire = WireDay(date: "2026-10-28", steps: 0, distanceKm: 0, calories: 0,
+                           syncedAt: 1_790_000_000_000)
+        XCTAssertTrue(WireBlockBuilder.json(wire).contains("\"synced_at\":1790000000000"), WireBlockBuilder.json(wire))
+    }
+
+    func testADayPulledFromTheCloudWithoutAStampStaysUnstamped() throws {
+        let payload = #"{"date":"2026-10-28","steps":10,"distance_km":0.01,"calories":3}"#
+        let wire = try JSONDecoder().decode(WireDay.self, from: Data(payload.utf8))
+        XCTAssertNil(wire.syncedAt, "absent means unknown; it must not read back as the epoch")
+    }
+
+    func testTheDayFingerprintChangesWhenOnlyTheConfirmationMoves() {
+        let before = WireDay(date: "2026-10-28", steps: 500, distanceKm: 0.4, calories: 20)
+        let after = WireDay(date: "2026-10-28", steps: 500, distanceKm: 0.4, calories: 20, syncedAt: 1_790_000_000_000)
+        XCTAssertNotEqual(AgaraCloudDays.fingerprint(before), AgaraCloudDays.fingerprint(after),
+                          "a day whose only change is its confirmation must still be re-sent")
+    }
+}

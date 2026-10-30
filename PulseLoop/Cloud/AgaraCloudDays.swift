@@ -73,13 +73,17 @@ enum AgaraCloudDays {
             let steps = day?.steps ?? 0
             let distanceKm = (day?.distanceMeters ?? 0) / 1000
             let calories = day?.calories ?? 0
-            if steps == 0, distanceKm == 0, calories == 0, sleep == nil { continue }   // nothing to say about this day
+            // A day with no activity is skipped **unless the ring confirmed it**: "confirmed, nothing happened" and
+            // "never synced" are different facts, and only the first may be read as a zero (BUG-213's cousin — a
+            // missing day counted as a quiet one). `synced_at` is what tells them apart downstream.
+            let stamp = day?.syncedAt.map { Int64($0.timeIntervalSince1970 * 1000) }
+            if steps == 0, distanceKm == 0, calories == 0, sleep == nil, stamp == nil { continue }
             rows.append(WireDay(
                 date: key, steps: steps, distanceKm: (distanceKm * 1000).rounded() / 1000, calories: (calories * 10).rounded() / 10,
                 sleepStart: sleep.map { WireCodec.rfc3339($0.startAt) }, sleepEnd: sleep.map { WireCodec.rfc3339($0.endAt) },
                 deep: sleep?.deep ?? 0, light: sleep?.light ?? 0, awake: sleep?.awake ?? 0, other: sleep?.other ?? 0,
                 sleepMinutes: sleep.map { max(0, Int($0.endAt.timeIntervalSince($0.startAt) / 60)) } ?? 0,
-                sleepScore: sleep?.quality ?? 0))
+                sleepScore: sleep?.quality ?? 0, syncedAt: stamp))
         }
         return rows
     }
@@ -130,5 +134,77 @@ enum AgaraCloudDays {
         }
         let sleepDays = Set(SleepRepository.allSessions(context: context).map { dayString($0.date, calendar: calendar) })
         return (steps, sleepDays)
+    }
+}
+
+// MARK: - Workout sessions
+
+@MainActor
+enum AgaraCloudSessions {
+    /// A session shorter than this is noise: a started-then-abandoned recording carries no workout.
+    nonisolated static let minimumMinutes: Double = 0.5
+
+    /// What may be uploaded: finished, not yet acknowledged, and long enough to mean something.
+    ///
+    /// A session still recording has no `endedAt` — uploading it would freeze a duration that keeps growing, so it
+    /// waits. `syncedAt` is the acknowledgement: set only after the server answered for it (`accepted` or
+    /// `duplicate`), so a request that failed mid-flight is retried rather than lost.
+    static func uploadable(_ session: ActivitySession) -> Bool {
+        guard session.syncedAt == nil, session.endedAt != nil else { return false }
+        return durationMinutes(session) >= minimumMinutes
+    }
+
+    /// Net recording time in minutes: wall time minus pauses, never negative (a clock that went backwards yields 0).
+    nonisolated static func durationMinutes(_ session: ActivitySession, now: Date = AppClock.now) -> Double {
+        let end = session.endedAt ?? now
+        let wall = end.timeIntervalSince(session.startedAt) - session.totalPauseSeconds
+        return max(0, wall) / 60
+    }
+
+    /// The sessions to send now, oldest first and capped by the server's per-request limit.
+    static func pending(context: ModelContext, limit: Int = 200) -> [ActivitySession] {
+        let descriptor = FetchDescriptor<ActivitySession>(sortBy: [SortDescriptor(\.startedAt, order: .forward)])
+        let all = (try? context.fetch(descriptor)) ?? []
+        var out: [ActivitySession] = []
+        for session in all where uploadable(session) {
+            out.append(session)
+            if out.count == limit { break }
+        }
+        return out
+    }
+
+    /// The wire object for one session, or nil when it is not uploadable.
+    nonisolated static func wire(_ session: ActivitySession, calendar: Calendar = .current) -> WireSession? {
+        guard session.endedAt != nil else { return nil }
+        let minutes = durationMinutes(session)
+        guard minutes >= minimumMinutes else { return nil }
+        return WireSession(
+            sessionKey: session.id.uuidString,
+            date: AgaraCloudDays.dayString(session.startedAt, calendar: calendar),
+            type: session.type,
+            startedAt: Int64(session.startedAt.timeIntervalSince1970 * 1000),
+            endedAt: session.endedAt.map { Int64($0.timeIntervalSince1970 * 1000) },
+            durationMin: minutes,
+            calories: session.calories,
+            distanceM: session.distanceMeters,
+            avgHr: session.avgHeartRate,
+            minHr: session.minHeartRate,
+            maxHr: session.maxHeartRate,
+            avgSpo2: session.avgSpO2,
+            deleted: false
+        )
+    }
+
+    /// The envelope objects for `sessions`, skipping any that do not map (they stay pending for a later pass).
+    nonisolated static func payload(_ sessions: [ActivitySession], calendar: Calendar = .current) -> [String] {
+        sessions.compactMap { wire($0, calendar: calendar) }.map { WireBlockBuilder.json($0) }
+    }
+
+    /// Mark sessions acknowledged, so the next sync does not replay them. `accepted` and `duplicate` both count:
+    /// the server holds them either way.
+    static func mark(synced sessions: [ActivitySession], at stamp: Date = AppClock.now, context: ModelContext) {
+        guard !sessions.isEmpty else { return }
+        for session in sessions { session.syncedAt = stamp }
+        try? context.save()
     }
 }

@@ -671,6 +671,9 @@ final class ActivitySession {
     // Recording-quality + Live Activity metadata. Defaulted so SwiftData lightweight
     // migration is additive on the existing (unversioned) store.
     var gpsPointCount: Int = 0
+    /// When the cloud acknowledged this session (cloud-v2 §2.1). nil = never sent. Both `accepted` and `duplicate`
+    /// count: the server holds it either way, so a replay is never queued twice.
+    var syncedAt: Date? = nil
     var rejectedGpsPointCount: Int = 0
     var hrPollCount: Int = 0
     var hrPollFailureCount: Int = 0
