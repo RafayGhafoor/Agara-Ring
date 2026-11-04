@@ -91,7 +91,7 @@ struct NotificationsSettingsView: View {
                         set: { prefs.set(topic, on: $0) }
                     ))
                     if topic == .weeklyReview, prefs.isOn(topic) {
-                        FormValueRow(title: "Week starts") {
+                        FormValueRow(title: "Weekly review arrives") {
                             Picker("Day", selection: Binding(get: { prefs.weeklyWeekday }, set: { prefs.weeklyWeekday = $0 })) {
                                 ForEach(1...7, id: \.self) { Text(NudgePreferencesStore.weekdayName($0)).tag($0) }
                             }
