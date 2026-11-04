@@ -393,4 +393,15 @@ final class Ev40TrackerTests: XCTestCase {
         XCTAssertEqual(Ev40Reminder.requestID(for: "2026-11-04"), "agara.ev40.2026-11-04")
         XCTAssertTrue(Ev40Reminder.requestID(for: "2026-11-04").hasPrefix(Ev40Reminder.requestPrefix))
     }
+
+    /// Regression guard for a crash this suite caught: `Ev40Reminder.refresh` used to fetch SwiftData inside its async
+    /// body, which trapped (`EXC_BREAKPOINT` in `SwiftData`, from `Ev40Repo.row`) when the call outlived the caller's
+    /// model context — three tests "crashed with signal trap" in one run. Today's completeness is now a parameter.
+    @MainActor
+    func testTogglingDoesNotCrashWhenTheRefreshOutlivesTheContext() async throws {
+        Ev40Repo.toggle(.hydrate, context: context, now: Self.now)
+        // Give the queued refresh time to run after this test's container is torn down; before the fix this trapped.
+        try await Task.sleep(nanoseconds: 250_000_000)
+        XCTAssertEqual(Ev40Reminder.requestPrefix, "agara.ev40.")
+    }
 }

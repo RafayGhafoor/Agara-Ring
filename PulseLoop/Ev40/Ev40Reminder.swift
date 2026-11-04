@@ -90,7 +90,12 @@ enum Ev40Reminder {
 
     /// Re-arm the whole window: remove every request of ours, then add one per remaining day — skipping today when the
     /// checklist is already complete (plan D6/D5: never nag about a finished day).
-    static func refresh(context: ModelContext? = nil, now: Date = AppClock.now, calendar: Calendar = .current) async {
+    ///
+    /// `todayComplete` is **passed in**, never looked up here: the first version fetched SwiftData inside the async call
+    /// and trapped (`EXC_BREAKPOINT` in `SwiftData` from `Ev40Repo.row`) when the call outlived the caller's model
+    /// context — `Ev40TrackerTests` caught it as a process crash, and a UI path that queues this after a tick has exactly
+    /// the same hazard. The caller owns the context and reads the mask while it is alive.
+    static func refresh(todayComplete: Bool, now: Date = AppClock.now, calendar: Calendar = .current) async {
         let settings = settings()
         let center = UNUserNotificationCenter.current()
         // Also drop requests left behind by a previous hour/minute choice or a time-zone change.
@@ -101,7 +106,7 @@ enum Ev40Reminder {
         guard await AgaraNotifications.shared.isAuthorizedToPost() else { return }
 
         let dayKey = AgaraCloudDays.dayString(now, calendar: calendar)
-        let complete = context.map { Ev40Disciplines.isComplete(Ev40Repo.todayMask(context: $0, now: now, calendar: calendar)) } ?? false
+        let complete = todayComplete
         let dates = nextFireDates(now: now, hour: settings.hour, minute: settings.minute, calendar: calendar)
         for fire in dates {
             let key = AgaraCloudDays.dayString(fire, calendar: calendar)

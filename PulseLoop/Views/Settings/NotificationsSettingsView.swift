@@ -46,7 +46,7 @@ struct NotificationsSettingsView: View {
             feed.refresh(context: modelContext)
             ev40Reminder = Ev40Reminder.settings()
             ev40Time = Self.date(hour: ev40Reminder.hour, minute: ev40Reminder.minute)
-            await Ev40Reminder.refresh(context: modelContext)
+            await Ev40Reminder.refresh(todayComplete: Ev40Disciplines.isComplete(Ev40Repo.todayMask(context: modelContext)))
         }
     }
 
@@ -274,7 +274,8 @@ struct NotificationsSettingsView: View {
         guard on else {
             ev40Reminder.enabled = false
             Ev40Reminder.save(ev40Reminder)
-            Task { await Ev40Reminder.refresh(context: modelContext) }
+            let complete = Ev40Disciplines.isComplete(Ev40Repo.todayMask(context: modelContext))
+            Task { await Ev40Reminder.refresh(todayComplete: complete) }
             return
         }
         Task {
@@ -283,7 +284,7 @@ struct NotificationsSettingsView: View {
             notifPermissionDenied = !granted
             ev40Reminder.enabled = granted
             Ev40Reminder.save(ev40Reminder)
-            await Ev40Reminder.refresh(context: modelContext)
+            await Ev40Reminder.refresh(todayComplete: Ev40Disciplines.isComplete(Ev40Repo.todayMask(context: modelContext)))
         }
     }
 
@@ -292,7 +293,8 @@ struct NotificationsSettingsView: View {
         ev40Reminder.hour = parts.hour ?? 20
         ev40Reminder.minute = parts.minute ?? 0
         Ev40Reminder.save(ev40Reminder)
-        Task { await Ev40Reminder.refresh(context: modelContext) }
+        let complete = Ev40Disciplines.isComplete(Ev40Repo.todayMask(context: modelContext))
+        Task { await Ev40Reminder.refresh(todayComplete: complete) }
     }
 
     private static func date(hour: Int, minute: Int) -> Date {

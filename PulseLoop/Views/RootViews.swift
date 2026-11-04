@@ -179,8 +179,10 @@ struct RootAppView: View {
                     liveWorkout.recover()
                     routeDeepLinkIfNeeded()
                     // The EV40 reminder is a two-week window of one-shot requests: re-arm it on every foreground so a
-                    // time-zone change or a fortnight away from the app cannot leave it stale (plan D5).
-                    Task { await Ev40Reminder.refresh(context: modelContext) }
+                    // time-zone change or a fortnight away from the app cannot leave it stale (plan D5). Today's mask is
+                    // read here — the async part must not touch the model context (see `Ev40Reminder.refresh`).
+                    let ev40Complete = Ev40Disciplines.isComplete(Ev40Repo.todayMask(context: modelContext))
+                    Task { await Ev40Reminder.refresh(todayComplete: ev40Complete) }
                 }
             }
             .onOpenURL { url in

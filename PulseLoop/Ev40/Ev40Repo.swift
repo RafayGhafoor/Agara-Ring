@@ -50,7 +50,9 @@ enum Ev40Repo {
         // screen already listens to, so a tick made from the tracker updates the card behind it.
         AgaraDataChange.shared.notify()
         // Completing the day removes today's reminder, and un-ticking it puts it back (plan D5/D6): re-arm the window.
-        Task { await Ev40Reminder.refresh(context: context) }
+        // The mask is passed in, so the async part never touches this (possibly short-lived) model context.
+        let complete = Ev40Disciplines.isComplete(day.mask)
+        Task { await Ev40Reminder.refresh(todayComplete: complete) }
         return day.mask
     }
 
