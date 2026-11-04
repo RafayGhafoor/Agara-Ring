@@ -210,6 +210,11 @@ struct SleepView: View {
             showsScore: SleepDay.heroShowsScore(isMain: isMain)
         )
         .accessibilityIdentifier(isMain ? "sleep.hero.main" : "sleep.hero.nap")
+        // E-P2: the score explains itself. Hung off the score column that only exists when `heroShowsScore` is true, so a
+        // nap page can never show a breakdown for a score it does not display.
+        if let score, SleepDay.heroShowsScore(isMain: isMain) {
+            SleepScoreBreakdownCard(score: score)
+        }
         VisualizationCard(eyebrow: "Stages", title: "Night timeline", legend: true) {
             SleepHypnogramView(blocks: s.blocks, totalMin: s.session.totalMinutes, startTs: s.session.startAt,
                                onScrubActiveChanged: { hypnogramScrubbing = $0 })
@@ -627,5 +632,87 @@ final class SleepTabCache {
         self.key = key
         data = fresh
         return fresh
+    }
+}
+
+/// "Why this score?" — the components the score was actually built from, with the points each earned, and an
+/// "estimated" note when the ring did not label the whole night (item E-P2).
+///
+/// Collapsed by default and hidden entirely when the scorer has no breakdown (the v1 scorer, i.e. `sleep_score_v2`
+/// off), because there is nothing honest to show then.
+private struct SleepScoreBreakdownCard: View {
+    let score: SleepScoreResult
+    @State private var open = false
+
+    var body: some View {
+        if !score.components.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                Button {
+                    withAnimation(.snappy) { open.toggle() }
+                } label: {
+                    HStack(spacing: 6) {
+                        Text(open ? "Hide the breakdown" : "Why this score?")
+                            .font(AgaraFont.caption.weight(.semibold))
+                            .foregroundStyle(AgaraColors.accent)
+                        Image(systemName: open ? "chevron.up" : "chevron.down")
+                            .font(AgaraFont.caption2.weight(.semibold))
+                            .foregroundStyle(AgaraColors.accent)
+                        Spacer(minLength: 0)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("sleep.score.breakdown")
+
+                if open {
+                    if score.estimated {
+                        Text("Estimated — the ring didn't label the whole night, so this is an average over what it did.")
+                            .font(AgaraFont.caption2)
+                            .foregroundStyle(AgaraColors.textMuted)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .accessibilityIdentifier("sleep.score.estimated")
+                    }
+                    ForEach(score.components) { c in
+                        HStack(spacing: 8) {
+                            Text(Self.title(c.id)).font(AgaraFont.caption).foregroundStyle(AgaraColors.textPrimary)
+                            Text(Self.value(c) + c.unit)
+                                .font(AgaraFont.caption2).monospacedDigit().foregroundStyle(AgaraColors.textMuted)
+                            Spacer(minLength: 0)
+                            // A fixed-size track: a GeometryReader inside a scrolling stack hung the app under the UI test
+                            // (watchdog kill, no crash report), and 5 pt of bar does not need to be screen-proportional.
+                            ZStack(alignment: .leading) {
+                                Capsule().fill(AgaraColors.borderSubtle).frame(width: 90, height: 5)
+                                Capsule().fill(AgaraColors.accent).frame(width: max(2, 90 * c.earned), height: 5)
+                            }
+                            Text("\(Int(c.points.rounded())) / \(Int(c.weight.rounded()))")
+                                .font(AgaraFont.caption2.weight(.semibold)).monospacedDigit()
+                                .foregroundStyle(AgaraColors.textSecondary)
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("sleep.score.component.\(c.id)")
+                    }
+                }
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(AgaraColors.card))
+            .transition(.opacity)
+        }
+    }
+
+    private static func title(_ id: String) -> String {
+        switch id {
+        case "duration": return "Duration"
+        case "deep": return "Deep sleep"
+        case "rem": return "REM sleep"
+        case "light": return "Light sleep"
+        case "awake": return "Awake time"
+        default: return id.capitalized
+        }
+    }
+
+    /// 7.9 h / 16 % — one decimal where it matters, never "16.0".
+    private static func value(_ c: SleepScoreComponent) -> String {
+        abs(c.value.rounded() - c.value) < 0.05 ? String(Int(c.value.rounded())) : String(format: "%.1f", c.value)
     }
 }

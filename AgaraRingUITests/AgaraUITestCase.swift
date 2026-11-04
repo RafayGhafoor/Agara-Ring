@@ -112,7 +112,22 @@ class AgaraUITestCase: XCTestCase {
             "-AppleLanguages", "(en)",
         ] + extra
         app.launch()
+        dismissSystemAlert()
         return app
+    }
+
+    /// Tap through a system alert that a fresh install raises (today: the notifications permission prompt), which
+    /// otherwise blocks **every** element query — the failure then looks like "ring chip missing" or a dead app.
+    /// Scoped to the prompts we expect; anything else is left alone so a real dialog still fails the test loudly.
+    func dismissSystemAlert(timeout: TimeInterval = 3) {
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        for label in ["Allow", "OK"] {
+            let button = springboard.buttons[label]
+            if button.waitForExistence(timeout: timeout) {
+                button.tap()
+                return
+            }
+        }
     }
 
     /// Launch with no ring transport at all (CoreBluetooth path — unauthorized/unsupported in the sim).
