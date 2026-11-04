@@ -261,13 +261,18 @@ struct SleepTileView: View {
     var body: some View {
         TodayTile(label: "Sleep", color: AgaraColors.sleep, onTap: onTap) {
             if let day = tile.day {
+                // The stage bar stays the main session's (the one deliberate deviation, as on Android), but the
+                // headline is **the day's total**: night + naps, the owner's 2026-10-22 option-A rule. It used to read
+                // `day.main.session.totalMinutes`, so a day with a 40-minute nap rendered 7h 52m here while Android
+                // rendered 8h 32m for the same day — a Rule 2 parity break, and the caption underneath already said
+                // "Night … · nap 40m" (i.e. everything around the number was already whole-day).
                 let sleep = day.main
                 let stages = SleepStageDistribution(sleep)
                 // The DAY's score: the night and the naps together (owner 2026-10-22, option A).
                 let score = day.score.score
                 VStack(alignment: .leading, spacing: 10) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(SleepFormat.duration(sleep.session.totalMinutes))
+                        Text(SleepFormat.duration(day.totalMinutes))
                             .font(AgaraFont.greeting)
                             .monospacedDigit()
                             .foregroundStyle(AgaraColors.textPrimary)

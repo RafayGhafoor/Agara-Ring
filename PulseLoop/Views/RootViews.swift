@@ -76,7 +76,11 @@ struct RootAppView: View {
                 // `-seedDemo` cannot be used for that: it also replaces the store with demo rows, which changes the
                 // numbers a synced-ring test asserts. Without one of the two, a fresh install sits on onboarding and
                 // every test waiting for `ringChip` fails upstream (that is the harness gap triaged on 2026-11-04).
-                if DebugLaunch.bool("skipOnboarding") {
+                // Only on the first launch of a run: a test that reconnects (terminate + launch) must keep the store it
+                // just filled, or the reconnect re-requests every day and `SleepDayAndSyncPlanTests`' "only day 0"
+                // assertion fails for the harness's own reason.
+                let existingProfiles = (try? modelContext.fetch(FetchDescriptor<UserProfile>())) ?? []
+                if DebugLaunch.bool("skipOnboarding"), existingProfiles.first?.onboardingCompleted != true {
                     SeedData.clearAll(modelContext)
                     let profile = UserProfile(name: StoreCapture.profile(""), onboardingCompleted: true,
                                               baselineCompleted: true)

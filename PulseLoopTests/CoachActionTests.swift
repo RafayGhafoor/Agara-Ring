@@ -369,6 +369,19 @@ final class SleepDayScoreTests: XCTestCase {
         XCTAssertEqual(SleepScore.calculate(day: SleepDay(main: main, naps: [nap])).score, SleepScore.score(inputs).score)
     }
 
+    /// The Today sleep tile's headline is **the day's total** (owner 2026-10-22, option A): it rendered the main
+    /// session alone until 2026-11-04, so a day with a 40-minute nap read 7h 52m on iOS and 8h 32m on Android for the
+    /// same night — the parity break the E2E caught. `TodayTiles` now formats `day.totalMinutes`.
+    func testTheDayTotalIsTheNightPlusItsNaps() {
+        let main = summary(start: night, deep: 100, light: 372)                       // 7 h 52 m
+        let nap = summary(start: night.addingTimeInterval(14 * 3600), deep: 5, light: 35)   // 40 m
+        let day = SleepDay(main: main, naps: [nap])
+        XCTAssertEqual(day.totalMinutes, 472 + 40)
+        XCTAssertEqual(SleepFormat.duration(day.totalMinutes), "8h 32m", "the tile headline, not the night alone")
+        XCTAssertEqual(SleepFormat.duration(main.session.totalMinutes), "7h 52m", "what it used to render")
+        XCTAssertEqual(day.breakdownCaption, "Night 7h 52m · nap 40m", "the caption already described the whole day")
+    }
+
     func testTheBreakdownSaysTheNapsArePartOfTheTotal() {
         XCTAssertEqual(SleepDayRule.breakdownCaption(mainMinutes: 405, napCount: 2, napMinutes: 97), "Night 6h 45m · 2 naps 1h 37m")
         XCTAssertEqual(SleepDayRule.breakdownCaption(mainMinutes: 420, napCount: 1, napMinutes: 40), "Night 7h 0m · nap 40m")
