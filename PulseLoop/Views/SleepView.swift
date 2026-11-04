@@ -144,12 +144,15 @@ struct SleepView: View {
             let dayFallback = SleepInsights.dayCoach(primary, score: primaryScore.score, awakePct: primaryScore.awakePct, deepPct: primaryScore.deepPct, activitySteps: activitySteps)
 
             if sessions.count == 1 {
-                // Single session: render exactly as before, no carousel chrome.
-                sessionPage(sessions[0])
+                // Single session: render exactly as before, no carousel chrome. It is the day's main sleep by
+                // definition, so it keeps its score.
+                sessionPage(sessions[0], isMain: true)
             } else {
                 // Several sessions: the whole day first (the number the Today tile shows), then each session's page.
+                // A nap's page carries no score of its own (owner 2026-11-04, option (a)) — the day's score above it
+                // still includes the nap.
                 if let wholeDay { dayTotalRow(wholeDay) }
-                sleepCarousel(sessions: sessions)
+                sleepCarousel(sessions: sessions, wholeDay: wholeDay)
             }
             // The LLM day summary describes last night only; on a past day fall back to the
             // scripted coach (deterministically computed from that day's own primary session).
@@ -194,15 +197,19 @@ struct SleepView: View {
 
     /// One session's stack: Hero + hypnogram VisualizationCard + stage cards.
     @ViewBuilder
-    private func sessionPage(_ s: SleepSummary) -> some View {
-        let score = SleepScore.calculate(s)
+    private func sessionPage(_ s: SleepSummary, isMain: Bool) -> some View {
+        // A nap is not a night: no score, no rating, and the eyebrow says what the page is. `nil` score would still
+        // draw a dash ("unavailable"), so the nap page hides the whole score column instead.
+        let score = SleepDay.heroShowsScore(isMain: isMain) ? SleepScore.calculate(s) : nil
         SleepHeroCardView(
-            label: SleepInsights.rangeHeroLabel[.day] ?? "Last Sleep",
+            label: SleepDay.heroLabel(isMain: isMain),
             value: SleepFormat.duration(s.session.totalMinutes),
             support: "\(SleepFormat.clockTime(s.session.startAt)) to \(SleepFormat.clockTime(s.session.endAt))",
-            score: score.score,
-            scoreLabel: score.label.rawValue
+            score: score?.score,
+            scoreLabel: score?.label.rawValue,
+            showsScore: SleepDay.heroShowsScore(isMain: isMain)
         )
+        .accessibilityIdentifier(isMain ? "sleep.hero.main" : "sleep.hero.nap")
         VisualizationCard(eyebrow: "Stages", title: "Night timeline", legend: true) {
             SleepHypnogramView(blocks: s.blocks, totalMin: s.session.totalMinutes, startTs: s.session.startAt,
                                onScrubActiveChanged: { hypnogramScrubbing = $0 })
@@ -245,7 +252,7 @@ struct SleepView: View {
     /// Horizontal paged carousel across multiple sleep sessions in one day.
     /// Sizes to the tallest visible page (no fixed height) and shows a dot row.
     @ViewBuilder
-    private func sleepCarousel(sessions: [SleepSummary]) -> some View {
+    private func sleepCarousel(sessions: [SleepSummary], wholeDay: SleepDay?) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
             LazyHStack(spacing: 0) {
                 ForEach(Array(sessions.enumerated()), id: \.element.session.id) { idx, s in
@@ -256,7 +263,7 @@ struct SleepView: View {
                             .textCase(.uppercase)
                             .kerning(0.5)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                        sessionPage(s)
+                        sessionPage(s, isMain: wholeDay?.isMain(s) ?? true)
                     }
                     .containerRelativeFrame(.horizontal)
                     .id(idx)

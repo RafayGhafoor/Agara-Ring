@@ -370,6 +370,9 @@ struct SleepHeroCardView: View {
     var score: Int?
     var scoreLabel: String?
     var noData: Bool = false
+    /// False = draw no score column at all (a nap's page). Distinct from a `nil` score, which renders a dash for
+    /// "no data yet" — a nap has no score *by definition* (owner 2026-11-04, option (a)).
+    var showsScore: Bool = true
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -391,18 +394,22 @@ struct SleepHeroCardView: View {
                 }
             }
             Spacer(minLength: 8)
-            VStack(alignment: .trailing, spacing: 4) {
-                HStack(alignment: .center, spacing: 2) {
-                    HelpTip(AgaraHelp.sleepScore)
-                    Text(score.map { "\($0)" } ?? "—")
-                        .font(AgaraFont.largeTitle)
-                        .monospacedDigit()
-                        .foregroundStyle(AgaraColors.sleep)
-                }
-                if let scoreLabel, score != nil {
-                    Text(scoreLabel)
-                        .font(AgaraFont.subheadline)
-                        .foregroundStyle(AgaraColors.textPrimary)
+            // A nap's page draws no score column at all (owner 2026-11-04, option (a)); `nil` with the column shown
+            // means "no data yet" and stays a dash — the two are deliberately different statements.
+            if showsScore {
+                VStack(alignment: .trailing, spacing: 4) {
+                    HStack(alignment: .center, spacing: 2) {
+                        HelpTip(AgaraHelp.sleepScore)
+                        Text(score.map { "\($0)" } ?? "—")
+                            .font(AgaraFont.largeTitle)
+                            .monospacedDigit()
+                            .foregroundStyle(AgaraColors.sleep)
+                    }
+                    if let scoreLabel, score != nil {
+                        Text(scoreLabel)
+                            .font(AgaraFont.subheadline)
+                            .foregroundStyle(AgaraColors.textPrimary)
+                    }
                 }
             }
         }

@@ -252,6 +252,18 @@ struct SleepDay {
     }
     /// The day's sleep score: the night and the naps scored together (`SleepScore.calculate(day:)`).
     var score: SleepScoreResult { SleepScore.calculate(day: self) }
+
+    /// Whether `session` is the day's **main sleep** (the long one) rather than one of its naps. `main` is positional —
+    /// the longest session of the waking day (`SleepDayRule.split`) — never a duration threshold, so a short night with
+    /// no nap is still the main sleep.
+    func isMain(_ session: SleepSummary) -> Bool { session.session.id == main.session.id }
+
+    /// What a session's own hero says, and whether it carries a score (owner 2026-11-04, option (a)). A nap page shows
+    /// its duration, range and stages and **no score or rating**: the score's bands and gates describe a night, so a
+    /// 30-minute nap would read "Needs work" under them however restful it was. The day's score above the carousel
+    /// still includes the nap. Pure, so the rule is unit-tested without a device.
+    static func heroLabel(isMain: Bool) -> String { isMain ? "Last Sleep" : "Nap" }
+    static func heroShowsScore(isMain: Bool) -> Bool { isMain }
 }
 
 struct SleepRangeSummary {
