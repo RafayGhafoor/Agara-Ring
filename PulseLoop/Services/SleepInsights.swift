@@ -93,7 +93,7 @@ enum SleepScore {
     /// The model's tunables — weights, the label-coverage threshold and the duration gates/floor. Defaults come
     /// from the shared catalog (`docs/config/shared.yaml` → `AgaraConfig.Sleep`, Rule 5) so both apps agree and a
     /// tuning change is one edit; a cloud `app_config` record may override it (plan asana-heart-bugs-2026-11-01, F).
-    struct Model {
+    struct Model: Equatable {
         var durationWeight = AgaraConfig.Sleep.durationWeight
         var deepWeight = AgaraConfig.Sleep.deepWeight
         var remWeight = AgaraConfig.Sleep.remWeight
@@ -129,7 +129,7 @@ enum SleepScore {
     static var v2Enabled: Bool { AgaraFeatureStore.isOn(.sleepScoreV2) }
 
     /// The score the app shows: v1 while the flag is off, v2 once it is on. Tests pin `v2`.
-    static func score(_ input: Inputs, model: Model = Model(), v2: Bool? = nil) -> SleepScoreResult {
+    static func score(_ input: Inputs, model: Model = SleepScoreConfig.active(), v2: Bool? = nil) -> SleepScoreResult {
         (v2 ?? v2Enabled) ? scoreV2(input, model: model) : scoreV1(input)
     }
 
@@ -155,7 +155,7 @@ enum SleepScore {
     }
 
     /// v2 — REM its own band, only the components the ring reported are scored, duration gates + floor.
-    static func scoreV2(_ input: Inputs, model: Model = Model()) -> SleepScoreResult {
+    static func scoreV2(_ input: Inputs, model: Model = SleepScoreConfig.active()) -> SleepScoreResult {
         let total = max(0, input.asleep)
         let span = input.span
         let totalHours = total / 60
@@ -196,14 +196,14 @@ enum SleepScore {
                                 remPct: Int(remPct.rounded()), estimated: estimated)
     }
 
-    static func calculate(_ sleep: SleepSummary, model: Model = Model(), v2: Bool? = nil) -> SleepScoreResult {
+    static func calculate(_ sleep: SleepSummary, model: Model = SleepScoreConfig.active(), v2: Bool? = nil) -> SleepScoreResult {
         score(inputs(sleep), model: model, v2: v2)
     }
 
     /// The day's score (owner 2026-10-22, option A — "a combined score, like Samsung Health"): every session of the
     /// waking day — the main sleep AND the naps — scored together. Naps add to the duration band and count toward the
     /// stage and awake shares like any other minute of sleep. One session → exactly `calculate(main)`.
-    static func calculate(day: SleepDay, model: Model = Model(), v2: Bool? = nil) -> SleepScoreResult {
+    static func calculate(day: SleepDay, model: Model = SleepScoreConfig.active(), v2: Bool? = nil) -> SleepScoreResult {
         score(([day.main] + day.naps).map(inputs).reduce(Inputs(), +), model: model, v2: v2)
     }
 
