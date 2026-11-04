@@ -75,6 +75,12 @@ struct RootAppView: View {
                     SeedData.clearAll(modelContext)
                     SeedData.seedDemo(modelContext, completeOnboarding: true)
                 }
+                // Test tooling: `-ev40Reset YES` clears the EV40 Daily Tracker's log, so the UI test always starts on a
+                // fresh local day (the E2E script also reinstalls, but `E2E_KEEP_APP_STATE=1` keeps the store).
+                if DebugLaunch.bool("ev40Reset") {
+                    for row in (try? modelContext.fetch(FetchDescriptor<Ev40Day>())) ?? [] { modelContext.delete(row) }
+                    try? modelContext.save()
+                }
                 // Test tooling: `-demoEstimatedCalories YES` reshapes the seeded recent days into
                 // what a phone-away ring-history sync produces (source `ring_history`, no device
                 // calories) so the on-device estimated-total path is visible in the UI.
