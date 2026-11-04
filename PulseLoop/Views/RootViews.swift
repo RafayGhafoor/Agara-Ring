@@ -107,6 +107,11 @@ struct RootAppView: View {
                     for row in (try? modelContext.fetch(FetchDescriptor<Ev40Day>())) ?? [] { modelContext.delete(row) }
                     try? modelContext.save()
                 }
+                // Test tooling: `-openEV40 YES` pushes the EV40 Daily Tracker straight away, so a capture (or a UI test that
+                // only cares about that screen) does not have to tap the Today card first.
+                if DebugLaunch.bool("openEV40") {
+                    path.append(AppRoute.ev40)
+                }
                 // Test tooling: `-demoEstimatedCalories YES` reshapes the seeded recent days into
                 // what a phone-away ring-history sync produces (source `ring_history`, no device
                 // calories) so the on-device estimated-total path is visible in the UI.
