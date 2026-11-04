@@ -71,6 +71,28 @@ struct RootAppView: View {
                     SampleDataStore.shared.markExploring()
                     SampleDataStore.shared.activateIfExploring(context: modelContext)
                 }
+                // Test tooling: `-skipOnboarding YES` starts at Today with a minimal completed profile and **no** demo
+                // data, so a ring-only E2E class does not have to drive the six-step onboarding on a clean install.
+                // `-seedDemo` cannot be used for that: it also replaces the store with demo rows, which changes the
+                // numbers a synced-ring test asserts. Without one of the two, a fresh install sits on onboarding and
+                // every test waiting for `ringChip` fails upstream (that is the harness gap triaged on 2026-11-04).
+                if DebugLaunch.bool("skipOnboarding") {
+                    SeedData.clearAll(modelContext)
+                    let profile = UserProfile(name: StoreCapture.profile(""), onboardingCompleted: true,
+                                              baselineCompleted: true)
+                    modelContext.insert(profile)
+                    // The chip renders from a paired Device, not from the transport: without this row the header has no
+                    // `ringChip` and every ring assertion fails even though the virtual ring is reachable. Same values
+                    // as `SeedData.seedDemo`'s device (the TK20 capability set) minus all the demo activity.
+                    modelContext.insert(Device(
+                        advertisedName: "SMART_RING",
+                        bleAddressHint: "41:42:2e:c7:5b:6a",
+                        batteryPercent: 82,
+                        state: .connected,
+                        capabilities: MetricsService.tk20Capabilities
+                    ))
+                    try? modelContext.save()
+                }
                 if DebugLaunch.bool("seedDemo") {
                     SeedData.clearAll(modelContext)
                     SeedData.seedDemo(modelContext, completeOnboarding: true)

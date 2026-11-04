@@ -104,6 +104,9 @@ class AgaraUITestCase: XCTestCase {
             "-historyDays", "8",
             "-historyWindowDays", "90",
             "-noCoachMarks", coachMarks ? "NO" : "YES",
+            // Start at Today: a clean install otherwise sits on onboarding and every ring assertion fails upstream.
+            // Minimal profile, no demo rows — the ring's own data is what these tests assert.
+            "-skipOnboarding", "YES",
             "-acceptDisclaimer", "YES",   // the one-time wellness disclaimer (debug launch argument)
             // Keep every run on the same, shipped look regardless of what an earlier test chose.
             "-AppleLanguages", "(en)",
