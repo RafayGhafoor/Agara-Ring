@@ -19,6 +19,17 @@ final class Sleeper: @unchecked Sendable {
 /// The account, consent, retry ladder and delete flows of `AgaraCloud` (release 1.1, tasks 2-4) against the fake backend.
 @MainActor
 final class AgaraCloudCenterTests: XCTestCase {
+
+    /// This suite must not depend on ambient defaults. `SampleDataStore` persists in `UserDefaults.standard`, so a class
+    /// that seeds the sample set (`StoreLaunchPhase1Tests`, `StoreCaptureHooksTests`) leaves
+    /// `agara.sampleDataActive = true` **in the simulator**, and the next run's cloud gate then refuses every sync with
+    /// `Failure.sampleData` — which is how 15 of these tests failed on 2026-11-04 while passing in isolation. The gate
+    /// reads `SampleDataStore.isActiveNow` (a live defaults read), so clearing the keys here is enough.
+    override func setUp() {
+        super.setUp()
+        UserDefaults.standard.removeObject(forKey: SampleDataStore.activeKey)
+        UserDefaults.standard.removeObject(forKey: SampleDataStore.exploringKey)
+    }
     private var backend: FakeCloudBackend!
     private var sleeper: Sleeper!
     private var clock: TestClock!

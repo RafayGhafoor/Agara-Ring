@@ -169,13 +169,30 @@ final class CoachInsightToolsTests: XCTestCase {
 
     func testWeekReviewIsOneCallForEveryMetric() async throws {
         let c = try TestSupport.makeContext()
-        for i in 1...7 { TestSupport.insertActivity(date: TestSupport.day(-i), steps: 9000, into: c) }
-        for i in 8...14 { TestSupport.insertActivity(date: TestSupport.day(-i), steps: 8000, into: c) }
+        // D14 (owner 2026-11-01, option (a)): the review covers the **last complete calendar week**, not the last
+        // seven days — so the fixture is seeded from the window the tool itself computes. Seeding `day(-1)…day(-7)`
+        // instead made the expectations depend on which weekday the suite ran on (they were 9000/8000 on a Monday and
+        // 8714/9000 later in the week): a test must not encode "today is a Monday".
+        // D14 (owner 2026-11-01, option (a)): the review covers the **last complete calendar week**, not the last
+        // seven days — so the fixture is seeded from the same boundary the tool uses. Seeding `day(-1)…day(-7)`
+        // instead made the expectations depend on which weekday the suite ran on (they were 9000/8000 on a Monday
+        // and 8714/9000 later in the week): a test must not encode "today is a Monday".
+        let cal = Calendar.current
+        let thisWeekStart = cal.date(byAdding: .day, value: -7, to: WeekStart.startOfWeek(AppClock.now)) ?? AppClock.now
+        let lastWeekStart = cal.date(byAdding: .day, value: -14, to: WeekStart.startOfWeek(AppClock.now)) ?? AppClock.now
+        for offset in 0..<7 {
+            TestSupport.insertActivity(date: cal.date(byAdding: .day, value: offset, to: thisWeekStart) ?? thisWeekStart,
+                                       steps: 9000, into: c)
+            TestSupport.insertActivity(date: cal.date(byAdding: .day, value: offset, to: lastWeekStart) ?? lastWeekStart,
+                                       steps: 8000, into: c)
+        }
         let out = try await run("get_week_review", "{}", c)
         let steps = try XCTUnwrap((out["metrics"] as? [[String: Any]])?.first { $0["metric"] as? String == "steps" })
         XCTAssertEqual(steps["this_week"] as? Double, 9000)
         XCTAssertEqual(steps["last_week"] as? Double, 8000)
         XCTAssertEqual(steps["change_pct"] as? Double, 13, "percent changes are whole (owner decision C, 2026-10-23)")
+        XCTAssertEqual(steps["days_this_week"] as? Int, 7, "the whole completed week is covered")
+        XCTAssertEqual(steps["days_last_week"] as? Int, 7, "and the whole week before it")
         XCTAssertEqual((out["metrics"] as? [[String: Any]])?.count, InsightTools.weekMetrics.count)
     }
 
