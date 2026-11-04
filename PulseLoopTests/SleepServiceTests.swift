@@ -237,7 +237,11 @@ final class SleepServiceTests: XCTestCase {
             // The migration is UserDefaults-gated; clear the flag so it runs in this test.
             UserDefaults.standard.removeObject(forKey: "sleepMidnightMerge.v1")
             let cal = Calendar.current
-            let today = cal.startOfDay(for: Date())
+            // Derive the dates from the *same* clock the reads use (`AppClock.now`, pinned above). With the real
+            // `Date()` here the sessions landed five days in the future relative to the pinned clock and
+            // `latestSleep` keyed on the 2026-10-29/30 reference night, so the last assertion read nil
+            // (2026-11-04: `("nil") is not equal to ("Optional(465)")`) — a harness time bomb, not a product bug.
+            let today = cal.startOfDay(for: AppClock.now)
             let yesterday = cal.date(byAdding: .day, value: -1, to: today)!
 
             // Create duplicate sessions like the ones in the bug:

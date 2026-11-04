@@ -484,7 +484,7 @@ final class AbOtaInstallerTests: XCTestCase {
 @MainActor
 final class FirmwareInstallGatesTests: XCTestCase {
     private let go = FirmwareInstallInputs(
-        flagOn: true, debugBuild: true, fileVerified: true, connected: true, otaType: 3, otaServicePresent: true,
+        flagOn: true, fileVerified: true, connected: true, otaType: 3, otaServicePresent: true,
         batteryPercent: 40, minBatteryPercent: 40, syncing: false, measuring: false
     )
 
@@ -499,8 +499,9 @@ final class FirmwareInstallGatesTests: XCTestCase {
             return i
         }
         let cases: [(FirmwareInstallInputs, FirmwareInstallGate)] = [
+            // No build gate: since 1.1 the install ships to every build (the flag flip removed `debugBuild` from
+            // the inputs), so every remaining field is a live ring/app-state gate. Policy: plan firmware-update "1.1".
             (with { $0.flagOn = false }, .flagOff),
-            (with { $0.debugBuild = false }, .flagOff),
             (with { $0.fileVerified = false }, .noVerifiedFile),
             (with { $0.otaType = 5 }, .unsupportedRing),
             (with { $0.otaType = nil }, .unsupportedRing),
@@ -527,7 +528,7 @@ final class FirmwareInstallGatesTests: XCTestCase {
         i.batteryPercent = 49
         i.minBatteryPercent = 50
         XCTAssertEqual(FirmwareInstallGates.evaluate(i), [.lowBattery])
-        XCTAssertEqual(FirmwareInstallController(debugBuild: true).minBattery, AgaraConfig.Ring.firmwareMinBatteryPercent)
+        XCTAssertEqual(FirmwareInstallController().minBattery, AgaraConfig.Ring.firmwareMinBatteryPercent)
     }
 
     /// Package 3 exactly as our ring sends it (emulator frames.py / research 05 §2): byte 16 = 03.
@@ -603,8 +604,7 @@ final class FirmwareInstallGatesTests: XCTestCase {
             checker: FirmwareUpdateChecker(defaults: UserDefaults(suiteName: "FirmwareInstallGatesTests")!,
                                            storageDirectory: FileManager.default.temporaryDirectory
                                                .appendingPathComponent("fw-gates-\(UUID().uuidString)"),
-                                           isOn: { _ in true }),
-            debugBuild: true
+                                           isOn: { _ in true })
         )
         XCTAssertFalse(controller.start())
         XCTAssertEqual(controller.state.failure, .blocked)

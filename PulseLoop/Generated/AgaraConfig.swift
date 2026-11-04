@@ -215,11 +215,11 @@ enum AgaraFeature: String, CaseIterable {
     case autoMeasureSettings = "auto_measure_settings"
     /// Send height, weight, age, sex and step/sleep goals to the ring (a3).
     case profileSync = "profile_sync"
-    /// Check the vendor's version endpoint for newer ring firmware and show it on the Wearable Firmware row. No ring writes.
+    /// Check the vendor's version endpoint for newer ring firmware and show it on the Wearable Firmware row. No ring writes. ON for users since 1.1 (owner decision 2026-10-30; was off through 1.0).
     case firmwareCheck = "firmware_check"
-    /// Download the newer firmware file and verify its MD5 and size ("Ready to install"). No ring writes. Requires firmware_check.
+    /// Download the newer firmware file and verify its MD5 and size ("Ready to install"). No ring writes. Requires firmware_check. ON for users since 1.1.
     case firmwareDownload = "firmware_download"
-    /// Flash firmware to the ring (Bluetrum AB-OTA on F003). Built on Android (2026-09-25; emulator suite + one real ring 00.12.07→00.12.09); iOS pending. Debug-only override.
+    /// Flash firmware to the ring (Bluetrum AB-OTA on F003) — gates: verified file, OTA type 3, F003 present, battery ≥ 40 %, no sync, no measurement. ON for users since 1.1 (owner decision 2026-10-30); the debug-build restriction was removed in the same change. Android proven on hardware 00.12.07→00.12.09 (2026-09-25), emulator clean/drops/CRC on both.
     case firmwareInstall = "firmware_install"
     /// Demo-data rows in Settings (seed/clear demo data). Off in release; debug builds can turn it on via the override (2026-09-26).
     case demoData = "demo_data"
@@ -280,9 +280,9 @@ enum AgaraFeature: String, CaseIterable {
         case .vitalsGlucose: return false
         case .autoMeasureSettings: return true
         case .profileSync: return false
-        case .firmwareCheck: return false
-        case .firmwareDownload: return false
-        case .firmwareInstall: return false
+        case .firmwareCheck: return true
+        case .firmwareDownload: return true
+        case .firmwareInstall: return true
         case .demoData: return false
         case .coach: return true
         case .coachCloud: return true

@@ -2,7 +2,8 @@ import Foundation
 import Observation
 
 // Ring firmware update, stage 4 (docs/process/plans/firmware-update.md): install the verified download on the
-// connected Agara ring over AB-OTA (`AbOta` / `AbOtaInstaller`). Debug builds only, behind `firmware_install`.
+// connected Agara ring over AB-OTA (`AbOta` / `AbOtaInstaller`). Behind `firmware_install`, which ships on for
+// every build since 1.1 (the debug-build restriction was removed with the flag flip).
 // Same gates, hold, flow and copy as Android `FirmwareInstallGates` / `FirmwareInstallController`.
 
 /// Everything that must hold before the first block goes to the ring (plan "Gates"). Pure, so each gate is
@@ -13,7 +14,6 @@ import Observation
 /// Agara ring reports 3, the only type this installer speaks.
 struct FirmwareInstallInputs: Equatable {
     var flagOn: Bool
-    var debugBuild: Bool
     var fileVerified: Bool
     var connected: Bool
     var otaType: Int?
@@ -50,7 +50,7 @@ enum FirmwareInstallGates {
     /// Every gate that fails, in the order the screen should explain them; empty means go.
     static func evaluate(_ i: FirmwareInstallInputs) -> [FirmwareInstallGate] {
         var gates: [FirmwareInstallGate] = []
-        if !i.flagOn || !i.debugBuild { gates.append(.flagOff) }
+        if !i.flagOn { gates.append(.flagOff) }
         if !i.fileVerified { gates.append(.noVerifiedFile) }
         guard i.connected else {
             gates.append(.notConnected)
@@ -145,18 +145,12 @@ final class FirmwareInstallController {
     @ObservationIgnored private weak var client: RingBLEClient?
     @ObservationIgnored private weak var coordinator: RingSyncCoordinator?
     @ObservationIgnored private let checker: FirmwareUpdateChecker
-    @ObservationIgnored private let debugBuild: Bool
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private var installer: AbOtaInstaller?
     @ObservationIgnored private var autoInstallTask: Task<Void, Never>?
 
-    init(checker: FirmwareUpdateChecker? = nil, debugBuild: Bool? = nil) {
+    init(checker: FirmwareUpdateChecker? = nil) {
         self.checker = checker ?? .shared
-        #if DEBUG
-        self.debugBuild = debugBuild ?? true
-        #else
-        self.debugBuild = debugBuild ?? false
-        #endif
     }
 
     /// Wire the live ring client and coordinator (once, at launch).
@@ -167,15 +161,14 @@ final class FirmwareInstallController {
 
     var minBattery: Int { AgaraConfig.Ring.firmwareMinBatteryPercent }
 
-    /// The flag as the UI sees it: on, and a debug build.
-    var enabled: Bool { debugBuild && AgaraFeatureStore.isOn(.firmwareInstall) }
+    /// The flag as the UI sees it.
+    var enabled: Bool { AgaraFeatureStore.isOn(.firmwareInstall) }
 
     /// The gates right now, from live app state. `fileVerified` nil → "a download is Ready".
     func inputs(fileVerified: Bool? = nil) -> FirmwareInstallInputs {
         let ready: Bool = { if case .ready = checker.status { return true }; return false }()
         return FirmwareInstallInputs(
             flagOn: AgaraFeatureStore.isOn(.firmwareInstall),
-            debugBuild: debugBuild,
             fileVerified: fileVerified ?? ready,
             connected: client?.state == .connected,
             otaType: client?.ringCapabilities?.otaType,
