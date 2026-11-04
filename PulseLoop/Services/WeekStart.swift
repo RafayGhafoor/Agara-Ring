@@ -22,6 +22,24 @@ enum WeekStart {
         (1...7).contains(stored) ? stored : localeDay(calendar)
     }
 
+    /// The **last complete calendar week** and the week before it, as the `yyyy-MM-dd` strings the coach tools use
+    /// (owner decision D14, option (a), 2026-11-01: Fitbit/Google Health's model — the week in progress is excluded
+    /// because it is incomplete). Delivered on the week-start day, so "this week" is the one that just ended.
+    struct Window {
+        let thisStart: String, thisEnd: String, lastStart: String, lastEnd: String
+    }
+
+    static func weekReviewWindow(today: Date, day: Int = day(), calendar: Calendar = .current) -> Window {
+        let currentWeekStart = startOfWeek(today, day: day, calendar: calendar)
+        func shift(_ base: Date, _ days: Int) -> String {
+            CoachDataAccess.localDateString(calendar.date(byAdding: .day, value: days, to: base) ?? base)
+        }
+        let thisStart = calendar.date(byAdding: .day, value: -7, to: currentWeekStart) ?? currentWeekStart
+        let lastStart = calendar.date(byAdding: .day, value: -14, to: currentWeekStart) ?? currentWeekStart
+        return Window(thisStart: shift(thisStart, 0), thisEnd: shift(thisStart, 6),
+                      lastStart: shift(lastStart, 0), lastEnd: shift(lastStart, 6))
+    }
+
     /// The first day of the week that contains `date` — idempotent, so a date that already IS the start returns
     /// itself and a second pass never walks back another week.
     static func startOfWeek(_ date: Date, day: Int = day(), calendar: Calendar = .current) -> Date {

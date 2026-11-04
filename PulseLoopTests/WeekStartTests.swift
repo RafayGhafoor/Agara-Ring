@@ -46,4 +46,55 @@ final class WeekStartTests: XCTestCase {
         XCTAssertEqual(cal.date(from: DateComponents(year: 2026, month: 10, day: 26)),
                        WeekStart.startOfWeek(sunday, day: 2, calendar: cal))
     }
+
+    // MARK: - The weekly review window (D14 option (a): the last COMPLETE calendar week)
+
+    private func date(_ y: Int, _ m: Int, _ d: Int, _ cal: Calendar) -> Date {
+        cal.date(from: DateComponents(year: y, month: m, day: d))!
+    }
+
+    func testTheReviewCoversTheLastCompleteCalendarWeek() {
+        let cal = calendar("en_GB")   // Monday start
+        // Wednesday 2026-11-04 → the week just ended is Mon 10-26 … Sun 11-01. A rolling 7 days would have said
+        // 10-28…11-03, i.e. part of the CURRENT week — which is why "week starts" meant nothing before.
+        let w = WeekStart.weekReviewWindow(today: date(2026, 11, 4, cal), day: 2, calendar: cal)
+        XCTAssertEqual(w.thisStart, "2026-10-26")
+        XCTAssertEqual(w.thisEnd, "2026-11-01")
+        XCTAssertEqual(w.lastStart, "2026-10-19")
+        XCTAssertEqual(w.lastEnd, "2026-10-25")
+    }
+
+    func testTheReviewWindowIsStableThroughTheCurrentWeek() {
+        let cal = calendar("en_GB")
+        let monday = WeekStart.weekReviewWindow(today: date(2026, 11, 2, cal), day: 2, calendar: cal)
+        let sunday = WeekStart.weekReviewWindow(today: date(2026, 11, 8, cal), day: 2, calendar: cal)
+        XCTAssertEqual(monday.thisStart, sunday.thisStart)
+        XCTAssertEqual(monday.thisEnd, sunday.thisEnd)
+        XCTAssertEqual(monday.lastStart, sunday.lastStart)
+        XCTAssertEqual(monday.lastEnd, sunday.lastEnd)
+    }
+
+    func testASundayStartUserGetsTheirOwnWeek() {
+        let cal = calendar("en_US")   // Sunday start
+        // Sunday 2026-11-01 IS the week-start day, so the completed week is the one before it: 10-25 … 10-31.
+        let w = WeekStart.weekReviewWindow(today: date(2026, 11, 1, cal), day: 1, calendar: cal)
+        XCTAssertEqual(w.thisStart, "2026-10-25")
+        XCTAssertEqual(w.thisEnd, "2026-10-31")
+    }
+
+    func testTheTwoWindowsAreAdjacentSevenDayBlocks() {
+        let cal = calendar("en_GB")
+        let w = WeekStart.weekReviewWindow(today: date(2026, 11, 4, cal), day: 2, calendar: cal)
+        let f = DateFormatter()
+        f.calendar = cal
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        let thisStart = f.date(from: w.thisStart)!
+        let thisEnd = f.date(from: w.thisEnd)!
+        let lastStart = f.date(from: w.lastStart)!
+        let lastEnd = f.date(from: w.lastEnd)!
+        XCTAssertEqual(cal.dateComponents([.day], from: thisStart, to: thisEnd).day, 6)
+        XCTAssertEqual(cal.dateComponents([.day], from: lastStart, to: lastEnd).day, 6)
+        XCTAssertEqual(cal.dateComponents([.day], from: lastEnd, to: thisStart).day, 1)
+    }
 }

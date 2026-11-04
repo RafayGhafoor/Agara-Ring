@@ -133,7 +133,11 @@ enum InsightTools {
     struct NoArgsInsight: Decodable {}
 
     static func weekReviewObject(_ ctx: ModelContext) -> [String: Any] {
-        let thisStart = day(-7), thisEnd = day(-1), lastStart = day(-14), lastEnd = day(-8)
+        // The last COMPLETE calendar week against the one before it (D14, option (a)); the week in progress is
+        // excluded because it is incomplete — this used to be a rolling 7 days, which made "week start" meaningless.
+        let window = WeekStart.weekReviewWindow(today: today)
+        let thisStart = window.thisStart, thisEnd = window.thisEnd
+        let lastStart = window.lastStart, lastEnd = window.lastEnd
         let rows: [[String: Any]] = weekMetrics.map { m in
             let a = values(m, thisStart, thisEnd, ctx), b = values(m, lastStart, lastEnd, ctx)
             let am = mean(a), bm = mean(b)
@@ -146,7 +150,7 @@ enum InsightTools {
         }
         return ["this_week": ["start": thisStart, "end": thisEnd], "last_week": ["start": lastStart, "end": lastEnd],
                 "metrics": rows,
-                "note": "Bedtime change is in minutes (positive = later). Today is excluded (incomplete)."]
+                "note": "this_week is the last COMPLETE calendar week (aligned to the user's week start), last_week the week before it; the week in progress is excluded (incomplete). Bedtime change is in minutes (positive = later)."]
     }
 
     // MARK: - get_readiness (use cases 1, 5, 11)
