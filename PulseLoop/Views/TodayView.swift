@@ -123,26 +123,24 @@ struct TodayView: View {
                 // otherwise the deterministic hero fills it. Only ever one card here, so the
                 // coach summary and the hero can't render the same content twice on one screen.
                 if coachEnabled, let coachSummary {
+                    // The card's numbers come from the prepared tiles at render time (the stored summary may be up
+                    // to a rate-limit old), its prose from the stored summary, and the caption from the same age the
+                    // heart-rate tile shows — see `CoachTodayCard`.
+                    let card = CoachTodayCard.make(
+                        summary: coachSummary,
+                        heartRate: activeStore.cards[.heartRate],
+                        showAge: !SampleDataStore.shared.isActive
+                    )
                     Button {
                         summaryService.openInChat(coachSummary)
                     } label: {
-                        CoachMessageCard(
-                            headline: coachSummary.title,
-                            body: coachSummary.body,
-                            chips: coachSummary.chips
-                        )
+                        CoachTodayCardView(card: card)
                     }
                     .buttonStyle(.agaraTap)
                 } else if coachEnabled {
                     // Coach on but no summary generated yet: offer the chat entry point.
                     Button { CoachNavigation.shared.openRoot() } label: {
-                        CoachMessageCard(
-                            headline: summary.calibration.isCalibrating ? "Baseline in progress" : "Want a recap?",
-                            body: summary.calibration.isCalibrating
-                                ? "I can help explain what data is collected and what is still missing."
-                                : "Want a summary from the latest ring context? Tap to open the coach.",
-                            chips: []
-                        )
+                        CoachTodayCardView(card: .placeholder(isCalibrating: summary.calibration.isCalibrating))
                     }
                     .buttonStyle(.agaraTap)
                 } else {
