@@ -91,6 +91,24 @@ struct NotificationsSettingsView: View {
                         set: { prefs.set(topic, on: $0) }
                     ))
                     if topic == .weeklyReview, prefs.isOn(topic) {
+                        // The week boundary itself (owner D3): the user's choice, else the device region — Monday for most
+                        // of the world, Sunday in the US/Canada/Japan, Saturday in much of the Middle East. Set apart from
+                        // "Weekly review arrives" below, which is only when the push lands.
+                        FormValueRow(title: "Week starts") {
+                            Picker("Week starts", selection: Binding(
+                                get: { WeekStartPrefs.stored() },
+                                set: { WeekStartPrefs.install($0) }
+                            )) {
+                                Text("Device (\(NudgePreferencesStore.weekdayName(WeekStart.localeDay())))")
+                                    .tag(WeekStart.locale)
+                                ForEach(1...7, id: \.self) {
+                                    Text(NudgePreferencesStore.weekdayName($0)).tag($0)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .tint(AgaraColors.accent)
+                            .accessibilityIdentifier("weekStart.day")
+                        }
                         FormValueRow(title: "Weekly review arrives") {
                             Picker("Day", selection: Binding(get: { prefs.weeklyWeekday }, set: { prefs.weeklyWeekday = $0 })) {
                                 ForEach(1...7, id: \.self) { Text(NudgePreferencesStore.weekdayName($0)).tag($0) }

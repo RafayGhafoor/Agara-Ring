@@ -17,8 +17,17 @@ enum WeekStart {
     /// The device locale's first day of the week (1 = Sunday … 7 = Saturday).
     static func localeDay(_ calendar: Calendar = .current) -> Int { calendar.firstWeekday }
 
+    /// The user's installed choice (0 = follow the device). Set by `WeekStartPrefs`, so the chart, the review window and
+    /// the coach all agree without a store threaded through every call site — and never a constant.
+    private static var installed = WeekStart.locale
+
+    /// Install the user's choice (the prefs store does this at app start, and the settings row on change).
+    static func install(_ stored: Int) {
+        installed = (1...7).contains(stored) ? stored : locale
+    }
+
     /// The effective day: an explicit 1...7 wins, anything else (including `locale`) follows the device.
-    static func day(stored: Int = locale, calendar: Calendar = .current) -> Int {
+    static func day(stored: Int = installed, calendar: Calendar = .current) -> Int {
         (1...7).contains(stored) ? stored : localeDay(calendar)
     }
 

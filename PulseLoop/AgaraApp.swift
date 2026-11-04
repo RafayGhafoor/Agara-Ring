@@ -52,6 +52,8 @@ struct AgaraApp: App {
         AppClock.applyLaunchArguments()
         StoreCapture.applyLaunchArguments()
         // Manrope ships as data assets; register it before the first view resolves a `Font.custom`.
+        // The user's week start (unset = the device locale) — before the first chart, review or settings row.
+        WeekStartPrefs.installFromDefaults()
         AgaraFontRegistry.registerBundledFonts()
         AgaraUIKitFonts.apply()
         let runningTests = Self.isRunningUnitTests

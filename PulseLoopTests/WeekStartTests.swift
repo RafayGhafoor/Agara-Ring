@@ -97,4 +97,42 @@ final class WeekStartTests: XCTestCase {
         XCTAssertEqual(cal.dateComponents([.day], from: lastStart, to: lastEnd).day, 6)
         XCTAssertEqual(cal.dateComponents([.day], from: lastEnd, to: thisStart).day, 1)
     }
+
+    // MARK: - The user's own choice (D3: "user-visible and configurable")
+
+    func testAnInstalledChoiceGovernsEveryWeeklySurface() throws {
+        defer { WeekStart.install(WeekStart.locale) }
+        let cal = calendar("en_GB")            // the device says Monday…
+        WeekStart.install(1)                   // …the user picked Sunday
+        XCTAssertEqual(WeekStart.day(calendar: cal), 1)
+        XCTAssertEqual(WeekStart.day(stored: 1, calendar: cal), 1)
+        // …and the review window moves with it: Wednesday 2026-11-04 → the week just ended starts Sun 10-25.
+        let w = WeekStart.weekReviewWindow(today: date(2026, 11, 4, cal), day: 1, calendar: cal)
+        XCTAssertEqual(w.thisStart, "2026-10-25")
+        XCTAssertEqual(w.thisEnd, "2026-10-31")
+    }
+
+    func testFollowTheDeviceAndCorruptValuesFallBackToTheLocale() {
+        defer { WeekStart.install(WeekStart.locale) }
+        WeekStart.install(7)
+        XCTAssertEqual(WeekStart.day(calendar: calendar("en_US")), 7)
+        WeekStart.install(WeekStart.locale)
+        XCTAssertEqual(WeekStart.day(calendar: calendar("en_US")), 1, "0 restores the device default")
+        WeekStart.install(42)
+        XCTAssertEqual(WeekStart.day(calendar: calendar("en_GB")), 2, "a corrupt value behaves as follow-the-device")
+    }
+
+    func testThePrefsStoreRoundTripsThroughDefaults() throws {
+        let suite = try XCTUnwrap(UserDefaults(suiteName: "weekStartTests"))
+        suite.removeObject(forKey: WeekStartPrefs.key)
+        defer { suite.removeObject(forKey: WeekStartPrefs.key); WeekStart.install(WeekStart.locale) }
+
+        XCTAssertEqual(WeekStartPrefs.stored(suite), WeekStart.locale, "unset means follow the device")
+        WeekStartPrefs.install(3, defaults: suite)
+        XCTAssertEqual(WeekStartPrefs.stored(suite), 3)
+        XCTAssertEqual(WeekStartPrefs.installFromDefaults(suite), 3)
+        XCTAssertEqual(WeekStart.day(calendar: calendar("en_GB")), 3, "the installed choice wins over the region")
+        WeekStartPrefs.install(99, defaults: suite)   // corrupt: clamped to follow-the-device
+        XCTAssertEqual(WeekStartPrefs.stored(suite), WeekStart.locale)
+    }
 }
