@@ -153,6 +153,9 @@ final class AgaraSyncEngine {
             if !report.needsUpload { break }
         }
         state.lastSync = now()
+        // Server-side tuning of the sleep model, once per pass (12 h throttle inside). Deliberately after the sync and
+        // deliberately non-fatal: the model is a tuning knob, not something worth failing a sync over.
+        await refreshSleepModel()
         snapshot.stage = .finished
         progress(snapshot)
         Self.log.info("sync done: \(summary.blocksAccepted) blocks up, \(summary.pull.storedNew + summary.pull.mergedLocally + summary.pull.rowsInserted) changes down")
@@ -296,6 +299,22 @@ final class AgaraSyncEngine {
     }
 
     // MARK: Pull
+
+    /// A model accepted on a previous run applies before this one, so a cold start does not fall back to the compiled
+    /// default for a whole session.
+    func installCachedModel() {
+        SleepScoreConfig.install(SleepScoreConfig.Cache.model(raw: state.sleepModel))
+    }
+
+    /// Server-side tuning of the sleep model (item F): at most once per 12 h (throttled inside `SleepScoreConfig`), and
+    /// never an error the user sees — a failed fetch keeps the previous model, a rejected payload falls back to the
+    /// compiled default.
+    private func refreshSleepModel() async {
+        let next = await SleepScoreConfig.refresh(
+            fetch: { key in (try? await api.config(key: key)) ?? nil },
+            raw: state.sleepModel, now: now())
+        if let next { state.setSleepModel(next) }
+    }
 
     /// Pull every page after the stored cursor. The cursor advances only after a page has been applied and saved, so a
     /// crash re-reads at most one page (applying it again is idempotent).

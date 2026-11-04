@@ -40,6 +40,14 @@ nonisolated struct AgaraCloudAPI: Sendable {
         return try Self.decode(ChangesResponse.self, response)
     }
 
+    /// `GET api/agara/config?key=…` — a server-side value the app may apply without a release (item F).
+    /// Returns the raw record so `SleepScoreConfig` owns the validation: this layer only carries bytes.
+    func config(key: String) async throws -> [String: Any]? {
+        let response = try await call("GET", "api/agara/config", query: [URLQueryItem(name: "key", value: key)])
+        let list = response.json["config"] as? [[String: Any]]
+        return list?.first
+    }
+
     func me() async throws -> MeInfo {
         try Self.decode(MeInfo.self, try await call("GET", "api/agara/me"))
     }

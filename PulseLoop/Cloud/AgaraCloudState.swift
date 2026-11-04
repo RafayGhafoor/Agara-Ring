@@ -20,9 +20,21 @@ nonisolated final class AgaraCloudState: @unchecked Sendable {
         static let dayHashes = "agara.cloud.dayHashes"
         static let rejected = "agara.cloud.rejected"
         static let unverifiedSince = "agara.cloud.unverifiedSince"
+        static let sleepModel = "agara.cloud.sleepModel"
     }
 
     init(defaults: UserDefaults = .standard) { self.defaults = defaults }
+
+    // MARK: Server-side model tuning (plan asana-heart-bugs-2026-11-01, item F)
+
+    /// The last accepted sleep-score model, as `SleepScoreConfig.Cache` encodes it.
+    var sleepModel: String? {
+        get { lock.lock(); defer { lock.unlock() }; return defaults.string(forKey: Key.sleepModel) }
+    }
+    func setSleepModel(_ raw: String?) {
+        lock.lock(); defer { lock.unlock() }
+        if let raw { defaults.set(raw, forKey: Key.sleepModel) } else { defaults.removeObject(forKey: Key.sleepModel) }
+    }
 
     // MARK: Consent
 
