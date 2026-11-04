@@ -458,13 +458,14 @@ enum MetricsService {
         return filtered.sorted { $0.timestamp < $1.timestamp }.map { MetricSample(timestamp: $0.timestamp, value: $0.value) }
     }
     
+    /// The anchor week's rows, aligned to **the user's** week start (`WeekStart`: stored choice, else the device
+    /// locale — 1 = Sunday … 7 = Saturday). It used to be hardcoded to Monday, which is wrong for the US/Canada/Japan
+    /// (Sunday) and much of the Middle East (Saturday): plan asana-heart-bugs-2026-11-01, item D.
     private static func alignedWeekActivity(rows: [ActivityDaily], anchor: Date) -> [ActivityDaily] {
         var calendar = Calendar.current
-        calendar.firstWeekday = 2
-        let anchorStart = calendar.startOfDay(for: anchor)
-        let weekday = calendar.component(.weekday, from: anchorStart)
-        let daysSinceMonday = (weekday + 5) % 7
-        let weekStart = calendar.date(byAdding: .day, value: -daysSinceMonday, to: anchorStart) ?? anchorStart
+        let weekStartDay = WeekStart.day()
+        calendar.firstWeekday = weekStartDay
+        let weekStart = WeekStart.startOfWeek(anchor, day: weekStartDay, calendar: calendar)
         let byDay = Dictionary(grouping: rows) { calendar.startOfDay(for: $0.date) }
         return (0..<7).map { offset in
             let date = calendar.date(byAdding: .day, value: offset, to: weekStart) ?? weekStart
