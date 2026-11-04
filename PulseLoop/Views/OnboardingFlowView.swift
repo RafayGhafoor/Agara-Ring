@@ -171,7 +171,7 @@ struct OnboardingWelcomeView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private let features = [
-        OnboardingItem(icon: "dollarsign.circle.fill", title: "No subscription", detail: "Own your ring data", tint: AgaraColors.success),
+        OnboardingItem(icon: "checkmark.seal.fill", title: "Yours to keep", detail: "Own your ring data", tint: AgaraColors.success),
         OnboardingItem(icon: "lock.shield.fill", title: "Privacy first", detail: "Stays local unless you sync", tint: AgaraColors.info),
         // The AI coach is off in the store release (flag `coach`), so the tile only claims it when it exists.
         AgaraFeatureStore.isOn(.coach)

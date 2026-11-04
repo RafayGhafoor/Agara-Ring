@@ -13,7 +13,7 @@ enum AgaraCopy {
     static let coachGreeting = "Hi! I'm your Agara Coach. I can answer questions about your sleep, heart rate, activity, and recovery. What would you like to know?"
     static let aboutDescription = "AGARA Heart tracks your sleep, heart, activity and recovery from a ring you barely notice. Your data syncs straight from the ring to your phone and stays yours — cloud backup is optional."
     static let aboutProductName = "AGARA Heart"
-    static let onboardingSubtitle = "Your health, on your terms — no subscription."
+    static let onboardingSubtitle = "Your health, on your terms."
     static let onboardingSetupTitle = "Set up AGARA Heart"
     static let welcomeNotificationTitle = "Welcome to AGARA Heart"
     static let removeDataTitle = "Remove AGARA Heart data?"
