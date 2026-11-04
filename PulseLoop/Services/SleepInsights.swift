@@ -23,6 +23,11 @@ struct SleepScoreResult {
     let lightPct: Int
     /// nil when there is no usable awake signal.
     let awakePct: Int?
+    /// REM's own share of time asleep (model v2; 0 under v1, which folded REM into deep).
+    var remPct: Int = 0
+    /// True when the stage labels cover less than `SleepScore.Model.coverageFull` of the night, so the stage
+    /// shares — and the score — are an average over the minutes the ring did label.
+    var estimated: Bool = false
 }
 
 enum SleepScore {
@@ -30,14 +35,11 @@ enum SleepScore {
         min(hi, max(lo, value))
     }
 
-    private static func bandScore(
-        _ value: Double,
-        idealLow: Double, idealHigh: Double,
-        softLow: Double, softHigh: Double,
-        hardLow: Double, hardHigh: Double,
-        points: Double
-    ) -> Double {
+    private static func bandScore(_ value: Double, band: Band, points: Double) -> Double {
         guard value.isFinite else { return 0 }
+        let idealLow = band.idealLow, idealHigh = band.idealHigh
+        let softLow = band.softLow, softHigh = band.softHigh
+        let hardLow = band.hardLow, hardHigh = band.hardHigh
         if value >= idealLow && value <= idealHigh { return points }
         if value < idealLow && value >= softLow {
             return points * (0.65 + 0.35 * ((value - softLow) / (idealLow - softLow)))
@@ -72,7 +74,8 @@ enum SleepScore {
     /// (the model has no REM band; both are restorative). Without blocks the summary's minutes are used.
     /// What the score is made of, in minutes — summable across sessions, which is how the DAY score works.
     struct Inputs: Equatable {
-        var deep: Double = 0          // deep + REM
+        var deep: Double = 0          // DEEP only (model v2; v1 adds `rem` back in)
+        var rem: Double = 0           // REM only
         var light: Double = 0
         var awake: Double = 0
         var asleep: Double = 0        // every stage except awake
@@ -80,29 +83,140 @@ enum SleepScore {
         var hasAwakeSignal = false
 
         static func + (lhs: Inputs, rhs: Inputs) -> Inputs {
-            Inputs(deep: lhs.deep + rhs.deep, light: lhs.light + rhs.light, awake: lhs.awake + rhs.awake,
-                   asleep: lhs.asleep + rhs.asleep, span: lhs.span + rhs.span,
+            Inputs(deep: lhs.deep + rhs.deep, rem: lhs.rem + rhs.rem, light: lhs.light + rhs.light,
+                   awake: lhs.awake + rhs.awake, asleep: lhs.asleep + rhs.asleep,
+                   span: lhs.span + rhs.span,
                    hasAwakeSignal: lhs.hasAwakeSignal || rhs.hasAwakeSignal)
         }
     }
 
-    static func calculate(_ sleep: SleepSummary) -> SleepScoreResult { score(inputs(sleep)) }
+    /// The model's tunables — weights, the label-coverage threshold and the duration gates/floor. Defaults come
+    /// from the shared catalog (`docs/config/shared.yaml` → `AgaraConfig.Sleep`, Rule 5) so both apps agree and a
+    /// tuning change is one edit; a cloud `app_config` record may override it (plan asana-heart-bugs-2026-11-01, F).
+    struct Model {
+        var durationWeight = AgaraConfig.Sleep.durationWeight
+        var deepWeight = AgaraConfig.Sleep.deepWeight
+        var remWeight = AgaraConfig.Sleep.remWeight
+        var lightWeight = AgaraConfig.Sleep.lightWeight
+        var awakeWeight = AgaraConfig.Sleep.awakeWeight
+        var coverageFull = AgaraConfig.Sleep.coverageFull
+        var floorHours = AgaraConfig.Sleep.floorHours
+        var floorAwakePct = AgaraConfig.Sleep.floorAwakePct
+        var floorScore = Int(AgaraConfig.Sleep.floorScore)
+        var shortHours6 = AgaraConfig.Sleep.shortHours6
+        var capUnder6h = Int(AgaraConfig.Sleep.capUnder6h)
+        var shortHours5 = AgaraConfig.Sleep.shortHours5
+        var capUnder5h = Int(AgaraConfig.Sleep.capUnder5h)
+        var id = "sleep-v2"
+        var version = 1
+    }
+
+    /// Band geometry: measurements of population sleep, not tuning knobs — hence code, not the catalog (D10).
+    private struct Band {
+        let idealLow: Double, idealHigh: Double
+        let softLow: Double, softHigh: Double
+        let hardLow: Double, hardHigh: Double
+    }
+
+    private static let durationBand = Band(idealLow: 7.5, idealHigh: 8.5, softLow: 6, softHigh: 9.5, hardLow: 3, hardHigh: 12)
+    private static let deepBand = Band(idealLow: 13, idealHigh: 23, softLow: 5, softHigh: 35, hardLow: 0, hardHigh: 45)
+    private static let remBand = Band(idealLow: 18, idealHigh: 25, softLow: 10, softHigh: 35, hardLow: 0, hardHigh: 45)
+    private static let lightBand = Band(idealLow: 45, idealHigh: 55, softLow: 30, softHigh: 70, hardLow: 15, hardHigh: 90)
+    /// v1's light band (wider ideal, 50-60) — frozen with the rest of v1.
+    private static let v1LightBand = Band(idealLow: 50, idealHigh: 60, softLow: 35, softHigh: 75, hardLow: 20, hardHigh: 90)
+
+    /// The rollout rule (owner 2026-11-01): v2 ships behind `sleep_score_v2` and turns on in a later update.
+    static var v2Enabled: Bool { AgaraFeatureStore.isOn(.sleepScoreV2) }
+
+    /// The score the app shows: v1 while the flag is off, v2 once it is on. Tests pin `v2`.
+    static func score(_ input: Inputs, model: Model = Model(), v2: Bool? = nil) -> SleepScoreResult {
+        (v2 ?? v2Enabled) ? scoreV2(input, model: model) : scoreV1(input)
+    }
+
+    /// v1 — shipped through 1.1.0, frozen. Only the `sleep_score_v2` flag reaches it: duration 35 / deep 30 /
+    /// light 20 / awake 15, REM folded into deep, stage shares un-normalised, a flat 55 % for a missing awake
+    /// signal. A function rather than values, because the fold and the missing re-normalisation are code.
+    static func scoreV1(_ input: Inputs) -> SleepScoreResult {
+        let total = max(0, input.asleep)
+        let span = input.span
+        let totalHours = total / 60
+        let deep = input.deep + input.rem
+        let deepPct = total > 0 ? (deep / total) * 100 : 0
+        let lightPct = total > 0 ? (input.light / total) * 100 : 0
+        let awakePct: Double? = (span > 0 && input.hasAwakeSignal) ? (input.awake / span) * 100 : nil
+        let points = bandScore(totalHours, band: durationBand, points: 35) +
+            bandScore(deepPct, band: deepBand, points: 30) +
+            bandScore(lightPct, band: v1LightBand, points: 20) +
+            awakeScore(awakePct, points: 15)
+        let rounded = Int(clamp(points.rounded(), 0, 100))
+        return SleepScoreResult(score: rounded, label: qualityLabel(rounded),
+                                deepPct: Int(deepPct.rounded()), lightPct: Int(lightPct.rounded()),
+                                awakePct: awakePct.map { Int($0.rounded()) })
+    }
+
+    /// v2 — REM its own band, only the components the ring reported are scored, duration gates + floor.
+    static func scoreV2(_ input: Inputs, model: Model = Model()) -> SleepScoreResult {
+        let total = max(0, input.asleep)
+        let span = input.span
+        let totalHours = total / 60
+        let labelled = input.deep + input.rem + input.light + input.awake
+        let coverage: Double = span > 0 ? clamp(labelled / span, 0, 1) : (labelled > 0 ? 1 : 0)
+        let estimated = labelled > 0 && coverage < model.coverageFull
+
+        func pct(_ part: Double) -> Double { total > 0 && part.isFinite ? (part / total) * 100 : 0 }
+        let deepPct = pct(input.deep), remPct = pct(input.rem), lightPct = pct(input.light)
+        let awakePct: Double? = (span > 0 && input.hasAwakeSignal) ? (input.awake / span) * 100 : nil
+
+        var points = 0.0, weights = 0.0
+        func add(_ p: Double, _ w: Double) { points += p; weights += w }
+
+        add(bandScore(totalHours, band: durationBand, points: model.durationWeight), model.durationWeight)
+        if labelled > 0 {
+            add(bandScore(deepPct, band: deepBand, points: model.deepWeight), model.deepWeight)
+            if input.rem > 0 { add(bandScore(remPct, band: remBand, points: model.remWeight), model.remWeight) }
+            add(bandScore(lightPct, band: lightBand, points: model.lightWeight), model.lightWeight)
+            if let awakePct { add(awakeScore(awakePct, points: model.awakeWeight), model.awakeWeight) }
+        } else {
+            add(bandScore(deepPct, band: deepBand, points: model.deepWeight), model.deepWeight)
+            add(bandScore(lightPct, band: lightBand, points: model.lightWeight), model.lightWeight)
+            add(awakeScore(awakePct, points: model.awakeWeight), model.awakeWeight)
+        }
+
+        var score = weights > 0 ? (points / weights) * 100 : 0
+        if totalHours < model.shortHours5 { score = min(score, Double(model.capUnder5h)) }
+        else if totalHours < model.shortHours6 { score = min(score, Double(model.capUnder6h)) }
+        if labelled > 0, !estimated, totalHours >= model.floorHours,
+           awakePct == nil || awakePct! <= model.floorAwakePct {
+            score = max(score, Double(model.floorScore))
+        }
+        let rounded = Int(clamp(score.rounded(), 0, 100))
+        return SleepScoreResult(score: rounded, label: qualityLabel(rounded),
+                                deepPct: Int(deepPct.rounded()), lightPct: Int(lightPct.rounded()),
+                                awakePct: awakePct.map { Int($0.rounded()) },
+                                remPct: Int(remPct.rounded()), estimated: estimated)
+    }
+
+    static func calculate(_ sleep: SleepSummary, model: Model = Model(), v2: Bool? = nil) -> SleepScoreResult {
+        score(inputs(sleep), model: model, v2: v2)
+    }
 
     /// The day's score (owner 2026-10-22, option A — "a combined score, like Samsung Health"): every session of the
     /// waking day — the main sleep AND the naps — scored together. Naps add to the duration band and count toward the
     /// stage and awake shares like any other minute of sleep. One session → exactly `calculate(main)`.
-    static func calculate(day: SleepDay) -> SleepScoreResult {
-        score(([day.main] + day.naps).map(inputs).reduce(Inputs(), +))
+    static func calculate(day: SleepDay, model: Model = Model(), v2: Bool? = nil) -> SleepScoreResult {
+        score(([day.main] + day.naps).map(inputs).reduce(Inputs(), +), model: model, v2: v2)
     }
 
     static func inputs(_ sleep: SleepSummary) -> Inputs {
         let deep: Double
+        let rem: Double
         let light: Double
         let awake: Double
         let asleep: Double
         let coveredStageMin: Double
         if sleep.blocks.isEmpty {
-            deep = Double(max(0, sleep.deepMinutes) + max(0, sleep.remMinutes))
+            deep = Double(max(0, sleep.deepMinutes))
+            rem = Double(max(0, sleep.remMinutes))
             light = Double(max(0, sleep.lightMinutes))
             awake = Double(max(0, sleep.awakeMinutes))
             asleep = Double(max(0, sleep.session.totalMinutes)) - awake
@@ -111,7 +225,8 @@ enum SleepScore {
             func minutes(_ stages: Set<SleepStage>) -> Double {
                 sleep.blocks.reduce(0.0) { $0 + (stages.contains($1.stage) ? Double(max(0, $1.durationMinutes)) : 0) }
             }
-            deep = minutes([.deep, .rem])
+            deep = minutes([.deep])
+            rem = minutes([.rem])
             light = minutes([.light])
             awake = minutes([.awake])
             coveredStageMin = sleep.blocks.reduce(0.0) { $0 + Double(max(0, $1.durationMinutes)) }
@@ -123,34 +238,10 @@ enum SleepScore {
             sleep.blocks.contains { $0.stage == .awake } ||
             awake > 0 ||
             (span > 0 && coveredStageMin >= span * 0.95)
-        return Inputs(deep: deep, light: light, awake: awake, asleep: total, span: span, hasAwakeSignal: hasAwakeSignal)
+        return Inputs(deep: deep, rem: rem, light: light, awake: awake, asleep: total, span: span,
+                      hasAwakeSignal: hasAwakeSignal)
     }
 
-    static func score(_ input: Inputs) -> SleepScoreResult {
-        let deep = input.deep, light = input.light, awake = input.awake
-        let total = max(0, input.asleep)
-        let span = input.span
-        let hasAwakeSignal = input.hasAwakeSignal
-
-        let totalHours = total / 60
-        let deepPct = total > 0 ? (deep / total) * 100 : 0
-        let lightPct = total > 0 ? (light / total) * 100 : 0
-        let awakePct: Double? = (span > 0 && hasAwakeSignal) ? (awake / span) * 100 : nil
-
-        let duration = bandScore(totalHours, idealLow: 7.5, idealHigh: 8.5, softLow: 6, softHigh: 9.5, hardLow: 3, hardHigh: 12, points: 35)
-        let deepScore = bandScore(deepPct, idealLow: 13, idealHigh: 23, softLow: 5, softHigh: 35, hardLow: 0, hardHigh: 45, points: 30)
-        let lightScore = bandScore(lightPct, idealLow: 50, idealHigh: 60, softLow: 35, softHigh: 75, hardLow: 20, hardHigh: 90, points: 20)
-        let awakeSub = awakeScore(awakePct, points: 15)
-        let score = Int(clamp((duration + deepScore + lightScore + awakeSub).rounded(), 0, 100))
-
-        return SleepScoreResult(
-            score: score,
-            label: qualityLabel(score),
-            deepPct: Int(deepPct.rounded()),
-            lightPct: Int(lightPct.rounded()),
-            awakePct: awakePct.map { Int($0.rounded()) }
-        )
-    }
 }
 
 // MARK: - Formatting
