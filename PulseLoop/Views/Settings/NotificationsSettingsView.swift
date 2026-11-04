@@ -22,6 +22,9 @@ struct NotificationsSettingsView: View {
     @State private var testStatus: String?
     @State private var notifPermissionDenied = false
     @State private var feed = NudgeFeed()
+    // EV40 Daily Tracker reminder (1.1, plan D5): on at 20:00 by default; a plain switch + time row.
+    @State private var ev40Reminder = Ev40Reminder.settings()
+    @State private var ev40Time = Date()
 
     private var nudgesOn: Bool { features.isOn(.coachNudges) && prefs.masterOn }
 
@@ -33,12 +36,18 @@ struct NotificationsSettingsView: View {
                     tools
                 }
                 coachCheckins
+                ev40ReminderGroup
             }
             .padding()
         }
         .background(AgaraColors.background)
         .pageChrome("Notifications")
-        .task { feed.refresh(context: modelContext) }
+        .task {
+            feed.refresh(context: modelContext)
+            ev40Reminder = Ev40Reminder.settings()
+            ev40Time = Self.date(hour: ev40Reminder.hour, minute: ev40Reminder.minute)
+            await Ev40Reminder.refresh(context: modelContext)
+        }
     }
 
     // MARK: - Nudges
@@ -237,6 +246,61 @@ struct NotificationsSettingsView: View {
     }
 
     // MARK: - Actions
+
+    /// The EV40 reminder: one notification a day, at a time the user picks, only while the checklist is unfinished.
+    @ViewBuilder private var ev40ReminderGroup: some View {
+        SettingsGroup(
+            header: AgaraCopy.ev40ReminderName,
+            footer: "One reminder a day while today's checklist still has open disciplines. Nothing is sent once all eight are done."
+        ) {
+            FormToggleRow(title: AgaraCopy.ev40ReminderName, isOn: Binding(
+                get: { ev40Reminder.enabled },
+                set: { setEv40Reminder($0) }
+            ))
+            if ev40Reminder.enabled {
+                FormValueRow(title: "Reminder time") {
+                    DatePicker("Reminder time", selection: Binding(
+                        get: { ev40Time },
+                        set: { setEv40Time($0) }
+                    ), displayedComponents: .hourAndMinute)
+                        .labelsHidden()
+                        .accessibilityIdentifier("ev40.reminder.time")
+                }
+            }
+        }
+    }
+
+    private func setEv40Reminder(_ on: Bool) {
+        guard on else {
+            ev40Reminder.enabled = false
+            Ev40Reminder.save(ev40Reminder)
+            Task { await Ev40Reminder.refresh(context: modelContext) }
+            return
+        }
+        Task {
+            let granted = (try? await UNUserNotificationCenter.current()
+                .requestAuthorization(options: [.alert, .sound, .badge])) ?? false
+            notifPermissionDenied = !granted
+            ev40Reminder.enabled = granted
+            Ev40Reminder.save(ev40Reminder)
+            await Ev40Reminder.refresh(context: modelContext)
+        }
+    }
+
+    private func setEv40Time(_ date: Date) {
+        let parts = Calendar.current.dateComponents([.hour, .minute], from: date)
+        ev40Reminder.hour = parts.hour ?? 20
+        ev40Reminder.minute = parts.minute ?? 0
+        Ev40Reminder.save(ev40Reminder)
+        Task { await Ev40Reminder.refresh(context: modelContext) }
+    }
+
+    private static func date(hour: Int, minute: Int) -> Date {
+        var parts = Calendar.current.dateComponents([.year, .month, .day], from: AppClock.now)
+        parts.hour = hour
+        parts.minute = minute
+        return Calendar.current.date(from: parts) ?? AppClock.now
+    }
 
     private func setMaster(_ on: Bool) {
         guard on else {

@@ -227,6 +227,7 @@ struct Ev40TrackerView: View {
                     }
                 }
                 historyLink
+                reminderLine
             }
             .padding(.horizontal, AgaraShape.gutter)
             .padding(.top, 8)
@@ -325,6 +326,34 @@ struct Ev40TrackerView: View {
         }
         return completed + " · " + String.localizedStringWithFormat(
             NSLocalizedString("%d remaining", comment: "EV40 tracker: remaining count"), total - done)
+    }
+
+    /// "Daily reminder · 20:00 ›" — the tracker is where the reminder is thought about, but the one control lives with
+    /// every other notification in Settings, so this line only says what is set and takes you there.
+    private var reminderLine: some View {
+        let settings = Ev40Reminder.settings()
+        return Button { path.wrappedValue.append(AppRoute.settingsNotifications) } label: {
+            HStack(spacing: 12) {
+                Image(systemName: settings.enabled ? "bell.badge" : "bell.slash")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(settings.enabled ? AgaraColors.accent : AgaraColors.textMuted)
+                Text(AgaraCopy.ev40ReminderName)
+                    .font(AgaraFont.caption)
+                    .foregroundStyle(AgaraColors.textSecondary)
+                Spacer(minLength: 8)
+                Text(settings.enabled ? settings.displayTime : "Off")
+                    .font(AgaraFont.caption.weight(.semibold))
+                    .foregroundStyle(AgaraColors.textMuted)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(AgaraColors.textMuted)
+            }
+            .padding(.horizontal, 4)
+            .padding(.vertical, 6)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("ev40.reminderLine")
     }
 
     private var historyLink: some View {

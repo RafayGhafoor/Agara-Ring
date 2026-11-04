@@ -314,4 +314,83 @@ final class Ev40TrackerTests: XCTestCase {
         // the sync bookkeeping is per device: a restored row uploads once (the server answers duplicate if unchanged)
         XCTAssertTrue(Ev40Repo.history(context: restored.mainContext)[0].hasUnsentChange)
     }
+
+    // MARK: - The daily reminder (plan D5)
+
+    func testReminderFiresAtTheChosenLocalTimeAndSkipsAPassedToday() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Europe/London")!
+        let noon = Date(timeIntervalSince1970: 1_793_796_000)   // 2026-11-04T12:00:00Z
+
+        // 20:00 is still ahead: 14 fires, the first today, each at exactly 20:00 local
+        let ahead = Ev40Reminder.nextFireDates(now: noon, hour: 20, minute: 0, calendar: calendar)
+        XCTAssertEqual(ahead.count, Ev40Reminder.horizonDays)
+        for fire in ahead {
+            XCTAssertEqual(calendar.component(.hour, from: fire), 20)
+            XCTAssertEqual(calendar.component(.minute, from: fire), 0)
+        }
+        XCTAssertEqual(AgaraCloudDays.dayString(ahead[0], calendar: calendar), "2026-11-04")
+
+        // 09:00 has passed: today is not armed, so the first fire is tomorrow
+        let passed = Ev40Reminder.nextFireDates(now: noon, hour: 9, minute: 0, calendar: calendar)
+        XCTAssertEqual(passed.count, Ev40Reminder.horizonDays - 1)
+        XCTAssertEqual(AgaraCloudDays.dayString(passed[0], calendar: calendar), "2026-11-05")
+    }
+
+    func testReminderSurvivesADSTChangeAtTheSameWallClockTime() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+        // 2026-11-01 is the fall-back day in Los Angeles (02:00 → 01:00).
+        let before = Date(timeIntervalSince1970: 1_793_491_200)   // 2026-10-31T12:00:00Z (PDT)
+        let fires = Ev40Reminder.nextFireDates(now: before, hour: 20, minute: 30, days: 4, calendar: calendar)
+        XCTAssertEqual(fires.count, 4)
+        for fire in fires {
+            XCTAssertEqual(calendar.component(.hour, from: fire), 20, "\(fire)")
+            XCTAssertEqual(calendar.component(.minute, from: fire), 30, "\(fire)")
+        }
+        // the wall clock is constant while the UTC offset is not
+        let utcHours = Set(fires.map { Calendar(identifier: .gregorian).dateComponents(in: TimeZone(identifier: "UTC")!, from: $0).hour })
+        XCTAssertEqual(utcHours.count, 2)
+    }
+
+    func testReminderIsDueOnlyWhenEnabledIncompleteUnpostedAndPastTheTime() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let midnight = calendar.date(from: DateComponents(year: 2026, month: 11, day: 4))!
+        let at = { (hour: Int, minute: Int) in midnight.addingTimeInterval(Double(hour * 3600 + minute * 60)) }
+        let settings = Ev40Reminder.Settings(enabled: true, hour: 20, minute: 0)
+        let today = "2026-11-04"
+
+        XCTAssertFalse(Ev40Reminder.shouldPost(now: at(19, 59), settings: settings, mask: 3, lastPostedDay: nil, calendar: calendar),
+                       "before the chosen time")
+        XCTAssertTrue(Ev40Reminder.shouldPost(now: at(20, 0), settings: settings, mask: 3, lastPostedDay: nil, calendar: calendar),
+                      "the boundary itself: 20:00 exactly is due")
+        XCTAssertFalse(Ev40Reminder.shouldPost(now: at(21, 0), settings: settings, mask: 255, lastPostedDay: nil, calendar: calendar),
+                       "the day is complete: never nag about a finished checklist")
+        XCTAssertFalse(Ev40Reminder.shouldPost(now: at(21, 0), settings: Ev40Reminder.Settings(enabled: false, hour: 20, minute: 0),
+                                               mask: 3, lastPostedDay: nil, calendar: calendar),
+                       "the switch is off")
+        XCTAssertFalse(Ev40Reminder.shouldPost(now: at(21, 0), settings: settings, mask: 3, lastPostedDay: today, calendar: calendar),
+                       "already posted today (a re-arm must not double-post)")
+        XCTAssertTrue(Ev40Reminder.shouldPost(now: at(21, 0), settings: settings, mask: 3, lastPostedDay: "2026-11-03", calendar: calendar),
+                      "yesterday's post does not block today")
+    }
+
+    func testReminderSettingsDefaultAndPersist() {
+        let suite = "ev40.reminder.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        XCTAssertEqual(Ev40Reminder.settings(defaults: defaults), .default, "on at 20:00 by default (plan D5)")
+        XCTAssertEqual(Ev40Reminder.Settings.default.hour, 20)
+        Ev40Reminder.save(Ev40Reminder.Settings(enabled: false, hour: 7, minute: 5), defaults: defaults)
+        XCTAssertEqual(Ev40Reminder.settings(defaults: defaults), Ev40Reminder.Settings(enabled: false, hour: 7, minute: 5))
+        // a stored out-of-range time is clamped rather than trusted
+        defaults.set(99, forKey: "agara.ev40.reminder.hour")
+        XCTAssertEqual(Ev40Reminder.settings(defaults: defaults).hour, 23)
+        defaults.removePersistentDomain(forName: suite)
+    }
+
+    func testReminderRequestIdsAreDayKeyed() {
+        XCTAssertEqual(Ev40Reminder.requestID(for: "2026-11-04"), "agara.ev40.2026-11-04")
+        XCTAssertTrue(Ev40Reminder.requestID(for: "2026-11-04").hasPrefix(Ev40Reminder.requestPrefix))
+    }
 }

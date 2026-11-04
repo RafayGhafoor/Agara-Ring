@@ -278,8 +278,10 @@ final class AgaraNotificationsTests: XCTestCase {
         XCTAssertEqual(AgaraNotifications.deepLink(from: request.content.userInfo), .measure)
         // The three coach-nudge categories are the 1.1 addition (docs/apps/coach-nudges.md): recovery and stress carry
         // their own actions (Keep goal / Lighter today / Why?, Breathe 2 min / Not now), everything else is generic.
+        // `ev40` is the 1.1 daily tracker reminder (plan ev40-tracker, decision D5). The policy this asserts: every
+        // category the app posts under is registered here, in one place — so this set is the notification inventory.
         XCTAssertEqual(Set(AgaraNotificationCategory.allCases.map(\.rawValue)),
-                       ["measurement", "sync", "firmware", "battery", "coach",
+                       ["measurement", "sync", "firmware", "battery", "coach", "ev40",
                         "coach.recovery", "coach.stress", "coach.generic"])
     }
 }

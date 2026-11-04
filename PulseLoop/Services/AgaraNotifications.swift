@@ -12,6 +12,8 @@ import UIKit
 /// there, categories here).
 enum AgaraNotificationCategory: String, CaseIterable {
     case measurement, sync, firmware, battery, coach
+    /// The EV40 Daily Tracker's daily check-in (1.1). Its tap opens the tracker.
+    case ev40
     /// The three proactive-nudge categories (spec: `agara.coach.recovery`, `agara.coach.stress`,
     /// `agara.coach.generic`). Their buttons and the seeded coach answer they open are defined in
     /// `Coach/Nudges/NudgeNotifications.swift` — this layer stays the one place categories are registered.
@@ -33,6 +35,8 @@ enum AgaraDeepLink: String, Equatable {
     case wearable
     /// The Coach sheet (a conversation id may ride along in `userInfo`).
     case coach
+    /// The EV40 Daily Tracker (1.1).
+    case ev40
 }
 
 struct AgaraNotification: Equatable {
@@ -175,6 +179,12 @@ final class AgaraNotifications {
     }
 
     static func request(for note: AgaraNotification) -> UNNotificationRequest {
+        UNNotificationRequest(identifier: note.id, content: content(for: note), trigger: nil)
+    }
+
+    /// The look and payload of a notification, shared by the immediate request above and the scheduled one below, so a
+    /// reminder cannot drift from a posted alert (same category, same deep link, same copy source).
+    static func content(for note: AgaraNotification) -> UNMutableNotificationContent {
         let content = UNMutableNotificationContent()
         content.title = note.title
         content.body = note.body
@@ -184,7 +194,16 @@ final class AgaraNotifications {
         var info: [String: String] = note.extraUserInfo
         if let link = note.deepLink { info[deepLinkKey] = link.rawValue }
         content.userInfo = info
-        return UNNotificationRequest(identifier: note.id, content: content, trigger: nil)
+        return content
+    }
+
+    /// Hand a **scheduled** notification to the system (a calendar trigger: the daily EV40 reminder). Returns whether it
+    /// was handed over; it never prompts for permission (the caller checks `isAuthorizedToPost`).
+    @discardableResult
+    func schedule(_ note: AgaraNotification, at components: DateComponents) async -> Bool {
+        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+        await deliver(UNNotificationRequest(identifier: note.id, content: Self.content(for: note), trigger: trigger))
+        return true
     }
 
     /// The deep link a tapped notification carries, if any.

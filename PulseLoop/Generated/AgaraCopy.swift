@@ -199,6 +199,8 @@ enum AgaraCopy {
     static let ev40DisciplineFastRelease = "Fast-Release"
     static let ev40DisciplineDocumentShare = "Document & Share"
     static let ev40DisciplineRest = "Rest"
+    static let coachUpdatedPrefix = "Updated"
+    static let coachSyncedPrefix = "Synced"
     static let nudgeA1V1 = "Rough night: your resting heart rate is {rhr_delta} above your usual and you slept {sleep_short} under goal."
     static let nudgeA1V2 = "Your body is asking for an easier day — resting heart rate up {rhr_delta}, sleep {sleep_short} short."
     static let nudgeA1V3 = "Two signals down this morning: resting heart rate {rhr_delta} high, and {sleep_short} less sleep than usual."

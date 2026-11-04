@@ -236,6 +236,8 @@ enum AgaraFeature: String, CaseIterable {
     case firmwareDownload = "firmware_download"
     /// Flash firmware to the ring (Bluetrum AB-OTA on F003) — gates: verified file, OTA type 3, F003 present, battery ≥ 40 %, no sync, no measurement. ON for users since 1.1 (owner decision 2026-10-30); the debug-build restriction was removed in the same change. Android proven on hardware 00.12.07→00.12.09 (2026-09-25), emulator clean/drops/CRC on both.
     case firmwareInstall = "firmware_install"
+    /// Sleep score model v2 (REM its own band, score normalised over the stages the ring actually reported, duration gates and the >=7 h floor). OFF for the 1.1 rollout (owner 2026-11-01 — "make sure the new v2 sleep is behind feature flag, we will roll out in next update"): while it is off the app scores with v1 exactly as shipped, so turning it off is a real rollback. Model, tests and docs — docs/features/sleep-score.md.
+    case sleepScoreV2 = "sleep_score_v2"
     /// Demo-data rows in Settings (seed/clear demo data). Off in release; debug builds can turn it on via the override (2026-09-26).
     case demoData = "demo_data"
     /// AI Coach (tab/floating button, cards, check-ins). Was Android AgaraFeatureFlags.COACH (off); iOS showed it. Android on 2026-10-25 after the Agara Cloud coach parity port (transport/gate/context/tools) and certificate pinning; iOS on since 1.1 (owner 2026-10-20).
@@ -298,6 +300,7 @@ enum AgaraFeature: String, CaseIterable {
         case .firmwareCheck: return true
         case .firmwareDownload: return true
         case .firmwareInstall: return true
+        case .sleepScoreV2: return false
         case .demoData: return false
         case .coach: return true
         case .coachCloud: return true

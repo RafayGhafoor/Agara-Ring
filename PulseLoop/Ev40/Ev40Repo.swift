@@ -49,6 +49,8 @@ enum Ev40Repo {
         // The card and the tracker read SwiftData directly; this wakes the coalesced persistence token the Today
         // screen already listens to, so a tick made from the tracker updates the card behind it.
         AgaraDataChange.shared.notify()
+        // Completing the day removes today's reminder, and un-ticking it puts it back (plan D5/D6): re-arm the window.
+        Task { await Ev40Reminder.refresh(context: context) }
         return day.mask
     }
 

@@ -172,6 +172,9 @@ struct RootAppView: View {
                 if phase == .active {
                     liveWorkout.recover()
                     routeDeepLinkIfNeeded()
+                    // The EV40 reminder is a two-week window of one-shot requests: re-arm it on every foreground so a
+                    // time-zone change or a fortnight away from the app cannot leave it stale (plan D5).
+                    Task { await Ev40Reminder.refresh(context: modelContext) }
                 }
             }
             .onOpenURL { url in
@@ -406,6 +409,10 @@ struct MainTabView: View {
         case .coach:
             CoachNavigation.shared.openRoot()
             openCoachTabIfRequested()
+        case .ev40:
+            // The daily reminder lands on today's checklist, in the Today tab's stack.
+            selected = .today
+            path.append(AppRoute.ev40)
         }
     }
 
