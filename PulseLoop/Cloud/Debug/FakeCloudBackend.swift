@@ -56,6 +56,9 @@ nonisolated final class FakeCloudBackend: CloudTransport, AgaraCloudBackendInfo,
     struct StoredBlock { var container: Data; var hash: Data; var wire: WireBlock; var revision: Int; var tombstones: Set<Int64>; var seq: Int }
     private var blocks: [String: [String: StoredBlock]] = [:]   // uid → block_key → block
     private var days: [String: [String: (day: WireDay, seq: Int)]] = [:]
+    /// EV40 tracker rows: uid → local date → (the row incl. the **server's** stamp, seq). The stamp comes from this
+    /// fake's clock, exactly as the real server stamps a change itself (cloud-v2 §2.1).
+    private var tracker: [String: [String: (row: WireEv40Day, seq: Int)]] = [:]
     private var seqs: [String: Int] = [:]
 
     // MARK: Test controls and observations
@@ -123,6 +126,19 @@ nonisolated final class FakeCloudBackend: CloudTransport, AgaraCloudBackendInfo,
         lock.lock(); defer { lock.unlock() }
         guard let uid = users.values.first(where: { $0.email == email })?.uid else { return [:] }
         return (days[uid] ?? [:]).mapValues(\.day)
+    }
+
+    func serverTracker(email: String) -> [String: WireEv40Day] {
+        lock.lock(); defer { lock.unlock() }
+        guard let uid = users.values.first(where: { $0.email == email })?.uid else { return [:] }
+        return (tracker[uid] ?? [:]).mapValues(\.row)
+    }
+
+    /// Seed the server with an EV40 day another device uploaded (for pull tests).
+    func seedTracker(email: String, date: String, mask: Int, updatedAt: Int64) {
+        lock.lock(); defer { lock.unlock() }
+        guard let uid = users.values.first(where: { $0.email == email })?.uid else { return }
+        tracker[uid, default: [:]][date] = (WireEv40Day(date: date, mask: mask, updatedAt: updatedAt), nextSeq(uid))
     }
 
     /// Seed the server with a block another device uploaded (for pull tests).
@@ -273,7 +289,7 @@ nonisolated final class FakeCloudBackend: CloudTransport, AgaraCloudBackendInfo,
         }
         if path.hasSuffix("/me"), request.method == "DELETE" {
             if clock().timeIntervalSince(token.authTime) > recentLoginWindow { return serverError(401, "recent_login_required") }
-            blocks[uid] = nil; days[uid] = nil; seqs[uid] = nil
+            blocks[uid] = nil; days[uid] = nil; tracker[uid] = nil; seqs[uid] = nil
             deletedUids.insert(uid)
             if serverDeletesFirebaseUser { users[uid]?.firebaseDeleted = true }
             return json(200, ["deleted": true, "firebase_deleted": serverDeletesFirebaseUser])
@@ -306,7 +322,30 @@ nonisolated final class FakeCloudBackend: CloudTransport, AgaraCloudBackendInfo,
             if merged != existing { days[uid, default: [:]][day.date] = (merged, nextSeq(uid)) }
             dayResults.append(DayResult(date: day.date, status: "ok"))
         }
-        let response = SyncResponse(cursor: "c1.\(seqs[uid] ?? 0)", blocks: results, days: dayResults)
+        // EV40 tracker rows: decoded separately because `SyncRequest` carries only blocks and days.
+        struct TrackerEnvelope: Decodable {
+            struct Row: Decodable { var date: String; var mask: Int }
+            var tracker: [Row]?
+        }
+        let incoming = (try? JSONDecoder().decode(TrackerEnvelope.self, from: body))?.tracker ?? []
+        if incoming.count > AgaraCloudTracker.maxRowsPerRequest { return serverError(413, "too_many_tracker") }
+        var trackerResults: [Ev40RowResult] = []
+        for row in incoming {
+            guard AgaraCloudDays.parseDay(row.date, calendar: Calendar(identifier: .gregorian)) != nil else {
+                trackerResults.append(Ev40RowResult(date: row.date, status: "rejected", reason: "bad_date")); continue
+            }
+            guard (0...255).contains(row.mask) else {
+                trackerResults.append(Ev40RowResult(date: row.date, status: "rejected", reason: "bad_mask")); continue
+            }
+            let stamp = Int64(clock().timeIntervalSince1970 * 1000)
+            if let existing = tracker[uid]?[row.date], existing.row.mask == row.mask {
+                trackerResults.append(Ev40RowResult(date: row.date, status: "duplicate", updatedAt: existing.row.updatedAt))
+                continue
+            }
+            tracker[uid, default: [:]][row.date] = (WireEv40Day(date: row.date, mask: row.mask, updatedAt: stamp), nextSeq(uid))
+            trackerResults.append(Ev40RowResult(date: row.date, status: "accepted", updatedAt: stamp))
+        }
+        let response = SyncResponse(cursor: "c1.\(seqs[uid] ?? 0)", blocks: results, days: dayResults, tracker: trackerResults)
         return CloudResponse(status: 200, body: (try? JSONEncoder().encode(response)) ?? Data())
     }
 
@@ -381,13 +420,15 @@ nonisolated final class FakeCloudBackend: CloudTransport, AgaraCloudBackendInfo,
             guard since.hasPrefix("c1."), let n = Int(since.dropFirst(3)) else { return serverError(400, "bad_cursor") }
             after = n
         }
-        var entries: [(seq: Int, block: WireBlock?, day: WireDay?)] = []
-        for stored in (blocks[uid] ?? [:]).values where stored.seq > after { entries.append((stored.seq, stored.wire, nil)) }
-        for (_, value) in days[uid] ?? [:] where value.seq > after { entries.append((value.seq, nil, value.day)) }
+        var entries: [(seq: Int, block: WireBlock?, day: WireDay?, tracker: WireEv40Day?)] = []
+        for stored in (blocks[uid] ?? [:]).values where stored.seq > after { entries.append((stored.seq, stored.wire, nil, nil)) }
+        for (_, value) in days[uid] ?? [:] where value.seq > after { entries.append((value.seq, nil, value.day, nil)) }
+        for (_, value) in tracker[uid] ?? [:] where value.seq > after { entries.append((value.seq, nil, nil, value.row)) }
         entries.sort { $0.seq < $1.seq }
         let page = Array(entries.prefix(limit))
         let cursor = page.last.map { "c1.\($0.seq)" } ?? since
-        let response = ChangesResponse(cursor: cursor, more: entries.count > page.count, blocks: page.compactMap(\.block), days: page.compactMap(\.day))
+        let response = ChangesResponse(cursor: cursor, more: entries.count > page.count, blocks: page.compactMap(\.block),
+                                       days: page.compactMap(\.day), tracker: page.compactMap(\.tracker))
         return CloudResponse(status: 200, body: (try? JSONEncoder().encode(response)) ?? Data())
     }
 }

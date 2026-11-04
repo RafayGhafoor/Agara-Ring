@@ -114,6 +114,11 @@ struct TodayView: View {
         let coachSummary = todaySummaries.first { $0.scopeKey == CoachDataAccess.localDateString(AppClock.now) }
         return AnyView(ScrollView {
             VStack(spacing: 16) {
+                // EV40 Daily Tracker (1.1, owner-approved): the first thing under the greeting — a daily accountability
+                // checklist is a to-do, so it comes before the insight cards. It collapses to one line once all eight
+                // are ticked and comes back at local midnight (plan decision D6).
+                Ev40TodayCard { path.append(AppRoute.ev40) }
+
                 // Top insight card. When the coach is on it owns this slot (tap → chat);
                 // otherwise the deterministic hero fills it. Only ever one card here, so the
                 // coach summary and the hero can't render the same content twice on one screen.

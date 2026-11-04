@@ -1065,3 +1065,41 @@ extension UserProfile {
         set { healthImportedRaw = newValue.sorted().joined(separator: ",") }
     }
 }
+
+/// One day of the EV40 Daily Tracker: the eight disciplines as the bits of `mask`, in the wire order of
+/// `docs/strings/brand.yaml` (`ev40_discipline_*`: Hydrate 0 … Rest 7 — never renumbered, the wire carries the
+/// number).
+///
+/// `dateKey` is the user's **local** `yyyy-MM-dd` — that is what makes a new day start empty (there is no reset
+/// job: a day is a row that does not exist yet) and why it is never a UTC day. One row per day, kept as the
+/// accountability log the history screen reads.
+@Model
+final class Ev40Day {
+    #Index<Ev40Day>([\.dateKey])
+    @Attribute(.unique) var id: UUID
+    var dateKey: String
+    /// Bits 0…7, one per discipline (0 = nothing yet, 255 = all eight).
+    var mask: Int
+    /// The mask the server last acknowledged. `mask != ackedMask` means "not uploaded yet" (`AgaraCloudTracker`);
+    /// the pull applies a server row only when nothing local is unsent.
+    var ackedMask: Int
+    /// The **server's** stamp of the stored row (cloud-v2 §2.1, plan D3): no device clock decides a conflict, and a
+    /// pulled row is applied only when its stamp is newer. nil = the server has never confirmed this day.
+    var serverUpdatedAt: Date?
+    var createdAt: Date
+    var updatedAt: Date
+
+    init(id: UUID = UUID(), dateKey: String, mask: Int = 0, ackedMask: Int = 0, serverUpdatedAt: Date? = nil) {
+        self.id = id
+        self.dateKey = dateKey
+        self.mask = mask
+        self.ackedMask = ackedMask
+        self.serverUpdatedAt = serverUpdatedAt
+        self.createdAt = AppClock.now
+        self.updatedAt = AppClock.now
+    }
+
+    var completedCount: Int { Ev40Disciplines.count(mask) }
+    var isComplete: Bool { completedCount == Ev40Disciplines.all.count }
+    var hasUnsentChange: Bool { mask != ackedMask }
+}

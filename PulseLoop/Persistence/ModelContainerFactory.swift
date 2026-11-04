@@ -19,6 +19,8 @@ enum ModelContainerFactory {
             UserGoal.self,
             DeviceMeasurementConfig.self,
             ActivitySession.self,
+            // EV40 Daily Tracker (1.1): one row per local day, the eight disciplines as bits of `mask`.
+            Ev40Day.self,
             ActivitySample.self,
             ActivityBucketSample.self,
             MeasurementDeletion.self,

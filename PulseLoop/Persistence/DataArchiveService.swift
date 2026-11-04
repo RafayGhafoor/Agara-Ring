@@ -189,6 +189,7 @@ enum DataArchiveService {
         try await table("measurementDeletions", "measurement_deletions", MeasurementDeletion.self) {
             ArchiveMeasurementDeletion($0)
         }
+        try await table("ev40Days", "ev40_days", Ev40Day.self) { ArchiveEv40Day($0) }
 
         var settings: [String: String] = [:]
         for key in settingsKeys {
@@ -441,6 +442,7 @@ enum DataArchiveService {
         try deleteAll(MealEntry.self, context)
         try deleteAll(CachedFoodProduct.self, context)
         try deleteAll(MeasurementDeletion.self, context)
+        try deleteAll(Ev40Day.self, context)
         ReadingDeletion.invalidate()
         SyncPlanStore.shared.resetAll()   // nothing is stored any more: the next pass downloads every day
     }
@@ -479,6 +481,7 @@ enum DataArchiveService {
         insert(archive.mealEntries, context)
         insert(archive.foodProducts, context)
         insert(archive.measurementDeletions, context)
+        insert(archive.ev40Days, context)
         ReadingDeletion.invalidate()
     }
 
@@ -598,6 +601,7 @@ protocol ArchiveInsertable {
 
 extension ArchiveDevice: ArchiveInsertable {}
 extension ArchiveMeasurementDeletion: ArchiveInsertable {}
+extension ArchiveEv40Day: ArchiveInsertable {}
 extension ArchiveActivityDaily: ArchiveInsertable {}
 extension ArchiveMeasurement: ArchiveInsertable {}
 extension ArchiveBatterySample: ArchiveInsertable {}

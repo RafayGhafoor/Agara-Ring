@@ -111,10 +111,10 @@ final class AgaraCloudGoldenTests: XCTestCase {
         let body = String(decoding: try WireCodec.encode(SyncRequest(envelope: 1, clientId: "c", app: WireApp(platform: "ios", version: "1.1.0"),
                                                                      sentAt: 5, blocks: [block], days: [])), as: UTF8.self)
         XCTAssertTrue(body.hasPrefix("{\"envelope\":1,\"client_id\":\"c\",\"app\":{\"platform\":\"ios\",\"version\":\"1.1.0\"},\"sent_at\":5,\"blocks\":[{\"block_key\":\"v1/hr/live/a3a04cab4846d63c/20722\",\"metric\":\"hr\",\"source\":\"live\",\"sensor_id\":\"a3a04cab4846d63c\",\"utc_day\":20722,\"revision\":1,\"sealed\":true,\"fmt\":{\"major\":1,\"minor\":0,\"codec\":"), body)
-        // The envelope gained a third array with cloud-v2 §2.1 ("Workout sessions"): sessions ride beside blocks and
-        // days. The assertion still pins a fixed key order and a fixed tail, which is the point of the golden — it
-        // just now asserts the v2 tail.
-        XCTAssertTrue(body.hasSuffix("\"days\":[],\"sessions\":[]}"), body)
+        // The envelope gained a third array with cloud-v2 §2.1 ("Workout sessions") and a fourth with the EV40
+        // tracker (§2.1, migration 0006): both ride beside blocks and days. The assertion still pins a fixed key
+        // order and a fixed tail, which is the point of the golden — it just now asserts the 1.1 tail.
+        XCTAssertTrue(body.hasSuffix("\"days\":[],\"sessions\":[],\"tracker\":[]}"), body)
         XCTAssertTrue(body.contains("\"summary\":{\"n\":1,\"min\":70,\"max\":70,\"sum\":70,\"first_ts\":1790380800000,\"last_ts\":1790380800000}"))
     }
 

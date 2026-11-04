@@ -368,6 +368,10 @@ final class DataArchiveTests: XCTestCase {
             "coachConversations", "coachMessages", "coachMemories", "coachToolCalls", "userProfiles", "userGoals",
             "rawPackets", "derivedUpdates", "coachSummaries", "wearableLogs", "coachNotificationRecords",
             "mealEntries", "foodProducts", "measurementDeletions",
+            // The EV40 Daily Tracker (1.1): the user's own accountability log. An export that dropped a table the apps
+            // store would be an incomplete backup, so the key set is pinned with it (the policy this asserts:
+            // "every stored table travels, under Android's key names").
+            "ev40Days",
         ]
         XCTAssertEqual(Set(root.keys), Set(androidKeys + ["settings", "attachments"]))
         // Table order in the file = AgaraArchive declaration order; counts last.

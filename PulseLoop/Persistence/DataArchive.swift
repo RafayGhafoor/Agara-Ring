@@ -70,6 +70,9 @@ nonisolated struct AgaraArchive: Decodable, Sendable {
     /// Deletion tombstones (Android's `measurementDeletions`): a restore wipes every table first, and without
     /// them the next sync would bring the deleted readings/buckets back.
     var measurementDeletions: [ArchiveMeasurementDeletion] = []
+    /// EV40 Daily Tracker days (`ev40_days` on the server): the user's own accountability log, so an export must
+    /// carry it — a backup that silently dropped a table the apps store is an incomplete backup.
+    var ev40Days: [ArchiveEv40Day] = []
 
     /// Raw UserDefaults JSON blobs keyed by their storage key (metric prefs, workout prefs,
     /// calibration, coach settings, Apple Health prefs). Opaque pass-through — never re-encoded.
@@ -86,7 +89,7 @@ nonisolated struct AgaraArchive: Decodable, Sendable {
              derivedUpdates, userProfiles, userGoals, deviceMeasurementConfigs, activitySessions,
              activitySamples, activityGpsPoints, activityEvents, coachConversations, coachMessages,
              coachMemories, coachToolCalls, coachNotificationRecords, coachSummaries, wearableLogs,
-             mealEntries, foodProducts, measurementDeletions, settings, attachments
+             mealEntries, foodProducts, measurementDeletions, ev40Days, settings, attachments
         case activityDaily, activityDailies
         case activityBuckets, activityBucketSamples
         case activitySensorPolls, activitySensorPollEvents
@@ -131,6 +134,7 @@ nonisolated struct AgaraArchive: Decodable, Sendable {
         mealEntries = try list(.mealEntries)
         foodProducts = try list(.foodProducts)
         measurementDeletions = try list(.measurementDeletions)
+        ev40Days = try list(.ev40Days)
         settings = try c.decodeIfPresent([String: String].self, forKey: .settings)
         attachments = try c.decodeIfPresent([ArchiveAttachment].self, forKey: .attachments)
     }
@@ -1377,5 +1381,22 @@ nonisolated struct ArchiveFoodProduct: Codable, Sendable {
         m.useCount = useCount
         m.fetchedAt = fetchedAt ?? lastUsedAt
         context.insert(m)
+    }
+}
+
+/// One EV40 tracker day. Only what the user created travels (`dateKey` + `mask`): the sync bookkeeping
+/// (`ackedMask`, `serverUpdatedAt`) is per device and is rebuilt by the next sync — a restored row starts
+/// unacknowledged, so the server answers `duplicate` or takes the newer mask.
+nonisolated struct ArchiveEv40Day: Codable, Sendable {
+    var dateKey: String
+    var mask: Int
+
+    @MainActor init(_ d: Ev40Day) {
+        dateKey = d.dateKey
+        mask = Ev40Disciplines.normalised(d.mask)
+    }
+
+    @MainActor func insert(into context: ModelContext) {
+        context.insert(Ev40Day(dateKey: dateKey, mask: Ev40Disciplines.normalised(mask)))
     }
 }

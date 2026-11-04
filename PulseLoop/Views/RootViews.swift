@@ -248,6 +248,12 @@ struct RootAppView: View {
                     MealDetailView(mealId: id, path: $path)
                 case .pairing:
                     PairingView(onConnected: { path.removeLast() }).readableColumn()
+                case .ev40:
+                    Ev40TrackerView(path: $path).readableColumn()
+                case .ev40History:
+                    Ev40HistoryView(path: $path).readableColumn()
+                case let .ev40Day(key):
+                    Ev40DayView(dateKey: key).readableColumn()
                 case .debug:
                     #if DEBUG
                     DebugView()

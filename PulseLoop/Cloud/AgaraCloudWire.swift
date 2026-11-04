@@ -133,6 +133,17 @@ nonisolated struct SessionResult: Codable, Equatable, Sendable {
     enum CodingKeys: String, CodingKey { case sessionKey = "session_key", status, reason }
 }
 
+/// The server's answer for one EV40 tracker row (cloud-v2 §2.1): `accepted` (stored), `duplicate` (the mask was
+/// already the stored one — both are acknowledgements), or `rejected` with a reason. `updatedAt` is the **server's**
+/// stamp of the stored row, which is what the client keeps for the next conflict decision.
+nonisolated struct Ev40RowResult: Codable, Equatable, Sendable {
+    var date: String
+    var status: String
+    var reason: String?
+    var updatedAt: Int64?
+    enum CodingKeys: String, CodingKey { case date, status, reason, updatedAt = "updated_at" }
+}
+
 nonisolated struct SyncResponse: Codable, Equatable, Sendable {
     var envelope: Int?
     var cursor: String?
@@ -141,6 +152,8 @@ nonisolated struct SyncResponse: Codable, Equatable, Sendable {
     /// Absent on a server that predates sessions (and on every request that carries none), so it decodes as empty
     /// rather than failing the whole response.
     var sessions: [SessionResult] = []
+    /// The EV40 tracker outcomes; absent on a server that predates the tracker (decoded as empty, like sessions).
+    var tracker: [Ev40RowResult] = []
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -149,9 +162,12 @@ nonisolated struct SyncResponse: Codable, Equatable, Sendable {
         blocks = try c.decodeIfPresent([BlockResult].self, forKey: .blocks) ?? []
         days = try c.decodeIfPresent([DayResult].self, forKey: .days) ?? []
         sessions = try c.decodeIfPresent([SessionResult].self, forKey: .sessions) ?? []
+        tracker = try c.decodeIfPresent([Ev40RowResult].self, forKey: .tracker) ?? []
     }
-    init(envelope: Int? = 1, cursor: String?, blocks: [BlockResult], days: [DayResult], sessions: [SessionResult] = []) {
-        self.envelope = envelope; self.cursor = cursor; self.blocks = blocks; self.days = days; self.sessions = sessions
+    init(envelope: Int? = 1, cursor: String?, blocks: [BlockResult], days: [DayResult], sessions: [SessionResult] = [],
+         tracker: [Ev40RowResult] = []) {
+        self.envelope = envelope; self.cursor = cursor; self.blocks = blocks; self.days = days
+        self.sessions = sessions; self.tracker = tracker
     }
 }
 
@@ -162,8 +178,10 @@ nonisolated struct ChangesResponse: Codable, Equatable, Sendable {
     var days: [WireDay]
     /// Sessions pulled from another device (empty until the server stores them).
     var sessions: [WireSession] = []
+    /// EV40 tracker rows pulled from another device (empty until the server stores them).
+    var tracker: [WireEv40Day] = []
 
-    enum CodingKeys: String, CodingKey { case cursor, more, blocks, days, sessions }
+    enum CodingKeys: String, CodingKey { case cursor, more, blocks, days, sessions, tracker }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         cursor = try c.decodeIfPresent(String.self, forKey: .cursor) ?? ""
@@ -171,9 +189,12 @@ nonisolated struct ChangesResponse: Codable, Equatable, Sendable {
         blocks = try c.decodeIfPresent([WireBlock].self, forKey: .blocks) ?? []
         days = try c.decodeIfPresent([WireDay].self, forKey: .days) ?? []
         sessions = try c.decodeIfPresent([WireSession].self, forKey: .sessions) ?? []
+        tracker = try c.decodeIfPresent([WireEv40Day].self, forKey: .tracker) ?? []
     }
-    init(cursor: String, more: Bool, blocks: [WireBlock], days: [WireDay], sessions: [WireSession] = []) {
-        self.cursor = cursor; self.more = more; self.blocks = blocks; self.days = days; self.sessions = sessions
+    init(cursor: String, more: Bool, blocks: [WireBlock], days: [WireDay], sessions: [WireSession] = [],
+         tracker: [WireEv40Day] = []) {
+        self.cursor = cursor; self.more = more; self.blocks = blocks; self.days = days
+        self.sessions = sessions; self.tracker = tracker
     }
 }
 
@@ -229,6 +250,27 @@ nonisolated struct WireSession: Codable, Equatable, Sendable {
         case sessionKey = "session_key", date, type, startedAt = "started_at", endedAt = "ended_at"
         case durationMin = "duration_min", calories, distanceM = "distance_m"
         case avgHr = "avg_hr", minHr = "min_hr", maxHr = "max_hr", avgSpo2 = "avg_spo2", deleted
+    }
+}
+
+/// One EV40 tracker row as `GET /changes` returns it (cloud-v2 §2.1/§3.2). `date` is the user's local date, `mask`
+/// the eight disciplines as bits (Hydrate 0 … Rest 7), `updatedAt` the **server's** stamp in epoch ms.
+nonisolated struct WireEv40Day: Codable, Equatable, Sendable {
+    var date: String
+    var mask: Int
+    var updatedAt: Int64
+    enum CodingKeys: String, CodingKey { case date, mask, updatedAt = "updated_at" }
+
+    init(date: String, mask: Int, updatedAt: Int64) {
+        self.date = date; self.mask = mask; self.updatedAt = updatedAt
+    }
+
+    /// Tolerant: a missing/zero stamp reads as 0, and the mask is clamped to the eight bits the app knows.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        date = try c.decode(String.self, forKey: .date)
+        mask = (try c.decodeIfPresent(Int.self, forKey: .mask)).map(Ev40Disciplines.normalised) ?? 0
+        updatedAt = (try c.decodeIfPresent(Int64.self, forKey: .updatedAt)) ?? 0
     }
 }
 
@@ -376,11 +418,19 @@ nonisolated enum WireBlockBuilder {
     }
 
     static func envelope(clientId: String, platform: String, version: String, sentAt: Int64, blocks: [String], days: [String],
-                         sessions: [String] = []) -> Data {
+                         sessions: [String] = [], tracker: [String] = []) -> Data {
         var s = "{\"envelope\":\(envelopeVersion),\"client_id\":\(quote(clientId)),\"app\":{\"platform\":\(quote(platform)),\"version\":\(quote(version))},\"sent_at\":\(sentAt),\"blocks\":["
         s += blocks.joined(separator: ",") + "],\"days\":[" + days.joined(separator: ",")
-        s += "],\"sessions\":[" + sessions.joined(separator: ",") + "]}"
+        s += "],\"sessions\":[" + sessions.joined(separator: ",")
+        s += "],\"tracker\":[" + tracker.joined(separator: ",") + "]}"
         return Data(s.utf8)
+    }
+
+    /// One EV40 tracker row of the envelope: `{"date":"2026-11-04","mask":165}` — fixed key order, and **no
+    /// timestamp**, because the server stamps the change with its own clock (cloud-v2 §2.1, plan D3). Takes the two
+    /// values rather than the model, so the wire layer never touches SwiftData.
+    nonisolated static func json(dateKey: String, mask: Int) -> String {
+        "{\"date\":\(quote(dateKey)),\"mask\":\(Ev40Disciplines.normalised(mask))}"
     }
 }
 

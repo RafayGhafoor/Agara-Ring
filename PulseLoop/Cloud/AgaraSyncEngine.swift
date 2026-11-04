@@ -23,6 +23,8 @@ nonisolated struct CloudSyncSummary: Equatable, Sendable {
     var blocksRejected = 0
     var daysSent = 0
     var sessionsSent = 0
+    /// EV40 tracker rows acknowledged by the server in this run.
+    var trackerSent = 0
     var requests = 0
     var pull = PullReport()
     var pullPages = 0
@@ -141,6 +143,7 @@ final class AgaraSyncEngine {
             summary.rounds = round
             snapshot.stage = .uploading
             progress(snapshot)
+            try await pushTracker(&summary)
             try await pushSessions(&summary)
             try await pushDays(&summary)
             try await pushBlocks(&summary, &snapshot, progress: progress)
@@ -158,9 +161,46 @@ final class AgaraSyncEngine {
 
     // MARK: Push
 
-    private func envelope(blocks: [String], days: [WireDay], sessions: [String] = []) -> Data {
+    private func envelope(blocks: [String], days: [WireDay], sessions: [String] = [], tracker: [String] = []) -> Data {
         WireBlockBuilder.envelope(clientId: clientId(), platform: "ios", version: appVersion, sentAt: BlockStore.ms(now()),
-                                  blocks: blocks, days: days.map(WireBlockBuilder.json), sessions: sessions)
+                                  blocks: blocks, days: days.map(WireBlockBuilder.json), sessions: sessions, tracker: tracker)
+    }
+
+    /// Upload the EV40 tracker rows whose ticks the server has not confirmed (cloud-v2 §2.1). The row carries no
+    /// timestamp — the server stamps the change — so this is a plain "send the mask, believe the answer" loop.
+    ///
+    /// A row is acknowledged only on `accepted`/`duplicate` (both mean the server holds that mask); a `rejected`
+    /// row is logged and left unsent-marked for a later pass, and a request that throws marks nothing, so no tick
+    /// is ever lost. The loop stops when a pass acknowledges nothing, so the same refused rows cannot spin.
+    private func pushTracker(_ summary: inout CloudSyncSummary) async throws {
+        let context = container.mainContext
+        while true {
+            let pending = AgaraCloudTracker.pending(context: context)
+            guard !pending.isEmpty else { return }
+            let sent = pending.map { (day: $0, mask: Ev40Disciplines.normalised($0.mask)) }
+            let response = try await api.sync(
+                body: envelope(blocks: [], days: [], tracker: AgaraCloudTracker.payload(pending))
+            )
+            summary.requests += 1
+            let byDate = Dictionary(response.tracker.map { ($0.date, $0) }, uniquingKeysWith: { first, _ in first })
+            var acknowledged: [(day: Ev40Day, mask: Int, serverUpdatedAt: Date?)] = []
+            for row in sent {
+                guard let result = byDate[row.day.dateKey] else { continue }
+                switch result.status {
+                case "accepted", "duplicate":
+                    let stamp = result.updatedAt.map { Date(timeIntervalSince1970: Double($0) / 1000) }
+                    acknowledged.append((row.day, row.mask, stamp))
+                case "rejected":
+                    Self.log.error("server refused tracker row: \(result.reason ?? "unknown")")
+                default:
+                    break
+                }
+            }
+            AgaraCloudTracker.mark(synced: acknowledged, context: context)
+            summary.trackerSent += acknowledged.count
+            if acknowledged.isEmpty { return }
+            if acknowledged.contains(where: { $0.day.hasUnsentChange }) { continue }   // re-ticked while in flight
+        }
     }
 
     /// Upload recorded workout sessions (cloud-v2 §2.1). They go **before** the days: the server computes each day's
@@ -267,8 +307,10 @@ final class AgaraSyncEngine {
             let report = await store.applyPulled(page.blocks, units: Self.units, now: now())
             total.add(report)
             await applyPulledDays(page.days)
+            let tracker = AgaraCloudTracker.applyPulled(page.tracker, context: container.mainContext)
+            if tracker.needsUpload { total.needsUpload = true }
             state.cursor = page.cursor.isEmpty ? state.cursor : page.cursor
-            if report.changedLocalData { AgaraDataChange.shared.notify() }
+            if report.changedLocalData || tracker.changed { AgaraDataChange.shared.notify() }
             if !page.more { break }
         }
         summary.pull.add(total)

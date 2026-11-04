@@ -35,6 +35,10 @@ enum AppRoute: Hashable {
     case mealDetail(UUID)
     case pairing
     case debug
+    /// EV40 Daily Tracker (1.1): the checklist, its history, and one past day (read-only).
+    case ev40
+    case ev40History
+    case ev40Day(String)
     case componentGallery
     /// Sources & references (App Review 1.4.1); the optional `AgaraSources` section id scrolls to that group.
     case healthSources(String?)

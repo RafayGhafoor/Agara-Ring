@@ -327,6 +327,10 @@ enum SeedData {
     @MainActor
     static func clearAll(_ context: ModelContext) {
         clearData(context, keepingProfile: false)
+        // The EV40 checklist is the user's own content, not ring data: "explore without ring" (clearData) keeps it,
+        // but "Delete all my data" and an archive import replace everything — so it is removed here.
+        deleteAll(Ev40Day.self, context)
+        try? context.save()
     }
 
     /// Deletes every data table. `keepingProfile` leaves the `UserProfile` and `UserGoal` rows (the sample-data
