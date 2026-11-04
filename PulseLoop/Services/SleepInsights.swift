@@ -28,6 +28,22 @@ struct SleepScoreResult {
     /// True when the stage labels cover less than `SleepScore.Model.coverageFull` of the night, so the stage
     /// shares — and the score — are an average over the minutes the ring did label.
     var estimated: Bool = false
+    /// What made the score, in the order a breakdown sheet should show it (E-P2). Only the components that were in the
+    /// denominator appear — a ring with no REM has no REM line, rather than a 0/12 that reads as a failure. Empty for the
+    /// v1 scorer, which has no per-component model.
+    var components: [SleepScoreComponent] = []
+}
+
+/// One line of "why this score": what it was judged on, and the points it earned out of its weight. `value`/`unit` are
+/// display-ready ("7.9", "h"; "16", "%") and already in the unit the band speaks.
+struct SleepScoreComponent: Identifiable, Equatable {
+    let id: String
+    let points: Double
+    let weight: Double
+    let value: Double
+    let unit: String
+    /// 0…1 — drives the bar in the sheet, and cannot disagree with the label beside it.
+    var earned: Double { weight > 0 ? min(1, max(0, points / weight)) : 0 }
 }
 
 enum SleepScore {
@@ -168,18 +184,23 @@ enum SleepScore {
         let awakePct: Double? = (span > 0 && input.hasAwakeSignal) ? (input.awake / span) * 100 : nil
 
         var points = 0.0, weights = 0.0
-        func add(_ p: Double, _ w: Double) { points += p; weights += w }
+        var components: [SleepScoreComponent] = []
+        func add(_ id: String, _ p: Double, _ w: Double, _ value: Double, _ unit: String) {
+            points += p; weights += w
+            components.append(SleepScoreComponent(id: id, points: p, weight: w, value: value, unit: unit))
+        }
 
-        add(bandScore(totalHours, band: durationBand, points: model.durationWeight), model.durationWeight)
+        add("duration", bandScore(totalHours, band: durationBand, points: model.durationWeight), model.durationWeight,
+            totalHours, "h")
         if labelled > 0 {
-            add(bandScore(deepPct, band: deepBand, points: model.deepWeight), model.deepWeight)
-            if input.rem > 0 { add(bandScore(remPct, band: remBand, points: model.remWeight), model.remWeight) }
-            add(bandScore(lightPct, band: lightBand, points: model.lightWeight), model.lightWeight)
-            if let awakePct { add(awakeScore(awakePct, points: model.awakeWeight), model.awakeWeight) }
+            add("deep", bandScore(deepPct, band: deepBand, points: model.deepWeight), model.deepWeight, deepPct, "%")
+            if input.rem > 0 { add("rem", bandScore(remPct, band: remBand, points: model.remWeight), model.remWeight, remPct, "%") }
+            add("light", bandScore(lightPct, band: lightBand, points: model.lightWeight), model.lightWeight, lightPct, "%")
+            if let awakePct { add("awake", awakeScore(awakePct, points: model.awakeWeight), model.awakeWeight, awakePct, "%") }
         } else {
-            add(bandScore(deepPct, band: deepBand, points: model.deepWeight), model.deepWeight)
-            add(bandScore(lightPct, band: lightBand, points: model.lightWeight), model.lightWeight)
-            add(awakeScore(awakePct, points: model.awakeWeight), model.awakeWeight)
+            add("deep", bandScore(deepPct, band: deepBand, points: model.deepWeight), model.deepWeight, deepPct, "%")
+            add("light", bandScore(lightPct, band: lightBand, points: model.lightWeight), model.lightWeight, lightPct, "%")
+            add("awake", awakeScore(awakePct, points: model.awakeWeight), model.awakeWeight, awakePct ?? 0, "%")
         }
 
         var score = weights > 0 ? (points / weights) * 100 : 0
@@ -193,7 +214,7 @@ enum SleepScore {
         return SleepScoreResult(score: rounded, label: qualityLabel(rounded),
                                 deepPct: Int(deepPct.rounded()), lightPct: Int(lightPct.rounded()),
                                 awakePct: awakePct.map { Int($0.rounded()) },
-                                remPct: Int(remPct.rounded()), estimated: estimated)
+                                remPct: Int(remPct.rounded()), estimated: estimated, components: components)
     }
 
     static func calculate(_ sleep: SleepSummary, model: Model = SleepScoreConfig.active(), v2: Bool? = nil) -> SleepScoreResult {
