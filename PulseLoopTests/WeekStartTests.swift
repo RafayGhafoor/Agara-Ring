@@ -140,17 +140,24 @@ final class WeekStartTests: XCTestCase {
 
     /// `.sevenDays` used to be `now − 7 × 24 h`, so the vitals chart and its readings list started on a different day
     /// from the activity chart's aligned week — and from Android. It is now the calendar week on the user's boundary.
+    ///
+    /// The expectation is a **literal date**, not `WeekStart.startOfWeek(now)`: the first version derived it with the
+    /// very function the production cutoff calls, so a wrong `startOfWeek` would have moved both sides and the test
+    /// would still have passed (the same tautology an Android E2E in this batch had — `docs/process/learnings.md`,
+    /// 2026-11-05). 14 Oct 2026 is a Wednesday; the en_GB week containing it starts Monday 12 October.
     func testTheSevenDayMetricWindowStartsOnTheUsersWeekStart() throws {
         let cal = calendar("en_GB")
-        let wednesday = date(2026, 10, 14, cal).addingTimeInterval(13 * 3600)   // a Wednesday, mid-week
         TestSupport.withClock("2026-10-14T13:00:00") {
+            XCTAssertEqual(WeekStart.day(), 2, "precondition: en_GB weeks start on Monday")
+
             let cutoff = MetricsService.cutoff(for: .sevenDays)
-            let resolved = WeekStart.day()
-            XCTAssertEqual(cutoff, WeekStart.startOfWeek(wednesday, day: resolved, calendar: cal),
-                           "the metric week starts on the resolved week-start day, not 7 days back")
-            XCTAssertEqual(cal.component(.weekday, from: cutoff), resolved)
-            XCTAssertEqual(cal.startOfDay(for: cutoff), cutoff, "and at local midnight")
-            XCTAssertLessThan(cutoff, wednesday, "the window still contains now")
+            XCTAssertEqual(cal.startOfDay(for: cutoff), cutoff, "the window starts at local midnight")
+            assertLocalDate(cutoff, isYear: 2026, month: 10, day: 12, in: cal,
+                            "the metric week starts on Monday 12 October, not 7 days back (Wed 7 Oct)")
+            // The regression this guards, stated as the value that must NOT appear.
+            XCTAssertNotEqual(cal.startOfDay(for: cutoff),
+                              cal.startOfDay(for: cal.date(byAdding: .day, value: -7, to: AppClock.now) ?? AppClock.now),
+                              "the trailing window (Wed 7 Oct) is the behaviour this replaced")
         }
     }
 
@@ -159,13 +166,20 @@ final class WeekStartTests: XCTestCase {
         let cal = calendar("en_GB")   // would otherwise start on Monday
         WeekStart.install(1)
         defer { WeekStart.install(WeekStart.locale) }
-        let thursday = date(2026, 10, 15, cal).addingTimeInterval(9 * 3600)
         TestSupport.withClock("2026-10-15T09:00:00") {
+            XCTAssertEqual(WeekStart.day(), 1, "precondition: the installed Sunday is in force")
+
             let cutoff = MetricsService.cutoff(for: .sevenDays)
-            XCTAssertEqual(cutoff, WeekStart.startOfWeek(thursday, day: 1, calendar: cal),
-                           "the stored Sunday start governs the vitals week, not the en_GB Monday")
-            XCTAssertEqual(cal.component(.weekday, from: cutoff), 1, "Sunday")
-            XCTAssertEqual(cal.startOfDay(for: cutoff), cutoff)
+            XCTAssertEqual(cal.startOfDay(for: cutoff), cutoff, "the window starts at local midnight")
+            assertLocalDate(cutoff, isYear: 2026, month: 10, day: 11, in: cal,
+                            "the stored Sunday start governs the vitals week (Sun 11 Oct), not the en_GB Monday (12 Oct)")
         }
+    }
+
+    /// Asserts a date's year/month/day, so a failure prints the date it got rather than two epoch intervals.
+    private func assertLocalDate(_ date: Date, isYear y: Int, month m: Int, day d: Int, in cal: Calendar,
+                                 _ message: String, file: StaticString = #filePath, line: UInt = #line) {
+        let got = cal.dateComponents([.year, .month, .day], from: date)
+        XCTAssertEqual([got.year, got.month, got.day], [y, m, d], message, file: file, line: line)
     }
 }
