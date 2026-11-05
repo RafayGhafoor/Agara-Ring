@@ -97,7 +97,10 @@ final class Ev40TrackerTests: AgaraUITestCase {
         XCTAssertTrue(today.waitForExistence(timeout: 10), "today's history row is missing")
         today.tap()
         waitFor(element("ev40.day"), timeout: 15, "the past-day screen did not open")
-        // Read-only (decision D4): the rows are not buttons on a past day.
+        // Read-only (decision D4): the rows are not buttons on a past day. The absence only means something once the row
+        // is known to be *rendered* — an empty screen satisfies "not a button" just as well (AGENTS Rule 19: an absence
+        // assertion must first assert the surface exists).
+        waitFor(element("ev40.toggle.hydrate"), timeout: 15, "the past day's rows did not render")
         XCTAssertFalse(app.buttons["ev40.toggle.hydrate"].exists, "a past day must not be editable")
         shot("day-detail")
     }
