@@ -10,10 +10,17 @@ final class Ev40TrackerTests: AgaraUITestCase {
     private var shotDir: String? { ProcessInfo.processInfo.environment["EV40_SHOT_DIR"] }
 
     private func launch(reset: Bool = false) {
-        app.launchArguments = ["-noCoachMarks", "YES", "-acceptDisclaimer", "YES", "-sampleData", "YES",
+        // `-skipOnboarding YES` is the harness's own way past a clean install (minimal profile, **no** demo rows);
+        // `-sampleData` no longer reaches Today, which is why this class sat on step 1 of 7 and every assertion failed
+        // upstream of the thing it tests.
+        app.launchArguments = ["-noCoachMarks", "YES", "-acceptDisclaimer", "YES", "-skipOnboarding", "YES",
                                "-features", "", "-AppleLanguages", "(en)"]
         if reset { app.launchArguments += ["-ev40Reset", "YES"] }
         app.launch()
+        // This class builds its own launch, so it does not inherit `AgaraUITestCase.launch()`'s guard. Without this the
+        // fresh-install notifications prompt blocks every element query and the failure reads as "ring chip missing"
+        // (the skill's rule, and this class proved it by failing 0/3 without it).
+        dismissSystemAlert()
         waitFor(app.buttons["Vitals"].exists ? app.buttons["Vitals"] : app.tabBars.buttons["Vitals"], timeout: 40)
     }
 
@@ -22,8 +29,13 @@ final class Ev40TrackerTests: AgaraUITestCase {
     /// profile the first launch created is simply reused.
     private func relaunchKeepingData() {
         app.terminate()
-        app.launchArguments = ["-noCoachMarks", "YES", "-acceptDisclaimer", "YES", "-features", "", "-AppleLanguages", "(en)"]
+        app.launchArguments = ["-noCoachMarks", "YES", "-acceptDisclaimer", "YES", "-skipOnboarding", "YES",
+                               "-features", "", "-AppleLanguages", "(en)"]
         app.launch()
+        // This class builds its own launch, so it does not inherit `AgaraUITestCase.launch()`'s guard. Without this the
+        // fresh-install notifications prompt blocks every element query and the failure reads as "ring chip missing"
+        // (the skill's rule, and this class proved it by failing 0/3 without it).
+        dismissSystemAlert()
         waitFor(app.buttons["Vitals"].exists ? app.buttons["Vitals"] : app.tabBars.buttons["Vitals"], timeout: 40)
     }
 
