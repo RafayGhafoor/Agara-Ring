@@ -378,11 +378,16 @@ enum MetricsService {
 
     /// Start date for a metric range window (mirrors `samplesSinceCutoff`'s non-demo cutoff so the
     /// windowed fetch returns exactly the rows that filter would have kept).
-    private static func cutoff(for range: MetricRange) -> Date {
+    ///
+    /// `.sevenDays` is the **calendar** week that contains now, on the user's own boundary (`WeekStart`: stored choice,
+    /// else the device locale) — not a trailing 7×24 h window. It used to be the trailing one, which disagreed with the
+    /// activity chart's aligned week and with Android (plan `asana-heart-bugs-2026-11-01`, item D gap #2, 2026-11-05).
+    /// Internal rather than private so the boundary — the part of this that has broken before — can be asserted.
+    static func cutoff(for range: MetricRange) -> Date {
         let cal = Calendar.current
         switch range {
         case .twentyFourHours: return cal.date(byAdding: .hour, value: -24, to: AppClock.now) ?? AppClock.now
-        case .sevenDays:       return cal.date(byAdding: .day, value: -7, to: AppClock.now) ?? AppClock.now
+        case .sevenDays:       return WeekStart.startOfWeek(AppClock.now, calendar: cal)
         case .thirtyDays:      return cal.date(byAdding: .day, value: -30, to: AppClock.now) ?? AppClock.now
         case .twelveMonths:    return cal.date(byAdding: .day, value: -365, to: AppClock.now) ?? AppClock.now
         }

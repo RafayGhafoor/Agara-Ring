@@ -357,7 +357,9 @@ struct MetricDetailView: View {
         let start: Date
         switch period {
         case .today: start = Calendar.current.startOfDay(for: now)
-        case .week: start = Calendar.current.date(byAdding: .day, value: -7, to: now) ?? now
+        // The calendar week (WeekStart), not a trailing 7 days: the readings list and the chart above it must agree
+        // with the activity chart and with Android — plan `asana-heart-bugs-2026-11-01`, item D gap #2.
+        case .week: start = WeekStart.startOfWeek(now)
         case .month: start = Calendar.current.date(byAdding: .day, value: -30, to: now) ?? now
         }
         let cal = CalibrationStore.shared.settings

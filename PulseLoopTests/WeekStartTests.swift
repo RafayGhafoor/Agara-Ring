@@ -135,4 +135,37 @@ final class WeekStartTests: XCTestCase {
         WeekStartPrefs.install(99, defaults: suite)   // corrupt: clamped to follow-the-device
         XCTAssertEqual(WeekStartPrefs.stored(suite), WeekStart.locale)
     }
+
+    // MARK: - The metric-detail week window (item D gap #2, 2026-11-05)
+
+    /// `.sevenDays` used to be `now − 7 × 24 h`, so the vitals chart and its readings list started on a different day
+    /// from the activity chart's aligned week — and from Android. It is now the calendar week on the user's boundary.
+    func testTheSevenDayMetricWindowStartsOnTheUsersWeekStart() throws {
+        let cal = calendar("en_GB")
+        let wednesday = date(2026, 10, 14, cal).addingTimeInterval(13 * 3600)   // a Wednesday, mid-week
+        TestSupport.withClock("2026-10-14T13:00:00") {
+            let cutoff = MetricsService.cutoff(for: .sevenDays)
+            let resolved = WeekStart.day()
+            XCTAssertEqual(cutoff, WeekStart.startOfWeek(wednesday, day: resolved, calendar: cal),
+                           "the metric week starts on the resolved week-start day, not 7 days back")
+            XCTAssertEqual(cal.component(.weekday, from: cutoff), resolved)
+            XCTAssertEqual(cal.startOfDay(for: cutoff), cutoff, "and at local midnight")
+            XCTAssertLessThan(cutoff, wednesday, "the window still contains now")
+        }
+    }
+
+    /// The resolution order has to reach this window too: an installed Sunday must beat a Monday locale.
+    func testAnInstalledSundayMovesTheMetricWindow() throws {
+        let cal = calendar("en_GB")   // would otherwise start on Monday
+        WeekStart.install(1)
+        defer { WeekStart.install(WeekStart.locale) }
+        let thursday = date(2026, 10, 15, cal).addingTimeInterval(9 * 3600)
+        TestSupport.withClock("2026-10-15T09:00:00") {
+            let cutoff = MetricsService.cutoff(for: .sevenDays)
+            XCTAssertEqual(cutoff, WeekStart.startOfWeek(thursday, day: 1, calendar: cal),
+                           "the stored Sunday start governs the vitals week, not the en_GB Monday")
+            XCTAssertEqual(cal.component(.weekday, from: cutoff), 1, "Sunday")
+            XCTAssertEqual(cal.startOfDay(for: cutoff), cutoff)
+        }
+    }
 }
