@@ -117,6 +117,30 @@ final class Ev40TrackerTests: AgaraUITestCase {
         shot("day-detail")
     }
 
+    /// The share sheet: the challenge eyebrow is on the tracker, the card renders, and the `ShareLink` exists.
+    /// Surface first, then the toggle — a sheet that opens empty must not pass as "no share button".
+    func testTheShareSheetRendersTheChallengeCard() {
+        launch(reset: true)
+        openTracker()
+        toggle("hydrate")
+        toggle("move")
+        XCTAssertTrue(element("ev40.challengeDay").waitForExistence(timeout: 10),
+                      "the challenge day line is missing on a ticked day")
+        XCTAssertTrue(element("ev40.challengeDay").label.lowercased().contains("day 1 of"),
+                      "day one of the challenge, got \(element("ev40.challengeDay").label)")
+
+        app.buttons["ev40.shareButton"].tap()
+        waitFor(element("ev40.shareSheet"), timeout: 15, "the share sheet did not open")
+        shot("ev40-share-story")
+        XCTAssertTrue(element("ev40.shareLink").waitForExistence(timeout: 20), "no ShareLink on the sheet")
+
+        // Square is the sheet's other export; the preview must survive the switch.
+        app.buttons["Square"].tap()
+        RunLoop.current.run(until: Date().addingTimeInterval(0.8))
+        shot("ev40-share-square")
+        XCTAssertTrue(element("ev40.shareLink").exists, "the ShareLink disappeared after switching format")
+    }
+
     func testTicksSurviveARelaunch() {
         launch(reset: true)
         openTracker()

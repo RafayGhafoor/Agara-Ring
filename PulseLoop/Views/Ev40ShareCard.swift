@@ -163,7 +163,6 @@ struct Ev40ShareSheet: View {
         .presentationBackground(AgaraColors.background)
         .onAppear(perform: rebuild)
         .onChange(of: format) { _, _ in renderShareImage() }
-        .accessibilityIdentifier("ev40.shareSheet")
     }
 
     private var header: some View {
@@ -171,6 +170,9 @@ struct Ev40ShareSheet: View {
             Text(AgaraCopy.ev40ShareTitle)
                 .font(AgaraFont.title3.weight(.bold))
                 .foregroundStyle(AgaraColors.textPrimary)
+                // The sheet's identifier lives on this label, not on the container: an identifier on a stack propagates
+                // to every descendant and shadows the children's own ids (`ev40.shareLink` became unreachable).
+                .accessibilityIdentifier("ev40.shareSheet")
             Spacer()
             Button { dismiss() } label: {
                 Image(systemName: "xmark")
