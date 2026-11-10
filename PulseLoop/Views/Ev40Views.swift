@@ -204,13 +204,20 @@ struct Ev40DisciplineRow: View {
 struct Ev40TrackerView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
+    @Query private var days: [Ev40Day]
     @State private var now = AppClock.now
+    @State private var showingShare = false
     let path: Binding<NavigationPath>
 
     private var key: String { Ev40Repo.dayKey(now) }
     private var mask: Int { Ev40Repo.todayMask(context: modelContext, now: now) }
     private var done: Int { Ev40Disciplines.count(mask) }
     private var isComplete: Bool { Ev40Disciplines.isComplete(mask) }
+
+    /// "Day 14 of 40", from the synced history — nil until the first tick of the challenge.
+    private var challengeLabel: String? {
+        Ev40Challenge.label(dayNumber: Ev40Challenge.todayDayNumber(days))
+    }
 
     var body: some View {
         ScrollView {
@@ -246,6 +253,17 @@ struct Ev40TrackerView: View {
                 .accessibilityIdentifier("ev40.historyButton")
                 .accessibilityLabel(AgaraCopy.ev40HistoryTitle)
             }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { showingShare = true } label: {
+                    Image(systemName: "square.and.arrow.up")
+                        .foregroundStyle(AgaraColors.accent)
+                }
+                .accessibilityIdentifier("ev40.shareButton")
+                .accessibilityLabel(AgaraCopy.ev40ShareTitle)
+            }
+        }
+        .sheet(isPresented: $showingShare) {
+            Ev40ShareSheet().agaraRingEnvironment()
         }
         .onChange(of: scenePhase) { _, phase in if phase == .active { now = AppClock.now } }
         .accessibilityIdentifier("ev40.screen")
@@ -259,6 +277,14 @@ struct Ev40TrackerView: View {
             Text(AgaraCopy.ev40ScreenSubhead)
                 .font(AgaraFont.footnote)
                 .foregroundStyle(AgaraColors.textMuted)
+            if let dayLabel = challengeLabel {
+                Text(dayLabel.uppercased())
+                    .font(AgaraFont.micro)
+                    .tracking(1.4)
+                    .foregroundStyle(AgaraColors.accent)
+                    .padding(.top, 2)
+                    .accessibilityIdentifier("ev40.challengeDay")
+            }
             Text(Ev40Repo.displayDate(key))
                 .font(AgaraFont.caption)
                 .foregroundStyle(AgaraColors.textMuted)

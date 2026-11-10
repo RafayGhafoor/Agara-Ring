@@ -276,9 +276,12 @@ final class SleepSourceMergeTests: XCTestCase {
         guard let tab = SleepService.sleepForDate(night, context: context) else { return XCTFail("no night") }
         let displayed = SleepScore.calculate(tab).score
         XCTAssertEqual(tab.session.score, displayed)
-        // Android's inputs (asleep minutes, deep = DEEP + REM, awake share of the 650-min span) — the same
-        // 64 Android's `SleepSourceMergeTest` pins for ring B's night (audit batch B).
-        XCTAssertEqual(displayed, 64)
+        // Android's inputs (asleep minutes, deep = DEEP + REM, awake share of the 650-min span) — the same value
+        // Android's `SleepSourceMergeTest` pins for ring B's night (audit batch B).
+        //
+        // **Policy change 2026-11-05:** `sleep_score_v2` now ships on, so this night scores 76 on both platforms
+        // instead of v1's 64. Kept as one literal on each side because that agreement *is* the parity proof.
+        XCTAssertEqual(displayed, 76)
         XCTAssertEqual(AgaraCloudDays.sleepSummary(for: night, context: context)?.quality, displayed,
                        "the cloud `quality` is the displayed score, not 0")
         // Every stored row carries its own displayed score, emulator rows included.

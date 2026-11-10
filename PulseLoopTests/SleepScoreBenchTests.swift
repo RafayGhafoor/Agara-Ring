@@ -8,8 +8,8 @@ import XCTest
 /// writes `app/build/sleep-score-bench.md`). Asserting them here is the parity proof Rule 2 asks for: the two
 /// platforms must produce the same score for the same night, under both models.
 ///
-/// The rollout rule (owner 2026-11-01) is covered too: v2 ships behind `sleep_score_v2`, so with the flag off
-/// the app must show the v1 column.
+/// The rollout is covered too: **`sleep_score_v2` ships ON from 2026-11-05** (owner rollout), so the app must show the
+/// v2 column, while passing `v2: false` must still produce v1 exactly — the flag remains the kill switch.
 final class SleepScoreBenchTests: XCTestCase {
 
     private struct Night {
@@ -54,11 +54,16 @@ final class SleepScoreBenchTests: XCTestCase {
     }
 
     /// The rollout rule: `sleep_score_v2` ships off, and the flag really selects the scorer.
-    func testFlagSelectsTheScorerAndShipsOff() {
-        XCTAssertFalse(SleepScore.v2Enabled, "sleep_score_v2 must ship off (owner 2026-11-01)")
+    /// **Policy changed 2026-11-05:** the flag shipped OFF through 1.1.0 ("ship v2 behind a flag, roll out next
+    /// update", owner 2026-11-01); the rollout turned it ON. The assertion now pins the shipped state and keeps the
+    /// kill switch honest — `v2: false` must still reproduce the frozen v1 column exactly.
+    func testFlagSelectsTheScorerAndShipsOn() {
+        XCTAssertTrue(SleepScore.v2Enabled, "sleep_score_v2 ships on from the 2026-11-05 rollout")
         for night in nights {
-            XCTAssertEqual(SleepScore.score(night.inputs).score, night.v1,
-                           "\(night.name): flag off must show v1")
+            XCTAssertEqual(SleepScore.score(night.inputs).score, night.v2,
+                           "\(night.name): flag on must show v2")
+            XCTAssertEqual(SleepScore.score(night.inputs, v2: false).score, night.v1,
+                           "\(night.name): flag off must still show v1 (kill switch)")
             XCTAssertEqual(SleepScore.score(night.inputs, v2: true).score, night.v2,
                            "\(night.name): flag on must show v2")
         }
