@@ -32,7 +32,9 @@ final class Ev40ShareCardModelTests: XCTestCase {
         let model = Ev40ShareCardModel.make(mask: 255, userName: nil, now: day("2026-11-05"), calendar: calendar,
                                             trackedKeys: ["2026-11-03", "2026-11-04", "2026-11-05"],
                                             masksByKey: masks)
-        XCTAssertEqual(model.dayLabel, "Day 3 of 40")
+        // v3 moved the day into the pill (dayLabel removed): asserted as the number the pill prints.
+        XCTAssertEqual(model.dayNumber, 3)
+        XCTAssertEqual(model.pillLabel, "DAY 3 / 40")
         XCTAssertEqual(model.journeyToday, 2)
         XCTAssertEqual(model.journey.count, Ev40Challenge.totalDays)
         XCTAssertEqual(Array(model.journey.prefix(4)), [2, 0, 4, 0])
@@ -68,7 +70,8 @@ final class Ev40ShareCardModelTests: XCTestCase {
         let model = Ev40ShareCardModel.make(mask: 1, userName: nil, now: day("2026-11-05"), calendar: calendar,
                                             trackedKeys: ["2026-11-01", "2026-11-05"],
                                             masksByKey: ["2026-11-01": 0, "2026-11-05": 1])
-        XCTAssertEqual(model.dayLabel, "Day 1 of 40")
+        XCTAssertEqual(model.dayNumber, 1)
+        XCTAssertEqual(model.pillLabel, "DAY 1 / 40")
         XCTAssertEqual(model.streak, 1)
         XCTAssertEqual(model.daysActive, 1)
         XCTAssertEqual(model.journey[0], 1)
@@ -77,7 +80,7 @@ final class Ev40ShareCardModelTests: XCTestCase {
     // MARK: Stats line — singular at exactly 1, the streak not repeated (mirror of Android `Ev40ShareCardStatsTest`)
 
     private func card(perfect: Int = 0, active: Int = 0, day: Int? = 14) -> Ev40ShareCardModel {
-        Ev40ShareCardModel(userName: nil, dayLabel: "Day 14 of 40", dateLine: "Tue, 10 Nov", done: 0, total: 8,
+        Ev40ShareCardModel(userName: nil, dateLine: "Tue, 10 Nov", done: 6, total: 8,
                            disciplines: [], streak: 9, perfectDays: perfect, daysActive: active,
                            journey: [], journeyToday: nil, dayNumber: day)
     }
@@ -120,5 +123,63 @@ final class Ev40ShareCardModelTests: XCTestCase {
         let model = Ev40ShareCardModel.make(mask: 0, userName: nil, trackedKeys: [])
         XCTAssertEqual(model.disciplines.map(\.symbol), Ev40Discipline.allCases.map(\.symbol))
         XCTAssertFalse(model.disciplines.contains { $0.symbol == "circle" }, "no discipline falls back to a blank disc")
+    }
+
+    func testTheCopyAroundTheNumbersComesFromTheCatalogTemplates() {
+        XCTAssertEqual(card().ringCount, "6 of 8")
+        XCTAssertEqual(Ev40ShareCardModel.journeyDay(1), "Day 1")
+        XCTAssertEqual(Ev40ShareCardModel.journeyDay(40), "Day 40")
+    }
+
+    // MARK: The 40-day window (review 2026-11-10, finding 1) — mirror of Android Ev40ChallengeTest
+
+    private func key(_ date: Date) -> String { Ev40Challenge.key(date, calendar: calendar) }
+
+    func testOnTheLastDayTheGridIsTheWholeChallengeWithTodayInTheLastSlot() {
+        let masks = ["2026-09-26": 1, "2026-11-04": 255]
+        let (slots, today) = Ev40ShareCardModel.journey(tickedKeys: Array(masks.keys), masksByKey: masks,
+                                                        today: day("2026-11-04"), calendar: calendar)
+        XCTAssertEqual(today, 39)
+        XCTAssertEqual(slots.first, 1)
+        XCTAssertEqual(slots[39], 4)
+    }
+
+    func testPastTheLastDayTheGridSlidesSoTodayStaysOnItWithTheDaysJustBefore() {
+        var masks = ["2026-09-26": 1, "2026-11-04": 7, "2026-11-05": 255]
+        let (slots, today) = Ev40ShareCardModel.journey(tickedKeys: Array(masks.keys), masksByKey: masks,
+                                                        today: day("2026-11-05"), calendar: calendar)
+        XCTAssertEqual(slots.count, 40)
+        XCTAssertEqual(today, 39, "today is the last slot, not slot 40 (off the grid)")
+        XCTAssertEqual(slots[39], 4, "and carries today's 8/8")
+        XCTAssertEqual(slots[38], 2, "yesterday's 3 ticks")
+        XCTAssertEqual(slots[0], 0, "day 1 has slid off")
+        masks["2026-11-06"] = 1
+        let (later, laterToday) = Ev40ShareCardModel.journey(tickedKeys: Array(masks.keys), masksByKey: masks,
+                                                             today: day("2026-11-06"), calendar: calendar)
+        XCTAssertEqual(laterToday, 39)
+        XCTAssertEqual(later[39], 1)
+        XCTAssertEqual(later[38], 4)
+    }
+
+    // MARK: The one shrink rule (review findings 2 and 12) — mirror of Android Ev40ShareCardStatsTest
+
+    func testTextThatFitsKeepsItsSizeTheBoundaryIncluded() {
+        XCTAssertEqual(Ev40ShareCardView.fitSize(base: 96, widthAtBase: 500, available: 936, floor: 48), 96)
+        XCTAssertEqual(Ev40ShareCardView.fitSize(base: 96, widthAtBase: 936, available: 936, floor: 48), 96)
+    }
+
+    func testTextThatIsTooWideShrinksInProportionButNeverBelowTheFloor() {
+        XCTAssertEqual(Ev40ShareCardView.fitSize(base: 96, widthAtBase: 1872, available: 936, floor: 48), 48)
+        XCTAssertEqual(Ev40ShareCardView.fitSize(base: 96, widthAtBase: 1248, available: 936, floor: 48), 72)
+        XCTAssertEqual(Ev40ShareCardView.fitSize(base: 96, widthAtBase: 9000, available: 936, floor: 48), 48)
+    }
+
+    func testAnEmptyStringDoesNotDivideByZero() {
+        XCTAssertEqual(Ev40ShareCardView.fitSize(base: 32, widthAtBase: 0, available: 100, floor: 18), 32)
+    }
+
+    func testTheAddressGetsWhatTheTaglineLeavesLessTheGapAndNeverNothing() {
+        XCTAssertEqual(Ev40ShareCardView.addressRoom(taglineWidth: 400), 512)
+        XCTAssertEqual(Ev40ShareCardView.addressRoom(taglineWidth: 5000), 1)
     }
 }

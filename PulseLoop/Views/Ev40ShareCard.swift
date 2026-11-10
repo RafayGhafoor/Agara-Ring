@@ -61,7 +61,8 @@ struct Ev40ShareCardView: View {
 
         // Who and when. No name → the date takes the name's place, so nothing below moves (D10).
         if let name = model.userName {
-            text(name, x: M, baseline: baseline, size: 96, weight: .bold, color: AgaraColors.textPrimary)
+            fitted(name, x: M, baseline: baseline, base: 96, floor: 48, available: IW, weight: .bold,
+                   color: AgaraColors.textPrimary)
             text(model.dateLine, x: M, baseline: baseline + 60, size: 34, weight: .medium,
                  color: AgaraColors.textSecondary)
         } else {
@@ -73,12 +74,12 @@ struct Ev40ShareCardView: View {
         ring(cx: cx, cy: cy, r: 132, stroke: 24)
         if model.isPerfect {
             symbol("star.fill", cx: cx, cy: cy - 6, size: 92, color: highlight)
-            text("\(model.done) of \(model.total)", x: cx, baseline: cy + 74, size: 26, weight: .semibold,
+            text(model.ringCount, x: cx, baseline: cy + 74, size: 26, weight: .semibold,
                  color: AgaraColors.textMuted, align: .center)
         } else {
             text("\(model.percent)%", x: cx, baseline: cy + 18, size: 64, weight: .bold,
                  color: AgaraColors.textPrimary, align: .center)
-            text("\(model.done) of \(model.total)", x: cx, baseline: cy + 62, size: 26, weight: .semibold,
+            text(model.ringCount, x: cx, baseline: cy + 62, size: 26, weight: .semibold,
                  color: AgaraColors.textMuted, align: .center)
         }
         let sx = cx + 132 + 72
@@ -123,8 +124,9 @@ struct Ev40ShareCardView: View {
             dayCell(day, rect: CGRect(x: x0, y: y0, width: cell, height: cell), radius: 9, ring: 5)
         }
         let labels = fy + 34 + 2 * cell + cellGap + 4 + 40
-        text("Day 1", x: M + pad, baseline: labels, size: 22, weight: .medium, color: AgaraColors.textMuted)
-        text("Day \(Ev40Challenge.totalDays)", x: W - M - pad, baseline: labels, size: 22, weight: .medium,
+        text(Ev40ShareCardModel.journeyDay(1), x: M + pad, baseline: labels, size: 22, weight: .medium,
+             color: AgaraColors.textMuted)
+        text(Ev40ShareCardModel.journeyDay(Ev40Challenge.totalDays), x: W - M - pad, baseline: labels, size: 22, weight: .medium,
              color: AgaraColors.textMuted, align: .trailing)
 
         footer
@@ -139,8 +141,8 @@ struct Ev40ShareCardView: View {
         let cell = (IW - 39 * gap) / 40
 
         header
-        text([model.userName, model.dateLine].compactMap { $0 }.joined(separator: " · "),
-             x: M, baseline: 246, size: 48, weight: .bold, color: AgaraColors.textPrimary)
+        fitted([model.userName, model.dateLine].compactMap { $0 }.joined(separator: " · "),
+               x: M, baseline: 246, base: 48, floor: 30, available: IW, weight: .bold, color: AgaraColors.textPrimary)
         ring(cx: cx, cy: cy, r: 100, stroke: 20)
         if model.isPerfect {
             symbol("star.fill", cx: cx, cy: cy, size: 70, color: highlight)
@@ -179,7 +181,7 @@ struct Ev40ShareCardView: View {
     /// The EV40 wordmark (owner's logo) with "BY AGARA" under it, and the day pill (D9) on the right.
     @ViewBuilder private var header: some View {
         mark(x: M, top: 92, height: 62, opacity: 1)
-        tracked("BY AGARA", x: M, baseline: 194, size: 22, weight: .bold, color: AgaraColors.textMuted, tracking: 0.28)
+        tracked(AgaraCopy.ev40ShareAttribution, x: M, baseline: 194, size: 22, weight: .bold, color: AgaraColors.textMuted, tracking: 0.28)
         Text(model.pillLabel)
             .font(AgaraFont.face(28 * k, .bold))
             .tracking(0.12 * 28 * k)
@@ -205,19 +207,17 @@ struct Ev40ShareCardView: View {
         text(AgaraCopy.ev40ChallengeTagline, x: M, baseline: baseline, size: size, weight: .medium,
              color: AgaraColors.textSecondary)
         if card.qr, let url = card.qrUrl {
-            // The console switched the QR on (A6/D4): it encodes the address instead of spelling it out.
+            // The console switched the QR on (A6/D4): it encodes the address instead of spelling it out. The bitmap is
+            // made for this 108-px slot and drawn at its own size, so no module is resampled (review finding 5).
             qrCode(url)
-                .frame(width: 108 * k, height: 108 * k)
-                .offset(x: (W - M - 108) * k, y: (ruleY + 14) * k)
+                .frame(width: Self.qrSlot * k, height: Self.qrSlot * k, alignment: .bottomTrailing)
+                .offset(x: (W - M - Self.qrSlot) * k, y: (ruleY + 14) * k)
         } else {
-            // The address the cloud names (R1), shrunk to whatever the tagline leaves.
-            Text(card.displayUrl)
-                .font(AgaraFont.face(size * k, .bold))
-                .foregroundStyle(AgaraColors.accent)
-                .lineLimit(1)
-                .minimumScaleFactor(18 / size)
-                .frame(width: (IW * 0.5) * k, alignment: .trailing)
-                .offset(x: (W - M - IW * 0.5) * k, y: (baseline - Self.ascent * size) * k)
+            // The address the cloud names (R1), by the same rule as Android: shrunk into what the tagline leaves.
+            let room = Self.addressRoom(taglineWidth: Self.measure(AgaraCopy.ev40ChallengeTagline, size: size,
+                                                                   weight: .medium), width: W, margin: M)
+            fitted(card.displayUrl, x: W - M, baseline: baseline, base: size, floor: 18, available: room,
+                   weight: .bold, color: AgaraColors.accent, align: .trailing)
         }
     }
 
@@ -283,16 +283,18 @@ struct Ev40ShareCardView: View {
 
     /// "LESS ▪▪▪▪ MORE", right-aligned at `right` on `baseline`.
     @ViewBuilder private func legend(right: CGFloat, baseline: CGFloat) -> some View {
-        HStack(spacing: 0) {
+        // Square bottoms sit on the text baseline, as Android draws them; LESS ends 10 px before the first square
+        // (Android: one 26-px pitch − the 20-px square + 4) — review findings 8 and 9.
+        HStack(alignment: .firstTextBaseline, spacing: 0) {
             Text(AgaraCopy.ev40ShareLegendLess).tracking(0.15 * 20 * k)
-                .padding(.trailing, 4 * k)
+                .padding(.trailing, 10 * k)
             HStack(spacing: 6 * k) {
                 ForEach(1...4, id: \.self) { level in
                     RoundedRectangle(cornerRadius: 5 * k).fill(AgaraColors.accent.opacity(Self.heat(level)))
                         .frame(width: 20 * k, height: 20 * k)
-                        .alignmentGuide(.firstTextBaseline) { $0[.bottom] }
                 }
             }
+            .alignmentGuide(.firstTextBaseline) { $0[.bottom] }
             .padding(.trailing, 12 * k)
             Text(AgaraCopy.ev40ShareLegendMore).tracking(0.15 * 20 * k)
         }
@@ -357,6 +359,47 @@ struct Ev40ShareCardView: View {
 
     // MARK: Text
 
+    /// The one shrink rule both platforms use for text whose length the card does not control (the name, the cloud's
+    /// address): the base size, scaled so the text fits `available` px, never below `floor`. Mirror of Android `fitSize`.
+    static func fitSize(base: CGFloat, widthAtBase: CGFloat, available: CGFloat, floor: CGFloat) -> CGFloat {
+        if widthAtBase <= available || widthAtBase <= 0 { return base }
+        return min(base, max(floor, base * available / widthAtBase))
+    }
+
+    /// The room the footer leaves the address: what the tagline does not take, less a 24-px gap. Mirror of Android.
+    static func addressRoom(taglineWidth: CGFloat, width: CGFloat = 1080, margin: CGFloat = 72) -> CGFloat {
+        max(1, width - margin - (margin + taglineWidth) - 24)
+    }
+
+    /// Width in card pixels of `s` in Manrope at `size` px — the measurement Android's `Paint.measureText` makes.
+    static func measure(_ s: String, size: CGFloat, weight: Font.Weight) -> CGFloat {
+        let face: String
+        switch weight {
+        case .bold, .heavy, .black: face = "Manrope-Bold"
+        case .semibold: face = "Manrope-SemiBold"
+        case .medium: face = "Manrope-Medium"
+        default: face = "Manrope-Regular"
+        }
+        let font = UIFont(name: face, size: size) ?? .systemFont(ofSize: size)
+        return ceil((s as NSString).size(withAttributes: [.font: font]).width)
+    }
+
+    /// Text fitted by `fitSize` and then truncated with "…" if it still does not fit at the floor.
+    @ViewBuilder
+    private func fitted(_ s: String, x: CGFloat, baseline: CGFloat, base: CGFloat, floor: CGFloat, available: CGFloat,
+                        weight: Font.Weight, color: Color, align: Align = .leading) -> some View {
+        let size = Self.fitSize(base: base, widthAtBase: Self.measure(s, size: base, weight: weight),
+                                available: available, floor: floor)
+        let label = Text(s)
+            .font(AgaraFont.face(size * k, weight))
+            .foregroundStyle(color)
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .frame(width: available * k, alignment: align == .trailing ? .trailing : .leading)
+        let y = (baseline - Self.ascent * size) * k
+        if align == .trailing { label.offset(x: (x - available) * k, y: y) } else { label.offset(x: x * k, y: y) }
+    }
+
     private enum Align { case leading, center, trailing }
 
     /// Text placed by its baseline, the way Android's `Canvas.drawText` places it. `x` is the leading edge, the centre or
@@ -400,22 +443,23 @@ struct Ev40ShareCardView: View {
         if let image = Ev40ShareCardView.qrImage(text) {
             image
                 .interpolation(.none)
-                .resizable()
-                .aspectRatio(1, contentMode: .fit)
                 .accessibilityHidden(true)
         }
     }
 
-    /// The QR bitmap for a 44 pt footer slot: at the card's 3× export that slot is 132 px, and the bitmap is an integer
-    /// multiple of the generator's module grid so no module edge falls mid-pixel.
+    /// The footer's QR slot in card pixels (36 pt at 3×).
+    static let qrSlot: CGFloat = 108
+
+    /// The QR bitmap for the footer slot: the largest *integer* multiple of the generator's module grid that fits
+    /// `qrSlot`, shown at its own size — so every module is the same number of pixels (review finding 5: a 132-px bitmap
+    /// drawn into the 108-px frame gave uneven modules).
     static func qrImage(_ text: String) -> Image? {
         guard let data = text.data(using: .utf8) else { return nil }
         let filter = CIFilter.qrCodeGenerator()
         filter.message = data
         filter.correctionLevel = "M"
         guard let output = filter.outputImage else { return nil }
-        let slotPixels = 132.0                                   // 44 pt × 3 (`format.scale`)
-        let factor = max(1, (slotPixels / output.extent.width).rounded(.up))
+        let factor = max(1, (Double(qrSlot) / output.extent.width).rounded(.down))
         let scaled = output.transformed(by: CGAffineTransform(scaleX: factor, y: factor))
         guard let cgImage = qrContext.createCGImage(scaled, from: scaled.extent) else { return nil }
         return Image(decorative: cgImage, scale: 3)
@@ -431,8 +475,6 @@ struct Ev40ShareCardView: View {
 struct Ev40ShareCardModel: Equatable {
     /// The person's name from their profile; nil hides the row rather than printing a placeholder.
     let userName: String?
-    /// "Day 14 of 40", or the challenge name when it has not started.
-    let dayLabel: String
     /// "Tue, 10 Nov" — the local day the card was made for, and the same shape Android prints (R3).
     let dateLine: String
     let done: Int
@@ -464,7 +506,19 @@ struct Ev40ShareCardModel: Equatable {
     /// "DAY 14 / 40", or "TODAY" before the challenge has a first ticked day (D9). Mirror of Android `pillLabel`.
     var pillLabel: String {
         guard let day = dayNumber, (1...Ev40Challenge.totalDays).contains(day) else { return AgaraCopy.ev40CardPillToday }
-        return "DAY \(day) / \(Ev40Challenge.totalDays)"
+        return AgaraCopy.ev40ShareDayPill.replacingOccurrences(of: "{day}", with: "\(day)")
+            .replacingOccurrences(of: "{total}", with: "\(Ev40Challenge.totalDays)")
+    }
+
+    /// "6 of 8" under the ring's percentage.
+    var ringCount: String {
+        AgaraCopy.ev40ShareRingCount.replacingOccurrences(of: "{done}", with: "\(done)")
+            .replacingOccurrences(of: "{total}", with: "\(total)")
+    }
+
+    /// "Day 1" / "Day 40" at the ends of THE 40.
+    static func journeyDay(_ day: Int) -> String {
+        AgaraCopy.ev40ShareJourneyDay.replacingOccurrences(of: "{day}", with: "\(day)")
     }
 
     /// The words after each stat's number, singular when the count is exactly 1 (v3 replaced the one stats line with a
@@ -474,7 +528,7 @@ struct Ev40ShareCardModel: Equatable {
     var perfectLabel: String { perfectDays == 1 ? AgaraCopy.ev40SharePerfectDay : AgaraCopy.ev40SharePerfectDays }
 
     var percent: Int { total == 0 ? 0 : Int((Double(done) / Double(total) * 100).rounded()) }
-    /// The ring's sweep; an empty day still draws its cap rather than nothing.
+    /// The ring's sweep, 0…1. At 0 the card draws only the track (`ring` skips the arc), same as Android.
     var fraction: Double { total == 0 ? 0 : min(1, Double(done) / Double(total)) }
     /// All eight today: green pill, green ring, a star in the ring (D9).
     var isPerfect: Bool { total > 0 && done == total }
@@ -500,7 +554,6 @@ struct Ev40ShareCardModel: Equatable {
         let slots = journey(tickedKeys: tickedKeys, masksByKey: masksByKey, today: now, calendar: calendar)
         return Ev40ShareCardModel(
             userName: trimmed.isEmpty ? nil : trimmed,
-            dayLabel: Ev40Challenge.label(dayNumber: day) ?? AgaraCopy.ev40ChallengeName,
             dateLine: formatter.string(from: now),
             done: done,
             total: Ev40Disciplines.all.count,
@@ -525,14 +578,17 @@ extension Ev40ShareCardModel {
                                                       today: Ev40Challenge.key(today, calendar: calendar),
                                                       calendar: calendar),
               let end = Ev40Repo.date(Ev40Challenge.key(today, calendar: calendar), calendar: calendar),
-              let start = calendar.date(byAdding: .day, value: -(dayNumber - 1), to: calendar.startOfDay(for: end))
+              // Past the last day the window slides so today stays in the last slot (ringed) with the days right before
+              // it; unclamped, day 41 put today off the grid (review 2026-11-10, finding 1). Mirror of Android `journey`.
+              case let slot = min(dayNumber - 1, Ev40Challenge.totalDays - 1),
+              let start = calendar.date(byAdding: .day, value: -slot, to: calendar.startOfDay(for: end))
         else { return ([], nil) }
         let slots = (0..<Ev40Challenge.totalDays).map { offset -> Int in
             guard let date = calendar.date(byAdding: .day, value: offset, to: start) else { return 0 }
             let key = Ev40Challenge.key(date, calendar: calendar)
             return Ev40Challenge.level(mask: masksByKey[key] ?? 0)
         }
-        return (slots, dayNumber - 1)
+        return (slots, min(dayNumber - 1, Ev40Challenge.totalDays - 1))
     }
 }
 
