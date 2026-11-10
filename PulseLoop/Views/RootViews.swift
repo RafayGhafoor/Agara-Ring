@@ -97,6 +97,14 @@ struct RootAppView: View {
                     ))
                     try? modelContext.save()
                 }
+                // Test tooling: `-profileName "Maya"` names the minimal profile so a share-card capture shows the
+                // name row (the card hides it when the profile has no name).
+                if let name = DebugLaunch.string("profileName"), !name.isEmpty {
+                    if let profile = (try? modelContext.fetch(FetchDescriptor<UserProfile>()))?.first {
+                        profile.name = name
+                        try? modelContext.save()
+                    }
+                }
                 if DebugLaunch.bool("seedDemo") {
                     SeedData.clearAll(modelContext)
                     SeedData.seedDemo(modelContext, completeOnboarding: true)

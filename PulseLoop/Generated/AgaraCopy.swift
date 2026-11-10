@@ -179,6 +179,7 @@ enum AgaraCopy {
     static let ev40CardComplete = "EV40 complete"
     static let ev40ChallengeName = "EV40 CHALLENGE"
     static let ev40ChallengeTagline = "Show up. Stack the days."
+    static let ev40ShareNameFallback = "AGARA member"
     static let ev40ShareTitle = "Share progress"
     static let ev40ScreenTitle = "EV40 Tracker"
     static let ev40ScreenHeadline = "Your EV40 daily disciplines."

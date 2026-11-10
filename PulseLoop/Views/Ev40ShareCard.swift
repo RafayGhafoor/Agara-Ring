@@ -12,73 +12,176 @@ struct Ev40ShareCardView: View {
     let model: Ev40ShareCardModel
     let format: ShareCardFormat
 
+    /// Square is 360×360 — the same content at story type sizes would crowd it, so the whole card scales down.
+    private var scale: CGFloat { format == .story ? 1 : 0.62 }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             brand
-            Spacer(minLength: 12)
-            challengeLine
-            Spacer(minLength: 16)
-            count
-            Spacer(minLength: 16)
-            dots
-            Spacer(minLength: 12)
-            tagline
+
+            // Who + which day of the challenge — the two things that make the card personal. A profile with no name
+            // hides the row rather than printing a placeholder; the card still reads.
+            VStack(alignment: .leading, spacing: 3) {
+                if let userName = model.userName {
+                    Text(userName)
+                        .font(.system(size: 24 * scale, weight: .bold))
+                        .foregroundStyle(AgaraColors.textPrimary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
+                Text(model.dayLabel.uppercased() + "  ·  " + model.dateLine)
+                    .font(.system(size: 10 * scale, weight: .semibold))
+                    .tracking(1.1)
+                    .foregroundStyle(AgaraColors.accent)
+            }
+            .padding(.top, 10 * scale)
+
+            HStack(alignment: .center, spacing: 18 * scale) {
+                ring
+                VStack(alignment: .leading, spacing: 3 * scale) {
+                    Text("\(model.done)/\(model.total)")
+                        .font(.system(size: 30 * scale, weight: .bold, design: .rounded))
+                        .foregroundStyle(AgaraColors.textPrimary)
+                    Text("\(model.percent)% of today")
+                        .font(.system(size: 11 * scale, weight: .medium))
+                        .foregroundStyle(AgaraColors.textMuted)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.top, 10 * scale)
+            Spacer(minLength: 6)
+            disciplineList
+
+            if !model.journey.isEmpty {
+                Spacer(minLength: 6)
+                journeyGrid
+            }
+
+            Spacer(minLength: 10)          // the foot is pinned low; the spacer above it takes the last of the slack
+            hairline
+            footer
         }
-        .padding(28)
-        .frame(width: format.pointSize.width, height: format.pointSize.height, alignment: .leading)
+        .padding(.horizontal, 24)
+        .padding(.top, 24)
+        .padding(.bottom, 20)
+        .frame(width: format.pointSize.width, height: format.pointSize.height, alignment: .topLeading)
         .background(AgaraColors.background)
     }
 
     private var brand: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text("AGARA")
-                .font(.system(size: 11, weight: .bold))
-                .tracking(2.4)
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text("AGARA")
+                    .font(.system(size: 10 * scale, weight: .bold))
+                    .tracking(2.2)
+                    .foregroundStyle(AgaraColors.accent)
+                Text(AgaraCopy.ev40ChallengeName)
+                    .font(.system(size: 11 * scale, weight: .semibold))
+                    .tracking(1.4)
+                    .foregroundStyle(AgaraColors.textMuted)
+            }
+            Spacer(minLength: 0)
+            Text(AgaraCopy.ev40CardPillToday)
+                .font(.system(size: 9 * scale, weight: .bold))
+                .tracking(1.1)
                 .foregroundStyle(AgaraColors.accent)
-            Text(AgaraCopy.ev40ChallengeName)
-                .font(.system(size: 13, weight: .semibold))
-                .tracking(1.6)
-                .foregroundStyle(AgaraColors.textMuted)
+                .padding(.horizontal, 7 * scale)
+                .padding(.vertical, 3 * scale)
+                .background(Capsule().fill(AgaraColors.accent.opacity(0.12)))
         }
     }
 
-    private var challengeLine: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(model.dayLabel)
-                .font(.system(size: 30, weight: .bold, design: .rounded))
-                .foregroundStyle(AgaraColors.textPrimary)
-            Text(model.dateLine)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(AgaraColors.textMuted)
-        }
-    }
-
-    private var count: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Text("\(model.done)/\(model.total)")
-                .font(.system(size: 56, weight: .bold, design: .rounded))
-                .foregroundStyle(AgaraColors.textPrimary)
+    /// The progress ring: the day's share in one shape, with the count inside it.
+    private var ring: some View {
+        let size = 96 * scale
+        return ZStack {
+            Circle()
+                .stroke(AgaraColors.cardSoft, lineWidth: 7 * scale)
+            Circle()
+                .trim(from: 0, to: max(0.001, model.fraction))
+                .stroke(AgaraColors.accent, style: StrokeStyle(lineWidth: 7 * scale, lineCap: .round))
+                .rotationEffect(.degrees(-90))
             Text("\(model.percent)%")
-                .font(.system(size: 22, weight: .semibold, design: .rounded))
-                .foregroundStyle(AgaraColors.accent)
+                .font(.system(size: 15 * scale, weight: .bold, design: .rounded))
+                .foregroundStyle(AgaraColors.textPrimary)
         }
+        .frame(width: size, height: size)
     }
 
-    /// One dot per discipline, filled for ticked — the smallest form that still says *which* ones, in the app's order.
-    private var dots: some View {
-        HStack(spacing: 7) {
-            ForEach(0..<model.total, id: \.self) { index in
-                Circle()
-                    .fill(index < model.done ? AgaraColors.accent : AgaraColors.cardSoft)
-                    .frame(width: 10, height: 10)
+    /// All eight, not just the count: the card should say what the day actually contained. Two columns keep the story
+    /// format from turning into a long list with dead space.
+    private var disciplineList: some View {
+        let columns = Array(repeating: GridItem(.flexible(), alignment: .leading), count: 2)
+        return LazyVGrid(columns: columns, alignment: .leading, spacing: 6 * scale) {
+            ForEach(model.disciplines) { discipline in
+                HStack(spacing: 6 * scale) {
+                    ZStack {
+                        Circle()
+                            .fill(discipline.done ? AgaraColors.success : AgaraColors.cardSoft)
+                            .frame(width: 14 * scale, height: 14 * scale)
+                        if discipline.done {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 7.5 * scale, weight: .bold))
+                                .foregroundStyle(AgaraColors.background)
+                        }
+                    }
+                    Text(discipline.name)
+                        .font(.system(size: 10.5 * scale, weight: discipline.done ? .semibold : .regular))
+                        .foregroundStyle(discipline.done ? AgaraColors.textPrimary : AgaraColors.textMuted)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                }
             }
         }
     }
 
-    private var tagline: some View {
-        Text(AgaraCopy.ev40ChallengeTagline)
-            .font(.system(size: 12, weight: .medium))
-            .foregroundStyle(AgaraColors.textMuted)
+    /// The whole 40-day journey, not just today: filled where the day carried at least one tick, outlined for today.
+    private var journeyGrid: some View {
+        let rows = stride(from: 0, to: model.journey.count, by: 8).map { start in
+            Array(start..<min(start + 8, model.journey.count))
+        }
+        return VStack(alignment: .leading, spacing: 7 * scale) {
+            Text("THE 40")
+                .font(.system(size: 8.5 * scale, weight: .bold))
+                .tracking(1.6)
+                .foregroundStyle(AgaraColors.textMuted)
+            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                HStack(spacing: 5 * scale) {
+                    ForEach(row, id: \.self) { index in
+                        let isToday = model.journeyToday == index
+                        RoundedRectangle(cornerRadius: 3 * scale, style: .continuous)
+                            .fill(model.journey[index] ? AgaraColors.accent : AgaraColors.cardSoft)
+                            .aspectRatio(1, contentMode: .fit)
+                            .frame(maxWidth: .infinity)
+                            .overlay {
+                                if isToday {
+                                    RoundedRectangle(cornerRadius: 3 * scale, style: .continuous)
+                                        .stroke(AgaraColors.textPrimary, lineWidth: 1.4)
+                                }
+                            }
+                    }
+                }
+            }
+        }
+    }
+
+    private var hairline: some View {
+        Rectangle()
+            .fill(AgaraColors.cardSoft)
+            .frame(height: 1)
+            .padding(.bottom, 9)
+    }
+
+    private var footer: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(AgaraCopy.ev40ChallengeTagline)
+                .font(.system(size: 10 * scale, weight: .medium))
+                .foregroundStyle(AgaraColors.textMuted)
+            Spacer(minLength: 0)
+            Text("agara.life")
+                .font(.system(size: 9 * scale, weight: .semibold))
+                .foregroundStyle(AgaraColors.accent)
+        }
     }
 }
 
@@ -86,27 +189,71 @@ struct Ev40ShareCardView: View {
 
 /// Formatted up front so the renderer does no date or pluralisation logic (same split as `ShareCardModel`).
 struct Ev40ShareCardModel: Equatable {
+    /// The person's name from their profile; nil hides the row rather than printing a placeholder.
+    let userName: String?
     /// "Day 14 of 40", or the challenge name when it has not started.
     let dayLabel: String
     /// "Thu, 5 Nov" — the local day the card was made for.
     let dateLine: String
     let done: Int
     let total: Int
+    /// One entry per discipline in the app's own order, so the card lists what the day contained.
+    let disciplines: [Entry]
+    /// The challenge journey: one slot per day of the 40, true when that day carried at least one tick.
+    let journey: [Bool]
+    /// Today's position in `journey` (0-based), so the card can mark it.
+    let journeyToday: Int?
+
+    struct Entry: Identifiable, Equatable {
+        let id: Int
+        let name: String
+        let done: Bool
+    }
 
     var percent: Int { total == 0 ? 0 : Int((Double(done) / Double(total) * 100).rounded()) }
+    /// The ring's sweep; an empty day still draws its cap rather than nothing.
+    var fraction: Double { total == 0 ? 0 : min(1, Double(done) / Double(total)) }
 
-    static func make(mask: Int, now: Date = AppClock.now, calendar: Calendar = .current,
-                     trackedKeys: [String]) -> Ev40ShareCardModel {
+    static func make(mask: Int, userName: String?, now: Date = AppClock.now, calendar: Calendar = .current,
+                     trackedKeys: [String], masksByKey: [String: Int] = [:]) -> Ev40ShareCardModel {
         let done = Ev40Disciplines.count(mask)
         let day = Ev40Challenge.dayNumber(trackedKeys: trackedKeys,
                                          today: Ev40Challenge.key(now, calendar: calendar), calendar: calendar)
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en")
         formatter.setLocalizedDateFormatFromTemplate("EEE d MMM")
-        return Ev40ShareCardModel(dayLabel: Ev40Challenge.label(dayNumber: day) ?? AgaraCopy.ev40ChallengeName,
-                                  dateLine: formatter.string(from: now),
-                                  done: done,
-                                  total: Ev40Disciplines.all.count)
+        let trimmed = userName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return Ev40ShareCardModel(
+            userName: trimmed.isEmpty ? nil : trimmed,
+            dayLabel: Ev40Challenge.label(dayNumber: day) ?? AgaraCopy.ev40ChallengeName,
+            dateLine: formatter.string(from: now),
+            done: done,
+            total: Ev40Disciplines.all.count,
+            disciplines: Ev40Disciplines.all.map {
+                Entry(id: $0.rawValue, name: $0.title, done: Ev40Disciplines.isOn(mask, $0))
+            },
+            journey: journey(trackedKeys: trackedKeys, masksByKey: masksByKey, today: now, calendar: calendar).0,
+            journeyToday: journey(trackedKeys: trackedKeys, masksByKey: masksByKey, today: now, calendar: calendar).1)
+    }
+}
+
+extension Ev40ShareCardModel {
+    /// The 40 slots from the challenge's first ticked day, plus today's index. Derived from the same synced rows as the
+    /// day number, so the grid and "Day N of 40" can never disagree.
+    static func journey(trackedKeys: [String], masksByKey: [String: Int], today: Date,
+                        calendar: Calendar) -> ([Bool], Int?) {
+        guard let dayNumber = Ev40Challenge.dayNumber(trackedKeys: trackedKeys,
+                                                      today: Ev40Challenge.key(today, calendar: calendar),
+                                                      calendar: calendar),
+              let end = Ev40Repo.date(Ev40Challenge.key(today, calendar: calendar), calendar: calendar),
+              let start = calendar.date(byAdding: .day, value: -(dayNumber - 1), to: calendar.startOfDay(for: end))
+        else { return ([], nil) }
+        let slots = (0..<Ev40Challenge.totalDays).map { offset -> Bool in
+            guard let date = calendar.date(byAdding: .day, value: offset, to: start) else { return false }
+            let key = Ev40Challenge.key(date, calendar: calendar)
+            return (masksByKey[key] ?? 0) != 0
+        }
+        return (slots, dayNumber - 1)
     }
 }
 
@@ -142,6 +289,7 @@ struct Ev40ShareSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Query private var days: [Ev40Day]
+    @Query private var profiles: [UserProfile]
 
     @State private var format: ShareCardFormat = .story
     @State private var model: Ev40ShareCardModel?
@@ -157,7 +305,9 @@ struct Ev40ShareSheet: View {
             formatToggle
             shareButton
         }
-        .padding(20)
+        .padding(.horizontal, 20)
+        .padding(.top, 28)          // clears the sheet grabber, which was clipping the title
+        .padding(.bottom, 20)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .presentationBackground(AgaraColors.background)
@@ -186,9 +336,17 @@ struct Ev40ShareSheet: View {
     @ViewBuilder
     private var preview: some View {
         if let model {
+            // The card shares the app's background colour, so without a real edge it reads as text floating in the
+            // sheet — the preview must look like an object.
             Ev40ShareCardView(model: model, format: format)
                 .scaledToFit()
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(AgaraColors.cardSoft, lineWidth: 1)
+                }
+                .shadow(color: .black.opacity(0.10), radius: 18, y: 8)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             ProgressView().frame(maxHeight: .infinity)
         }
@@ -223,7 +381,10 @@ struct Ev40ShareSheet: View {
     }
 
     private func rebuild() {
-        model = Ev40ShareCardModel.make(mask: mask, trackedKeys: days.map(\.dateKey))
+        model = Ev40ShareCardModel.make(mask: mask, userName: profiles.first?.name,
+                                        trackedKeys: days.map(\.dateKey),
+                                        masksByKey: Dictionary(days.map { ($0.dateKey, $0.mask) },
+                                                               uniquingKeysWith: { a, _ in a }))
         renderShareImage()
     }
 

@@ -9,13 +9,14 @@ import XCTest
 final class Ev40TrackerTests: AgaraUITestCase {
     private var shotDir: String? { ProcessInfo.processInfo.environment["EV40_SHOT_DIR"] }
 
-    private func launch(reset: Bool = false) {
+    private func launch(reset: Bool = false, profileName: String? = nil) {
         // `-skipOnboarding YES` is the harness's own way past a clean install (minimal profile, **no** demo rows);
         // `-sampleData` no longer reaches Today, which is why this class sat on step 1 of 7 and every assertion failed
         // upstream of the thing it tests.
         app.launchArguments = ["-noCoachMarks", "YES", "-acceptDisclaimer", "YES", "-skipOnboarding", "YES",
                                "-features", "", "-AppleLanguages", "(en)"]
         if reset { app.launchArguments += ["-ev40Reset", "YES"] }
+        if let profileName { app.launchArguments += ["-profileName", profileName] }
         app.launch()
         // This class builds its own launch, so it does not inherit `AgaraUITestCase.launch()`'s guard. Without this the
         // fresh-install notifications prompt blocks every element query and the failure reads as "ring chip missing"
@@ -120,7 +121,8 @@ final class Ev40TrackerTests: AgaraUITestCase {
     /// The share sheet: the challenge eyebrow is on the tracker, the card renders, and the `ShareLink` exists.
     /// Surface first, then the toggle — a sheet that opens empty must not pass as "no share button".
     func testTheShareSheetRendersTheChallengeCard() {
-        launch(reset: true)
+        // Named so the card's name row is exercised (the card hides it when the profile has no name).
+        launch(reset: true, profileName: "Maya")
         openTracker()
         toggle("hydrate")
         toggle("move")
