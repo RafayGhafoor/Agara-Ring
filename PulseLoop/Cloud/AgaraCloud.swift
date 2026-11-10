@@ -357,9 +357,10 @@ final class AgaraCloud {
         FakeCloudSeed.apply(container: container)   // UI tests: after the launch-time demo seed has run
         #endif
         let created = AgaraSyncEngine(api: api, auth: auth, container: container, state: state, limits: engineLimits, now: now)
-        // A model accepted on a previous run applies before this one, so a cold start does not run on the compiled
-        // default for a whole session (item F3).
+        // A model or share-card address accepted on a previous run applies before this one, so a cold start does not run
+        // on the compiled default for a whole session (item F3; plan ev40-share-card-v2).
         created.installCachedModel()
+        created.installCachedShareCard()
         engine = created
         return created
     }

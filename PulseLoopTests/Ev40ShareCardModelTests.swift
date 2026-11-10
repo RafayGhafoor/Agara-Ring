@@ -1,0 +1,95 @@
+import XCTest
+@testable import PulseLoop
+
+/// The share card's formatted model (plan `ev40-share-card-v2`): the date line both platforms must print the same way
+/// (R3), the streak/perfect/active numbers the card shows (A1/A2), and the 40-day journey as heat levels (A3).
+final class Ev40ShareCardModelTests: XCTestCase {
+    private var calendar: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        return calendar
+    }()
+
+    /// 2026-11-05 12:00 UTC — noon, so no timezone can move the local day.
+    private func day(_ key: String) -> Date {
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = calendar.timeZone
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        return formatter.date(from: key + " 12:00")!
+    }
+
+    /// The pinned date shape: `EEE, d MMM` reads "Tue, 10 Nov" — the same string Android prints (R3).
+    func testTheDateLineIsTheSameOnBothPlatforms() {
+        let model = Ev40ShareCardModel.make(mask: 1, userName: "Rafay", now: day("2026-11-10"),
+                                            calendar: calendar, trackedKeys: ["2026-11-10"])
+        XCTAssertEqual(model.dateLine, "Tue, 10 Nov")
+    }
+
+    func testTheJourneyIsOneHeatLevelPerDayFromTheFirstTickedDay() {
+        let masks = ["2026-11-03": 15, "2026-11-04": 0, "2026-11-05": 255]
+        let model = Ev40ShareCardModel.make(mask: 255, userName: nil, now: day("2026-11-05"), calendar: calendar,
+                                            trackedKeys: ["2026-11-03", "2026-11-04", "2026-11-05"],
+                                            masksByKey: masks)
+        XCTAssertEqual(model.dayLabel, "Day 3 of 40")
+        XCTAssertEqual(model.journeyToday, 2)
+        XCTAssertEqual(model.journey.count, Ev40Challenge.totalDays)
+        XCTAssertEqual(Array(model.journey.prefix(4)), [2, 0, 4, 0])
+    }
+
+    func testTheCardCarriesTheStreakThePerfectDaysAndTheDaysActive() {
+        let masks = ["2026-11-01": 255, "2026-11-02": 3, "2026-11-03": 255, "2026-11-04": 1, "2026-11-05": 255]
+        let model = Ev40ShareCardModel.make(mask: 255, userName: "  ", now: day("2026-11-05"), calendar: calendar,
+                                            trackedKeys: Array(masks.keys), masksByKey: masks)
+        XCTAssertEqual(model.streak, 5)
+        XCTAssertEqual(model.perfectDays, 3)
+        XCTAssertEqual(model.daysActive, 5)
+        XCTAssertTrue(model.isPerfect)
+        // An empty or blank name hides the row rather than printing a placeholder.
+        XCTAssertNil(model.userName)
+        XCTAssertEqual(model.done, 8)
+        XCTAssertEqual(model.percent, 100)
+    }
+
+    func testAnUnfinishedDayIsNotPerfect() {
+        let model = Ev40ShareCardModel.make(mask: 127, userName: "Rafay", now: day("2026-11-10"), calendar: calendar,
+                                            trackedKeys: ["2026-11-10"], masksByKey: ["2026-11-10": 127])
+        XCTAssertFalse(model.isPerfect)
+        XCTAssertEqual(model.done, 7)
+        XCTAssertEqual(model.percent, 88)
+        XCTAssertEqual(model.streak, 1)
+        XCTAssertEqual(model.perfectDays, 0)
+    }
+
+    /// A day someone opened but did not tick must not start the challenge (the `dayNumber` rule), so the streak, the
+    /// journey and "Day N of 40" agree on where it starts.
+    func testAnEmptyDayDoesNotStartTheChallenge() {
+        let model = Ev40ShareCardModel.make(mask: 1, userName: nil, now: day("2026-11-05"), calendar: calendar,
+                                            trackedKeys: ["2026-11-01", "2026-11-05"],
+                                            masksByKey: ["2026-11-01": 0, "2026-11-05": 1])
+        XCTAssertEqual(model.dayLabel, "Day 1 of 40")
+        XCTAssertEqual(model.streak, 1)
+        XCTAssertEqual(model.daysActive, 1)
+        XCTAssertEqual(model.journey[0], 1)
+    }
+
+    // MARK: Stats line — singular at exactly 1, the streak not repeated (mirror of Android `Ev40ShareCardStatsTest`)
+
+    private func card(perfect: Int, active: Int) -> Ev40ShareCardModel {
+        Ev40ShareCardModel(userName: nil, dayLabel: "Day 1 of 40", dateLine: "Tue, 10 Nov", done: 0, total: 8,
+                           disciplines: [], streak: 9, perfectDays: perfect, daysActive: active,
+                           journey: [], journeyToday: nil)
+    }
+
+    func testTheStatsLineUsesTheSingularOnlyAtExactlyOne() {
+        XCTAssertEqual(card(perfect: 0, active: 1).statsLine, "0 perfect days · 1 day active")
+        XCTAssertEqual(card(perfect: 1, active: 2).statsLine, "1 perfect day · 2 days active")
+        XCTAssertEqual(card(perfect: 3, active: 12).statsLine, "3 perfect days · 12 days active")
+    }
+
+    func testTheStatsLineDoesNotRepeatTheStreak() {
+        XCTAssertFalse(card(perfect: 3, active: 12).statsLine.contains("streak"),
+                       "the streak sits under the count; repeating it here read as filler")
+    }
+}

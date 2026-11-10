@@ -21,6 +21,7 @@ nonisolated final class AgaraCloudState: @unchecked Sendable {
         static let rejected = "agara.cloud.rejected"
         static let unverifiedSince = "agara.cloud.unverifiedSince"
         static let sleepModel = "agara.cloud.sleepModel"
+        static let shareCard = "agara.cloud.shareCard"
     }
 
     init(defaults: UserDefaults = .standard) { self.defaults = defaults }
@@ -34,6 +35,15 @@ nonisolated final class AgaraCloudState: @unchecked Sendable {
     func setSleepModel(_ raw: String?) {
         lock.lock(); defer { lock.unlock() }
         if let raw { defaults.set(raw, forKey: Key.sleepModel) } else { defaults.removeObject(forKey: Key.sleepModel) }
+    }
+
+    /// The last accepted EV40 share-card address, as `ShareCardConfig.Cache` encodes it (plan ev40-share-card-v2).
+    var shareCard: String? {
+        get { lock.lock(); defer { lock.unlock() }; return defaults.string(forKey: Key.shareCard) }
+    }
+    func setShareCard(_ raw: String?) {
+        lock.lock(); defer { lock.unlock() }
+        if let raw { defaults.set(raw, forKey: Key.shareCard) } else { defaults.removeObject(forKey: Key.shareCard) }
     }
 
     // MARK: Consent

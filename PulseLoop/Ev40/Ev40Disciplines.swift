@@ -20,7 +20,7 @@ enum Ev40Discipline: Int, CaseIterable, Identifiable, Sendable {
     var id: Int { rawValue }
 
     /// The bit this discipline owns in the day's mask.
-    var bit: Int { 1 << rawValue }
+    nonisolated var bit: Int { 1 << rawValue }
 
     var title: String {
         switch self {
@@ -53,24 +53,25 @@ enum Ev40Discipline: Int, CaseIterable, Identifiable, Sendable {
 }
 
 /// Pure mask arithmetic — the one place both the store and the views do it, so the count, the toggle and the
-/// completion rule cannot disagree (Rule 10).
+/// completion rule cannot disagree (Rule 10). `nonisolated` because it is integer arithmetic and nothing else: the
+/// challenge's own `nonisolated` derivations (the share card's streak, perfect days, heat levels) call it.
 enum Ev40Disciplines {
-    static let all = Ev40Discipline.allCases
-    static var fullMask: Int { all.reduce(0) { $0 | $1.bit } }
+    nonisolated static let all = Ev40Discipline.allCases
+    nonisolated static var fullMask: Int { all.reduce(0) { $0 | $1.bit } }
 
-    static func isOn(_ mask: Int, _ discipline: Ev40Discipline) -> Bool { mask & discipline.bit != 0 }
+    nonisolated static func isOn(_ mask: Int, _ discipline: Ev40Discipline) -> Bool { mask & discipline.bit != 0 }
 
     /// The mask with one discipline flipped. Only the eight known bits survive, so a corrupt stored value can never
     /// grow a ninth checkbox.
-    static func toggle(_ mask: Int, _ discipline: Ev40Discipline) -> Int {
+    nonisolated static func toggle(_ mask: Int, _ discipline: Ev40Discipline) -> Int {
         (mask ^ discipline.bit) & fullMask
     }
 
     /// How many of the eight are done (0…8).
-    static func count(_ mask: Int) -> Int { all.reduce(0) { $0 + (isOn(mask, $1) ? 1 : 0) } }
+    nonisolated static func count(_ mask: Int) -> Int { all.reduce(0) { $0 + (isOn(mask, $1) ? 1 : 0) } }
 
-    static func isComplete(_ mask: Int) -> Bool { count(mask) == all.count }
+    nonisolated static func isComplete(_ mask: Int) -> Bool { count(mask) == all.count }
 
     /// Bits outside the eight are dropped: the server's 0…255 allows a value an older or newer build could set.
-    static func normalised(_ mask: Int) -> Int { mask & fullMask }
+    nonisolated static func normalised(_ mask: Int) -> Int { mask & fullMask }
 }

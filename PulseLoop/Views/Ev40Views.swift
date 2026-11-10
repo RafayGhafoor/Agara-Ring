@@ -306,6 +306,19 @@ struct Ev40TrackerView: View {
                 Text(AgaraCopy.ev40CompleteBody)
                     .font(AgaraFont.footnote)
                     .foregroundStyle(AgaraColors.textSecondary)
+                // The 8/8 day is the moment worth sharing, so the card is one tap away from here too (plan A5) — the same
+                // sheet the toolbar button opens, not a second one that could drift from it.
+                Button { showingShare = true } label: {
+                    Label(AgaraCopy.ev40ShareTitle, systemImage: "square.and.arrow.up")
+                        .font(AgaraFont.bodyEmphasis)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 10)
+                        .background(Capsule().fill(AgaraColors.accent))
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 4)
+                .accessibilityIdentifier("ev40.completeShare")
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 20)

@@ -153,9 +153,10 @@ final class AgaraSyncEngine {
             if !report.needsUpload { break }
         }
         state.lastSync = now()
-        // Server-side tuning of the sleep model, once per pass (12 h throttle inside). Deliberately after the sync and
-        // deliberately non-fatal: the model is a tuning knob, not something worth failing a sync over.
+        // Server-side tuning of the sleep model and the share card's address, once per pass (12 h throttle inside each).
+        // Deliberately after the sync and deliberately non-fatal: both are tuning knobs, not worth failing a sync over.
         await refreshSleepModel()
+        await refreshShareCard()
         snapshot.stage = .finished
         progress(snapshot)
         Self.log.info("sync done: \(summary.blocksAccepted) blocks up, \(summary.pull.storedNew + summary.pull.mergedLocally + summary.pull.rowsInserted) changes down")
@@ -306,6 +307,11 @@ final class AgaraSyncEngine {
         SleepScoreConfig.install(SleepScoreConfig.Cache.model(raw: state.sleepModel))
     }
 
+    /// The share card's address accepted on a previous run, for the same reason (plan ev40-share-card-v2).
+    func installCachedShareCard() {
+        ShareCardConfig.install(ShareCardConfig.Cache.card(raw: state.shareCard))
+    }
+
     /// Server-side tuning of the sleep model (item F): at most once per 12 h (throttled inside `SleepScoreConfig`), and
     /// never an error the user sees — a failed fetch keeps the previous model, a rejected payload falls back to the
     /// compiled default.
@@ -314,6 +320,15 @@ final class AgaraSyncEngine {
             fetch: { key in (try? await api.config(key: key)) ?? nil },
             raw: state.sleepModel, now: now())
         if let next { state.setSleepModel(next) }
+    }
+
+    /// The share card's footer address: the same 12 h throttle, the same "a tuning value never fails a sync" treatment,
+    /// and the same fallback to the catalog on any rejection.
+    private func refreshShareCard() async {
+        let next = await ShareCardConfig.refresh(
+            fetch: { key in (try? await api.config(key: key)) ?? nil },
+            raw: state.shareCard, now: now())
+        if let next { state.setShareCard(next) }
     }
 
     /// Pull every page after the stored cursor. The cursor advances only after a page has been applied and saved, so a
