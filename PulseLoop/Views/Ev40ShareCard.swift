@@ -5,232 +5,391 @@ import CoreImage.CIFilterBuiltins
 
 // MARK: - The card
 
-/// The EV40 share card: a typographic card on the app's own surface, sized for a story and a feed post.
+/// The EV40 share card (v3 layout, owner 2026-11-10 — plan `ev40-share-card-v2` → *v3*, mockup
+/// `scripts/ev40_share_mockups.py`): the EV40 wordmark, the person, a hero card with the ring and three stats, the eight
+/// disciplines as tiles with the tracker's own symbols, the 40-day journey as two compact rows of twenty, and the footer.
 ///
-/// It carries only what the tracker screen already shows — the day of the challenge, today's count and share, and
-/// which of the eight are ticked — so nobody can share a claim the app does not make. No "copy link": the card is an
-/// image and the link would go stale the moment the day changes.
+/// **Laid out on Android's pixel grid.** Every block is placed at the coordinates Android's `Ev40ShareCard` draws at
+/// (1080-px canvas ÷ 3 = points, since the card renders at 3×), and text is placed by its *baseline* the way
+/// `Canvas.drawText` does: top = baseline − 1.066 × size, Manrope's ascent. So the two platforms produce the same card,
+/// not two cards that look alike (Rule 2). No "copy link" (owner).
 struct Ev40ShareCardView: View {
     let model: Ev40ShareCardModel
     let format: ShareCardFormat
 
-    /// Square is 360×360 — the same content at story type sizes would crowd it, so the whole card scales down.
-    private var scale: CGFloat { format == .story ? 1 : 0.62 }
+    /// Pixels → points: the card is laid out in Android's 1080-px units and rendered at 3×.
+    private let k: CGFloat = 1.0 / 3.0
+    private let M: CGFloat = 72                         // outer margin, px
+    private var W: CGFloat { format.pointSize.width * 3 }
+    private var H: CGFloat { format.pointSize.height * 3 }
+    private var IW: CGFloat { W - 2 * M }
+    /// Manrope's ascent in em (hhea 2132/2000) — the distance from a text block's top to its baseline.
+    private static let ascent: CGFloat = 1.066
+
+    private var highlight: Color { model.isPerfect ? AgaraColors.success : AgaraColors.accent }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            brand
-
-            // Who + which day of the challenge — the two things that make the card personal. A profile with no name
-            // hides the row rather than printing a placeholder; the card still reads.
-            VStack(alignment: .leading, spacing: 3) {
-                if let userName = model.userName {
-                    Text(userName)
-                        .font(.system(size: 24 * scale, weight: .bold))
-                        .foregroundStyle(AgaraColors.textPrimary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                }
-                Text(model.dayLabel.uppercased() + "  ·  " + model.dateLine)
-                    .font(.system(size: 10 * scale, weight: .semibold))
-                    .tracking(1.1)
-                    .foregroundStyle(AgaraColors.accent)
-            }
-            .padding(.top, 10 * scale)
-
-            HStack(alignment: .center, spacing: 18 * scale) {
-                ring
-                VStack(alignment: .leading, spacing: 3 * scale) {
-                    Text("\(model.done)/\(model.total)")
-                        .font(.system(size: 30 * scale, weight: .bold, design: .rounded))
-                        .foregroundStyle(AgaraColors.textPrimary)
-                    // The streak, not the percentage again: that number is already inside the ring (R2).
-                    Text("\(model.streak) \(AgaraCopy.ev40ShareStreak)")
-                        .font(.system(size: 11 * scale, weight: .medium))
-                        .foregroundStyle(AgaraColors.textMuted)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(.top, 10 * scale)
-            Spacer(minLength: 6)
-            disciplineList
-            statsRow
-
-            if !model.journey.isEmpty {
-                Spacer(minLength: 6)
-                journeyGrid
-            }
-
-            Spacer(minLength: 10)          // the foot is pinned low; the spacer above it takes the last of the slack
-            hairline
-            footer
+        ZStack(alignment: .topLeading) {
+            AgaraColors.background
+            if format == .story { story } else { square }
         }
-        .padding(.horizontal, 24)
-        .padding(.top, 24)
-        .padding(.bottom, 20)
         .frame(width: format.pointSize.width, height: format.pointSize.height, alignment: .topLeading)
-        .background(AgaraColors.background)
+        .clipped()
     }
 
-    private var brand: some View {
-        HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text("AGARA")
-                    .font(.system(size: 10 * scale, weight: .bold))
-                    .tracking(2.2)
-                    .foregroundStyle(AgaraColors.accent)
-                Text(AgaraCopy.ev40ChallengeName)
-                    .font(.system(size: 11 * scale, weight: .semibold))
-                    .tracking(1.4)
-                    .foregroundStyle(AgaraColors.textMuted)
-            }
-            Spacer(minLength: 0)
-            // The perfect day is the moment worth sharing, so the pill says so instead of "TODAY" (A4).
-            Text(model.isPerfect ? AgaraCopy.ev40SharePerfectBadge : AgaraCopy.ev40CardPillToday)
-                .font(.system(size: 9 * scale, weight: .bold))
-                .tracking(1.1)
-                .lineLimit(1)
-                .foregroundStyle(model.isPerfect ? AgaraColors.success : AgaraColors.accent)
-                .padding(.horizontal, 7 * scale)
-                .padding(.vertical, 3 * scale)
-                .background(Capsule().fill((model.isPerfect ? AgaraColors.success : AgaraColors.accent).opacity(0.12)))
+    // MARK: Story
+
+    @ViewBuilder private var story: some View {
+        let baseline: CGFloat = 322
+        let top = baseline + 120
+        let hero = CGRect(x: M, y: top + 10, width: IW, height: 380)
+        let cx = M + 56 + 132
+        let cy = hero.midY
+        let ty = hero.maxY + 90
+        let tw = (IW - 20) / 2, th: CGFloat = 104, gap: CGFloat = 18
+        let gridBottom = ty + 28 + 4 * th + 3 * gap
+        let box = CGRect(x: M, y: gridBottom + 48, width: IW, height: 236)
+        let pad: CGFloat = 36
+        let fy = box.minY + pad + 22
+        let cellGap: CGFloat = 9
+        let cell = (IW - 2 * pad - 19 * cellGap) / 20
+
+        // A large, faint wordmark in the open ground right of the name, bleeding off the edge (story only, V2).
+        mark(x: W - 190 * Self.markAspect * 0.62, top: 210, height: 190,
+             opacity: ThemeStore.current.isLight ? 0.09 : 0.08)
+        header
+
+        // Who and when. No name → the date takes the name's place, so nothing below moves (D10).
+        if let name = model.userName {
+            text(name, x: M, baseline: baseline, size: 96, weight: .bold, color: AgaraColors.textPrimary)
+            text(model.dateLine, x: M, baseline: baseline + 60, size: 34, weight: .medium,
+                 color: AgaraColors.textSecondary)
+        } else {
+            text(model.dateLine, x: M, baseline: baseline, size: 80, weight: .bold, color: AgaraColors.textPrimary)
         }
-    }
 
-    /// The progress ring: the day's share in one shape, with the count inside it.
-    private var ring: some View {
-        let size = 96 * scale
-        let tint = model.isPerfect ? AgaraColors.success : AgaraColors.accent
-        return ZStack {
-            Circle()
-                .stroke(AgaraColors.cardSoft, lineWidth: 7 * scale)
-            Circle()
-                .trim(from: 0, to: max(0.001, model.fraction))
-                .stroke(tint, style: StrokeStyle(lineWidth: 7 * scale, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-            Text("\(model.percent)%")
-                .font(.system(size: 15 * scale, weight: .bold, design: .rounded))
-                .foregroundStyle(AgaraColors.textPrimary)
+        // Hero card: the ring and the three numbers behind the day.
+        panel(hero, radius: 40)
+        ring(cx: cx, cy: cy, r: 132, stroke: 24)
+        if model.isPerfect {
+            symbol("star.fill", cx: cx, cy: cy - 6, size: 92, color: highlight)
+            text("\(model.done) of \(model.total)", x: cx, baseline: cy + 74, size: 26, weight: .semibold,
+                 color: AgaraColors.textMuted, align: .center)
+        } else {
+            text("\(model.percent)%", x: cx, baseline: cy + 18, size: 64, weight: .bold,
+                 color: AgaraColors.textPrimary, align: .center)
+            text("\(model.done) of \(model.total)", x: cx, baseline: cy + 62, size: 26, weight: .semibold,
+                 color: AgaraColors.textMuted, align: .center)
         }
-        .frame(width: size, height: size)
-    }
-
-    /// All eight, not just the count: the card should say what the day actually contained. Two columns keep the story
-    /// format from turning into a long list with dead space.
-    private var disciplineList: some View {
-        let columns = Array(repeating: GridItem(.flexible(), alignment: .leading), count: 2)
-        return LazyVGrid(columns: columns, alignment: .leading, spacing: 6 * scale) {
-            ForEach(model.disciplines) { discipline in
-                HStack(spacing: 6 * scale) {
-                    ZStack {
-                        if discipline.done {
-                            Circle().fill(AgaraColors.success)
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 7.5 * scale, weight: .bold))
-                                .foregroundStyle(AgaraColors.background)
-                        } else {
-                            // A clear fill with a real edge: `cardSoft` on `background` was nearly invisible on the
-                            // light theme (R8).
-                            Circle().strokeBorder(AgaraColors.borderStrong, lineWidth: 1.5 * scale)
-                        }
-                    }
-                    .frame(width: 14 * scale, height: 14 * scale)
-                    Text(discipline.name)
-                        .font(.system(size: 10.5 * scale, weight: discipline.done ? .semibold : .regular))
-                        .foregroundStyle(discipline.done ? AgaraColors.textPrimary : AgaraColors.textMuted)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                }
-            }
+        let sx = cx + 132 + 72
+        ForEach(Array(stats.enumerated()), id: \.offset) { i, stat in
+            let ry = cy - 100 + CGFloat(i) * 100
+            Circle().fill(AgaraColors.accent.opacity(40.0 / 255))
+                .frame(width: 60 * k, height: 60 * k)
+                .offset(x: sx * k, y: (ry - 30) * k)
+            symbol(stat.symbol, cx: sx + 30, cy: ry, size: 34, color: AgaraColors.accent)
+            statLine(stat, x: sx + 84, baseline: ry + 16, numberSize: 46, labelSize: 30, gap: 14, lift: 2)
         }
+
+        // Today's eight, as tiles with the tracker's own symbols.
+        tracked(AgaraCopy.ev40ShareActionsHeading, x: M, baseline: ty, size: 24, weight: .bold,
+                color: AgaraColors.textMuted, tracking: 0.22)
+        tracked("\(model.done)/\(model.total)", x: W - M, baseline: ty, size: 24, weight: .bold, color: highlight,
+                tracking: 0.10, align: .trailing)
+        ForEach(Array(model.disciplines.enumerated()), id: \.offset) { i, entry in
+            let x0 = M + CGFloat(i % 2) * (tw + 20)
+            let y0 = ty + 28 + CGFloat(i / 2) * (th + gap)
+            let mid = y0 + th / 2
+            let ic = x0 + 22 + 29
+            panel(CGRect(x: x0, y: y0, width: tw, height: th), radius: 26)
+            Circle().fill(entry.done ? AgaraColors.accent.opacity(40.0 / 255) : AgaraColors.cardSoft)
+                .frame(width: 58 * k, height: 58 * k)
+                .offset(x: (ic - 29) * k, y: (mid - 29) * k)
+            symbol(entry.symbol, cx: ic, cy: mid, size: 32,
+                   color: entry.done ? AgaraColors.accent : AgaraColors.textMuted)
+            text(entry.name, x: ic + 46, baseline: mid + 10, size: entry.name.count < 13 ? 29 : 25,
+                 weight: .semibold, color: entry.done ? AgaraColors.textPrimary : AgaraColors.textMuted)
+            check(cx: x0 + tw - 22 - 18, cy: mid, r: 18, on: entry.done, glyph: 26)
+        }
+
+        // THE 40: a card holding two compact rows of twenty (D11).
+        panel(box, radius: 40)
+        tracked(AgaraCopy.ev40ShareJourneyHeading, x: M + pad, baseline: fy, size: 24, weight: .bold,
+                color: AgaraColors.textMuted, tracking: 0.22)
+        legend(right: W - M - pad, baseline: fy)
+        ForEach(0..<Ev40Challenge.totalDays, id: \.self) { day in
+            let x0 = M + pad + CGFloat(day % 20) * (cell + cellGap)
+            let y0 = fy + 34 + CGFloat(day / 20) * (cell + cellGap + 4)
+            dayCell(day, rect: CGRect(x: x0, y: y0, width: cell, height: cell), radius: 9, ring: 5)
+        }
+        let labels = fy + 34 + 2 * cell + cellGap + 4 + 40
+        text("Day 1", x: M + pad, baseline: labels, size: 22, weight: .medium, color: AgaraColors.textMuted)
+        text("Day \(Ev40Challenge.totalDays)", x: W - M - pad, baseline: labels, size: 22, weight: .medium,
+             color: AgaraColors.textMuted, align: .trailing)
+
+        footer
     }
 
-    /// Streak · perfect days · days active (A2): the summary a day-30 card needs, and on a day-1 card the one line that
-    /// still says something real.
-    private var statsRow: some View {
-        Text(model.statsLine)
-            .font(.system(size: 9.5 * scale, weight: .medium))
-            .foregroundStyle(AgaraColors.textMuted)
+    // MARK: Square
+
+    @ViewBuilder private var square: some View {
+        let cx = M + 100, cy: CGFloat = 420
+        let step = IW / 8, iy: CGFloat = 620
+        let fy: CGFloat = 760, gap: CGFloat = 6
+        let cell = (IW - 39 * gap) / 40
+
+        header
+        text([model.userName, model.dateLine].compactMap { $0 }.joined(separator: " · "),
+             x: M, baseline: 246, size: 48, weight: .bold, color: AgaraColors.textPrimary)
+        ring(cx: cx, cy: cy, r: 100, stroke: 20)
+        if model.isPerfect {
+            symbol("star.fill", cx: cx, cy: cy, size: 70, color: highlight)
+        } else {
+            text("\(model.percent)%", x: cx, baseline: cy + 14, size: 48, weight: .bold,
+                 color: AgaraColors.textPrimary, align: .center)
+        }
+        let sx = cx + 100 + 64
+        ForEach(Array(stats.enumerated()), id: \.offset) { i, stat in
+            let ry = cy - 70 + CGFloat(i) * 70
+            symbol(stat.symbol, cx: sx + 20, cy: ry, size: 32, color: AgaraColors.accent)
+            statLine(stat, x: sx + 56, baseline: ry + 13, numberSize: 38, labelSize: 26, gap: 12, lift: 1)
+        }
+        // The eight as symbol discs, a tick badge on the done ones.
+        ForEach(Array(model.disciplines.enumerated()), id: \.offset) { i, entry in
+            let ic = M + step * CGFloat(i) + step / 2
+            Circle().fill(entry.done ? AgaraColors.accent.opacity(46.0 / 255) : AgaraColors.cardSoft)
+                .frame(width: 84 * k, height: 84 * k)
+                .offset(x: (ic - 42) * k, y: (iy - 42) * k)
+            symbol(entry.symbol, cx: ic, cy: iy, size: 40,
+                   color: entry.done ? AgaraColors.accent : AgaraColors.textMuted)
+            if entry.done { check(cx: ic + 34, cy: iy - 32, r: 12, on: true, glyph: 18) }
+        }
+        // THE 40 as one strip.
+        tracked(AgaraCopy.ev40ShareJourneyHeading, x: M, baseline: fy, size: 22, weight: .bold,
+                color: AgaraColors.textMuted, tracking: 0.22)
+        ForEach(0..<Ev40Challenge.totalDays, id: \.self) { day in
+            dayCell(day, rect: CGRect(x: M + CGFloat(day) * (cell + gap), y: fy + 22, width: cell, height: 44),
+                    radius: 6, ring: 4)
+        }
+        footer
+    }
+
+    // MARK: Shared parts
+
+    /// The EV40 wordmark (owner's logo) with "BY AGARA" under it, and the day pill (D9) on the right.
+    @ViewBuilder private var header: some View {
+        mark(x: M, top: 92, height: 62, opacity: 1)
+        tracked("BY AGARA", x: M, baseline: 194, size: 22, weight: .bold, color: AgaraColors.textMuted, tracking: 0.28)
+        Text(model.pillLabel)
+            .font(AgaraFont.face(28 * k, .bold))
+            .tracking(0.12 * 28 * k)
+            .foregroundStyle(highlight)
             .lineLimit(1)
-            .minimumScaleFactor(0.7)
-            .padding(.top, 8 * scale)
+            .fixedSize()
+            .padding(.horizontal, 26 * k)
+            .frame(height: 60 * k)
+            .background(Capsule().fill(highlight.opacity(46.0 / 255)))
+            .frame(width: (W - M) * k, alignment: .trailing)
+            .offset(y: 96 * k)
     }
 
-    /// The whole 40-day journey, not just today: one of four accent shades for the ticks that day carried (A3), an
-    /// outlined empty slot for a day with none, and the today ring on top of whichever it is.
-    private var journeyGrid: some View {
-        // Always the whole challenge (mirror of Android): a short journey list is padded with empty slots, so an early
-        // card still shows the days to come.
-        let slots = Ev40Challenge.totalDays
-        let rows = stride(from: 0, to: slots, by: 8).map { start in Array(start..<min(start + 8, slots)) }
-        return VStack(alignment: .leading, spacing: 7 * scale) {
-            Text("THE 40")
-                .font(.system(size: 8.5 * scale, weight: .bold))
-                .tracking(1.6)
-                .foregroundStyle(AgaraColors.textMuted)
-            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                HStack(spacing: 5 * scale) {
-                    ForEach(row, id: \.self) { index in
-                        let isToday = model.journeyToday == index
-                        let level = index < model.journey.count ? model.journey[index] : 0
-                        let shape = RoundedRectangle(cornerRadius: 3 * scale, style: .continuous)
-                        shape
-                            .fill(level == 0 ? AgaraColors.cardSoft : AgaraColors.accent.opacity(heat(level)))
-                            // Both strokes sit on the square itself, before the flexible frame: an overlay applied
-                            // after `.frame(maxWidth:)` outlines the frame, which in square format is wider than the cell.
-                            .overlay {
-                                if isToday {
-                                    shape.strokeBorder(AgaraColors.textPrimary, lineWidth: 1.4)
-                                } else if level == 0 {
-                                    shape.strokeBorder(AgaraColors.borderSubtle, lineWidth: 1)
-                                }
-                            }
-                            .aspectRatio(1, contentMode: .fit)
-                            .frame(maxWidth: .infinity)
-                    }
-                }
-            }
+    @ViewBuilder private var footer: some View {
+        let story = format == .story
+        let ruleY = H - (story ? 150 : 132)
+        let baseline = H - (story ? 92 : 80)
+        let size: CGFloat = story ? 32 : 28
+        let card = ShareCardConfig.active()
+        Rectangle().fill(AgaraColors.borderSubtle)
+            .frame(width: IW * k, height: 2 * k)
+            .offset(x: M * k, y: ruleY * k)
+        text(AgaraCopy.ev40ChallengeTagline, x: M, baseline: baseline, size: size, weight: .medium,
+             color: AgaraColors.textSecondary)
+        if card.qr, let url = card.qrUrl {
+            // The console switched the QR on (A6/D4): it encodes the address instead of spelling it out.
+            qrCode(url)
+                .frame(width: 108 * k, height: 108 * k)
+                .offset(x: (W - M - 108) * k, y: (ruleY + 14) * k)
+        } else {
+            // The address the cloud names (R1), shrunk to whatever the tagline leaves.
+            Text(card.displayUrl)
+                .font(AgaraFont.face(size * k, .bold))
+                .foregroundStyle(AgaraColors.accent)
+                .lineLimit(1)
+                .minimumScaleFactor(18 / size)
+                .frame(width: (IW * 0.5) * k, alignment: .trailing)
+                .offset(x: (W - M - IW * 0.5) * k, y: (baseline - Self.ascent * size) * k)
         }
     }
 
-    /// The four heat shades: more ticks, deeper colour (1–2, 3–4, 5–7, 8 of the eight).
-    private func heat(_ level: Int) -> Double {
+    private struct Stat { let symbol: String; let number: Int; let label: String }
+
+    private var stats: [Stat] {
+        [Stat(symbol: "flame.fill", number: model.streak, label: model.streakLabel),
+         Stat(symbol: "calendar", number: model.daysActive, label: model.activeLabel),
+         Stat(symbol: "star.fill", number: model.perfectDays, label: model.perfectLabel)]
+    }
+
+    /// "6 day streak": the number and its words on one baseline (the words sit `lift` px higher, as Android draws them).
+    private func statLine(_ stat: Stat, x: CGFloat, baseline: CGFloat, numberSize: CGFloat, labelSize: CGFloat,
+                          gap: CGFloat, lift: CGFloat) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: gap * k) {
+            Text("\(stat.number)").font(AgaraFont.face(numberSize * k, .bold))
+                .foregroundStyle(AgaraColors.textPrimary)
+            Text(stat.label).font(AgaraFont.face(labelSize * k, .medium))
+                .foregroundStyle(AgaraColors.textSecondary)
+                .baselineOffset(lift * k)
+        }
+        .lineLimit(1)
+        .fixedSize()
+        .offset(x: x * k, y: (baseline - Self.ascent * numberSize) * k)
+    }
+
+    private func ring(cx: CGFloat, cy: CGFloat, r: CGFloat, stroke: CGFloat) -> some View {
+        ZStack {
+            Circle().inset(by: stroke / 2 * k).stroke(AgaraColors.cardSoft, lineWidth: stroke * k)
+            if model.done > 0 {
+                Circle().inset(by: stroke / 2 * k)
+                    .trim(from: 0, to: model.fraction)
+                    .stroke(highlight, style: StrokeStyle(lineWidth: stroke * k, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+            }
+        }
+        .frame(width: 2 * r * k, height: 2 * r * k)
+        .offset(x: (cx - r) * k, y: (cy - r) * k)
+    }
+
+    /// One day of THE 40: shaded by effort up to today, outlined for the days to come, today ringed.
+    @ViewBuilder private func dayCell(_ day: Int, rect: CGRect, radius: CGFloat, ring: CGFloat) -> some View {
+        let today = model.journeyToday
+        let future = today.map { day > $0 } ?? true
+        let shape = RoundedRectangle(cornerRadius: radius * k, style: .continuous)
+        Group {
+            if future {
+                shape.strokeBorder(AgaraColors.borderStrong, lineWidth: 2 * k)
+            } else {
+                let level = day < model.journey.count ? model.journey[day] : 0
+                shape.fill(level > 0 ? AgaraColors.accent.opacity(Self.heat(level)) : AgaraColors.cardSoft)
+            }
+        }
+        .frame(width: rect.width * k, height: rect.height * k)
+        .offset(x: rect.minX * k, y: rect.minY * k)
+        if day == today {
+            RoundedRectangle(cornerRadius: (radius + 4) * k, style: .continuous)
+                .strokeBorder(AgaraColors.textPrimary, lineWidth: 3 * k)
+                .frame(width: (rect.width + 2 * ring) * k, height: (rect.height + 2 * ring) * k)
+                .offset(x: (rect.minX - ring) * k, y: (rect.minY - ring) * k)
+        }
+    }
+
+    /// "LESS ▪▪▪▪ MORE", right-aligned at `right` on `baseline`.
+    @ViewBuilder private func legend(right: CGFloat, baseline: CGFloat) -> some View {
+        HStack(spacing: 0) {
+            Text(AgaraCopy.ev40ShareLegendLess).tracking(0.15 * 20 * k)
+                .padding(.trailing, 4 * k)
+            HStack(spacing: 6 * k) {
+                ForEach(1...4, id: \.self) { level in
+                    RoundedRectangle(cornerRadius: 5 * k).fill(AgaraColors.accent.opacity(Self.heat(level)))
+                        .frame(width: 20 * k, height: 20 * k)
+                        .alignmentGuide(.firstTextBaseline) { $0[.bottom] }
+                }
+            }
+            .padding(.trailing, 12 * k)
+            Text(AgaraCopy.ev40ShareLegendMore).tracking(0.15 * 20 * k)
+        }
+        .font(AgaraFont.face(20 * k, .semibold))
+        .foregroundStyle(AgaraColors.textMuted)
+        .fixedSize()
+        .frame(width: right * k, alignment: .trailing)
+        .offset(y: (baseline - Self.ascent * 20) * k)
+    }
+
+    private func check(cx: CGFloat, cy: CGFloat, r: CGFloat, on: Bool, glyph: CGFloat) -> some View {
+        ZStack {
+            if on {
+                Circle().fill(AgaraColors.success)
+                Image(systemName: "checkmark")
+                    .font(.system(size: glyph * 0.62 * k, weight: .heavy))
+                    .foregroundStyle(AgaraColors.card)
+            } else {
+                Circle().inset(by: 1.5 * k).stroke(AgaraColors.borderStrong, lineWidth: 3 * k)
+            }
+        }
+        .frame(width: 2 * r * k, height: 2 * r * k)
+        .offset(x: (cx - r) * k, y: (cy - r) * k)
+    }
+
+    private func panel(_ rect: CGRect, radius: CGFloat) -> some View {
+        let shape = RoundedRectangle(cornerRadius: radius * k, style: .continuous)
+        return shape.fill(AgaraColors.card)
+            .overlay { shape.strokeBorder(AgaraColors.borderSubtle, lineWidth: 2 * k) }
+            .frame(width: rect.width * k, height: rect.height * k)
+            .offset(x: rect.minX * k, y: rect.minY * k)
+    }
+
+    /// The tracker's SF Symbol in a `size`-px box centred on (`cx`, `cy`) — the box Android's Material glyph fills.
+    private func symbol(_ name: String, cx: CGFloat, cy: CGFloat, size: CGFloat, color: Color) -> some View {
+        Image(systemName: name)
+            .resizable()
+            .scaledToFit()
+            .foregroundStyle(color)
+            .frame(width: size * 0.78 * k, height: size * 0.78 * k)
+            .frame(width: size * k, height: size * k)
+            .offset(x: (cx - size / 2) * k, y: (cy - size / 2) * k)
+    }
+
+    // MARK: The mark
+
+    /// Width ÷ height of the wordmark layers (963 × 169, `scripts/ev40_logo_extract.py`).
+    static let markAspect: CGFloat = 963.0 / 169.0
+
+    /// The wordmark `height` px tall at (`x`, `top`): "EV" in the mark's own orange, "40" tinted to the theme's text.
+    private func mark(x: CGFloat, top: CGFloat, height: CGFloat, opacity: Double) -> some View {
+        let size = CGSize(width: height * Self.markAspect * k, height: height * k)
+        return ZStack {
+            Image("ev40-mark-ev").resizable().renderingMode(.original)
+            Image("ev40-mark-forty").resizable().renderingMode(.template).foregroundStyle(AgaraColors.textPrimary)
+        }
+        .frame(width: size.width, height: size.height)
+        .opacity(opacity)
+        .offset(x: x * k, y: top * k)
+        .accessibilityHidden(true)
+    }
+
+    // MARK: Text
+
+    private enum Align { case leading, center, trailing }
+
+    /// Text placed by its baseline, the way Android's `Canvas.drawText` places it. `x` is the leading edge, the centre or
+    /// the trailing edge depending on `align`.
+    private func text(_ s: String, x: CGFloat, baseline: CGFloat, size: CGFloat, weight: Font.Weight, color: Color,
+                      align: Align = .leading) -> some View {
+        tracked(s, x: x, baseline: baseline, size: size, weight: weight, color: color, tracking: 0, align: align)
+    }
+
+    @ViewBuilder
+    private func tracked(_ s: String, x: CGFloat, baseline: CGFloat, size: CGFloat, weight: Font.Weight, color: Color,
+                         tracking: CGFloat, align: Align = .leading) -> some View {
+        let label = Text(s)
+            .font(AgaraFont.face(size * k, weight))
+            .tracking(tracking * size * k)
+            .foregroundStyle(color)
+            .lineLimit(1)
+            .fixedSize()
+        let y = (baseline - Self.ascent * size) * k
+        switch align {
+        case .leading: label.offset(x: x * k, y: y)
+        case .trailing: label.frame(width: x * k, alignment: .trailing).offset(y: y)
+        case .center: label.frame(width: 2 * x * k, alignment: .center).offset(y: y)
+        }
+    }
+
+    /// The four heat shades: more ticks, deeper colour (1–2, 3–4, 5–7, 8 of the eight). Same values as Android `heat`.
+    static func heat(_ level: Int) -> Double {
         switch level {
         case 1: 0.30
         case 2: 0.55
         case 3: 0.80
         default: 1.0
-        }
-    }
-
-    private var hairline: some View {
-        Rectangle()
-            .fill(AgaraColors.cardSoft)
-            .frame(height: 1)
-            .padding(.bottom, 9)
-    }
-
-    /// The footer prints the address the cloud says (`ShareCardConfig.active()`), never a literal — and, when the
-    /// console switches the QR on, encodes that same address instead of spelling it out (A6/D4).
-    private var footer: some View {
-        let card = ShareCardConfig.active()
-        return HStack(alignment: .center, spacing: 8 * scale) {
-            Text(AgaraCopy.ev40ChallengeTagline)
-                .font(.system(size: 10 * scale, weight: .medium))
-                .foregroundStyle(AgaraColors.textMuted)
-            Spacer(minLength: 0)
-            if card.qr, let url = card.qrUrl {
-                qrCode(url)
-                    .frame(width: 44 * scale, height: 44 * scale)
-            } else {
-                Text(card.displayUrl)
-                    .font(.system(size: 9 * scale, weight: .semibold))
-                    .foregroundStyle(AgaraColors.accent)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-            }
         }
     }
 
@@ -291,24 +450,33 @@ struct Ev40ShareCardModel: Equatable {
     /// Today's position in `journey` (0-based), so the card can mark it.
     let journeyToday: Int?
 
+    /// Today's day of the challenge (1…40), or nil before it starts — the pill's number (v3 D9).
+    var dayNumber: Int? = nil
+
     struct Entry: Identifiable, Equatable {
         let id: Int
         let name: String
         let done: Bool
+        /// The tracker's own SF Symbol for this discipline (`Ev40Discipline.symbol`).
+        var symbol: String { Ev40Discipline(rawValue: id)?.symbol ?? "circle" }
     }
 
-    /// The stats row: perfect days and days active, singular when the count is exactly 1. The streak is **not** repeated
-    /// here — it already sits under the count, and printing it twice read as filler (review, 2026-11-10).
-    var statsLine: String {
-        let perfect = perfectDays == 1 ? AgaraCopy.ev40SharePerfectDay : AgaraCopy.ev40SharePerfectDays
-        let active = daysActive == 1 ? AgaraCopy.ev40ShareDayActive : AgaraCopy.ev40ShareDaysActive
-        return "\(perfectDays) \(perfect) · \(daysActive) \(active)"
+    /// "DAY 14 / 40", or "TODAY" before the challenge has a first ticked day (D9). Mirror of Android `pillLabel`.
+    var pillLabel: String {
+        guard let day = dayNumber, (1...Ev40Challenge.totalDays).contains(day) else { return AgaraCopy.ev40CardPillToday }
+        return "DAY \(day) / \(Ev40Challenge.totalDays)"
     }
+
+    /// The words after each stat's number, singular when the count is exactly 1 (v3 replaced the one stats line with a
+    /// row per stat). Mirror of Android.
+    var streakLabel: String { AgaraCopy.ev40ShareStreak }
+    var activeLabel: String { daysActive == 1 ? AgaraCopy.ev40ShareDayActive : AgaraCopy.ev40ShareDaysActive }
+    var perfectLabel: String { perfectDays == 1 ? AgaraCopy.ev40SharePerfectDay : AgaraCopy.ev40SharePerfectDays }
 
     var percent: Int { total == 0 ? 0 : Int((Double(done) / Double(total) * 100).rounded()) }
     /// The ring's sweep; an empty day still draws its cap rather than nothing.
     var fraction: Double { total == 0 ? 0 : min(1, Double(done) / Double(total)) }
-    /// All eight today: the ring turns success-green and the pill becomes the badge (A4).
+    /// All eight today: green pill, green ring, a star in the ring (D9).
     var isPerfect: Bool { total > 0 && done == total }
 
     static func make(mask: Int, userName: String?, now: Date = AppClock.now, calendar: Calendar = .current,
@@ -343,7 +511,8 @@ struct Ev40ShareCardModel: Equatable {
             perfectDays: Ev40Challenge.perfectDays(masksByKey: masksByKey, today: todayKey, calendar: calendar),
             daysActive: Ev40Challenge.daysActive(masksByKey: masksByKey, today: todayKey, calendar: calendar),
             journey: slots.0,
-            journeyToday: slots.1)
+            journeyToday: slots.1,
+            dayNumber: day)
     }
 }
 

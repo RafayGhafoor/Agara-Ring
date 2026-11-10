@@ -25,6 +25,45 @@ final class Ev40ShareCardRenderTests: XCTestCase {
                                        trackedKeys: Array(masks.keys), masksByKey: masks)
     }
 
+    /// The Android render test's fixture, mask for mask (`Ev40ShareCardRenderTest.history`): 13 days from 28 Oct with two
+    /// gaps and every shade, today 10 Nov — so the two platforms' galleries can be compared value for value (Rule 2).
+    private func galleryModel(mask: Int, userName: String? = "Maya") -> Ev40ShareCardModel {
+        var masks: [String: Int] = [:]
+        let start = calendar.date(from: DateComponents(year: 2026, month: 10, day: 28, hour: 12))!
+        for offset in 0..<13 {
+            let date = calendar.date(byAdding: .day, value: offset, to: start)!
+            let key = Ev40Challenge.key(date, calendar: calendar)
+            switch offset {
+            case 3, 7: masks[key] = 0
+            case 2, 9: masks[key] = 255
+            default: masks[key] = (1 << (offset % 8 + 1)) - 1
+            }
+        }
+        masks["2026-11-10"] = mask
+        return Ev40ShareCardModel.make(mask: mask, userName: userName, now: now(), calendar: calendar,
+                                       trackedKeys: Array(masks.keys), masksByKey: masks)
+    }
+
+    /// Counts pixels within `tolerance` of `rgb` inside `rect` (pixel coordinates) of a rendered card.
+    private func count(_ image: UIImage, rgb: (Int, Int, Int), in rect: CGRect, tolerance: Int = 14) -> Int {
+        guard let cg = image.cgImage else { return 0 }
+        let width = cg.width, height = cg.height
+        var data = [UInt8](repeating: 0, count: width * height * 4)
+        let context = CGContext(data: &data, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                                space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        context.draw(cg, in: CGRect(x: 0, y: 0, width: width, height: height))
+        var hits = 0
+        for y in Int(rect.minY)..<Int(rect.maxY) {
+            for x in Int(rect.minX)..<Int(rect.maxX) {
+                let i = (y * width + x) * 4
+                if abs(Int(data[i]) - rgb.0) < tolerance, abs(Int(data[i + 1]) - rgb.1) < tolerance,
+                   abs(Int(data[i + 2]) - rgb.2) < tolerance { hits += 1 }
+            }
+        }
+        return hits
+    }
+
     private func pixelSize(_ image: UIImage) -> CGSize {
         CGSize(width: image.size.width * image.scale, height: image.size.height * image.scale)
     }
@@ -62,6 +101,26 @@ final class Ev40ShareCardRenderTests: XCTestCase {
         XCTAssertFalse(image?.pngData.isEmpty ?? true)
     }
 
+    // MARK: The EV40 wordmark (v3, owner 2026-11-10)
+
+    /// The header is the owner's EV40 wordmark. Its "EV" is the mark's own orange #F3682F, a colour nothing else on the
+    /// card uses, so the header band holding a few thousand pixels of it proves the mark was drawn — on both themes and
+    /// both formats. Mirror of Android `theHeaderCarriesTheEv40Wordmark`.
+    func testTheHeaderCarriesTheEv40Wordmark() throws {
+        let original = ThemeStore.current
+        defer { ThemeStore.current = original }
+        XCTAssertNotNil(UIImage(named: "ev40-mark-ev"), "the EV layer ships in the app's asset catalog")
+        XCTAssertNotNil(UIImage(named: "ev40-mark-forty"), "the 40 layer ships in the app's asset catalog")
+        for theme in ["light", "dark"] {
+            ThemeStore.select(theme)
+            for format in [ShareCardFormat.story, .square] {
+                let image = try XCTUnwrap(Ev40ShareRenderer.render(model: galleryModel(mask: 0b0011_1111), format: format))
+                let orange = count(image, rgb: (0xF3, 0x68, 0x2F), in: CGRect(x: 72, y: 92, width: 360, height: 62))
+                XCTAssertGreaterThan(orange, 2_000, "\(theme) \(format): the EV40 mark's orange in the header")
+            }
+        }
+    }
+
     // MARK: No name → no name row (owner, 2026-11-10: "if no name, let's not use that in the image")
 
     func testAProfileWithNoNamePutsNoNameOnTheCard() {
@@ -90,14 +149,14 @@ final class Ev40ShareCardRenderTests: XCTestCase {
         for theme in ["light", "dark"] {
             ThemeStore.select(theme)
             ShareCardConfig.install(nil)
-            try write("ios-\(theme)-story-progress", makeModel(mask: 0b0001_0111), .story)
-            try write("ios-\(theme)-square-progress", makeModel(mask: 0b0001_0111), .square)
-            try write("ios-\(theme)-story-perfect", makeModel(mask: 255), .story)
-            try write("ios-\(theme)-story-noname", makeModel(mask: 0b0001_0111, userName: nil), .story)
+            try write("ios-\(theme)-story-progress", galleryModel(mask: 0b0011_1111), .story)
+            try write("ios-\(theme)-square-progress", galleryModel(mask: 0b0011_1111), .square)
+            try write("ios-\(theme)-story-perfect", galleryModel(mask: 255), .story)
+            try write("ios-\(theme)-story-noname", galleryModel(mask: 0b0011_1111, userName: nil), .story)
         }
         ThemeStore.select("light")
         ShareCardConfig.install(ShareCard(displayUrl: "agaralife.com/ev40",
                                                           qrUrl: "https://www.agaralife.com/ev40", qr: true))
-        try write("ios-light-story-qr", makeModel(mask: 0b0001_0111), .story)
+        try write("ios-light-story-qr", galleryModel(mask: 0b0011_1111), .story)
     }
 }

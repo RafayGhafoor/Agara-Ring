@@ -76,20 +76,49 @@ final class Ev40ShareCardModelTests: XCTestCase {
 
     // MARK: Stats line — singular at exactly 1, the streak not repeated (mirror of Android `Ev40ShareCardStatsTest`)
 
-    private func card(perfect: Int, active: Int) -> Ev40ShareCardModel {
-        Ev40ShareCardModel(userName: nil, dayLabel: "Day 1 of 40", dateLine: "Tue, 10 Nov", done: 0, total: 8,
+    private func card(perfect: Int = 0, active: Int = 0, day: Int? = 14) -> Ev40ShareCardModel {
+        Ev40ShareCardModel(userName: nil, dayLabel: "Day 14 of 40", dateLine: "Tue, 10 Nov", done: 0, total: 8,
                            disciplines: [], streak: 9, perfectDays: perfect, daysActive: active,
-                           journey: [], journeyToday: nil)
+                           journey: [], journeyToday: nil, dayNumber: day)
     }
 
-    func testTheStatsLineUsesTheSingularOnlyAtExactlyOne() {
-        XCTAssertEqual(card(perfect: 0, active: 1).statsLine, "0 perfect days · 1 day active")
-        XCTAssertEqual(card(perfect: 1, active: 2).statsLine, "1 perfect day · 2 days active")
-        XCTAssertEqual(card(perfect: 3, active: 12).statsLine, "3 perfect days · 12 days active")
+    // Policy history: v2 printed one stats line ("1 perfect day · 2 days active"); v3 (owner, 2026-11-10) gives each
+    // stat its own row with an icon, so the line became three labels. Asserted now: singular at exactly 1 and only then;
+    // the pill names the day of the challenge, or TODAY before it starts (D9). Mirror of Android Ev40ShareCardStatsTest.
+
+    func testEachStatLabelTakesTheSingularOnlyAtExactlyOne() {
+        XCTAssertEqual(card(perfect: 0).perfectLabel, "perfect days")
+        XCTAssertEqual(card(perfect: 1).perfectLabel, "perfect day")
+        XCTAssertEqual(card(perfect: 2).perfectLabel, "perfect days")
+        XCTAssertEqual(card(active: 0).activeLabel, "days active")
+        XCTAssertEqual(card(active: 1).activeLabel, "day active")
+        XCTAssertEqual(card(active: 12).activeLabel, "days active")
+        XCTAssertEqual(card().streakLabel, "day streak")
     }
 
-    func testTheStatsLineDoesNotRepeatTheStreak() {
-        XCTAssertFalse(card(perfect: 3, active: 12).statsLine.contains("streak"),
-                       "the streak sits under the count; repeating it here read as filler")
+    func testThePillNamesTheDayOfTheChallengeFirstAndLastIncluded() {
+        XCTAssertEqual(card(day: 1).pillLabel, "DAY 1 / 40")
+        XCTAssertEqual(card(day: 14).pillLabel, "DAY 14 / 40")
+        XCTAssertEqual(card(day: 40).pillLabel, "DAY 40 / 40")
+    }
+
+    func testBeforeTheChallengeStartsOrOutsideItThePillSaysToday() {
+        XCTAssertEqual(card(day: nil).pillLabel, "TODAY")
+        XCTAssertEqual(card(day: 0).pillLabel, "TODAY")
+        XCTAssertEqual(card(day: 41).pillLabel, "TODAY")
+    }
+
+    func testMakeCarriesTheDayNumberIntoThePill() {
+        let model = Ev40ShareCardModel.make(mask: 1, userName: "Rafay", now: day("2026-11-10"), calendar: calendar,
+                                            trackedKeys: ["2026-11-08", "2026-11-10"],
+                                            masksByKey: ["2026-11-08": 3, "2026-11-10": 1])
+        XCTAssertEqual(model.dayNumber, 3)
+        XCTAssertEqual(model.pillLabel, "DAY 3 / 40")
+    }
+
+    func testEveryDisciplineEntryCarriesTheTrackersOwnSymbol() {
+        let model = Ev40ShareCardModel.make(mask: 0, userName: nil, trackedKeys: [])
+        XCTAssertEqual(model.disciplines.map(\.symbol), Ev40Discipline.allCases.map(\.symbol))
+        XCTAssertFalse(model.disciplines.contains { $0.symbol == "circle" }, "no discipline falls back to a blank disc")
     }
 }
