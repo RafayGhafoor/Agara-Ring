@@ -335,6 +335,170 @@ final class RingNicknameTests: XCTestCase {
         XCTAssertNil(DeviceRepository.current(context: context)?.nickname)
     }
 
+    // MARK: - A ring named after its person (D5/D6)
+
+    func testAPersonNameBecomesTheRingsPossessiveName() {
+        XCTAssertEqual(RingNickname.forPerson("Hayden"), "Hayden\u{2019}s Ring")
+    }
+
+    func testOnlyTheFirstWordIsUsedAndItsFirstLetterIsCapitalised() {
+        XCTAssertEqual(RingNickname.forPerson("  hayden  smith "), "Hayden\u{2019}s Ring")
+        XCTAssertEqual(RingNickname.forPerson("Hayden Smith"), "Hayden\u{2019}s Ring")
+    }
+
+    func testANameEndingInSTakesTheApostropheS() {
+        // One style, stated in the plan: modern possessive, never "James\u{2019} Ring".
+        XCTAssertEqual(RingNickname.forPerson("James"), "James\u{2019}s Ring")
+    }
+
+    func testSurroundingPunctuationIsDropped() {
+        XCTAssertEqual(RingNickname.forPerson("Hayden,"), "Hayden\u{2019}s Ring")
+        XCTAssertEqual(RingNickname.forPerson("\"Hayden\""), "Hayden\u{2019}s Ring")
+        XCTAssertEqual(RingNickname.forPerson("(Hayden)"), "Hayden\u{2019}s Ring")
+    }
+
+    func testNoUsablePersonNameYieldsNoDerivedName() {
+        XCTAssertNil(RingNickname.forPerson(nil))
+        XCTAssertNil(RingNickname.forPerson(""))
+        XCTAssertNil(RingNickname.forPerson("   \t\n"))
+        XCTAssertNil(RingNickname.forPerson("123"))
+        XCTAssertNil(RingNickname.forPerson("--"))
+    }
+
+    func testAVeryLongPersonNameIsShortenedButKeepsTheSuffix() {
+        let derived = RingNickname.forPerson(String(repeating: "a", count: 40))
+        let name = try? XCTUnwrap(derived)
+        XCTAssertEqual(name?.count, RingNickname.maxLength, "the whole name fits the field's limit")
+        XCTAssertEqual(name?.hasSuffix(RingNickname.possessiveSuffix), true, "the suffix is never what gets cut")
+        XCTAssertEqual(derived?.count, RingNickname.maxLength)
+    }
+
+    func testADerivedNameIsDeterministic() {
+        XCTAssertEqual(RingNickname.forPerson("Hayden"), RingNickname.forPerson("Hayden"))
+        // And it must survive the store's own normalisation unchanged: it is a real name, not a placeholder.
+        XCTAssertEqual(RingNickname.normalized("Hayden\u{2019}s Ring"), "Hayden\u{2019}s Ring")
+    }
+
+    func testThePersonsNameIsTheFirstSuggestionChip() {
+        let chips = RingNickname.suggestions(forPerson: "Hayden")
+        XCTAssertEqual(chips.first, "Hayden\u{2019}s Ring")
+        XCTAssertEqual(Array(chips.dropFirst()), RingNickname.suggestions, "the standing chips are unchanged behind it")
+        XCTAssertEqual(RingNickname.suggestions(forPerson: nil), RingNickname.suggestions)
+        XCTAssertEqual(RingNickname.suggestions(forPerson: "  "), RingNickname.suggestions)
+    }
+
+    func testPrefillOffersThePersonsNameOnlyWhenTheRingHasNone() {
+        XCTAssertEqual(RingNickname.prefill(identifier: ringA, row: nil, personName: "Hayden"), "Hayden\u{2019}s Ring")
+        XCTAssertEqual(RingNickname.prefill(identifier: ringA, row: nil, personName: nil), RingNickname.defaultName)
+        RingNicknameMemory().set("Left hand", for: ringA)
+        XCTAssertEqual(RingNickname.prefill(identifier: ringA, row: nil, personName: "Hayden"), "Left hand",
+                       "a name the user chose always wins over the derived one")
+    }
+
+    // MARK: - The scan row (D1/D2)
+
+    func testAnUnnamedRingShowsTheProductNamePlusItsTag() {
+        let row = RingScanName.row(identity: ringA, nickname: nil, advertisedName: "TK20",
+                                   isMatched: true, pairedIdentity: nil)
+        XCTAssertEqual(row.text, AgaraCopy.ringDisplayName + RingScanName.tagSeparator + RingScanName.tag(identity: ringA))
+        XCTAssertEqual(row.spokenText, AgaraCopy.ringDisplayName + ", " + RingScanName.tag(identity: ringA))
+        XCTAssertFalse(row.isKnown)
+        XCTAssertFalse(row.text.contains("TK20"), "the advertised hardware name never shows on a matched ring")
+    }
+
+    func testANamedRingShowsItsNameAndIsKnown() {
+        RingNicknameMemory().set("Hayden\u{2019}s Ring", for: ringA)
+        let row = RingScanName.row(identity: ringA, nickname: RingNicknameMemory().nickname(for: ringA),
+                                   advertisedName: "TK20", isMatched: true, pairedIdentity: nil)
+        XCTAssertEqual(row.text, "Hayden\u{2019}s Ring")
+        XCTAssertEqual(row.spokenText, "Hayden\u{2019}s Ring")
+        XCTAssertTrue(row.isKnown)
+    }
+
+    func testAnotherRingsNameIsNeverShownOnThisRow() {
+        RingNicknameMemory().set("Sleep ring", for: ringB)
+        let row = RingScanName.row(identity: ringA, nickname: RingNicknameMemory().nickname(for: ringA),
+                                   advertisedName: "TK20", isMatched: true, pairedIdentity: nil)
+        XCTAssertFalse(row.text.contains("Sleep ring"), "one ring's name must never label another ring")
+        XCTAssertTrue(row.text.hasPrefix(AgaraCopy.ringDisplayName))
+    }
+
+    func testTheTagIsStableFourUppercaseHexAndDiffersBetweenRings() {
+        let a = RingScanName.tag(identity: ringA)
+        XCTAssertEqual(a, RingScanName.tag(identity: ringA), "stable across calls, so the row does not flicker")
+        XCTAssertNotEqual(a, RingScanName.tag(identity: ringB))
+        XCTAssertEqual(a.count, RingScanName.tagLength)
+        XCTAssertTrue(a.allSatisfy { $0.isHexDigit && !$0.isLowercase })
+        XCTAssertEqual(RingScanName.tag(identity: ringA.lowercased()), a, "the identity's case is irrelevant")
+    }
+
+    func testTheTagMatchesTheSharedFormula() {
+        // FNV-1a 32-bit over the uppercased identity, low 16 bits, uppercase hex — the same vectors Android's
+        // `RingScanNameTest` pins, so a port drift is a red test on one side or the other. (The identity each
+        // platform hashes differs: the peripheral UUID here, the BLE address there.)
+        XCTAssertEqual(RingScanName.tag(identity: "AA:BB:CC:DD:EE:01"), "B9CC")
+        XCTAssertEqual(RingScanName.tag(identity: "aa:bb:cc:dd:ee:02"), "BE85")
+        XCTAssertEqual(RingScanName.tag(identity: ""), "9DC5")
+    }
+
+    func testAnUnmatchedPeripheralKeepsItsAdvertisedNameAndGetsNoTag() {
+        let row = RingScanName.row(identity: ringA, nickname: nil, advertisedName: "  My Scale  ",
+                                   isMatched: false, pairedIdentity: nil)
+        XCTAssertEqual(row.text, "My Scale")
+        XCTAssertFalse(row.isKnown)
+        let unnamed = RingScanName.row(identity: ringA, nickname: nil, advertisedName: "   ",
+                                       isMatched: false, pairedIdentity: nil)
+        XCTAssertEqual(unnamed.text, AgaraCopy.ringDisplayName, "a blank advertisement still shows something tappable")
+    }
+
+    func testThePairedRingWithoutANameIsStillKnown() {
+        // Pairing happened, the user skipped naming: the row is theirs, so it sorts first even though unnamed.
+        let row = RingScanName.row(identity: ringA, nickname: nil, advertisedName: "TK20",
+                                   isMatched: true, pairedIdentity: ringA.lowercased())
+        XCTAssertTrue(row.isKnown)
+    }
+
+    func testSortKeyPutsAKnownRingAboveEverythingElse() {
+        let known = RingScanName.sortKey(isKnown: true, isLikelyRing: true, rssi: -95)
+        let strongRing = RingScanName.sortKey(isKnown: false, isLikelyRing: true, rssi: -40)
+        let stranger = RingScanName.sortKey(isKnown: false, isLikelyRing: false, rssi: -30)
+        XCTAssertLessThan(known, strongRing, "mine first, however weak its signal")
+        XCTAssertLessThan(strongRing, stranger, "recognised rings above unrecognised ones")
+        XCTAssertLessThan(RingScanName.sortKey(isKnown: false, isLikelyRing: true, rssi: -50),
+                          RingScanName.sortKey(isKnown: false, isLikelyRing: true, rssi: -80),
+                          "within a group, the stronger signal leads")
+    }
+
+    // MARK: - The person's name adopted at profile completion (D5/B2)
+
+    func testSavingTheProfileNamesAnUnnamedRing() throws {
+        let context = try TestSupport.makeContext()
+        EventPersistenceSubscriber(context: context).persist(identified("TK20 3B00", ring: ringA))
+
+        XCTAssertTrue(DeviceRepository.adoptPersonName("Hayden", context: context))
+        XCTAssertEqual(DeviceRepository.current(context: context)?.nickname, "Hayden\u{2019}s Ring")
+        XCTAssertEqual(RingNicknameMemory().nickname(for: ringA), "Hayden\u{2019}s Ring",
+                       "remembered per ring, so the name follows that ring and not the row")
+    }
+
+    func testAdoptingThePersonsNameNeverReplacesAChosenOne() throws {
+        let context = try TestSupport.makeContext()
+        EventPersistenceSubscriber(context: context).persist(identified("TK20 3B00", ring: ringA))
+        DeviceRepository.setNickname("Left hand", context: context)
+
+        XCTAssertFalse(DeviceRepository.adoptPersonName("Hayden", context: context))
+        XCTAssertEqual(DeviceRepository.current(context: context)?.nickname, "Left hand")
+    }
+
+    func testAdoptingDoesNothingWithoutAPairedRingOrAName() throws {
+        let context = try TestSupport.makeContext()
+        XCTAssertFalse(DeviceRepository.adoptPersonName("Hayden", context: context), "no ring to name yet")
+        EventPersistenceSubscriber(context: context).persist(identified("TK20 3B00", ring: ringA))
+        XCTAssertFalse(DeviceRepository.adoptPersonName(nil, context: context))
+        XCTAssertFalse(DeviceRepository.adoptPersonName("   ", context: context))
+        XCTAssertNil(DeviceRepository.current(context: context)?.nickname, "a skipped profile step leaves the model name")
+    }
+
     // MARK: - Animation curves
 
     func testAnimationCurvesStayInTheirRanges() {

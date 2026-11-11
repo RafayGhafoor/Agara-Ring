@@ -199,6 +199,9 @@ struct RootAppView: View {
                 if let raw = DebugLaunch.string("openRoute") {
                     let routes: [String: AppRoute] = [
                         "about": .settingsAbout, "dataExport": .settingsDataExport, "storage": .settingsStorage, "privacy": .settingsPrivacyData,
+                        // The scan list's names and order (plan `scan-row-ring-name.md`): a screenshot/UItest
+                        // entry point that does not depend on first-run state.
+                        "pairing": .pairing,
                         "wearable": .settingsWearable, "autoMeasure": .settingsAutoMeasure, "profile": .settingsProfile,
                         "sources": .healthSources(nil),
                     ]

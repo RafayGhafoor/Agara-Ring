@@ -16,6 +16,7 @@ struct PairingView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.modelContext) private var modelContext
+    @Query private var profiles: [UserProfile]
 
     /// Pushed onto the Settings nav stack (no onboarding "Skip"): show our own glass
     /// back button and hide the system nav bar so it doesn't stack a second, empty
@@ -86,14 +87,88 @@ struct PairingView: View {
         ble.connect(to: ring.id, selectedModelID: selectedModel.id)
     }
 
+    /// One row of the scan list: the advertisement plus the name `RingScanName` gives it.
+    private struct RingScanEntry: Identifiable {
+        let ring: RingBLEClient.DiscoveredRing
+        let row: RingScanRow
+        var id: UUID { ring.id }
+    }
+
     /// Discovered rings whose matched family is one the selected model can resolve to (recognized
     /// first), falling back to all named devices if nothing matches yet so the user is never stuck.
     /// Matching on *every* family the card can be — not just its default — is what keeps a row the scan
-    /// tagged `.the ringSmartHealth` visible under the ring card.
-    private var matchingRings: [RingBLEClient.DiscoveredRing] {
+    /// tagged `.veepooSmartHealth` visible under the ring card.
+    ///
+    /// Each row is named by `RingScanName` (this ring's own name when the phone has one, else the product
+    /// name plus a stable tag) and this phone's ring sorts first: with several rings in one room the product
+    /// name alone made every row identical (plan `scan-row-ring-name.md`, D1/D2).
+    private var matchingRings: [RingScanEntry] {
         let matches = ble.discovered.filter { selectedModel.acceptsScanFamily($0.deviceType) }
-        return matches.isEmpty ? ble.discovered : matches
+        let discovered = matches.isEmpty ? ble.discovered : matches
+        let memory = RingNicknameMemory()
+        let pairedIdentity = ble.deviceIdentifier ?? DeviceRepository.current(context: modelContext)?.peripheralIdentifier
+        return discovered
+            .map { ring -> (entry: RingScanEntry, order: RingScanOrder) in
+                let identity = ring.id.uuidString
+                let row = RingScanName.row(
+                    identity: identity,
+                    nickname: memory.nickname(for: identity),
+                    advertisedName: ring.name,
+                    isMatched: ring.deviceType != nil,
+                    pairedIdentity: pairedIdentity
+                )
+                return (
+                    RingScanEntry(ring: ring, row: row),
+                    RingScanName.sortKey(isKnown: row.isKnown, isLikelyRing: ring.isLikelyRing, rssi: ring.rssi)
+                )
+            }
+            .sorted { $0.order < $1.order }
+            .map(\.entry) + stubRings
     }
+
+    /// `-pairingStubRings N` (DEBUG, simulator only): N extra rows, so the crowded-room case this feature
+    /// exists for can be photographed. The emulator advertises one ring per port and the app discovers one
+    /// virtual ring, so the multi-ring list has no live rig (Rule 4 evidence for `scan-row-ring-name.md`).
+    /// Inert in release, and inert without the flag, so every other run sees the real scan.
+    private var stubRings: [RingScanEntry] {
+        #if DEBUG
+        #if targetEnvironment(simulator)
+        let count = DebugLaunch.integer("pairingStubRings")
+        guard count > 0 else { return [] }
+        let named: [String?] = [RingNickname.forPerson(personName) ?? "Hayden’s Ring", "Sleep ring"]
+        return (0..<min(count, 12)).compactMap { index in
+            let suffix = String(format: "%012d", 900 + index)
+            let identity = "00000000-0000-4000-8000-\(suffix)"
+            guard let uuid = UUID(uuidString: identity) else { return nil }
+            let nickname = index < named.count ? named[index] : nil
+            let ring = RingBLEClient.DiscoveredRing(
+                id: uuid,
+                name: "TK20",
+                rssi: -48 - index * 5,
+                isLikelyRing: true,
+                deviceType: .veepoo,
+                wearableModelID: "tk20"
+            )
+            let row = RingScanName.row(
+                identity: identity,
+                nickname: nickname,
+                advertisedName: "TK20",
+                isMatched: true,
+                pairedIdentity: nil
+            )
+            return RingScanEntry(ring: ring, row: row)
+        }
+        #else
+        return []
+        #endif
+        #else
+        return []
+        #endif
+    }
+
+    /// The person this phone belongs to, when the profile has a name: what a ring is called by default
+    /// ("Hayden’s Ring"). Absent before onboarding's profile step and whenever that step was skipped.
+    private var personName: String? { profiles.first?.name }
 
     /// Bluetooth is known to be unusable (off / not allowed / unsupported). Before the first scan the manager
     /// doesn't exist yet — the system permission prompt comes from the "Connect my ring" tap, not from
@@ -118,7 +193,9 @@ struct PairingView: View {
                     successHaptic.notificationOccurred(.success) // §6 success haptic
                     // "Name your ring" comes next; `onConnected` fires once it is saved or skipped.
                     nameText = RingNickname.prefill(
-                        identifier: ble.deviceIdentifier, row: DeviceRepository.current(context: modelContext)
+                        identifier: ble.deviceIdentifier,
+                        row: DeviceRepository.current(context: modelContext),
+                        personName: personName
                     )
                     isNaming = true
                 }
@@ -439,11 +516,11 @@ struct PairingView: View {
                 .frame(maxWidth: .infinity, alignment: .center) // §4 centered
 
                 VStack(spacing: 8) {
-                    ForEach(matchingRings) { ring in
+                    ForEach(matchingRings) { entry in
                         Button {
-                            connect(to: ring)
+                            connect(to: entry.ring)
                         } label: {
-                            ringRow(ring)
+                            ringRow(entry)
                         }
                         .buttonStyle(.plain)
                     }
@@ -469,14 +546,15 @@ struct PairingView: View {
 
     /// The wrong-pick escape hatch. A user-initiated connect that dies in `.failed` on a two-app card is,
     /// far more often than not, the other app's driver — the ring never answered because we were speaking
-    private func ringRow(_ ring: RingBLEClient.DiscoveredRing) -> some View {
+    /// The row's text comes from `RingScanName`: a ring this phone has a name for takes that name, an unnamed
+    /// one the product name plus a stable tag, and an unrecognised peripheral its advertised name — so the
+    /// hardware name ("TK20") still never labels a matched ring (AGENTS Rule 3). See `RingScanName.row`.
+    private func ringRow(_ entry: RingScanEntry) -> some View {
+        let ring = entry.ring
+        let shownName = entry.row.text
         let signalLevel: String = ring.rssi >= -65 ? "Strong signal"
             : ring.rssi >= -80 ? "Medium signal"
             : "Weak signal"
-        // A matched ring is shown by the app's product name, never the Bluetooth hardware name the ring advertises
-        // ("TK20"): pairing is the first place a person meets the ring, and the hardware model is not our name for it
-        // (AGENTS Rule 3). Unmatched peripherals keep their advertised name so the user can still find them.
-        let shownName = ring.deviceType.map { _ in AgaraCopy.ringDisplayName } ?? ring.name
         return HStack {
             Image(systemName: ring.isLikelyRing ? "circle.hexagongrid.circle.fill" : "dot.radiowaves.left.and.right")
                 .foregroundStyle(ring.isLikelyRing ? AgaraColors.accent : AgaraColors.textMuted)
@@ -503,7 +581,7 @@ struct PairingView: View {
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine) // §5
         .accessibilityLabel(Text( // §5 spoken label with signal level
-            "\(shownName), \(signalLevel)"
+            "\(entry.row.spokenText), \(signalLevel)"
         ))
     }
 
@@ -528,7 +606,11 @@ struct PairingView: View {
             }
             .accessibilityElement(children: .combine)
             if isNaming {
-                RingNameEditor(text: $nameText, onSubmit: saveName)
+                RingNameEditor(
+                    text: $nameText,
+                    onSubmit: saveName,
+                    suggestions: RingNickname.suggestions(forPerson: personName)
+                )
             } else if let onSkip {
                 // Already connected on arrival (e.g. back-navigating in onboarding): nothing to name.
                 PrimaryButton(title: "Continue", systemImage: "checkmark", action: onSkip)

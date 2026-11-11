@@ -358,6 +358,10 @@ struct OnboardingProfileView: View {
         }
         draft.apply(to: profile)
         try? modelContext.save()
+        // Onboarding asks the ring's name before the person's, so this is where an unnamed ring finally gets
+        // one: "Hayden's Ring". It never replaces a name the user chose and does nothing without a ring
+        // (plan `scan-row-ring-name.md`, D5).
+        DeviceRepository.adoptPersonName(profile.name, context: modelContext)
         coordinator.applyUserProfile()
         // Weight/height/age/sex shift every term of the daily calorie estimate.
         DailyCalorieEstimator.recomputeRecentDays(context: modelContext)

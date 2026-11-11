@@ -35,10 +35,61 @@ enum RingNickname {
     }
 
     /// What the "Name your ring" step and the Rename sheet prefill: the connected ring's remembered name
-    /// (per-ring map, keyed by `identifier`), else the model name — so Save without editing keeps a
-    /// re-paired ring's name instead of blanking it or copying another ring's.
-    static func prefill(identifier: String?, row: Device?, memory: RingNicknameMemory = RingNicknameMemory()) -> String {
-        memory.nickname(forConnected: identifier ?? row?.peripheralIdentifier, row: row) ?? defaultName
+    /// (per-ring map, keyed by `identifier`), else the person's own name when the profile has one, else the
+    /// model name — so Save without editing keeps a re-paired ring's name instead of blanking it or copying
+    /// another ring's.
+    ///
+    /// The person's name is a *prefill*, not a stored name: the pairing step runs before the profile step in
+    /// onboarding, so it has nothing to offer there, and Rename is where a ring with no name gets one.
+    static func prefill(
+        identifier: String?,
+        row: Device?,
+        personName: String? = nil,
+        memory: RingNicknameMemory = RingNicknameMemory()
+    ) -> String {
+        memory.nickname(forConnected: identifier ?? row?.peripheralIdentifier, row: row)
+            ?? forPerson(personName)
+            ?? defaultName
+    }
+
+    /// The suffix every person-derived name ends with. The typographic apostrophe (`’`, U+2019) is what the
+    /// rest of the app's copy uses, and a name ending in *s* takes it too ("James’s Ring") — one style, no
+    /// exceptions for a later session to re-derive (plan `scan-row-ring-name.md`, D6).
+    static let possessiveSuffix = "’s Ring"
+
+    /// The ring name a person's own name suggests: "Hayden Smith" → "Hayden’s Ring".
+    ///
+    /// A ring named after its person is what makes two rings in one room tellable apart, and it is the only
+    /// thing the app knows about its owner. First word only, first letter capitalised, surrounding punctuation
+    /// dropped, and the whole string capped at `maxLength` by shortening the *name* — never the suffix, so a
+    /// very long name still yields a name that reads as one. `nil` when there is no usable name, which leaves
+    /// the model name in place (the pre-existing behaviour).
+    static func forPerson(_ raw: String?) -> String? {
+        guard let name = firstWord(of: raw) else { return nil }
+        let room = maxLength - possessiveSuffix.count
+        guard room > 0 else { return nil }
+        let shortened = String(name.prefix(room)).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !shortened.isEmpty else { return nil }
+        return shortened + possessiveSuffix
+    }
+
+    /// The chips under the name field: the person's own name first when the profile has one, then the standing
+    /// suggestions. Deduped, so a person whose derived name equals a standing chip does not see it twice.
+    static func suggestions(forPerson personName: String?) -> [String] {
+        let personal = forPerson(personName).map { [$0] } ?? []
+        return (personal + suggestions).reduce(into: [String]()) { chips, chip in
+            if !chips.contains(chip) { chips.append(chip) }
+        }
+    }
+
+    /// The first word of a name, with punctuation and whitespace trimmed off both ends, capitalised.
+    /// A word with no letters in it ("123", "--") is not a person's name.
+    private static func firstWord(of raw: String?) -> String? {
+        let trimmed = raw?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard let token = trimmed.split(whereSeparator: { $0.isWhitespace }).first.map(String.init) else { return nil }
+        let stripped = token.trimmingCharacters(in: CharacterSet.punctuationCharacters.union(.symbols).union(.whitespaces))
+        guard stripped.contains(where: { $0.isLetter }) else { return nil }
+        return stripped.prefix(1).uppercased() + stripped.dropFirst()
     }
 
     /// The name to show: the nickname when set, else the model name, else the default model name.
@@ -135,6 +186,37 @@ struct RingNicknameMemory {
 }
 
 extension DeviceRepository {
+    /// Give an unnamed ring the person's own name once the profile knows it (plan `scan-row-ring-name.md`, D5/B2).
+    ///
+    /// Onboarding asks the ring's name *before* the person's, so the default case — pair, name nothing, fill in
+    /// the profile — would otherwise leave the ring as "Agara Ring" for ever, and every row of a crowded scan
+    /// list would read the same. Called when the profile is saved; it never replaces a name anybody chose and
+    /// does nothing when no ring is paired, so it is safe to call on every profile save. The per-ring map makes
+    /// it idempotent, so a re-connect cannot re-apply it after the user clears the name.
+    ///
+    /// Returns whether this call gave the ring its name (tests read it; callers ignore it).
+    @MainActor
+    @discardableResult
+    static func adoptPersonName(
+        _ personName: String?,
+        peripheralIdentifier: String? = nil,
+        memory: RingNicknameMemory = RingNicknameMemory(),
+        context: ModelContext
+    ) -> Bool {
+        guard let suggested = RingNickname.forPerson(personName) else { return false }
+        guard let device = current(context: context) else { return false }
+        let identity = peripheralIdentifier ?? device.peripheralIdentifier
+        let existing = identity.flatMap { memory.nickname(for: $0) }
+            ?? device.nickname.flatMap(RingNickname.normalized)
+        guard existing == nil else { return false }
+        device.nickname = suggested
+        if let identity { memory.set(suggested, for: identity) }
+        device.updatedAt = AppClock.now
+        try? context.save()
+        AgaraDataChange.shared.notify()
+        return true
+    }
+
     /// Store the user's name for the (single) current ring, on the row and in the per-ring memory under
     /// that ring's identity. Blank resets to the model name. Creates the row when a just-paired ring's
     /// connect event has not been persisted yet, so the name is never lost; the event subscriber reuses

@@ -7,6 +7,9 @@ import SwiftData
 struct RingNameEditor: View {
     @Binding var text: String
     var onSubmit: () -> Void = {}
+    /// The chips under the field. Defaults to the standing set; the pairing step and Rename pass
+    /// `RingNickname.suggestions(forPerson:)` so the person's own "Hayden’s Ring" leads (plan D5).
+    var suggestions: [String] = RingNickname.suggestions
     @FocusState private var focused: Bool
 
     private var trimmedCount: Int { text.trimmingCharacters(in: .whitespacesAndNewlines).count }
@@ -56,10 +59,10 @@ struct RingNameEditor: View {
             .padding(.horizontal, 4)
 
             ViewThatFits(in: .horizontal) {
-                HStack(spacing: 8) { chips(RingNickname.suggestions) }
+                HStack(spacing: 8) { chips(suggestions) }
                 VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 8) { chips(Array(RingNickname.suggestions.prefix(2))) }
-                    HStack(spacing: 8) { chips(Array(RingNickname.suggestions.suffix(2))) }
+                    HStack(spacing: 8) { chips(Array(suggestions.prefix(2))) }
+                    HStack(spacing: 8) { chips(Array(suggestions.dropFirst(2))) }
                 }
             }
             .agaraGlassContainer(spacing: 8)
@@ -97,11 +100,19 @@ struct RenameRingSheet: View {
     @State private var text: String
     /// The connected ring's identity, so Save files the name under that ring (nil: the row's ring).
     private let peripheralIdentifier: String?
+    /// The chips offered: the person's own name first when the profile has one.
+    private let suggestions: [String]
 
-    /// `initialText` is `RingNickname.prefill(…)`: the ring's remembered name, else the model name.
-    init(initialText: String, peripheralIdentifier: String? = nil) {
+    /// `initialText` is `RingNickname.prefill(…)`: the ring's remembered name, else the person's name, else the
+    /// model name. `suggestions` is `RingNickname.suggestions(forPerson:)`.
+    init(
+        initialText: String,
+        peripheralIdentifier: String? = nil,
+        suggestions: [String] = RingNickname.suggestions
+    ) {
         _text = State(initialValue: initialText)
         self.peripheralIdentifier = peripheralIdentifier
+        self.suggestions = suggestions
     }
 
     var body: some View {
@@ -111,7 +122,7 @@ struct RenameRingSheet: View {
                     Text("Give your ring a name you'll recognise.")
                         .font(AgaraFont.subheadline)
                         .foregroundStyle(AgaraColors.textMuted)
-                    RingNameEditor(text: $text, onSubmit: save)
+                    RingNameEditor(text: $text, onSubmit: save, suggestions: suggestions)
                 }
                 .padding(20)
             }

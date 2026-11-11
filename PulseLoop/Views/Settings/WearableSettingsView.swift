@@ -7,6 +7,7 @@ import UserNotifications
 struct WearableSettingsView: View {
     @Environment(RingBLEClient.self) private var ble
     @Environment(RingSyncCoordinator.self) private var coordinator
+                @Query private var profiles: [UserProfile]
     @Query private var devices: [Device]
     @Binding var path: NavigationPath
     @State private var features = AgaraFeatureStore.shared
@@ -253,8 +254,13 @@ struct WearableSettingsView: View {
         }
         .sheet(isPresented: $showsRename) {
             RenameRingSheet(
-                initialText: RingNickname.prefill(identifier: ble.deviceIdentifier, row: devices.first),
-                peripheralIdentifier: ble.deviceIdentifier
+                initialText: RingNickname.prefill(
+                    identifier: ble.deviceIdentifier,
+                    row: devices.first,
+                    personName: profiles.first?.name
+                ),
+                peripheralIdentifier: ble.deviceIdentifier,
+                suggestions: RingNickname.suggestions(forPerson: profiles.first?.name)
             )
             .agaraRingEnvironment()
         }
