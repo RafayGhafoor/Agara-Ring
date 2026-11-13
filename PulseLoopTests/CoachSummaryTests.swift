@@ -132,3 +132,66 @@ final class CoachSummaryServiceTests: XCTestCase {
         XCTAssertEqual(convos.count, 1)
     }
 }
+
+/// The sleep card must be grounded in **that night's date** (plan `coach-summary-vs-data-2026-11-11.md`, H1/H3).
+/// Jimmy's report: a card about 14 Oct said "Nightly steps for that day aren't available" while the store held
+/// other days' steps, and a store-wide coverage warning ("only N days of activity data exist for that period")
+/// travelled into a claim about a three-week-old night.
+@MainActor
+final class CoachSummarySleepDayContextTests: XCTestCase {
+
+    /// A 12-minute deep-sleep night that belongs to **today** (so it is the main sleep the card describes). Steps
+    /// sync lags behind sleep in the real app, so the interesting case is "today has no activity row yet".
+    private func seedLastNight(into context: ModelContext) {
+        // A night that starts at 23:00 yesterday and ends after midnight belongs to today.
+        let nightStart = Calendar.current.date(byAdding: .hour, value: -1, to: TestSupport.day(0))!
+        TestSupport.insertSleep(nightStart: nightStart, stages: Array(repeating: .deep, count: 12), into: context)
+    }
+
+    func testTodaysCardDoesNotBorrowAnotherDaysSteps() throws {
+        let context = try TestSupport.makeContext()
+        seedLastNight(into: context)
+        // No activity row for today (the sync has not brought one yet), one for yesterday.
+        TestSupport.insertActivity(date: TestSupport.day(-1), steps: 9280, into: context)
+
+        let built = try XCTUnwrap(CoachSummaryContextBuilder.sleepDay(context: context))
+        XCTAssertFalse(built.json.contains("9280"),
+                       "yesterday's steps must not ride along with today's night: \(built.json)")
+        // The key is absent rather than null (JSONEncoder omits nils), which is the cleanest signal for the model:
+        // there is no step field to talk about (D2 — say nothing rather than apologise).
+        XCTAssertFalse(built.json.contains("steps_that_day"), "expected no step field at all: \(built.json)")
+    }
+
+    func testTodaysCardQuotesTodaysSteps() throws {
+        let context = try TestSupport.makeContext()
+        seedLastNight(into: context)
+        TestSupport.insertActivity(date: TestSupport.day(0), steps: 4123, into: context)
+        TestSupport.insertActivity(date: TestSupport.day(-1), steps: 9280, into: context)
+
+        let built = try XCTUnwrap(CoachSummaryContextBuilder.sleepDay(context: context))
+        XCTAssertTrue(built.json.contains("\"steps_that_day\":4123"), "got: \(built.json)")
+        XCTAssertFalse(built.json.contains("9280"), "got: \(built.json)")
+    }
+
+    func testTheStoreWideCoverageWarningNamesItsOwnWindow() throws {
+        // The chat still reports coverage — but the sentence must say what it is about, because the model used to
+        // attach the count to whatever date it was discussing (Jimmy's "for that period").
+        let warnings = DataQualityAnalyzer.warnings(.init(profileCompleteness: "complete", daysAvailable: 2,
+                                                          hasSleep: true, lastSyncAt: Date(), isDemo: false))
+        let line = try XCTUnwrap(warnings.first { $0.contains("activity data") })
+        XCTAssertTrue(line.contains("in total"), "the warning must name the store's window, got: \(line)")
+    }
+
+    func testADatedPacketCanLeaveTheStoreWideWarningOut() throws {
+        let context = try TestSupport.makeContext()
+        seedLastNight(into: context)
+        TestSupport.insertActivity(date: TestSupport.day(0), steps: 4123, into: context)
+
+        let scoped = CoachContextBuilder.build(context: context, reportsActivityCoverage: false)
+        XCTAssertFalse(scoped.dataQualityWarnings.contains { $0.contains("activity data") },
+                       "a dated packet must not carry the store-wide coverage claim")
+        let whole = CoachContextBuilder.build(context: context)
+        XCTAssertTrue(whole.dataQualityWarnings.contains { $0.contains("activity data") },
+                      "the chat's packet keeps it")
+    }
+}

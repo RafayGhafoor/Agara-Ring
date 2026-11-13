@@ -12,7 +12,9 @@ enum CoachContextBuilder {
         now: Date = AppClock.now,
         budget: CoachContextBudget = .full,
         environment: CoachContextPacket.EnvironmentContext? = nil,
-        includeNutrition: Bool = true
+        includeNutrition: Bool = true,
+        /// False for a packet about one past date (the sleep card): see `DataQualityAnalyzer.Inputs`.
+        reportsActivityCoverage: Bool = true
     ) -> CoachContextPacket {
         let summary = MetricsService.buildTodaySummary(context: context)
         let profile = ProfileRepository.profile(context: context)
@@ -111,7 +113,8 @@ enum CoachContextBuilder {
                 daysAvailable: daysAvailable,
                 hasSleep: sleep != nil,
                 lastSyncAt: device?.lastSyncAt,
-                isDemo: summary.isDemo
+                isDemo: summary.isDemo,
+                reportsActivityCoverage: reportsActivityCoverage
             ),
             now: now
         )

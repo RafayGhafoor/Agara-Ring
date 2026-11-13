@@ -53,7 +53,9 @@ struct SleepView: View {
             SleepTabData(
                 summary: SleepService.sleepRange(range, context: modelContext, now: range == .day ? effectiveNow : AppClock.now),
                 goalMinutes: MetricsRepository.goals(context: modelContext)?.sleepMinutes,
-                activitySteps: MetricsRepository.latestActivity(context: modelContext)?.steps,
+                // That day's own steps, not the newest row: this feeds the day-level coach text, and the newest
+                // row may be another day's (plan `coach-summary-vs-data-2026-11-11.md`, H1).
+                activitySteps: MetricsRepository.activity(on: anchor, context: modelContext)?.steps,
                 earliestDay: SleepRepository.sessions(context: modelContext).first.map { Calendar.current.startOfDay(for: $0.date) }
             )
         }
@@ -523,7 +525,7 @@ struct SleepView: View {
         let bars = range == .year
             ? SleepInsights.buildMonthBuckets(end: summary.end, sessions: summary.sessions)
             : SleepInsights.buildNightAxis(start: summary.start, end: summary.end, sessions: summary.sessions, range: range)
-        let vizTitle = range == .year ? "Monthly average" : "Nightly sleep"
+        let vizTitle = range == .year ? "Monthly average" : "Daily sleep"
 
         // Hero card opens the page; coach card closes it.
         SleepHeroCardView(

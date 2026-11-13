@@ -62,12 +62,18 @@ enum CoachSummaryContextBuilder {
         let night = day.main
         // The day's score (night + naps), the number the Today tile and the Sleep tab show — the coach must quote it.
         let score = day.score
-        let activitySteps = MetricsRepository.latestActivity(context: context)?.steps
-        let memories = CoachContextBuilder.build(context: context, now: now).memories
+        // **That night's date's** activity, not the newest row: the card is about this date, and handing the model
+        // another day's steps (or today's) is what let a summary about 14 Oct say "steps for that day aren't
+        // available" while the app held them, or quote a number from a different day
+        // (plan `coach-summary-vs-data-2026-11-11.md`, H1).
+        let stepsThatDay = MetricsRepository.activity(on: night.session.date, context: context)?.steps
+        // The store-wide coverage line is about "now" and does not describe this date (H3), so it is left out here.
+        let packet = CoachContextBuilder.build(context: context, now: now, reportsActivityCoverage: false)
+        let memories = packet.memories
 
         struct Packet: Encodable {
             let date: String, dayTotalMin: Int, nightMin: Int, remMin: Int, napMin: Int?, deepMin: Int, lightMin: Int, awakeMin: Int
-            let score: Int, scoreLabel: String, awakePct: Int?, deepPct: Int, activitySteps: Int?
+            let score: Int, scoreLabel: String, awakePct: Int?, deepPct: Int, stepsThatDay: Int?
             let memories: [CoachContextPacket.MemoryContext]
             let environment: CoachContextPacket.EnvironmentContext?
         }
@@ -77,7 +83,7 @@ enum CoachSummaryContextBuilder {
             remMin: night.remMinutes, napMin: day.naps.isEmpty ? nil : day.napMinutes, deepMin: night.deepMinutes,
             lightMin: night.lightMinutes, awakeMin: night.awakeMinutes,
             score: score.score, scoreLabel: score.label.rawValue, awakePct: score.awakePct,
-            deepPct: score.deepPct, activitySteps: activitySteps, memories: memories,
+            deepPct: score.deepPct, stepsThatDay: stepsThatDay, memories: memories,
             environment: environment
         )
         let sig = signature([
@@ -85,7 +91,7 @@ enum CoachSummaryContextBuilder {
             String(night.lightMinutes), String(night.awakeMinutes), String(score.score),
         ])
         let coach = SleepInsights.dayCoach(night, score: score.score, awakePct: score.awakePct,
-                                           deepPct: score.deepPct, activitySteps: activitySteps)
+                                           deepPct: score.deepPct, activitySteps: stepsThatDay)
         return Built(
             scopeKey: CoachDataAccess.localDateString(night.session.date),
             json: encode(p), signature: sig,

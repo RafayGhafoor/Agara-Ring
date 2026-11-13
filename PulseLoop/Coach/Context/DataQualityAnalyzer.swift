@@ -12,6 +12,11 @@ enum DataQualityAnalyzer {
         var hasSleep: Bool
         var lastSyncAt: Date?
         var isDemo: Bool
+        /// Whether to report the store's trailing activity coverage at all. On by default (the chat and the Today
+        /// card talk about "now"); **off** for a packet that is about one past date, where `daysAvailable` counts a
+        /// different window and the model used to attach the count to the date it was discussing ("only two days of
+        /// activity data exist for that period", plan `coach-summary-vs-data-2026-11-11.md`, H3).
+        var reportsActivityCoverage: Bool = true
     }
 
     static func warnings(_ input: Inputs, now: Date = AppClock.now) -> [String] {
@@ -28,9 +33,12 @@ enum DataQualityAnalyzer {
             )
         }
 
-        if input.daysAvailable <= 3 {
+        if input.reportsActivityCoverage, input.daysAvailable <= 3 {
+            // Name the subject: this is about the store's own trailing window ("now"), not about any date the model
+            // happens to be discussing — the ambiguous wording is what produced "only two days of activity data exist
+            // for that period" about a night three weeks earlier.
             out.append(
-                "Only \(input.daysAvailable) day(s) of activity data available — "
+                "The app currently holds \(input.daysAvailable) day(s) of activity data in total — "
                 + "trends are limited; avoid strong week-over-week claims."
             )
         }
