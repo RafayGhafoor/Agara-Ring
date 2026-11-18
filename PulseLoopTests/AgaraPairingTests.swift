@@ -35,6 +35,25 @@ final class AgaraPairingTests: XCTestCase {
         XCTAssertNotNil(UIImage(named: "agara-logo"), "the model's art must exist in the catalog")
     }
 
+    /// The capability chips on the "Add your ring" card come from the shared catalog (Rule 5) and must
+    /// never promise blood pressure or blood glucose: Apple 1.4.1 forbids claiming those from device
+    /// sensors, and the store build ships with the `vitals_bp` / `vitals_glucose` flags off. Before this
+    /// test the blurb was hard-coded here as "… · BP · Glucose" while Android's copy had already
+    /// dropped them, which is exactly the drift the catalog exists to prevent.
+    func testThePairingCapabilityChipsComeFromTheCatalogAndOmitClinicalMetrics() {
+        let ring = WearableModel.tk20
+        XCTAssertEqual(ring.blurb, AgaraCopy.ringCapabilities)
+
+        let chips = ring.blurb.components(separatedBy: " · ")
+        XCTAssertEqual(chips.count, 6)
+        XCTAssertEqual(chips.first, "Steps")
+        XCTAssertFalse(chips.contains("BP"))
+        XCTAssertFalse(chips.contains("Glucose"))
+        // A substring guard too: "BP" hidden inside a longer chip would still be a claim.
+        XCTAssertFalse(ring.blurb.lowercased().contains("bp"))
+        XCTAssertFalse(ring.blurb.lowercased().contains("glucose"))
+    }
+
     /// The name shown for a ring that never advertised one comes from the shared copy catalog, so the
     /// app name and the ring name cannot drift apart (Rule 5).
     func testTheDeviceTypeDisplayNameComesFromTheCatalog() {
