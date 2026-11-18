@@ -49,6 +49,20 @@ final class Ev40TrackerTests: XCTestCase {
         ])
     }
 
+    /// The two disciplines whose names were shortened on 2026-11-18 (`Fast-Release` → `Fast`,
+    /// `Document & Share` → `Share`). Pinned here because the copy now comes from the catalog: a future
+    /// catalog edit that lengthens them again would break the one-line chip layout, and a rename of the
+    /// *key* would silently change the wire contract. Names are display-only; bits 32 / 64 never move.
+    func testTheShortenedDisciplineTitlesAreOneWord() {
+        XCTAssertEqual(AgaraCopy.ev40DisciplineFastRelease, "Fast")
+        XCTAssertEqual(AgaraCopy.ev40DisciplineDocumentShare, "Share")
+        XCTAssertEqual(Ev40Discipline.fastRelease.bit, 32)
+        XCTAssertEqual(Ev40Discipline.documentShare.bit, 64)
+        for discipline in Ev40Disciplines.all {
+            XCTAssertFalse(discipline.title.contains(" "), "\(discipline.title) must stay a single word")
+        }
+    }
+
     func testMaskArithmetic() {
         XCTAssertEqual(Ev40Disciplines.count(0), 0)
         XCTAssertEqual(Ev40Disciplines.count(255), 8)
@@ -351,6 +365,33 @@ final class Ev40TrackerTests: XCTestCase {
         // the wall clock is constant while the UTC offset is not
         let utcHours = Set(fires.map { Calendar(identifier: .gregorian).dateComponents(in: TimeZone(identifier: "UTC")!, from: $0).hour })
         XCTAssertEqual(utcHours.count, 2)
+    }
+
+    /// The owner's 2026-11-19 feedback: "the user couldn't change the values like if it's 8 AM". 08:00 must be a real,
+    /// honoured choice — today while it is still ahead, and skipped once it has passed (never an immediate fire).
+    func testReminderHonoursAnEightAmTime() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Asia/Karachi")!
+        func at(_ day: Int, _ hour: Int, _ minute: Int) -> Date {
+            calendar.date(from: DateComponents(year: 2026, month: 11, day: day, hour: hour, minute: minute))!
+        }
+
+        let ahead = Ev40Reminder.nextFireDates(now: at(19, 6, 30), hour: 8, minute: 0, days: 2, calendar: calendar)
+        XCTAssertEqual(ahead.count, 2)
+        XCTAssertEqual(calendar.component(.hour, from: ahead[0]), 8)
+        XCTAssertEqual(calendar.component(.minute, from: ahead[0]), 0)
+        XCTAssertEqual(calendar.component(.day, from: ahead[0]), 19, "06:30 → today 08:00")
+        XCTAssertEqual(calendar.component(.day, from: ahead[1]), 20)
+
+        let passed = Ev40Reminder.nextFireDates(now: at(19, 9, 0), hour: 8, minute: 0, days: 2, calendar: calendar)
+        XCTAssertEqual(passed.count, 1, "09:00 → tomorrow only; a passed fire is never re-armed in the past")
+        XCTAssertEqual(calendar.component(.day, from: passed[0]), 20)
+        XCTAssertEqual(calendar.component(.hour, from: passed[0]), 8)
+
+        // the due check agrees at the boundary
+        let settings = Ev40Reminder.Settings(enabled: true, hour: 8, minute: 0)
+        XCTAssertFalse(Ev40Reminder.shouldPost(now: at(19, 7, 59), settings: settings, mask: 3, lastPostedDay: nil, calendar: calendar))
+        XCTAssertTrue(Ev40Reminder.shouldPost(now: at(19, 8, 0), settings: settings, mask: 3, lastPostedDay: nil, calendar: calendar))
     }
 
     func testReminderIsDueOnlyWhenEnabledIncompleteUnpostedAndPastTheTime() {
