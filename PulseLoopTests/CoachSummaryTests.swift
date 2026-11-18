@@ -140,6 +140,16 @@ final class CoachSummaryServiceTests: XCTestCase {
 @MainActor
 final class CoachSummarySleepDayContextTests: XCTestCase {
 
+    /// Midday of the current test day.
+    ///
+    /// `SleepService.dayReferenceNight` anchors the Day view on **yesterday** before 04:00 local, so a test that calls
+    /// `sleepDay` with the real clock passes all day and fails between 00:00 and 03:59 — the BUG-213 class of
+    /// non-hermetic test (this one was added after `b07a3c7` made the rest of the suite clock-hermetic). Pinning `now`
+    /// to midday keeps the assertion about the grounding rule and never about the hour the suite happens to run.
+    private var midday: Date {
+        Calendar.current.date(bySettingHour: 12, minute: 0, second: 0, of: AppClock.now) ?? AppClock.now
+    }
+
     /// A 12-minute deep-sleep night that belongs to **today** (so it is the main sleep the card describes). Steps
     /// sync lags behind sleep in the real app, so the interesting case is "today has no activity row yet".
     private func seedLastNight(into context: ModelContext) {
@@ -154,7 +164,7 @@ final class CoachSummarySleepDayContextTests: XCTestCase {
         // No activity row for today (the sync has not brought one yet), one for yesterday.
         TestSupport.insertActivity(date: TestSupport.day(-1), steps: 9280, into: context)
 
-        let built = try XCTUnwrap(CoachSummaryContextBuilder.sleepDay(context: context))
+        let built = try XCTUnwrap(CoachSummaryContextBuilder.sleepDay(context: context, now: midday))
         XCTAssertFalse(built.json.contains("9280"),
                        "yesterday's steps must not ride along with today's night: \(built.json)")
         // The key is absent rather than null (JSONEncoder omits nils), which is the cleanest signal for the model:
@@ -168,7 +178,7 @@ final class CoachSummarySleepDayContextTests: XCTestCase {
         TestSupport.insertActivity(date: TestSupport.day(0), steps: 4123, into: context)
         TestSupport.insertActivity(date: TestSupport.day(-1), steps: 9280, into: context)
 
-        let built = try XCTUnwrap(CoachSummaryContextBuilder.sleepDay(context: context))
+        let built = try XCTUnwrap(CoachSummaryContextBuilder.sleepDay(context: context, now: midday))
         XCTAssertTrue(built.json.contains("\"steps_that_day\":4123"), "got: \(built.json)")
         XCTAssertFalse(built.json.contains("9280"), "got: \(built.json)")
     }
