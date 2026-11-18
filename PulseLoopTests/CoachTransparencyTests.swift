@@ -8,7 +8,10 @@ import XCTest
 @MainActor
 final class CoachTransparencyTests: XCTestCase {
 
-    private actor FailingContinuationClient: ResponsesClient {
+    /// See `StubResponsesClient`: under `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` an `actor` cannot conform
+    /// to the implicitly MainActor-isolated `ResponsesClient`, so this test double is a MainActor class.
+    @MainActor
+    private final class FailingContinuationClient: ResponsesClient {
         private var sentInitial = false
         let first: OpenAIResponse
 

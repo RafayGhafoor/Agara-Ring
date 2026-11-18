@@ -6,7 +6,13 @@ import XCTest
 // MARK: - Stubs
 
 /// In-memory ResponsesClient that replays a scripted queue of responses.
-actor StubResponsesClient: ResponsesClient {
+///
+/// A `@MainActor` class, not an `actor`: the test target builds with
+/// `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`, so `ResponsesClient` is implicitly MainActor-isolated and an
+/// `actor` cannot conform to it ("Actor 'StubResponsesClient' cannot conform to global-actor-isolated protocol").
+/// A class under the same default isolation conforms exactly, and `send` stays `async` for callers.
+@MainActor
+final class StubResponsesClient: ResponsesClient {
     private var queue: [OpenAIResponse]
     private(set) var sendCount = 0
     init(_ responses: [OpenAIResponse]) { self.queue = responses }
