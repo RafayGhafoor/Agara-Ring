@@ -367,6 +367,56 @@ final class Ev40TrackerTests: XCTestCase {
         XCTAssertEqual(utcHours.count, 2)
     }
 
+    /// The same rule over the whole set, so a future catalog edit cannot add a duplicate, a blank row or a two-word
+    /// title: the eight must be distinct, non-empty, single-word, and neither retired compound name may survive.
+    func testEveryDisciplineTitleIsOneDistinctWordAndTheOldNamesAreGone() {
+        let titles = Ev40Disciplines.all.map(\.title)
+        XCTAssertEqual(titles.count, 8)
+        XCTAssertEqual(Set(titles).count, titles.count, "no two rows may read the same")
+        XCTAssertFalse(titles.contains { $0.trimmingCharacters(in: .whitespaces).isEmpty })
+        XCTAssertFalse(titles.contains { $0.contains(" ") })
+        XCTAssertFalse(titles.contains { $0.contains("Fast-Release") })
+        XCTAssertFalse(titles.contains { $0.contains("Document & Share") })
+    }
+
+    /// Midnight is a legal choice and must land on the *next* day's first minute; 23:59 stays today. Both are
+    /// boundaries of `nextFireDates`' "today only while it is still ahead" rule.
+    func testReminderHandlesTheDayBoundaries() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Asia/Karachi")!
+        let noon = calendar.date(from: DateComponents(year: 2026, month: 11, day: 19, hour: 12))!
+
+        // At noon, today's 00:00 has already passed, so the window must skip it and arm TOMORROW's — one entry in a
+        // two-day window, and none at all in a one-day window. (`XCTAssertEqual` does not stop execution, so the
+        // unwrap has to be a guard: indexing an empty array here crashed the whole test process first time round.)
+        let oneDay = Ev40Reminder.nextFireDates(now: noon, hour: 0, minute: 0, days: 1, calendar: calendar)
+        XCTAssertTrue(oneDay.isEmpty, "today's midnight is in the past; a one-day window has nothing to arm")
+        let midnight = Ev40Reminder.nextFireDates(now: noon, hour: 0, minute: 0, days: 2, calendar: calendar)
+        XCTAssertEqual(midnight.count, 1)
+        guard let tomorrow = midnight.first else { return XCTFail("no midnight fire in a two-day window") }
+        XCTAssertEqual(calendar.component(.day, from: tomorrow), 20)
+        XCTAssertEqual(calendar.component(.hour, from: tomorrow), 0)
+        XCTAssertEqual(calendar.component(.minute, from: tomorrow), 0)
+
+        let lastMinute = Ev40Reminder.nextFireDates(now: noon, hour: 23, minute: 59, days: 1, calendar: calendar)
+        XCTAssertEqual(lastMinute.count, 1)
+        guard let tonight = lastMinute.first else { return XCTFail("no 23:59 fire today") }
+        XCTAssertEqual(calendar.component(.day, from: tonight), 19)
+        XCTAssertEqual(calendar.component(.hour, from: tonight), 23)
+        XCTAssertEqual(calendar.component(.minute, from: tonight), 59)
+    }
+
+    /// Out-of-range values are clamped on read, so a corrupt stored value can never reach the scheduler.
+    func testReminderSettingsClampOutOfRangeValues() {
+        let defaults = UserDefaults(suiteName: "ev40.clamp.\(UUID().uuidString)")!
+        for (raw, expected) in [((25, 61), (23, 59)), ((-3, -1), (0, 0)), ((8, 0), (8, 0))] {
+            Ev40Reminder.save(.init(enabled: true, hour: raw.0, minute: raw.1), defaults: defaults)
+            let read = Ev40Reminder.settings(defaults: defaults)
+            XCTAssertEqual(read.hour, expected.0, "hour from \(raw.0) must clamp to \(expected.0)")
+            XCTAssertEqual(read.minute, expected.1, "minute from \(raw.1) must clamp to \(expected.1)")
+        }
+    }
+
     /// The owner's 2026-11-19 feedback: "the user couldn't change the values like if it's 8 AM". 08:00 must be a real,
     /// honoured choice — today while it is still ahead, and skipped once it has passed (never an immediate fire).
     func testReminderHonoursAnEightAmTime() {
