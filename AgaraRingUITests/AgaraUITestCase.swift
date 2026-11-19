@@ -215,6 +215,10 @@ class AgaraUITestCase: XCTestCase {
     /// "No heart rate yet" and frame 04 with "Not enough data for this period". Same launch args, same emulator: the
     /// only difference was time. Call this while the **Vitals** tab is open; it waits for the empty-state copy to go.
     func waitForHealthData(timeout: TimeInterval = 600, file: StaticString = #filePath, line: UInt = #line) {
+        // Positive signal only. Waiting for the ABSENCE of the empty-state copy is not enough: it is also absent while
+        // the card is still loading, which is how an earlier version of this wait passed and the walk then captured an
+        // empty card (2026-11-19 — 42,106 measurement rows in the store, "No heart rate yet" in the frame).
+        let reading = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS[c] %@", "bpm")).firstMatch
         let emptyStates = ["No heart rate yet", "No oxygen readings yet"]
         // Wait in LONG idle chunks and query once per chunk. The first version of this polled `exists` every second for
         // 300 s and timed out while still showing "No heart rate yet" — 300 accessibility snapshots keep the app's main
@@ -224,6 +228,7 @@ class AgaraUITestCase: XCTestCase {
         let deadline = Date().addingTimeInterval(timeout)
         var lastEmpty = ""
         while Date() < deadline {
+            if reading.exists { return }
             if let found = emptyStates.first(where: { app.staticTexts[$0].exists }) {
                 lastEmpty = found
                 print("waitForHealthData: still \(found) — idling \(Int(chunk)) s")
