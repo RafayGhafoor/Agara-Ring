@@ -203,6 +203,36 @@ class AgaraUITestCase: XCTestCase {
         }
     }
 
+    /// Wait until the ring's history has actually **landed**, not merely until the "Syncing" label is quiet.
+    ///
+    /// `waitForSyncIdle` returns after 3 s without the label, which is satisfied *mid-sync* on a 30-day pass: the early
+    /// days deliver steps and sleep first and heart rate later. Measured 2026-11-19 — the App Preview test had 395 HR
+    /// readings because it spends ~25 s tapping before it reaches Vitals, while the screenshot walk shot frame 03 with
+    /// "No heart rate yet" and frame 04 with "Not enough data for this period". Same launch args, same emulator: the
+    /// only difference was time. Call this while the **Vitals** tab is open; it waits for the empty-state copy to go.
+    func waitForHealthData(timeout: TimeInterval = 600, file: StaticString = #filePath, line: UInt = #line) {
+        let emptyStates = ["No heart rate yet", "No oxygen readings yet"]
+        // Wait in LONG idle chunks and query once per chunk. The first version of this polled `exists` every second for
+        // 300 s and timed out while still showing "No heart rate yet" — 300 accessibility snapshots keep the app's main
+        // thread busy, and this codebase already documents that measure/sync work during a busy main thread delays HR
+        // samples. The App Preview test, which taps and idles rather than polling, gets 395 readings on the same rig.
+        let chunk: TimeInterval = 20
+        let deadline = Date().addingTimeInterval(timeout)
+        var lastEmpty = ""
+        while Date() < deadline {
+            if let found = emptyStates.first(where: { app.staticTexts[$0].exists }) {
+                lastEmpty = found
+                print("waitForHealthData: still \(found) — idling \(Int(chunk)) s")
+                RunLoop.current.run(until: Date().addingTimeInterval(chunk))
+                continue
+            }
+            return
+        }
+        attachScreenshot("health-data-never-arrived")
+        XCTFail("the ring's history never delivered a reading within \(Int(timeout)) s (still showing \"\(lastEmpty)\")",
+                file: file, line: line)
+    }
+
     /// Wait until the post-connect history sync has finished (the header's "Syncing" bar gone for 3 s).
     /// Measuring while that sync floods the main thread delays HR samples past the 3 s contact-gap rule and
     /// the reading is (wrongly) abandoned — see the report; tests measure the way a user does, after sync.

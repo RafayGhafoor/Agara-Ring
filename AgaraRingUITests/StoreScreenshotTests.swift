@@ -43,6 +43,10 @@ final class StoreScreenshotTests: AgaraUITestCase {
         ], features: "")
         waitForConnected()
         waitForSyncIdle()
+        // The 30-day sync delivers steps and sleep before heart rate, and `waitForSyncIdle` is satisfied mid-sync.
+        // Wait for a real reading before shooting anything (2026-11-19: three frames were empty because of this).
+        openTab("Vitals")
+        waitForHealthData()
 
         // 01 Today: greeting, rings, sleep and heart-rate tiles.
         openTab("Today")
@@ -58,8 +62,10 @@ final class StoreScreenshotTests: AgaraUITestCase {
 
         // 03 Vitals: the recovery-related cards (HRV, SpO2, stress, resting heart rate).
         openTab("Vitals")
-        eventually(timeout: 90, "Vitals heart-rate card has no data") {
-            text(containing: "HEART RATE").exists && !text(containing: "No data").exists
+        eventually(timeout: 120, "Vitals heart-rate card has no data") {
+            text(containing: "HEART RATE").exists
+                && !text(containing: "No heart rate yet").exists
+                && !text(containing: "No oxygen readings yet").exists
         }
         snap("vitals")
 
@@ -67,7 +73,9 @@ final class StoreScreenshotTests: AgaraUITestCase {
         let hrCard = text(containing: "HEART RATE")
         hrCard.tap()
         waitFor(app.buttons["Back"], timeout: 15, "heart-rate detail did not open")
-        RunLoop.current.run(until: Date().addingTimeInterval(2))
+        eventually(timeout: 90, "heart-rate detail shows no readings") {
+            !text(containing: "Not enough data").exists
+        }
         snap("heart-rate")
         goBack()
 
