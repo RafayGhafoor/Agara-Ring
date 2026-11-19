@@ -586,6 +586,24 @@ final class VeepooSyncEngineTests: XCTestCase {
         XCTAssertTrue(buckets.isEmpty)
         XCTAssertTrue(skippedRecords)
     }
+    /// The pass must be dated on **the app's** clock, not the device's.
+    ///
+    /// Regression (2026-11-19): `VeepooSyncEngine.now` defaulted to `Date.init`, while `RingEventBridge` filters every
+    /// `historyMeasurement` with `isWithinHistoryWindow(timestamp, now: AppClock.now)`. Under `-fixedNow` those two
+    /// clocks differ, so a store capture decoded 395 heart-rate samples for day 0 (and 480 a day after) and dated them
+    /// ~8 weeks in the future — where the bridge dropped all of them. `ZMEASUREMENT` was 0 while steps, sleep and
+    /// activity persisted, and three of eight App Store frames shipped empty. In production the clocks coincide, which
+    /// is why only the captures and the E2E saw it.
+    func testThePassIsDatedOnTheAppClockNotTheDeviceClock() {
+        let shift = AppClock.configure("2020-01-02T03:04:00")
+        defer { AppClock.configure(nil) }
+        XCTAssertNotEqual(shift, 0, "the clock did not shift, so this test would prove nothing")
+
+        let engine = VeepooSyncEngine(writer: nil, decoder: VeepooDecoder(), historyDays: 1)
+        XCTAssertEqual(engine.now().timeIntervalSince1970, AppClock.now.timeIntervalSince1970, accuracy: 5,
+                       "the sync pass must be dated on the app clock the bridge filters against")
+    }
+
 }
 
 private func hex(_ value: String) -> Data {

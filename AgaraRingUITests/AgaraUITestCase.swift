@@ -103,6 +103,10 @@ class AgaraUITestCase: XCTestCase {
             "-features", features,
             "-historyDays", "8",
             "-historyWindowDays", "90",
+            // Writes one line per sync pass and one per planned day to Documents/syncdiag.log. Debug-only in the app
+            // and inert unless asked, so it costs nothing here — and when a sync stores nothing, this file is the only
+            // place that says why (2026-11-19: the store capture had 0 measurements and no channel carried the reason).
+            "-syncDiag", "YES",
             "-noCoachMarks", coachMarks ? "NO" : "YES",
             // Start at Today: a clean install otherwise sits on onboarding and every ring assertion fails upstream.
             // Minimal profile, no demo rows — the ring's own data is what these tests assert.
@@ -229,8 +233,16 @@ class AgaraUITestCase: XCTestCase {
             return
         }
         attachScreenshot("health-data-never-arrived")
-        XCTFail("the ring's history never delivered a reading within \(Int(timeout)) s (still showing \"\(lastEmpty)\")",
-                file: file, line: line)
+        let message = "the ring's history never delivered a reading within \(Int(timeout)) s (still showing \"\(lastEmpty)\")"
+        // Diagnostics only: while the cause is being found we still want the rest of the walk to run and write its logs.
+        // Never set this for a release capture — it is exactly how three empty frames shipped.
+        // `xcodebuild` forwards `TEST_RUNNER_*` into the test process, so the capture script sets that form; accept both.
+        let env = ProcessInfo.processInfo.environment
+        if env["STORE_ALLOW_EMPTY_HEALTH"] == "1" || env["TEST_RUNNER_STORE_ALLOW_EMPTY_HEALTH"] == "1" {
+            print("WARNING: \(message) — continuing because STORE_ALLOW_EMPTY_HEALTH=1")
+            return
+        }
+        XCTFail(message, file: file, line: line)
     }
 
     /// Wait until the post-connect history sync has finished (the header's "Syncing" bar gone for 3 s).

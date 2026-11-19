@@ -67,7 +67,15 @@ final class VeepooSyncEngine: RingSyncEngine {
     /// The per-ring, per-date ledger the plan reads and each finished day updates. Injectable for tests.
     var syncPlanStore: SyncPlanStore = .shared
     /// The clock the plan's dates come from. Injectable for tests.
-    var now: () -> Date = Date.init
+    /// The clock the pass runs on — **the app's**, not the device's.
+    ///
+    /// It used to default to `Date.init`. Under `-fixedNow` that made the two halves of the sync disagree: the engine
+    /// dated each record from the real clock while `RingEventBridge` filters samples against `AppClock` (its
+    /// `isWithinHistoryWindow` guard), so on 2026-11-19 a store capture stored 0 measurements — 395 heart-rate samples
+    /// for day 0 and 480 a day after were decoded and dated ~8 weeks in the *future*, then dropped as implausible —
+    /// while steps, sleep and activity (keyed by day, not filtered by timestamp) all persisted. In production the two
+    /// clocks are identical, which is why only the captures and the E2E saw it.
+    var now: () -> Date = { AppClock.now }
     /// Live poll timer: refreshes today's totals (D8) and battery (A0) every 30 s, the same rolling
     /// read the python live client (`tools/veepoo_live.py`) performs — but at a cadence the UI can
     /// swallow, with the ~1 Hz FEA1 stream (driver) covering the between-poll movement.
@@ -259,6 +267,17 @@ final class VeepooSyncEngine: RingSyncEngine {
         passToday = now()
         let ledger = passRing.map { syncPlanStore.ledger(ring: $0) }
         plan = SyncPlan.make(historyDays: historyDays, today: passToday, calendar: decoder.calendar, ledger: ledger).days
+        #if DEBUG
+        // `-syncDiag YES`: the *plan* is the half the end-of-day line cannot show. A day that starts at a position past
+        // what the ring holds syncs zero records and says nothing else (2026-11-19: "from 86 … 0 records,
+        // stored through 85"), so log what the ledger told the plan.
+        if UserDefaults.standard.bool(forKey: "syncDiag") {
+            let shown = plan.prefix(4).map { "\($0.offset):from \($0.position)" }.joined(separator: " ")
+            let lines = "SYNCDIAG plan ring=\(passRing ?? "none") days=\(historyDays) window=\(plan.count) [\(shown)]"
+            NSLog("%@", lines)
+            SyncDiagLog.append(lines)
+        }
+        #endif
         planIndex = 0
         currentDay = plan.first?.offset ?? 0
         sleepComplete = false
@@ -587,11 +606,32 @@ final class VeepooSyncEngine: RingSyncEngine {
         }
     }
 
+    /// Appends `-syncDiag YES` lines to `Documents/syncdiag.log` (debug only).
+    ///
+    /// The E2E trace carries neither the app's stdout nor its `os_log`, and a plain `simctl launch` has no App Group
+    /// store to log into — a file in the app's own container is the one channel that works under the harness and can be
+    /// read back with `simctl get_app_container … data`. Kept behind the flag so it is inert in normal runs.
+    enum SyncDiagLog {
+        static func append(_ line: String) {
+            guard let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
+            let url = docs.appendingPathComponent("syncdiag.log")
+            guard let data = (line + "\n").data(using: .utf8) else { return }
+            if let handle = try? FileHandle(forWritingTo: url) {
+                handle.seekToEndOfFile()
+                handle.write(data)
+                try? handle.close()
+            } else {
+                try? data.write(to: url)
+            }
+        }
+    }
+
     private func emitDailyRecords() {
         guard let records = dailyFrames[currentDay] else { return }
         var incomplete = 0
         var corrupt = 0
         var implausible = 0
+        var firstPayloadTags = ""
         for index in records.keys.sorted() {
             guard let parts = records[index] else { continue }
             let payload: [UInt8]
@@ -599,6 +639,17 @@ final class VeepooSyncEngine: RingSyncEngine {
             case let .complete(bytes): payload = bytes
             case .incomplete: incomplete += 1; continue
             case .checksumMismatch: corrupt += 1; continue
+            }
+            if firstPayloadTags.isEmpty {
+                var tags: [String] = []
+                var walk = 0
+                while walk + 2 <= payload.count {
+                    let tag = payload[walk], len = Int(payload[walk + 1])
+                    if tag == 0 || walk + 2 + len > payload.count { break }
+                    tags.append(String(format: "%02X", tag))
+                    walk += 2 + len
+                }
+                firstPayloadTags = tags.joined(separator: ",")
             }
             // BUG-102: the record's date is the day we asked for — B1 carries no year, and building one
             // from the phone's clock filed a ring a minute ahead a *year* back.
@@ -660,6 +711,19 @@ final class VeepooSyncEngine: RingSyncEngine {
             }
             emitExtendedMetrics(record)
         }
+        #if DEBUG
+        // `-syncDiag YES` (debug only): one line per day saying what the records actually carried, so "the ring sends
+        // HR but the app stores none" can be answered from the app instead of from the transport (plan section 2b).
+        if UserDefaults.standard.bool(forKey: "syncDiag") {
+            let line = "SYNCDIAG day=\(currentDay) records=\(records.count)"
+                + " assembled=\(records.count - incomplete - corrupt) incomplete=\(incomplete)"
+                + " corrupt=\(corrupt) implausible=\(implausible)"
+                + " steps=\(dayCounts.steps) hr=\(dayCounts.heartRate) spo2=\(dayCounts.spo2) hrv=\(dayCounts.hrv)"
+                + " tags=\(firstPayloadTags)"
+            NSLog("%@", line)
+            SyncDiagLog.append(line)
+        }
+        #endif
         crcFailures += corrupt
         if incomplete > 0, let writer {
             writer.emit(.historySyncProgress(stage: "daily: \(incomplete) incomplete records skipped"))
