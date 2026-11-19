@@ -24,6 +24,26 @@ final class StoreVideoTests: AgaraUITestCase {
         ProcessInfo.processInfo.environment["STORE_NOW"].flatMap { $0.isEmpty ? nil : $0 } ?? "2026-09-24T19:30:00"
     }
 
+    /// Leave a pushed screen. A plain `app.buttons["Back"].tap()` failed here after the chart scrub: the button existed
+    /// but was not hittable while the chart's touch session was still unwinding, which killed the whole recording run
+    /// (2026-11-19). Try the nav-bar button, then the left-edge interactive pop, and only then fail.
+    private func goBack() {
+        let navBack = app.navigationBars.buttons.element(boundBy: 0)
+        if navBack.waitForExistence(timeout: 5), navBack.isHittable {
+            navBack.tap()
+            return
+        }
+        if app.buttons["Back"].exists, app.buttons["Back"].isHittable {
+            app.buttons["Back"].tap()
+            return
+        }
+        let window = app.windows.firstMatch
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.5))
+            .press(forDuration: 0.05,
+                   thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5)),
+                   withVelocity: .default, thenHoldForDuration: 0.05)
+    }
+
     private func mark(_ name: String) {
         marks[name] = Date().timeIntervalSince1970
         NSLog("STORE_BEAT %@ %.3f", name, marks[name] ?? 0)
@@ -107,7 +127,7 @@ final class StoreVideoTests: AgaraUITestCase {
 
         // Beat 16-19.5 s: Vitals (HRV / SpO2 / stress ...), a slow scroll.
         mark("vitalsBack")
-        app.buttons["Back"].tap()
+        goBack()
         dwell(1.2)
         mark("vitalsScroll")
         app.swipeUp(velocity: .slow)
@@ -161,9 +181,13 @@ final class StoreVideoTests: AgaraUITestCase {
         dwell(0.8)
 
         // Beat 26.5-29 s: Settings > Privacy (on-phone storage, optional cloud backup, no account), under the end card.
-        let settingsTab = app.tabBars.buttons["Settings"]
-        waitFor(settingsTab, timeout: 20, "Settings tab missing")
-        settingsTab.tap()
+        // Settings is the header gear, not a tab. The tab-bar lookup that used to be here encoded a superseded
+        // navigation design and failed the whole recording at :185 ("Settings tab missing", 2026-11-20) — the tab bar
+        // has been Today / Vitals / Activity / Sleep / Coach since the Coach landed, with Settings behind this button
+        // (RootViews.swift:736, accessibilityLabel "Settings").
+        let settingsButton = app.buttons["Settings"].firstMatch
+        waitFor(settingsButton, timeout: 20, "Settings (header gear) missing")
+        settingsButton.tap()
         let privacy = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Privacy")).firstMatch
         scrollTo(privacy)
         waitFor(privacy, "Privacy row missing in Settings")
