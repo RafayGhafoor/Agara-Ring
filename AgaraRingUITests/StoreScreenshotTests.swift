@@ -43,6 +43,16 @@ final class StoreScreenshotTests: AgaraUITestCase {
             // The sync engine and the Vitals store write what they loaded to Documents/syncdiag.log under this flag.
             // Without it the capture runs blind, and lines left by another run look like this run's evidence.
             "-syncDiag", "YES",
+            // One real coach answer carrying a chart, written through the production path (CoachView:205). The store set
+            // had no Coach frame at all — the owner asked for it on 2026-11-20 — and this needs no key and no account.
+            "-coachDemoChart", "YES",
+            // The coach must be ON for its seeded answer to render at all; `CoachTabUITests` passes the same set.
+            "-features", "coach=on,coach_cloud=on,coach_history=on",
+            // The coach's own state is opened by these debug hooks (the same set CoachTabUITests uses). Without them the
+            // tab renders the cloud upsell instead of a thread, so neither the seeded answer nor the starters exist.
+            "-coachOn", "YES", "-coachProvider", "agaraCloud", "-coachGateOpen", "YES",
+            "-coachQuotaRemaining", "24", "-coachQuotaResetsAt", "2026-10-24T00:00:00Z",
+            "-coach.cloudUpsell.dismissed", "YES",
         ], features: "")
         waitForConnected()
         waitForSyncIdle()
@@ -97,7 +107,20 @@ final class StoreScreenshotTests: AgaraUITestCase {
         snap("workout")
         goBack()
 
-        // 07 Measure hub.
+        // 07 Coach: a real answer to a real question, with its chart.
+        openTab("Coach")
+        let answerChart = app.descendants(matching: .any)["coach.chart"]
+        if !answerChart.waitForExistence(timeout: 25) {
+            // No seeded answer: ask a real question through the UI instead, so the frame is a genuine answer.
+            let starter = app.buttons.matching(identifier: "coach.starter").firstMatch
+            waitFor(starter, timeout: 20, "neither the seeded answer nor a starter question appeared")
+            starter.tap()
+            waitFor(answerChart, timeout: 90, "the coach never answered the starter question")
+        }
+        RunLoop.current.run(until: Date().addingTimeInterval(1.2))   // let the chart draw in
+        snap("coach")
+
+        // 08 Measure hub.
         openTab("Vitals")
         let measure = app.buttons["vitals.measure"]
         waitFor(measure, timeout: 30, "Measure button missing").tap()
@@ -106,7 +129,7 @@ final class StoreScreenshotTests: AgaraUITestCase {
         let close = app.buttons["Close"].exists ? app.buttons["Close"] : app.buttons["Done"]
         if close.exists { close.tap() } else { app.swipeDown() }
 
-        // 08 Settings > Privacy (on-phone storage, optional cloud backup, no account).
+        // 09 Settings > Privacy (on-phone storage, optional cloud backup, no account).
         openTab("Settings")
         let privacy = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Privacy")).firstMatch
         scrollTo(privacy)
