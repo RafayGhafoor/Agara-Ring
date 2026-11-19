@@ -66,6 +66,8 @@ final class VitalsStore {
         loadExtendedSeries()
         self.signature = Self.currentSignature(context: modelContext, profile: profile)
         applyRebuiltCards()
+        VitalsStore.diag("init", hr: hrSamples.count, spo2: spo2Samples.count,
+                         latest: summary.latestHeartRate.map { Int($0.value) })
     }
 
     /// The sole mutator of `cards`, so "revision changed" is exactly "a card's data changed".
@@ -108,6 +110,18 @@ final class VitalsStore {
         loadExtendedSeries()
         applyRebuiltCards()
         signature = sig
+        VitalsStore.diag("rebuild", hr: hrSamples.count, spo2: spo2Samples.count,
+                         latest: summary.latestHeartRate.map { Int($0.value) })
+    }
+
+    /// `-syncDiag YES` only: what the Vitals store actually loaded, and when.
+    ///
+    /// This exists because the frames rendered empty while the database held 42,106 rows and a fresh launch of the same
+    /// store drew 69 bpm — so the question is not "is the data there" but "did THIS store, in THIS process, load it".
+    /// Writes to the same Documents/syncdiag.log the sync engine uses, so one capture answers both halves.
+    static func diag(_ phase: String, hr: Int, spo2: Int, latest: Int?) {
+        guard DebugLaunch.bool("syncDiag") else { return }
+        VeepooSyncEngine.SyncDiagLog.append("VITALS \(phase) hr=\(hr) spo2=\(spo2) latestHr=\(latest.map(String.init) ?? "-")")
     }
 
     /// Respiration, MET, cardiac load and the five blood components (24 h), plus the latest-values
