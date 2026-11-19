@@ -40,6 +40,9 @@ final class StoreScreenshotTests: AgaraUITestCase {
             "-theme", theme,
             "-historyDays", "30",
             "-AppleLocale", "en_US",
+            // The sync engine and the Vitals store write what they loaded to Documents/syncdiag.log under this flag.
+            // Without it the capture runs blind, and lines left by another run look like this run's evidence.
+            "-syncDiag", "YES",
         ], features: "")
         waitForConnected()
         waitForSyncIdle()

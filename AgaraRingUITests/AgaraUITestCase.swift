@@ -215,10 +215,12 @@ class AgaraUITestCase: XCTestCase {
     /// "No heart rate yet" and frame 04 with "Not enough data for this period". Same launch args, same emulator: the
     /// only difference was time. Call this while the **Vitals** tab is open; it waits for the empty-state copy to go.
     func waitForHealthData(timeout: TimeInterval = 600, file: StaticString = #filePath, line: UInt = #line) {
-        // Positive signal only. Waiting for the ABSENCE of the empty-state copy is not enough: it is also absent while
-        // the card is still loading, which is how an earlier version of this wait passed and the walk then captured an
-        // empty card (2026-11-19 — 42,106 measurement rows in the store, "No heart rate yet" in the frame).
-        let reading = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS[c] %@", "bpm")).firstMatch
+        // Both obvious signals are wrong, and each fooled me once in this same evening:
+        //   * "wait for a bpm label" — the Vitals chart's AXIS is labelled "bpm", so that element exists on a fully
+        //     empty screen and the wait returns instantly;
+        //   * "wait for the empty copy to disappear" — also true while the card is still loading.
+        // What holds is a QUIET WINDOW: the empty copy absent on several consecutive checks. Same rule as
+        // `waitForSyncIdle`, and it cannot be satisfied by a screen that has not drawn yet.
         let emptyStates = ["No heart rate yet", "No oxygen readings yet"]
         // Wait in LONG idle chunks and query once per chunk. The first version of this polled `exists` every second for
         // 300 s and timed out while still showing "No heart rate yet" — 300 accessibility snapshots keep the app's main
@@ -227,15 +229,18 @@ class AgaraUITestCase: XCTestCase {
         let chunk: TimeInterval = 20
         let deadline = Date().addingTimeInterval(timeout)
         var lastEmpty = ""
+        var quiet = 0
         while Date() < deadline {
-            if reading.exists { return }
             if let found = emptyStates.first(where: { app.staticTexts[$0].exists }) {
                 lastEmpty = found
+                quiet = 0
                 print("waitForHealthData: still \(found) — idling \(Int(chunk)) s")
                 RunLoop.current.run(until: Date().addingTimeInterval(chunk))
                 continue
             }
-            return
+            quiet += 1
+            if quiet >= 3 { return }             // seen clear three times running: believe it
+            RunLoop.current.run(until: Date().addingTimeInterval(2))
         }
         attachScreenshot("health-data-never-arrived")
         let message = "the ring's history never delivered a reading within \(Int(timeout)) s (still showing \"\(lastEmpty)\")"
