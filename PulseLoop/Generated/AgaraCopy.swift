@@ -105,7 +105,7 @@ enum AgaraCopy {
     static let cloudConsentWhatSleep = "Sleep: when each night started and ended, the stage minutes and the score."
     static let cloudConsentNotUploaded = "Not uploaded: workouts and routes, coach conversations, your profile and settings, and sample data."
     static let cloudConsentWhereTitle = "Where it goes"
-    static let cloudConsentWhere = "This is health data. It travels over an encrypted connection to Agara's servers and is stored against your account. It is used only to back up and sync your data, and is not sold or shared. Signing in uses Google's Firebase Authentication for your email and password."
+    static let cloudConsentWhere = "This is health data. It travels over an encrypted connection to Agara's servers and is stored against your account. It is used to back up and sync your data, and is not sold or shared. If you use the Coach, a summary of your health context (not your conversations) is sent to our AI provider so it can answer you. Signing in uses Google's Firebase Authentication for your email and password."
     static let cloudConsentDeleteTitle = "How to delete it"
     static let cloudConsentDelete = "Settings › Agara Cloud › Delete account erases your cloud copy for good. Your data on this phone stays. You can also stop syncing any time by signing out."
     static let cloudConsentAgree = "Agree and continue"
